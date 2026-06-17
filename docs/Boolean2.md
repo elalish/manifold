@@ -36,10 +36,12 @@ Boolean2 builds a planar arrangement and filters it by winding:
    the vertex-on-edge list path. Crossings are resolved in this single pass;
    there is no separate post-hoc merge.
 6. Canonicalize sub-edges and cancel opposing multiplicities.
-7. Filter by winding: for each canonical sub-edge, ray-cast the winding just to
-   its left and right and keep the edge iff the requested rule disagrees across
-   it. The nearest-edge clearance and the ray cast share one BVH built over the
-   canonical sub-edges, so the pass is roughly O(E log E) rather than O(E^2).
+7. Filter by winding: for each canonical sub-edge, evaluate the winding of the
+   face just left of vMin->vMax at the start vertex (a +x ray cast under a
+   symbolic perturbation into that face), take the right side as leftW - mult,
+   and keep the edge iff the requested rule disagrees across it. The ray cast
+   reuses one BVH built over the canonical sub-edges, so the pass is roughly
+   O(E log E) rather than O(E^2).
 
 The high-level fill/Boolean core API is in `src/boolean2.h`. The lower-level
 driver returns retained directed sub-edges plus the merged vertex map, and the
@@ -59,7 +61,7 @@ canonicalization) -> `boolean2_winding.cpp` -> regularized `Polygons`.
 | Public core API | `boolean2.h`, `boolean2.cpp` (entry points) | Converts `Polygons` to local vertices plus directed edges, invokes one arrangement pass, and turns retained edges back into regularized output. |
 | Arrangement coordinator | `boolean2.cpp` (driver section) | Runs one pass of merge, edge-pair discovery, edge-vertex insertion, crossing insertion, canonicalization, and winding filtering. |
 | Geometry leaves | `boolean2.cpp` (BVH, vertex merge, edge-vertex list, intersection sections), `boolean2_predicates.cpp` | Provide the local geometric operations and the projected segment-order predicates used by the arrangement pass. |
-| Output filter | `boolean2.cpp` (canonicalize section), `boolean2_winding.cpp` | Splits directed edges into canonical sub-edges, then ray-casts the winding on each side of every sub-edge and keeps the boundary edges the rule selects. |
+| Output filter | `boolean2.cpp` (canonicalize section), `boolean2_winding.cpp` | Splits directed edges into canonical sub-edges, then evaluates the winding at each sub-edge's start vertex and keeps the boundary edges the rule selects. |
 | Sibling helpers | `boolean2_offset.cpp` | Offset and decomposition support for the rest of the `CrossSection` API. |
 
 Debug and performance tracing live in `boolean2_diagnostics.{h,cpp}`.

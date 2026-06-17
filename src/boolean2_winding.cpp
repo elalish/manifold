@@ -38,21 +38,14 @@ bool IsInside(WindRule rule, int w) {
   return false;
 }
 
-// Signed contribution of a canonical sub-edge to a +x winding ray that it
-// crosses to the right: +mult if vMin->vMax points up, else -mult. Matches the
-// standard CCW=+1 convention (an upward edge to the right of the point raises
-// the winding by its multiplicity).
-inline int RayContribution(const CanonEdge& e, const std::vector<vec2>& verts) {
-  const bool upward = verts[e.vMin].y < verts[e.vMax].y;
-  return upward ? e.mult : -e.mult;
-}
-
 // Winding of the face immediately to the LEFT of the directed sub-edge
 // `start`->`end`, evaluated AT the start vertex.
 //
 // The query point is the start vertex P pushed an infinitesimal distance into
-// the left face: Q = P + e*d + e^2*n (e -> 0+), where d = end - start and
-// n = (-d.y, d.x) is the left normal. The primary step is ALONG the sub-edge,
+// the left face: Q = P + e*d + e^2*n, where e is a symbolic infinitesimal
+// (e -> 0+) for tie-breaking, not the machine eps used elsewhere in boolean2;
+// d = end - start, and n = (-d.y, d.x) is the left normal. The primary step is
+// ALONG the sub-edge,
 // the secondary a tiny push to its left: this hugs start->end so Q lands in its
 // left face even when other edges incident to P fall between the bare left
 // normal and the edge (the bare normal can overshoot past them into a different
@@ -105,12 +98,11 @@ int LeftWindingAtVertex(int start, int end, const BVH& bvh,
       // Incident edge: it passes through P, so its crossing-x equals P.x to
       // leading order and the perturbation decides. With w = O - P (O the
       // non-P endpoint), the +x ray crosses to the right iff, after clearing
-      // the sign of w.y, -e*cross(d,w) - e^2*cross(n,w) > 0. cross is the 2D
-      // orient determinant u.x*w.y - u.y*w.x.
+      // the sign of w.y, -e*la::cross(d,w) - e^2*la::cross(n,w) > 0.
       const int other = e.vMin == start ? e.vMax : e.vMin;
       const vec2 w = verts[other] - P;
-      const double primary = -(d.x * w.y - d.y * w.x);
-      const double secondary = -(n.x * w.y - n.y * w.x);
+      const double primary = -la::cross(d, w);
+      const double secondary = -la::cross(n, w);
       const bool pos = primary != 0.0 ? primary > 0.0 : secondary > 0.0;
       rightOf = w.y > 0.0 ? pos : !pos;
     } else {
@@ -122,7 +114,9 @@ int LeftWindingAtVertex(int start, int end, const BVH& bvh,
       const double crossX = Interpolate(loYX, hiYX, P.y).x;
       rightOf = Shadows(P.x, crossX, xTieDir);
     }
-    if (rightOf) winding += RayContribution(e, verts);
+    // CCW=+1: an upward sub-edge (vMin->vMax) crossing to the right of P raises
+    // the winding by its multiplicity, a downward one lowers it.
+    if (rightOf) winding += a.y < b.y ? e.mult : -e.mult;
   };
   auto recorder = MakeSimpleRecorder(accumulate);
   auto qf = [&](int) { return slab; };
