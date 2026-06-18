@@ -60,8 +60,9 @@ bool IsInside(WindRule rule, int w) {
 // P.x" test is degenerate. They are resolved instead by the Smith shadow of
 // their OTHER endpoint O: post-insertion no edges cross and coincidences are
 // one shared vertex, so an incident edge cannot cross the ray at P, and whether
-// the perturbed ray crosses it is fixed by where O sits relative to the
-// perturbation (an orient2d sign on cross(d, O-P), broken by cross(n, O-P)).
+// the perturbed ray crosses it is fixed by which side of the classified edge O
+// sits on - an Interpolate+Shadows side test (O and the classified far vert
+// share a y-side of P), with no explicit cross product (see the branch below).
 int LeftWindingAtVertex(int start, int end, const BVH& bvh,
                         const CanonicalSubEdges& canon,
                         const std::vector<vec2>& verts, double globalMaxX) {
@@ -95,16 +96,27 @@ int LeftWindingAtVertex(int start, int end, const BVH& bvh,
 
     bool rightOf;
     if (e.vMin == start || e.vMax == start) {
-      // Incident edge: it passes through P, so its crossing-x equals P.x to
-      // leading order and the perturbation decides. With w = O - P (O the
-      // non-P endpoint), the +x ray crosses to the right iff, after clearing
-      // the sign of w.y, -e*la::cross(d,w) - e^2*la::cross(n,w) > 0.
+      // Incident edge through P: its crossing-x is P.x to leading order, so the
+      // perturbation decides. O (its far vert) and E (the classified far vert)
+      // share a y-side of P, so the side test is just Interpolate+Shadows:
+      // interpolate whichever of O, E lies between P and the other (so the
+      // query stays in Interpolate's domain) onto the other edge and
+      // Shadows-compare x. The classified sub-edge itself crosses the ray iff
+      // perturbed up.
       const int other = e.vMin == start ? e.vMax : e.vMin;
-      const vec2 w = verts[other] - P;
-      const double primary = -la::cross(d, w);
-      const double secondary = -la::cross(n, w);
-      const bool pos = primary != 0.0 ? primary > 0.0 : secondary > 0.0;
-      rightOf = w.y > 0.0 ? pos : !pos;
+      if (other == end) {
+        rightOf = perturbUp;
+      } else {
+        const vec2 O = verts[other];
+        const vec2 E = verts[end];
+        const bool oInterior = (O.y - P.y) * (O.y - E.y) <= 0.0;
+        const vec2 far = oInterior ? E : O;
+        const vec3 pYX(P.y, P.x, 0.0);
+        const vec3 farYX(far.y, far.x, 0.0);
+        const double xq = Interpolate(pYX, farYX, oInterior ? O.y : E.y).x;
+        rightOf =
+            oInterior ? Shadows(xq, O.x, xTieDir) : !Shadows(xq, E.x, xTieDir);
+      }
     } else {
       // Non-incident edge: crossing-x at height P.y via Smith's Interpolate
       // (axes swapped so the segment is interpolated at its y). The finite gap
