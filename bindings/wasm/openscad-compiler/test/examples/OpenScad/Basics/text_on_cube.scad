@@ -1,4 +1,4 @@
-// Volume: 221636.43770043965, SurfaceArea: 25772.122639432226
+// Volume: 221636.4385581232, SurfaceArea: 25772.12457148346
 // text_on_cube.scad - Example for text() usage in OpenSCAD
 
 echo(version=version());

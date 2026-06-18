@@ -1,3 +1,4 @@
+// Volume: 23750, SurfaceArea: 10200
 
 module example003()
 {

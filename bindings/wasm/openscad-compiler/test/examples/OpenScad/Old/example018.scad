@@ -1,3 +1,4 @@
+// Volume: 2573426.9797826908, SurfaceArea: 276223.7435543865
 
 module step(len, mod)
 {

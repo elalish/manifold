@@ -1,3 +1,4 @@
+// Volume: 90406.98033212512, SurfaceArea: 32021.41909844164
 
 function get_cylinder_h(p) = lookup(p, [
     [ -200, 5 ],

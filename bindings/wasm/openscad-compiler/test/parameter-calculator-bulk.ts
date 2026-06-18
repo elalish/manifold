@@ -19,7 +19,7 @@ for (const file of allOpenScadFiles) {
 
 async function addPropertiesToFile(filename: string) {
   try {
-    await execAsync(`openscad -o output.3mf ${filename}`);
+    await execAsync(`openscad -o output.3mf --backend=manifold ${filename}`);
 
     const manifold = await importManifold("./output.3mf", {
       mimetype: 'model/3mf',
@@ -38,7 +38,7 @@ async function addPropertiesToFile(filename: string) {
     const content = fs.readFileSync(`${filename}`, "utf-8");
 
     // check if the first line already contains the propertyString (if yes then replace otherwise insert)
-    const firstLine = content.split("\n")[0];
+    const firstLine = content.trim().split("\n")[0];
     if (!firstLine) {
       console.log("File is empty", filename);
       return;

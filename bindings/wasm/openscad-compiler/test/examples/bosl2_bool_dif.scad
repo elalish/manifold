@@ -1,4 +1,4 @@
-// Volume: 33110.471893085305, SurfaceArea: 6775.275616568968
+// Volume: 33110.47202355277, SurfaceArea: 6775.275638614218
 include <BOSL2/std.scad>;
 
 diff()

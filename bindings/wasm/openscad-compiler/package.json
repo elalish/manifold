@@ -9,7 +9,8 @@
   "scripts": {
     "build": "tsup index.ts --format cjs && tsup runtime/runtime.ts --format esm --target esnext --outDir runtime --external manifold-3d --external opentype.js --external fs --no-splitting",
     "serve": "npx serve .",
-    "test": "cd test && npx vitest run compiler.test.ts && npx vitest run source-location.test.ts"
+    "test": "cd test && npx vitest run compiler.test.ts && npx vitest run source-location.test.ts",
+    "compute-parameters": "cd test && npx tsx parameter-calculator-bulk.ts"
   },
   "keywords": [],
   "author": "",
@@ -19,7 +20,7 @@
     "canvas": "^3.2.3",
     "commander": "^14.0.3",
     "dxf-parser": "^1.1.2",
-    "manifold-3d": "^3.5.0",
+    "manifold-3d": "^3.5.1",
     "opentype.js": "^2.0.0"
   },
   "devDependencies": {

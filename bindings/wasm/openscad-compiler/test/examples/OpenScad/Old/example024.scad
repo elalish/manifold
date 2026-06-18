@@ -1,4 +1,4 @@
-// Volume: 203221.09549813872, SurfaceArea: 130468.301094465
+// Volume: 203221.05428286197, SurfaceArea: 130468.30247404489
 // Menger Sponge
 
 // Size of edge of sponge

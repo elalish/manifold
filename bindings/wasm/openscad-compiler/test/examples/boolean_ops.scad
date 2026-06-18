@@ -1,4 +1,4 @@
-// Volume: 37355.61412526256, SurfaceArea: 6446.822344313823
+// Volume: 37355.61743167105, SurfaceArea: 6446.822584279683
 // Boolean operations and transforms
 $fn = 48;
 

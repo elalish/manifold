@@ -1,4 +1,4 @@
-// Volume: 3346.904155568674, SurfaceArea: 3254.188116511725
+// Volume: 3346.9042209024706, SurfaceArea: 3254.188216633952
 // CSG-modules.scad - Basic usage of modules, if, color, $fs/$fa
 
 // Change this to false to remove the helper geometry

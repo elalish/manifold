@@ -1,4 +1,4 @@
-// Volume: 27653.27493180356, SurfaceArea: 22446.07838731185
+// Volume: 27653.27647167968, SurfaceArea: 22446.079357900675
 // First example of parameteric model
 //   
 //    syntax: 

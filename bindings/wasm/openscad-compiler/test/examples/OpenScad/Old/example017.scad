@@ -1,3 +1,4 @@
+// Volume: 167575.89261655897, SurfaceArea: 69343.78331489394
 
 // To render the DXF file from the command line:
 // openscad -o example017.dxf -D'mode="parts"' example017.scad

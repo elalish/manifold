@@ -11,21 +11,20 @@ const opentypeParse = opentype.parse || (opentype as any).default?.parse;
 
 declare const document: any;
 declare const OffscreenCanvas: any;
-declare const _attach_transform_fn: any;
 
 const wasm = await Module();
 wasm.setup();
 const { Manifold, CrossSection } = wasm;
 
-// Type checks (OpenSCAD built-ins)
-function is_undef_fn(x: any) { return x === undefined || x === null; }
-function is_bool_fn(x: any) { return typeof x === "boolean"; }
-function is_num_fn(x: any) { return typeof x === "number" && !Number.isNaN(x); }
-function is_string_fn(x: any) { return typeof x === "string"; }
-function is_list_fn(x: any) { return Array.isArray(x); }
-function is_function_fn(x: any) { return typeof x === "function"; }
+function is_undef_fn(x: any) { return arguments.length === 1 ? (x === undefined || x === null) : undefined; }
+function is_bool_fn(x: any) { return arguments.length === 1 ? (typeof x === "boolean") : undefined; }
+function is_num_fn(x: any) { return arguments.length === 1 ? (typeof x === "number" && !Number.isNaN(x)) : undefined; }
+function is_string_fn(x: any) { return arguments.length === 1 ? (typeof x === "string") : undefined; }
+function is_list_fn(x: any) { return arguments.length === 1 ? Array.isArray(x) : undefined; }
+function is_function_fn(x: any) { return arguments.length === 1 ? (typeof x === "function") : undefined; }
+function is_object_fn(x: any) { return arguments.length === 1 ? (x !== null && typeof x === "object" && !Array.isArray(x)) : undefined; }
 
-// Trig (OpenSCAD uses degrees!)
+// Trig (OpenSCAD uses degrees)
 function sin_fn(x: any) { return Math.sin(x * Math.PI / 180); }
 function cos_fn(x: any) { return Math.cos(x * Math.PI / 180); }
 function tan_fn(x: any) { return Math.tan(x * Math.PI / 180); }
@@ -47,35 +46,74 @@ function log_fn(x: any) { return Math.log(x); }
 function min_fn(...a: any[]) { return a.length === 1 && Array.isArray(a[0]) ? Math.min(...a[0]) : Math.min(...a); }
 function max_fn(...a: any[]) { return a.length === 1 && Array.isArray(a[0]) ? Math.max(...a[0]) : Math.max(...a); }
 function norm_fn(v: any) { return Math.sqrt(v.reduce((s: any, x: any) => s + x * x, 0)); }
-function cross_fn(a: any, b: any) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+function cross_fn(a: any, b: any) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return undefined;
+  // 2D vector yeilds the scalar z-component and 3D vector yeilds the vector
+  if (a.length === 2 && b.length === 2) return a[0] * b[1] - a[1] * b[0];
+  if (a.length === 3 && b.length === 3) {
+    return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  }
+  console.warn("WARNING: Invalid arguments to cross()");
+  return undefined;
+}
 
 // String & list (OpenSCAD built-ins)
 function len_fn(x: any) {
   if (typeof x === "string" || Array.isArray(x)) return x.length;
-  // OpenSCAD returns undef and emits a warning for non-string/non-list inputs.
+  // returns undef and emits a warning for non-string/non-list inputs.
   console.warn("WARNING: len() parameter could not be converted");
   return undefined;
 }
-function str_fn(...a: any[]) { return a.map(x => x === undefined ? "undef" : String(x)).join(""); }
+
+function __ostr(x: any): string {
+  if (x === undefined || x === null) return "undef";
+  if (typeof x === "boolean") return x ? "true" : "false";
+  if (typeof x === "string") return x;
+  if (Array.isArray(x)) return "[" + x.map(__ostrInner).join(", ") + "]";
+  return String(x);
+}
+function __ostrInner(x: any): string {
+  return typeof x === "string" ? `"${x}"` : __ostr(x);
+}
+function str_fn(...a: any[]) { return a.map(__ostr).join(""); }
 function chr_fn(n: any) { return Array.isArray(n) ? n.map(c => String.fromCharCode(c)).join("") : String.fromCharCode(n); }
 function ord_fn(s: any) { return s == null || s.length === 0 ? undefined : s.charCodeAt(0); }
 function concat_fn(...a: any[]) { return [].concat(...a); }
+
+function __search_match(needle: any, entry: any, idx_col: any) {
+  const col = idx_col !== undefined ? idx_col : 0;
+  if (col === 0 && __eq(entry, needle)) return true;
+  return Array.isArray(entry) && col < entry.length && __eq(entry[col], needle);
+}
+
 function search_fn(needle: any, haystack: any, num_returns: any, idx_col: any) {
+  if (!is_list_fn(needle) && !is_string_fn(needle)) {
+    const indices: any[] = [];
+    for (var i = 0; i < haystack.length; i++) {
+      if (__search_match(needle, haystack[i], idx_col)) indices.push(i);
+    }
+    if (num_returns === 0) return indices;
+    return indices.length > 0 ? [indices[0]] : [];
+  }
   if (is_string_fn(needle) && is_string_fn(haystack)) {
-    var result = [];
+    var result: any[] = [];
     for (var ch of needle) {
       var indices = [];
       for (var i = 0; i < haystack.length; i++) { if (haystack[i] === ch) indices.push(i); }
-      result.push(num_returns === 0 ? indices : indices.slice(0, num_returns || 1));
+      if (num_returns === 1 || num_returns === undefined) {
+        // omits characters with no match from the result
+        if (indices.length > 0) result.push(indices[0]);
+      } else {
+        result.push(num_returns === 0 ? indices : indices.slice(0, num_returns));
+      }
     }
-    return num_returns === 1 || num_returns === undefined ? result.map(r => r.length > 0 ? r[0] : []) : result;
+    return result;
   }
   if (is_list_fn(haystack) && is_list_fn(needle)) {
-    return needle.map(function(n) {
+    return needle.map(function(n: any) {
       var indices = [];
       for (var i = 0; i < haystack.length; i++) {
-        var item = idx_col !== undefined ? haystack[i][idx_col] : haystack[i];
-        if (__eq(item, n)) indices.push(i);
+        if (__search_match(n, haystack[i], idx_col)) indices.push(i);
       }
       return num_returns === 0 ? indices : (indices.length > 0 ? indices[0] : []);
     });
@@ -108,8 +146,22 @@ function lookup_fn(key: any, table: any) {
   return undefined;
 }
 
+function __truthy(x: any) {
+  if (x === undefined || x === null || x === false) return false;
+  // OpenSCAD treats every non-zero number as true, including nan and inf.
+  if (typeof x === "number") return x !== 0;
+  if (typeof x === "string" || Array.isArray(x)) return x.length > 0;
+  return true;
+}
+
 // Control
-function openscad_assert_fn(cond: any, msg: any) { if (!cond) { console.trace("Assertion failed:", msg); throw new Error(msg || "Assertion failed"); } }
+function openscad_assert_fn(cond: any, msg: any) {
+  if (!__truthy(cond)) {
+    console.trace("Assertion failed:", msg);
+    throw new Error(msg || "Assertion failed");
+  }
+}
+
 function __eq(a: any, b: any) {
   if (a === b) return true;
   if (Array.isArray(a) && Array.isArray(b)) {
@@ -119,84 +171,126 @@ function __eq(a: any, b: any) {
   }
   return false;
 }
-function __add(a: any, b: any): any {
-  if (Array.isArray(a)) {
-    if (Array.isArray(b)) return a.map((x, i) => __add(x, b[i]));
-    return a.map(x => __add(x, b));
+
+function __cmpCat(x: any): string {
+  const t = typeof x;
+  if (t === "number") return "n";
+  if (t === "boolean") return "b";
+  if (t === "string") return "s";
+  if (Array.isArray(x)) return (x as any).__isRange ? "r" : "v";
+  return "u";
+}
+function __veccmp(a: any[], b: any[]): number {
+  const n = Math.min(a.length, b.length);
+  for (var i = 0; i < n; i++) {
+    if (a[i] < b[i]) return -1;
+    if (a[i] > b[i]) return 1;
   }
-  if (Array.isArray(b)) return b.map((x: any): any => __add(a, x));
-  return a + b;
+  return Math.sign(a.length - b.length);
+}
+function __lt(a: any, b: any): any {
+  const ca = __cmpCat(a); if (ca !== __cmpCat(b) || ca === "u") return undefined;
+  return (ca === "v" || ca === "r") ? __veccmp(a, b) < 0 : a < b;
+}
+function __gt(a: any, b: any): any {
+  const ca = __cmpCat(a); if (ca !== __cmpCat(b) || ca === "u") return undefined;
+  return (ca === "v" || ca === "r") ? __veccmp(a, b) > 0 : a > b;
+}
+function __le(a: any, b: any): any {
+  const ca = __cmpCat(a); if (ca !== __cmpCat(b) || ca === "u") return undefined;
+  return (ca === "v" || ca === "r") ? __veccmp(a, b) <= 0 : a <= b;
+}
+function __ge(a: any, b: any): any {
+  const ca = __cmpCat(a); if (ca !== __cmpCat(b) || ca === "u") return undefined;
+  return (ca === "v" || ca === "r") ? __veccmp(a, b) >= 0 : a >= b;
+}
+function __isNum(x: any): boolean { return typeof x === "number"; }
+function __isVec(x: any): boolean { return Array.isArray(x) && !(x as any).__isRange; }
+
+function __add(a: any, b: any): any {
+  if (__isNum(a) && __isNum(b)) return a + b;
+  if (__isVec(a) && __isVec(b)) {
+    var n = Math.min(a.length, b.length), r: any[] = [];
+    for (var i = 0; i < n; i++) r.push(__add(a[i], b[i]));
+    return r;
+  }
+  return undefined;
 }
 function __sub(a: any, b: any): any {
-  if (Array.isArray(a)) {
-    if (Array.isArray(b)) return a.map((x, i): any => __sub(x, b[i]));
-    return a.map((x: any): any => __sub(x, b));
+  if (__isNum(a) && __isNum(b)) return a - b;
+  if (__isVec(a) && __isVec(b)) {
+    var n = Math.min(a.length, b.length), r: any[] = [];
+    for (var i = 0; i < n; i++) r.push(__sub(a[i], b[i]));
+    return r;
   }
-  if (Array.isArray(b)) return b.map((x: any): any => __sub(a, x));
-  return a - b;
+  return undefined;
 }
-function __mul(a: any, b: any) {
-  if (Array.isArray(a)) {
-    if (Array.isArray(b)) {
-      if (a.length > 0 && Array.isArray(a[0])) {
-        if (b.length > 0 && Array.isArray(b[0])) {
-          var res: any[] = [];
-          for (var i = 0; i < a.length; i++) {
-            res[i] = [];
-            for (var j = 0; j < b[0].length; j++) {
-              var sum = 0;
-              for (var k = 0; k < a[0].length; k++) sum += a[i][k] * b[k][j];
-              res[i].push(sum);
-            }
+function __mul(a: any, b: any): any {
+  if (__isNum(a) && __isNum(b)) return a * b;
+  if (__isNum(a) && __isVec(b)) return b.map((x: any): any => __mul(a, x)); // scalar * vector
+  if (__isVec(a) && __isNum(b)) return a.map((x: any): any => __mul(x, b)); // vector * scalar
+  if (__isVec(a) && __isVec(b)) {
+    if (a.length > 0 && Array.isArray(a[0])) {
+      if (b.length > 0 && Array.isArray(b[0])) {
+        var res: any[] = [];                                               // matrix * matrix
+        for (var i = 0; i < a.length; i++) {
+          res[i] = [];
+          for (var j = 0; j < b[0].length; j++) {
+            var sum = 0;
+            for (var k = 0; k < a[0].length; k++) sum += a[i][k] * b[k][j];
+            res[i].push(sum);
           }
-          return res;
-        } else {
-          return a.map((row: any): any => __mul(row, b));
         }
-      } else {
-        if (b.length > 0 && Array.isArray(b[0])) {
-          var res2 = [];
-          for (var j2 = 0; j2 < b[0].length; j2++) {
-            var sum2 = 0;
-            for (var k2 = 0; k2 < a.length; k2++) sum2 += a[k2] * b[k2][j2];
-            res2.push(sum2);
-          }
-          return res2;
-        } else {
-          var sum3 = 0;
-          for (var i3 = 0; i3 < Math.min(a.length, b.length); i3++) sum3 += a[i3] * b[i3];
-          return sum3;
-        }
+        return res;
       }
+      return a.map((row: any): any => __mul(row, b));                      // matrix * vector
     }
-    return a.map((x: any): any => __mul(x, b));
+    if (b.length > 0 && Array.isArray(b[0])) {
+      var res2: any[] = [];                                                // vector * matrix
+      for (var j2 = 0; j2 < b[0].length; j2++) {
+        var sum2 = 0;
+        for (var k2 = 0; k2 < a.length; k2++) sum2 += a[k2] * b[k2][j2];
+        res2.push(sum2);
+      }
+      return res2;
+    }
+    var sum3 = 0;                                                          // vector . vector
+    for (var i3 = 0; i3 < Math.min(a.length, b.length); i3++) sum3 += a[i3] * b[i3];
+    return sum3;
   }
-  if (Array.isArray(b)) return b.map((x: any): any => __mul(a, x));
-  return a * b;
+  return undefined;
 }
-function __div(a: any, b: any) {
-  if (Array.isArray(a)) {
-    if (Array.isArray(b)) return a.map((x, i): any => __div(x, b[i]));
-    return a.map((x: any): any => __div(x, b));
+function __div(a: any, b: any): any {
+  if (__isNum(a) && __isNum(b)) return a / b;
+  if (__isVec(a) && __isNum(b)) return a.map((x: any): any => __div(x, b)); // vector / scalar
+  if (__isNum(a) && __isVec(b)) return b.map((x: any): any => __div(a, x)); // scalar / vector
+  if (__isVec(a) && __isVec(b)) {
+    var n = Math.min(a.length, b.length), r: any[] = [];
+    for (var i = 0; i < n; i++) r.push(__div(a[i], b[i]));
+    return r;
   }
-  if (Array.isArray(b)) return b.map((x: any): any => __div(a, x));
-  return a / b;
+  return undefined;
 }
 function __mod(a: any, b: any): any {
-  if (Array.isArray(a)) {
-    if (Array.isArray(b)) return a.map((x, i) => __mod(x, b[i]));
-    return a.map(x => __mod(x, b));
-  }
-  if (Array.isArray(b)) return b.map(x => __mod(a, x));
-  return a % b;
+  if (__isNum(a) && __isNum(b)) return a % b;
+  return undefined;
 }
 function __neg(a: any): any {
-  if (Array.isArray(a)) return a.map(__neg);
-  return -a;
+  if (__isNum(a)) return -a;
+  if (__isVec(a)) return a.map(__neg);
+  return undefined;
 }
 function __pos(a: any): any {
-  if (Array.isArray(a)) return a.map(__pos);
-  return +a;
+  if (__isNum(a)) return +a;
+  if (__isVec(a)) return a.map(__pos);
+  return undefined;
+}
+
+
+function __index(obj: any, idx: any): any {
+  if (typeof idx !== "number" || obj == null) return undefined;
+  if (typeof obj === "string" || Array.isArray(obj)) return obj[idx];
+  return undefined;
 }
 
 // OpenSCAD version
@@ -250,9 +344,13 @@ function __to_manifold_mat4(m: any) {
   return out;
 }
 
-// Guard transform() against invalid matrices produced by complex attachment math.
+function __to_manifold_mat3(m: any) {
+  if (!__is_finite_matrix4(m)) return undefined;
+  return [m[0][0], m[1][0], 0, m[0][1], m[1][1], 0, m[0][3], m[1][3], 1];
+}
+
 function __safe_transform(shape: any, m: any) {
-  const mm = __to_manifold_mat4(m);
+  const mm = __is2D(shape) ? __to_manifold_mat3(m) : __to_manifold_mat4(m);
   if (!mm) return shape;
   try {
     return shape.transform(mm);
@@ -265,16 +363,23 @@ function __identity4() {
   return [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
 }
 
-function __safe_attach_transform(...args: any[]) {
+function __safe_attach_transform(fn: any, ...args: any[]) { // TO BE REMOVED LATER (UNWANTED LIBRARY SPECIFIC RUNTIME HELPER)
+  // BOSL2's _attach_transform(anchor,spin,orient,geom,p) returns a 4x4 matrix
+  // when p is undef, but the transformed geometry (path/region/VNF) when p is given.
+  const p = args[4];
   try {
-    const m = _attach_transform_fn(...args);
-    return __is_finite_matrix4(m) ? m : __identity4();
-  } catch {
-    return __identity4();
+    const res = fn(...args);
+    if (p === undefined || p === null) {
+      return __is_finite_matrix4(res) ? res : __identity4();
+    }
+    return res;
+  } catch (e) {
+    console.warn("__safe_attach_transform fallback:", (e as any)?.message ?? e);
+    return p === undefined || p === null ? __identity4() : p;
   }
 }
 
-// 2D helpers used by offset()/projection() fallbacks.
+// 2D helpers used by offset()/projection() fallbacks
 function __safe_offset2d(shape: any, delta: any, joinType = "Round", miterLimit = 2, circularSegments = 0, fa = 12, fs = 2) {
   try {
     if (shape && typeof shape.offset === "function") {
@@ -473,11 +578,20 @@ function __flat_map_iter(v: any, fn: any) {
   return [v].flatMap(fn);
 }
 
-// Range expansion: convert OpenSCAD range [start:step:end] to an actual array
+function __rangeCount(start: any, step: any, end: any): number {
+  if (step === 0 || Number.isNaN(start) || Number.isNaN(step) || Number.isNaN(end)) return 0;
+  var n = (end - start) / step;
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.floor(n + 1e-10) + 1;
+}
+
 function __range(start: any, step: any, end: any) {
-  var result = [];
-  if (step > 0) { for (var i = start; i <= end; i += step) result.push(i); }
-  else if (step < 0) { for (var i = start; i >= end; i += step) result.push(i); }
+  var result: any[] = [];
+  var n = __rangeCount(start, step, end);
+  for (var i = 0; i < n; i++) result.push(start + i * step);
+  Object.defineProperty(result, "__isRange", {
+    value: true, enumerable: false, writable: true, configurable: true,
+  });
   return result;
 }
 
@@ -494,18 +608,51 @@ function __isEmpty(x: any) {
   return false;
 }
 
-// Boolean ops: use CrossSection for 2D, Manifold for 3D (no thin extrusion of 2D)
+const __TOL_FACTOR = Math.pow(2, -24);
+function __maxBBoxDim3d(items: any[]): number {
+  let lo = [Infinity, Infinity, Infinity];
+  let hi = [-Infinity, -Infinity, -Infinity];
+  for (const it of items) {
+    if (!it || typeof it.boundingBox !== "function") continue;
+    const bb = it.boundingBox();
+    if (!bb || !bb.min || !bb.max) continue;
+    for (let i = 0; i < 3; i++) {
+      if (bb.min[i] < lo[i]!) lo[i] = bb.min[i];
+      if (bb.max[i] > hi[i]!) hi[i] = bb.max[i];
+    }
+  }
+  let maxDim = 0;
+  for (let i = 0; i < 3; i++) {
+    const d = hi[i]! - lo[i]!;
+    if (Number.isFinite(d) && d > maxDim) maxDim = d;
+  }
+  return maxDim;
+}
+function __withTol3d(items: any[]): any[] {
+  const maxDim = __maxBBoxDim3d(items);
+  if (!(maxDim > 0)) return items;
+  const tol = maxDim * __TOL_FACTOR;
+  return items.map(it => {
+    if (it && typeof it.setTolerance === "function" && typeof it.tolerance === "function") {
+      return tol > it.tolerance() ? it.setTolerance(tol) : it;
+    }
+    return it;
+  });
+}
+
+// Boolean ops: use CrossSection for 2D, Manifold for 3D
 function __union2d3d(items: any[]) {
   const valid = items.filter(x => !__isEmpty(x));
   if (valid.length === 0) return Manifold.union([]);
-  return __is2D(valid[0]) ? CrossSection.union(valid) : Manifold.union(valid);
+  return __is2D(valid[0]) ? CrossSection.union(valid) : Manifold.union(__withTol3d(valid));
 }
 function __difference2d3d(first: any, rest: any[]) {
   if (__isEmpty(first)) return first;
   const validRest = rest.filter(x => !__isEmpty(x));
   if (validRest.length === 0) return first;
   if (__is2D(first)) return CrossSection.difference([first, ...validRest]);
-  return validRest.length === 1 ? first.subtract(validRest[0]) : first.subtract(Manifold.union(validRest));
+  const [tf, ...tr] = __withTol3d([first, ...validRest]);
+  return tr.length === 1 ? tf.subtract(tr[0]) : tf.subtract(Manifold.union(tr));
 }
 function __intersection2d3d(items: any[]) {
   if (items.length === 0) return Manifold.union([]);
@@ -514,7 +661,7 @@ function __intersection2d3d(items: any[]) {
     const firstValid2D = valid.find(__is2D);
     return firstValid2D ? CrossSection.union([]) : Manifold.union([]);
   }
-  return __is2D(valid[0]) ? CrossSection.intersection(valid) : Manifold.intersection(valid);
+  return __is2D(valid[0]) ? CrossSection.intersection(valid) : Manifold.intersection(__withTol3d(valid));
 }
 function __hull2d3d(items: any[]) {
   const valid = items.filter(x => !__isEmpty(x));
@@ -626,56 +773,26 @@ function __normalizeScale(scale: number | number[] | undefined): [number, number
   return [Math.max(0, sx as number), Math.max(0, sy as number)];
 }
 
-function __getDiagonalSlices(maxDeltaSqr: number, height: number, fn: number, fs: number): number {
-  if (fn > 0) return fn;
-  return Math.ceil(Math.sqrt(maxDeltaSqr + height * height) / fs);
-}
-
-function __getHelixSlices(rSqr: number, height: number, twist: number, fn: number, fa: number, fs: number, fe: number): number {
-  const minSlices = Math.max(Math.ceil(twist / 120), 1);
-
-  if (fn > 0) {
-    return Math.max(Math.ceil((twist / 360) * fn), minSlices);
-  }
-
-  if (fe > 0) {
-    const r = Math.sqrt(rSqr);
-    const twistRad = (twist * Math.PI) / 180;
-    const circumference = r * twistRad;
-    return Math.max(Math.ceil(circumference / fe), minSlices);
-  }
-
+function __getHelixLength(rMax: number, height: number, twist: number, scaleX: number, scaleY: number): number {
+  const steps = 100;
+  let len = 0;
   const twistRad = (twist * Math.PI) / 180;
-
-  const helixLength = Math.sqrt(rSqr * twistRad * twistRad + height * height);
-
-  const faSlices = Math.ceil(twist / fa);
-  const fsSlices = Math.ceil(helixLength / fs);
-
-  return Math.max(Math.min(faSlices, fsSlices), minSlices);
-}
-
-function __getConicalHelixSlices(rSqr: number, height: number, twist: number, scale: number, fn: number, fa: number, fs: number): number {
-  const minSlices = Math.max(Math.ceil(twist / 120), 1);
-
-  if (fn > 0) {
-    return Math.max(Math.ceil((twist / 360) * fn), minSlices);
+  const dt = 1 / steps;
+  for (let i = 0; i < steps; i++) {
+    const t = (i + 0.5) * dt;
+    const sx = 1 + (scaleX - 1) * t;
+    const sy = 1 + (scaleY - 1) * t;
+    const sin = Math.sin(t * twistRad);
+    const cos = Math.cos(t * twistRad);
+    
+    const vx = -rMax * sx * twistRad * sin;
+    const vy = rMax * sy * twistRad * cos;
+    const vz = height;
+    
+    const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
+    len += speed * dt;
   }
-
-  const r = Math.sqrt(rSqr);
-  const twistRad = (twist * Math.PI) / 180;
-
-  const rEnd = r * scale;
-  const rMid = (r + rEnd) / 2;
-  const dh = height / (twist / 360);
-  const helixLength = Math.sqrt(
-    rMid * rMid * twistRad * twistRad + height * height
-  );
-
-  const faSlices = Math.ceil(twist / fa);
-  const fsSlices = Math.ceil(helixLength / fs);
-
-  return Math.max(Math.min(faSlices, fsSlices), minSlices);
+  return len;
 }
 
 function __computeExtrudeDivisions(shape: any, height: number, options: { twist?: number; scale?: number | number[] | undefined; fn?: number; fa?: number; fs?: number; fe?: number; slices?: number; }): number {
@@ -693,39 +810,230 @@ function __computeExtrudeDivisions(shape: any, height: number, options: { twist?
   const sx = normScale?.[0] ?? 1;
   const sy = normScale?.[1] ?? 1;
 
-  const isNonUniformScale = sx !== sy;
-  const isUniformScale = sx === sy && sx !== 1;
-
-  let rSqr = 1;
+  let rMax = 0;
   try {
-    const box = shape.bounds();
-    const dx = box.max[0] - box.min[0];
-    const dy = box.max[1] - box.min[1];
-    rSqr = Math.pow(Math.max(dx, dy) / 2, 2);
+    const polys = shape.toPolygons();
+    for (const poly of polys) {
+      for (const p of poly) {
+        const dist = Math.sqrt(p[0] * p[0] + p[1] * p[1]);
+        if (dist > rMax) rMax = dist;
+      }
+    }
   } catch {
-    rSqr = 100;
+    rMax = 10;
   }
 
-  const maxDeltaSqr = rSqr * Math.pow(Math.max(Math.abs(sx - 1), Math.abs(sy - 1)), 2);
-
   if (twist === 0) {
-    if (isNonUniformScale) {
-      return __getDiagonalSlices(maxDeltaSqr, height, fn, fs);
+    if (sx !== sy) {
+      const maxDeltaSqr = rMax * rMax * Math.max(Math.abs(sx - 1), Math.abs(sy - 1)) ** 2;
+      const diagSlices = Math.ceil(Math.sqrt(maxDeltaSqr + height * height) / fs);
+      return fn > 0 ? fn : diagSlices;
     }
     return 1;
   }
 
-  if (isNonUniformScale) {
-    const diag = __getDiagonalSlices(maxDeltaSqr, height, fn, fs);
-    const helix = __getHelixSlices(rSqr, height, twist, fn, fa, fs, fe);
-    return Math.max(diag, helix);
+  const minSlices = Math.max(Math.ceil(twist / 120), 1);
+  if (fn > 0) {
+    return Math.max(Math.ceil((twist / 360) * fn), minSlices);
   }
 
-  if (isUniformScale) {
-    return __getConicalHelixSlices(rSqr, height, twist, sx, fn, fa, fs);
+  if (fe > 0) {
+    const twistRad = (twist * Math.PI) / 180;
+    const circumference = rMax * twistRad;
+    return Math.max(Math.ceil(circumference / fe), minSlices);
   }
 
-  return __getHelixSlices(rSqr, height, twist, fn, fa, fs, fe);
+  const helixLen = __getHelixLength(rMax, height, twist, sx, sy);
+  const fsSlices = Math.ceil(helixLen / fs);
+  const faSlices = Math.ceil(twist / fa);
+
+  return Math.max(Math.min(faSlices, fsSlices), minSlices);
+}
+
+// Interpolate points along v0->v1, excluding the endpoint v1
+function __addSegmentedEdge(out: [number, number][], v0: [number, number], v1: [number, number], segs: number) {
+  for (let j = 0; j < segs; j++) {
+    const t = j / segs;
+    out.push([(1 - t) * v0[0] + t * v1[0], (1 - t) * v0[1] + t * v1[1]]);
+  }
+}
+
+function __maxEdgeLen(v0: [number, number], v1: [number, number], twist: number, sx: number, sy: number, slices: number): number {
+  if (sx === sy) {
+    return Math.hypot(v1[0] - v0[0], v1[1] - v0[1]) * Math.max(sx, 1);
+  }
+  let maxLen = 0;
+  for (let j = 0; j <= slices; j++) {
+    const t = j / slices;
+    const scx = 1 + (sx - 1) * t, scy = 1 + (sy - 1) * t;
+    const ang = -twist * t * Math.PI / 180;
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+    const x0 = (v0[0] * ca - v0[1] * sa) * scx, y0 = (v0[0] * sa + v0[1] * ca) * scy;
+    const x1 = (v1[0] * ca - v1[1] * sa) * scx, y1 = (v1[0] * sa + v1[1] * ca) * scy;
+    const len = Math.hypot(x1 - x0, y1 - y0);
+    if (len > maxLen) maxLen = len;
+  }
+  return maxLen;
+}
+
+// Split each edge into ceil(maxEdgeLen / fs) segments.
+function __splitOutlineByFs(o: [number, number][], twist: number, sx: number, sy: number, fs: number, slices: number): [number, number][] {
+  const n = o.length;
+  const out: [number, number][] = [];
+  for (let i = 1; i <= n; i++) {
+    const v0 = o[i - 1]!, v1 = o[i % n]!;
+    const segs = Math.max(1, Math.ceil(__maxEdgeLen(v0, v1, twist, sx, sy, slices) / fs));
+    __addSegmentedEdge(out, v0, v1, segs);
+  }
+  return out;
+}
+
+function __splitOutlineByFn(o: [number, number][], twist: number, sx: number, sy: number, target: number, slices: number): [number, number][] {
+  const n = o.length;
+  const maxLen: number[] = [];
+  for (let i = 1; i <= n; i++) {
+    maxLen.push(__maxEdgeLen(o[i - 1]!, o[i % n]!, twist, sx, sy, slices));
+  }
+  const segCount = new Array(n).fill(1);
+  const metric = (k: number) => maxLen[k]! / (segCount[k] + 0.5);
+  let segTotal = n;
+  while (segTotal < target) {
+    let top = 0;
+    for (let k = 1; k < n; k++) if (metric(k) > metric(top)) top = k;
+    const topMetric = metric(top);
+    const group: number[] = [];
+    for (let k = 0; k < n; k++) {
+      const mk = metric(k);
+      if (Math.min(mk, topMetric) / Math.max(mk, topMetric) >= 0.999) group.push(k);
+    }
+    if (segTotal + group.length > target) break;
+    for (const g of group) { segCount[g]++; segTotal++; }
+  }
+  const out: [number, number][] = [];
+  for (let i = 1; i <= n; i++) __addSegmentedEdge(out, o[i - 1]!, o[i % n]!, segCount[i - 1]);
+  return out;
+}
+
+// Refine a single outline for a non-linear (twisted/non-uniformly-scaled) extrude
+function __splitOutline(o: [number, number][], twist: number, sx: number, sy: number, slices: number,fn: number, fa: number, fs: number, segments: number): [number, number][] {
+  if (segments > 0 || fn > 0.0) {
+    const minVerts = segments > 0 ? segments : Math.max(fn, 3);
+    return o.length >= minVerts ? o : __splitOutlineByFn(o, twist, sx, sy, minVerts, slices);
+  }
+  const faSegs = Math.ceil(360.0 / fa);
+  if (o.length >= faSegs) return o;
+  const fsOutline = __splitOutlineByFs(o, twist, sx, sy, fs, slices);
+  return fsOutline.length >= faSegs
+    ? __splitOutlineByFn(o, twist, sx, sy, faSegs, slices)
+    : fsOutline;
+}
+
+function __extrudeTwisted(shape: any, height: number, twistDeg: number, slices: number, scaleVec: [number, number] | undefined, center: boolean | undefined, fn: number, fa: number, fs: number): any {
+  const rawPolys: [number, number][][] = shape.toPolygons();
+  if (!rawPolys.length) return Manifold.union([]);
+
+  const sx = scaleVec ? scaleVec[0] : 1;
+  const sy = scaleVec ? scaleVec[1] : 1;
+
+  // Refine each outline exactly as OpenSCAD does, so the cross-section vertex count matches OpenSCAD's twisted mesh.
+  const polys = rawPolys.map(c => __splitOutline(c, twistDeg, sx, sy, slices, fn, fa, fs, 0));
+
+  // Flatten all contours, keeping per-contour boundary order for the walls and a position -> flat-index map for recovering the cap triangulation
+  const flat: [number, number][] = [];
+  const contours: { off: number; len: number }[] = [];
+  const keyMap = new Map<string, number>();
+  const key = (x: number, y: number) => `${Math.round(x * 1000)},${Math.round(y * 1000)}`;
+  for (const c of polys) {
+    const off = flat.length;
+    for (const p of c) {
+      keyMap.set(key(p[0], p[1]), flat.length);
+      flat.push([p[0], p[1]]);
+    }
+    contours.push({ off, len: c.length });
+  }
+
+  // Recover cap triangles (as flat indices) from the bottom face of a plain, untwisted extrude of the refined outline.
+  let capTris: [number, number, number][] | null = [];
+  try {
+    const capShape = CrossSection.ofPolygons(polys);
+    const pm = capShape.extrude(1).getMesh();
+    const np = pm.numProp, vp = pm.vertProperties, tv = pm.triVerts;
+    for (let i = 0; i < tv.length && capTris; i += 3) {
+      const ia = tv[i]!, ib = tv[i + 1]!, ic = tv[i + 2]!;
+      if (vp[ia * np + 2]! < 1e-4 && vp[ib * np + 2]! < 1e-4 && vp[ic * np + 2]! < 1e-4) {
+        const a = keyMap.get(key(vp[ia * np]!, vp[ia * np + 1]!));
+        const b = keyMap.get(key(vp[ib * np]!, vp[ib * np + 1]!));
+        const cc = keyMap.get(key(vp[ic * np]!, vp[ic * np + 1]!));
+        if (a === undefined || b === undefined || cc === undefined) { capTris = null; break; }
+        capTris.push([a, b, cc]);
+      }
+    }
+  } catch { capTris = null; }
+  if (!capTris || !capTris.length) {
+    // Fall back to Manifold's own twist extrude if the cap mapping failed.
+    return shape.extrude(height, Math.max(0, slices - 1), Math.abs(twistDeg), scaleVec, center);
+  }
+
+  const S = Math.max(1, Math.round(slices));
+  const topZero = scaleVec !== undefined && sx === 0 && sy === 0;
+  const z0 = center ? -height / 2 : 0;
+  const M = flat.length;
+
+  // Rotate by -twist*t (positive twist -> clockwise), then apply the interpolated scale, matching OpenSCAD's Scaling * Rotation order.
+  const verts = new Float32Array((S + 1) * M * 3);
+  for (let i = 0; i <= S; i++) {
+    const t = i / S;
+    const ang = -twistDeg * t * Math.PI / 180;
+    const ca = Math.cos(ang), sa = Math.sin(ang);
+    const isx = 1 + (sx - 1) * t;
+    const isy = 1 + (sy - 1) * t;
+    const z = z0 + height * t;
+    for (let k = 0; k < M; k++) {
+      const x = flat[k]![0], y = flat[k]![1];
+      const base = (i * M + k) * 3;
+      verts[base] = (x * ca - y * sa) * isx;
+      verts[base + 1] = (x * sa + y * ca) * isy;
+      verts[base + 2] = z;
+    }
+  }
+
+  const tris: number[] = [];
+  const idx = (i: number, k: number) => i * M + k;
+  const dist2 = (p: number, q: number) => {
+    const pb = p * 3, qb = q * 3;
+    const dx = verts[pb]! - verts[qb]!;
+    const dy = verts[pb + 1]! - verts[qb + 1]!;
+    const dz = verts[pb + 2]! - verts[qb + 2]!;
+    return dx * dx + dy * dy + dz * dz;
+  };
+
+  // Bottom cap (slice 0) keeps the plain-extrude winding (faces -z); top cap (slice S) is reversed to face +z. Skip the top cap if it collapses to a point.
+  for (const [a, b, c] of capTris) tris.push(idx(0, a), idx(0, b), idx(0, c));
+  if (!topZero) {
+    for (const [a, b, c] of capTris) tris.push(idx(S, a), idx(S, c), idx(S, b));
+  }
+
+  // Walls: triangulate each quad p1->c1->c2->p2 along its shorter diagonal
+  for (const { off, len } of contours) {
+    for (let e = 0; e < len; e++) {
+      const a = off + e;
+      const b = off + ((e + 1) % len);
+      for (let i = 0; i < S; i++) {
+        const p1 = idx(i, a), c1 = idx(i, b);
+        const c2 = idx(i + 1, b), p2 = idx(i + 1, a);
+        if (topZero && i === S - 1) {
+          // Top collapsed to a point: fan to a single shared apex vertex (all slice-S vertices coincide at the origin, so pick one canonical index)
+          tris.push(p1, c1, idx(S, 0));
+        } else if (dist2(p1, c2) <= dist2(c1, p2)) {
+          tris.push(p1, c1, c2, p1, c2, p2);
+        } else {
+          tris.push(p1, c1, p2, c1, c2, p2);
+        }
+      }
+    }
+  }
+
+  return new Manifold({ vertProperties: verts, triVerts: new Uint32Array(tris), numProp: 3 } as any);
 }
 
 function __extrude(shape: any, height = 1, options: {twist?: number; scale?: number | number[] | undefined; center?: boolean; fn?: number; fa?: number; fs?: number; fe?: number; slices?: number;} = {}) {
@@ -737,14 +1045,22 @@ function __extrude(shape: any, height = 1, options: {twist?: number; scale?: num
     return shape;
   }
 
+  const twist = options.twist ?? 0;
   const normScale = __normalizeScale(options.scale);
 
   const nDivisions = __computeExtrudeDivisions(shape, height, { ...options, scale: normScale });
 
+  if (twist !== 0) {
+    return __extrudeTwisted(
+      shape, height, twist, nDivisions, normScale, options.center,
+      options.fn ?? 0, options.fa ?? 12, options.fs ?? 2,
+    );
+  }
+
   return shape.extrude(
     height,
     Math.max(0, nDivisions - 1),
-    options.twist !== undefined ? Math.abs(options.twist) : undefined,
+    undefined,
     normScale,
     options.center
   );
@@ -755,22 +1071,20 @@ function __revolve(shape: any, fn = 0, fa = 12, fs = 2, angle = 360) {
     return Manifold.union([]);
   }
   if (__is2D(shape)) {
-    let circularSegments: number;
+    let num_sections: number;
     const absAngle = Math.abs(angle);
 
     if (fn > 0) {
-      const num_sections = Math.max(1, Math.ceil(Math.max(fn, 3) * absAngle / 360));
-      circularSegments = Math.round(num_sections * 360 / absAngle);
+      num_sections = Math.max(1, Math.ceil(Math.max(fn, 3) * absAngle / 360));
     } else {
       const bounds = shape.bounds();
       const r = Math.max(Math.abs(bounds.max[0]), Math.abs(bounds.min[0]));
       const N_fa = 360 / fa;
       const N_fs = 2 * Math.PI * r / fs;
-      const num_sections = Math.max(1, Math.ceil(Math.max(Math.min(N_fa, N_fs), 5) * absAngle / 360));
-      circularSegments = Math.round(num_sections * 360 / absAngle);
+      num_sections = Math.max(1, Math.ceil(Math.max(Math.min(N_fa, N_fs), 5) * absAngle / 360));
     }
 
-    const revolved = shape.revolve(circularSegments, absAngle);
+    const revolved = shape.revolve(num_sections, absAngle);
     return angle < 0 ? revolved.mirror([0, 1, 0]) : revolved;
   }
   return shape;
@@ -890,8 +1204,7 @@ function __opentypeGlyphContours(ch: string, font: any, size: number, fn: number
 
     const scale = fontSize / font.unitsPerEm;
 
-    const spaceWidth =
-      (spaceGlyph?.advanceWidth ?? font.unitsPerEm * 0.25) * scale * 0.9766;
+    const spaceWidth = (spaceGlyph?.advanceWidth ?? font.unitsPerEm * 0.25) * scale;
 
     return {
       contours: [],
@@ -1384,6 +1697,15 @@ function __sphere(radius: number, fn = 0, fa = 12, fs = 2) {
   return sphere;
 }
 
+function __radius(dSpec: any, rSpec: any, dGen: any, rGen: any, dflt: any) {
+  const def = (x: any) => x !== undefined && x !== null && !(typeof x === "number" && Number.isNaN(x));
+  if (def(dSpec)) return dSpec / 2;
+  if (def(rSpec)) return rSpec;
+  if (def(dGen)) return dGen / 2;
+  if (def(rGen)) return rGen;
+  return dflt;
+}
+
 function __cylinder(height: number, radiusLow: number, radiusHigh = -1.0, fn = 0, center = false, fa = 12, fs = 2) {
   let segs = fn;
   if (segs <= 0) {
@@ -1454,12 +1776,35 @@ function __polygon(points: any, paths?: any) {
       }
       return contour;
     }).filter((c: any) => c.length > 0);
-    // Use EvenOdd fill rule — OpenSCAD polygon() does not assume outer/hole winding
+    // Use EvenOdd fill rule - OpenSCAD polygon() does not assume outer/hole winding
     return CrossSection.ofPolygons(contours, 'EvenOdd');
   }
 
   const ccwPoints = __forceWinding([...points], true);
   return CrossSection.ofPolygons([ccwPoints]);
+}
+
+function __polyhedron(points: any, faces: any) {
+  const verts: number[] = [];
+  if (Array.isArray(points)) {
+    for (const p of points) {
+      verts.push(Number(p?.[0]) || 0, Number(p?.[1]) || 0, Number(p?.[2]) || 0);
+    }
+  }
+  const tris: number[] = [];
+  if (Array.isArray(faces)) {
+    for (const face of faces) {
+      if (!Array.isArray(face) || face.length < 3) continue;
+      for (let i = 1; i + 1 < face.length; i++) {
+        tris.push(Number(face[i + 1]), Number(face[i]), Number(face[0]));
+      }
+    }
+  }
+  return new Manifold(new wasm.Mesh({
+    numProp: 3,
+    vertProperties: new Float32Array(verts),
+    triVerts: new Uint32Array(tris),
+  }));
 }
 
 function __parse_color_for_scope(c: any, alpha: any): any {
@@ -1470,100 +1815,103 @@ function __parse_color_for_scope(c: any, alpha: any): any {
   return [base[0], base[1], base[2], a];
 }
 
-async function __surface(dataUrl: string, opts: { center?: boolean; fn?: number; fa?: number; fs?: number } = {}) {
-  const { center = false } = opts;
-  const { width, height, data } = await decodeImageToPixels(dataUrl);
 
-  // Build height values (0–100) from grayscale (OpenSCAD: black (0) → 0, white (255) → 100)
+async function gridFromImage(dataUrl: string): Promise<{ width: number; height: number; Z: (x: number, y: number) => number }> {
+  const { width, height, data } = await decodeImageToPixels(dataUrl);
   const Z = (x: number, y: number): number => {
-    const row = y;
-    const i = (row * width + x) * 4;          // RGBA offset
+    const i = (y * width + x) * 4;
     const gray = 0.2126 * data![i]! + 0.7152 * data![i + 1]! + 0.0722 * data![i + 2]!;
     return (gray / 255) * 100;
   };
+  return { width, height, Z };
+}
 
-  const ox = center ? -(width  - 1) / 2 : 0;
+function gridFromText(text: string): { width: number; height: number; Z: (x: number, y: number) => number } {
+  const rows: number[][] = [];
+  for (const line of text.split(/\r?\n/)) {
+    const t = line.trim();
+    // skip blanks, '#' (OpenSCAD/Octave) and '%' (Matlab) comment lines
+    if (t === "" || t.startsWith("#") || t.startsWith("%")) continue;
+    const vals = t.split(/\s+/).map(Number).filter(v => Number.isFinite(v));
+    if (vals.length) rows.push(vals);
+  }
+  if (rows.length === 0) throw new Error("__surface: empty data file");
+  const height = rows.length;
+  const width = Math.max(...rows.map(r => r.length));
+  // OpenSCAD reads row 0 as the first data row; row index -> Y, column index -> X. Value used directly as Z (no normalization).
+  const Z = (x: number, y: number): number => rows[y]?.[x] ?? 0;
+  return { width, height, Z };
+}
+
+async function __surface(source: string, opts: { center?: boolean; kind?: "image" | "text"; fn?: number; fa?: number; fs?: number } = {}
+) {
+  const { center = false, kind = "image" } = opts;
+  const grid = kind === "text" ? gridFromText(source) : await gridFromImage(source);
+  return buildSurfaceMesh(grid, center);
+}
+
+function buildSurfaceMesh({ width, height, Z }: { width: number; height: number; Z: (x: number, y: number) => number }, center: boolean) {
+  const ox = center ? -(width - 1) / 2 : 0;
   const oy = center ? -(height - 1) / 2 : 0;
 
-  // Build a watertight mesh
+  let zmin = Infinity;
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++)
+      if (Z(x, y) < zmin) zmin = Z(x, y);
+  const zFloor = zmin - 1;
+
   const numTop = width * height;
   const numQuads = (width - 1) * (height - 1);
   const vertProps: number[] = [];
   const tris: number[] = [];
 
-  const topIdx = (x: number, y: number) => y * width  + x;
+  const topIdx = (x: number, y: number) => y * width + x;
   const centerIdx = (x: number, y: number) => numTop + y * (width - 1) + x;
   const botIdx = (x: number, y: number) => numTop + numQuads + y * width + x;
 
-  // top surface grid vertices
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++)
       vertProps.push(x + ox, y + oy, Z(x, y));
-    }
-  }
-  // top surface center vertices (one per quad, with average height of 4 corners)
-  for (let y = 0; y < height - 1; y++) {
-    for (let x = 0; x < width - 1; x++) {
-      const zCenter = (Z(x, y) + Z(x + 1, y) + Z(x, y + 1) + Z(x + 1, y + 1)) / 4;
-      vertProps.push(x + 0.5 + ox, y + 0.5 + oy, zCenter);
-    }
-  }
-  // bottom surface vertices (same XY, z=0)
-  for (let y = 0; y < height; y++) {
-    for (let x = 0; x < width; x++) {
-      vertProps.push(x + ox, y + oy, 0);
-    }
-  }
 
-  // top surface faces (CCW when viewed from +Z, 4 triangles per quad)
-  for (let y = 0; y < height - 1; y++) {
+  for (let y = 0; y < height - 1; y++)
     for (let x = 0; x < width - 1; x++) {
-      const a = topIdx(x, y);
-      const b = topIdx(x + 1, y);
-      const c = topIdx(x, y + 1);
-      const d = topIdx(x + 1, y + 1);
-      const center = centerIdx(x, y);
-      tris.push(a, b, center);
-      tris.push(b, d, center);
-      tris.push(d, c, center);
-      tris.push(c, a, center);
+      const zc = (Z(x, y) + Z(x + 1, y) + Z(x, y + 1) + Z(x + 1, y + 1)) / 4;
+      vertProps.push(x + 0.5 + ox, y + 0.5 + oy, zc);
     }
-  }
 
-  // bottom surface faces (CW from +Z = CCW from -Z, outward normal points down)
-  for (let y = 0; y < height - 1; y++) {
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++)
+      vertProps.push(x + ox, y + oy, zFloor);
+
+  for (let y = 0; y < height - 1; y++)
     for (let x = 0; x < width - 1; x++) {
-      const a = botIdx(x, y);
-      const b = botIdx(x + 1, y);
-      const c = botIdx(x, y + 1);
-      const d = botIdx(x + 1, y + 1);
-      tris.push(a, c, b);
-      tris.push(b, c, d);
+      const a = topIdx(x, y), b = topIdx(x + 1, y);
+      const c = topIdx(x, y + 1), d = topIdx(x + 1, y + 1);
+      const ctr = centerIdx(x, y);
+      tris.push(a, b, ctr, b, d, ctr, d, c, ctr, c, a, ctr);
     }
-  }
 
-  // side walls (4 edges of the grid)
-  for (let x = 0; x < width - 1; x++) {
-    tris.push(topIdx(x, 0), botIdx(x, 0), topIdx(x + 1, 0));
-    tris.push(topIdx(x + 1, 0), botIdx(x, 0), botIdx(x + 1, 0));
-  }
-  // Back edge (y = height-1, normal points in +Y)
+  for (let y = 0; y < height - 1; y++)
+    for (let x = 0; x < width - 1; x++) {
+      const a = botIdx(x, y), b = botIdx(x + 1, y);
+      const c = botIdx(x, y + 1), d = botIdx(x + 1, y + 1);
+      tris.push(a, c, b, b, c, d);
+    }
+
+  for (let x = 0; x < width - 1; x++)
+    tris.push(topIdx(x, 0), botIdx(x, 0), topIdx(x + 1, 0),
+              topIdx(x + 1, 0), botIdx(x, 0), botIdx(x + 1, 0));
   const yb = height - 1;
-  for (let x = 0; x < width - 1; x++) {
-    tris.push(topIdx(x, yb), topIdx(x + 1, yb), botIdx(x, yb));
-    tris.push(topIdx(x + 1, yb), botIdx(x + 1, yb), botIdx(x, yb));
-  }
-  // Left edge (x = 0, normal points in -X)
-  for (let y = 0; y < height - 1; y++) {
-    tris.push(topIdx(0, y), topIdx(0, y + 1), botIdx(0, y));
-    tris.push(topIdx(0, y + 1), botIdx(0, y + 1), botIdx(0, y));
-  }
-  // Right edge (x = width-1, normal points in +X)
+  for (let x = 0; x < width - 1; x++)
+    tris.push(topIdx(x, yb), topIdx(x + 1, yb), botIdx(x, yb),
+              topIdx(x + 1, yb), botIdx(x + 1, yb), botIdx(x, yb));
+  for (let y = 0; y < height - 1; y++)
+    tris.push(topIdx(0, y), topIdx(0, y + 1), botIdx(0, y),
+              topIdx(0, y + 1), botIdx(0, y + 1), botIdx(0, y));
   const xr = width - 1;
-  for (let y = 0; y < height - 1; y++) {
-    tris.push(topIdx(xr, y), botIdx(xr, y), topIdx(xr, y + 1));
-    tris.push(topIdx(xr, y + 1), botIdx(xr, y), botIdx(xr, y + 1));
-  }
+  for (let y = 0; y < height - 1; y++)
+    tris.push(topIdx(xr, y), botIdx(xr, y), topIdx(xr, y + 1),
+              topIdx(xr, y + 1), botIdx(xr, y), botIdx(xr, y + 1));
 
   return new Manifold(new wasm.Mesh({
     vertProperties: new Float32Array(vertProps),
@@ -1571,6 +1919,7 @@ async function __surface(dataUrl: string, opts: { center?: boolean; fn?: number;
     numProp: 3,
   }));
 }
+
 
 async function decodeImageToPixels(dataUrl: string): Promise<{ width: number; height: number; data: Uint8ClampedArray; }> {
   if (typeof OffscreenCanvas !== "undefined") {
@@ -1596,23 +1945,25 @@ async function decodeImageToPixels(dataUrl: string): Promise<{ width: number; he
   }
 }
 
+function pow_fn(base: any, exp: any) { return Math.pow(base, exp); }
+
 // Export all runtime symbols for compiled code
 export {
   Manifold, CrossSection, wasm,
-  __sphere, __cylinder, __circle, __rotate, __polygon, __translate, __scale, __mirror,
-  is_undef_fn, is_bool_fn, is_num_fn, is_string_fn, is_list_fn, is_function_fn,
+  __sphere, __cylinder, __circle, __radius, __rotate, __polygon, __polyhedron, __translate, __scale, __mirror,
+  is_undef_fn, is_bool_fn, is_num_fn, is_string_fn, is_list_fn, is_function_fn, is_object_fn,
   sin_fn, cos_fn, tan_fn, asin_fn, acos_fn, atan_fn, atan2_fn,
-  abs_fn, sign_fn, floor_fn, ceil_fn, round_fn, sqrt_fn, exp_fn, ln_fn, log_fn,
+  abs_fn, sign_fn, floor_fn, ceil_fn, round_fn, sqrt_fn, exp_fn, ln_fn, log_fn, pow_fn,
   min_fn, max_fn, norm_fn, cross_fn,
   len_fn, str_fn, chr_fn, ord_fn, concat_fn, search_fn, lookup_fn,
-  openscad_assert_fn, __eq, __add, __sub, __mul, __div, __mod, __neg, __pos,
+  openscad_assert_fn, __truthy, __eq, __lt, __gt, __le, __ge, __add, __sub, __mul, __div, __mod, __neg, __pos, __index,
   version_fn, version_num_fn,
   PI, INF, NAN, undef, _EPSILON,
   __children_stack, __with_children, parent_module_fn,
   __is_finite_matrix4, __to_manifold_mat4, __safe_transform, __identity4,
   __safe_attach_transform, __safe_offset2d, __safe_project3d,
   __apply_color,
-  __flat_map_iter, __range, __is2D, __union2d3d, __difference2d3d, __intersection2d3d, __hull2d3d, __minkowski2d3d,
+  __flat_map_iter, __range, __rangeCount, __is2D, __union2d3d, __difference2d3d, __intersection2d3d, __hull2d3d, __minkowski2d3d,
   __extrude, __revolve,
   __text, __parse_color_for_scope, __surface
 };

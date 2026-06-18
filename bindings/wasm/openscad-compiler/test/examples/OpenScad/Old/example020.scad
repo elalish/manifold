@@ -1,3 +1,4 @@
+// Volume: 915864.6553005457, SurfaceArea: 207548.61354523257
 
 module screw(type = 2, r1 = 15, r2 = 20, n = 7, h = 100, t = 8)
 {

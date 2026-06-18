@@ -1,4 +1,4 @@
-// Volume: 59915.768335812274, SurfaceArea: 15131.29692599908
+// Volume: 59915.78719724622, SurfaceArea: 15131.298531280176
 // offset.scad - Example for offset() usage in OpenSCAD
 
 $fn = 40;

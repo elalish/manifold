@@ -1,3 +1,4 @@
+// Volume: 13750.542186822751, SurfaceArea: 5563.623544057865
 
 // example010.dat generated using octave:
 //   d = (sin(1:0.2:10)' * cos(1:0.2:10)) * 10;

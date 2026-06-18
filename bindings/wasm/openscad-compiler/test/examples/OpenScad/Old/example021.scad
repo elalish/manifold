@@ -1,3 +1,4 @@
+// Volume: 3756.3284436245003, SurfaceArea: 15921.5537179351
 
 module thing()
 {

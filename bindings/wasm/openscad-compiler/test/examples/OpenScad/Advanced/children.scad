@@ -1,4 +1,4 @@
-// Volume: 12698.657019358296, SurfaceArea: 11790.880644999665
+// Volume: 12699.535338570537, SurfaceArea: 11798.95381917154
 // children.scad - Usage of children()
 
 // The use of children() allows to write generic modules that

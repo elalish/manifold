@@ -1,4 +1,4 @@
-// Volume: 18686.146069366492, SurfaceArea: 9586.172734280639
+// Volume: 18686.14693803324, SurfaceArea: 9586.173014386313
 // logo.scad - Basic example of module, top-level variable and $fn usage
 
 Logo(50);

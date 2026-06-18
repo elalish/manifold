@@ -1,4 +1,4 @@
-// Volume: 5208.3155226221315, SurfaceArea: 7817.148712253177
+// Volume: 5208.31624582326, SurfaceArea: 7817.149313807863
 /*[ Candle Stand ]*/
 //Length of candle stand
 length=50; // [70:large,50:medium,30:small]

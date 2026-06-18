@@ -1,4 +1,4 @@
-// Volume: 12738.308466946968, SurfaceArea: 6188.279702820568
+// Volume: 12335.232753372355, SurfaceArea: 5812.640949693574
 echo(version=version());
 
 // simple 2D -> 3D extrusion of a rectangle

@@ -1,4 +1,4 @@
-// Volume: 17379.024658299717, SurfaceArea: 17593.608838033084
+// Volume: 17379.026507693663, SurfaceArea: 17593.611144150047
 module simple_tree(size, dna, n) {   
         if (n > 0) {
             // trunk

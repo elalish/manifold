@@ -1,4 +1,4 @@
-// Volume: 7773.409319463621, SurfaceArea: 3466.8466731030026
+// Volume: 7773.4097469011285, SurfaceArea: 3466.8463580711905
 // CSG.scad - Basic example of CSG usage
 
 translate([-24,0,0]) {
