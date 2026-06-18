@@ -889,14 +889,12 @@ TEST(Boolean2, KeepsNearDistinctPresentationVertex) {
   EXPECT_NEAR(TotalSignedArea(polys), 1.0 + kDelta, 1e-12);
 }
 
-// The new-to-old snap is gated by perpendicular incidence, not distance: a
-// generated crossing fuses into a nearby old corner only when one of its
-// transversal source edges actually passes through that corner within the
-// bounded eps perpendicular band. Mere proximity (within the 2*eps broad-phase
-// band) is not enough - distinct near-corner crossings whose source edges miss
-// the corner stay separate, because the along-line distance of a true
-// concurrency is unbounded as the crossing angle shallows and so cannot
-// separate must-fuse from must-not-fuse.
+// The new-to-old snap is gated by perpendicular incidence (point-to-line
+// distance), not point-to-point proximity: a generated crossing fuses into a
+// nearby old corner only when one of its transversal source edges actually
+// passes through that corner within the bounded eps perpendicular band. Mere
+// proximity (within the 2*eps broad-phase band) is not enough - distinct
+// near-corner crossings whose source edges miss the corner stay separate.
 TEST(Boolean2, NewToOldMergeIsPerpIncidenceGated) {
   constexpr double eps = 1e-6;
   const Polygons a = {{{0, 0}, {10, 0}, {10, 1}, {0, 1}}};
