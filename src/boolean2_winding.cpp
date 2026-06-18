@@ -110,9 +110,9 @@ int LeftWindingAtVertex(int start, int end, const BVH& bvh,
         const vec2 O = verts[other];
         const vec2 E = verts[end];
         const bool oInterior = (O.y - P.y) * (O.y - E.y) <= 0.0;
-        const vec2 far = oInterior ? E : O;
+        const vec2 farEnd = oInterior ? E : O;
         const vec3 pYX(P.y, P.x, 0.0);
-        const vec3 farYX(far.y, far.x, 0.0);
+        const vec3 farYX(farEnd.y, farEnd.x, 0.0);
         const double xq = Interpolate(pYX, farYX, oInterior ? O.y : E.y).x;
         rightOf =
             oInterior ? Shadows(xq, O.x, xTieDir) : !Shadows(xq, E.x, xTieDir);
