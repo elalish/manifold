@@ -474,18 +474,15 @@ TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset4096) {
 // the square's boundary and drops the whole square (area -> 0). A regression
 // guard against a crossing merge that reaches too far.
 TEST(CrossSection, TinyEdgeFeatureKeepsSquare) {
-  const CrossSection cs(Polygons{{{-2097152.0, 0.0},
-                                  {2097152.0, 0.0},
-                                  {2097152.0, 4194304.0},
-                                  {-2097152.0, 4194304.0}},
-                                 {{1500000.0, -4e-05},
-                                  {1500000.000024, 5e-05},
-                                  {1500000.000012, 2e-05},
-                                  {1500000.00002, -5e-05},
-                                  {1500000.000016, 5e-05},
-                                  {1500000.00002, 4e-05},
-                                  {1500000.00002, -5e-05}}},
-                        CrossSection::FillRule::Positive);
+  const SimplePolygon square = {{-2097152.0, 0.0},
+                                {2097152.0, 0.0},
+                                {2097152.0, 4194304.0},
+                                {-2097152.0, 4194304.0}};
+  const SimplePolygon feature = {
+      {1500000.0, -4e-05},     {1500000.000024, 5e-05}, {1500000.000012, 2e-05},
+      {1500000.00002, -5e-05}, {1500000.000016, 5e-05}, {1500000.00002, 4e-05},
+      {1500000.00002, -5e-05}};
+  const CrossSection cs(Polygons{square, feature});
   // 2^22 x 2^22, independent of the engine; the tiny feature adds < 1.
   const double squareArea = 4194304.0 * 4194304.0;
   EXPECT_NEAR(cs.Area(), squareArea, 1e-3 * squareArea)
