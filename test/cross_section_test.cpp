@@ -468,6 +468,34 @@ TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset4096) {
   EXPECT_NEAR(aUb.Area(), ca.Area() + cb.Area() - inter.Area(), tol);
 }
 
+// DISABLED (same closed-walk assertion as the HostDrop case above). This one is
+// kept as the guard against relaxing that assert to an unconditional "drop the
+// non-closing walk": here a and b are two disjoint polygons point-touching
+// ~2e-9 at a corner, and the walk a release build drops is the ENTIRE
+// ~422k-area b (the macro traced first consumes the shared corner edges and
+// starves b's walk), not a sub-eps tangle. So dropping silently deletes a whole
+// feature - the victim is not always sub-resolution, which is why the assert
+// must stay.
+TEST(CrossSection, DISABLED_NearCornerTouchDropsMacroFeature) {
+  const SimplePolygon a = {{0, 0},
+                           {83.857939034036775, 258.08819842650098},
+                           {-172.27469772718226, 125.16489439806644},
+                           {-2.9290637642324677, -2.1280893919543549},
+                           {0.15484825622114765, -0.47657392893212197}};
+  const SimplePolygon b = {{83.857939035728577, 258.08819842543426},
+                           {-1433.9774541367817, 260.0062722781451},
+                           {-1435.7133694432041, 258.89661890546085},
+                           {-1434.6006741103567, 258.08819842543426},
+                           {-1254.542401839961, -296.07418187338237}};
+  const CrossSection ca(a), cb(b);
+  const auto inter = ca.Boolean(cb, OpType::Intersect);
+  const double tol = 1e-3 * (1.0 + ca.Area() + cb.Area());
+  EXPECT_NEAR(inter.Area(), 0.0, tol) << "disjoint: empty intersection";
+  EXPECT_NEAR((ca + cb).Area(), ca.Area() + cb.Area(), tol)
+      << "union must keep both disjoint pieces; the bug drops the ~422k b";
+  EXPECT_EQ((ca + cb).NumContour(), 2) << "two disjoint contours";
+}
+
 // A big square built together with a tiny self-intersecting feature whose edges
 // cross the square's edge at nearly the same spot (within epsilon). Those
 // crossings are distinct and must stay distinct: treating them as one collapses
