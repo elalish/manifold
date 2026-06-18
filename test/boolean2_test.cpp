@@ -1265,10 +1265,10 @@ TEST(Boolean2, ShortEdgeFusionAddIntersect) {
   // The two probe edges sit 0.4 eps apart (x0 = 1.1 eps, x1 = 1.5 eps), so the
   // eps-scale merge fuses them - an in-budget sub-eps merge. The fused boundary
   // shifts by <= 0.4 eps, which the h = 1/eps edge levers into an O(0.4) area
-  // wobble, so the area bound is deliberately loose (the feature is below the
-  // eps resolution). Intersect additionally returns one contour rather than
-  // two; that is the same sub-eps fusion and is accepted here, not a separate
-  // bug.
+  // wobble - observed 0.09 (Add) and 0.18 (Intersect), so the 5e-2 bound leaves
+  // ~3-7x headroom (the feature is below the eps resolution). Intersect
+  // additionally returns one contour rather than two; that is the same sub-eps
+  // fusion and is accepted here, not a separate bug.
   EXPECT_NEAR(std::fabs(TotalSignedArea(Boolean2D(
                   {rect, left, right}, {left, right}, OpType::Add, eps))),
               12.095, 5e-2 * 12.095)

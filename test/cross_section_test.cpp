@@ -486,9 +486,11 @@ TEST(CrossSection, TinyEdgeFeatureKeepsSquare) {
                                   {1500000.00002, 4e-05},
                                   {1500000.00002, -5e-05}}},
                         CrossSection::FillRule::Positive);
-  EXPECT_NEAR(cs.Area(), 17592186044416.0, 1e-3 * 17592186044416.0)
+  // 2^22 x 2^22, independent of the engine; the tiny feature adds < 1.
+  const double squareArea = 4194304.0 * 4194304.0;
+  EXPECT_NEAR(cs.Area(), squareArea, 1e-3 * squareArea)
       << "clustered edge crossings merged and dropped the square";
-  EXPECT_GT(cs.NumContour(), 0);
+  EXPECT_GT(cs.NumContour(), 0) << "square dropped entirely";
 }
 
 // The large-offset variant (this class passes at the origin): the StarRing big
