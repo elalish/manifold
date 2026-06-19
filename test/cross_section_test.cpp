@@ -520,6 +520,34 @@ TEST(CrossSection, NearCoincidentLargeCoordIsValid) {
   }
 }
 
+// DISABLED: a centered near-degenerate corner touch whose two un-merged
+// crossings sit ~2.8x eps apart - just outside the merge band - so the
+// arrangement is non-manifold (a retained vertex with in != out degree) and
+// OutEdgesToPolygons correctly hits the closed-walk assert. The assert is not
+// in question: a non-closing walk is a real defect. Position-inclusive eps is a
+// no-op at the origin, so it does not address this (it fixed HostDrop/Lane B
+// only by inflating eps at their large coords until the tangle merges). In
+// Release the macro area is incidentally correct (only a sub-eps sliver drops),
+// but the arrangement is still non-manifold - the fix belongs in the
+// arrangement, not the assert. Below-resolution floor, StressB/StressD class.
+// Re-enable when the arrangement is made manifold here.
+TEST(CrossSection, DISABLED_CenteredSubEpsNonClosingWalk) {
+  const SimplePolygon big = {{16.326654361604518, -168.72132050147599},
+                             {126.43622068872992, 170.16107906902442},
+                             {-126.4362206896044, -64.998020356457175},
+                             {14.343687683060599, -170.16203012505568},
+                             {16.635671355979465, -169.67237701777114}};
+  const SimplePolygon tiny = {{126.4362206896044, 170.16107906853938},
+                              {125.43666000402905, 170.16203012505565},
+                              {125.43554197004028, 170.16166685379164},
+                              {124.77049882701533, 169.67730915692113},
+                              {125.51465251505573, 169.92009174481331}};
+  // Release-correct result (only a ~6e-8 sub-eps sliver is dropped).
+  const auto u = CrossSection(big) + CrossSection(tiny);
+  EXPECT_NEAR(u.Area(), 30107.44255, 1e-3);
+  EXPECT_EQ(u.NumContour(), 1);
+}
+
 // A big square built together with a tiny self-intersecting feature whose edges
 // cross the square's edge at nearly the same spot (within epsilon). Those
 // crossings are distinct and must stay distinct: treating them as one collapses
