@@ -35,28 +35,31 @@ if (navigator.serviceWorker) {
   const isDevEnv = import.meta.env.DEV;
 
   if (window.caches) {
-    window.caches.keys().then(keys => {
+    window.caches.keys().then((keys) => {
       keys.filter(
-              key => key.startsWith('manifoldCAD-cache-') &&
-                  key !== 'manifoldCAD-cache-v4')
-          .forEach(key => window.caches.delete(key));
+              (key) => key.startsWith('manifoldCAD-cache-') &&
+                  key !== 'manifoldCAD-cache-v4',
+              )
+          .forEach((key) => window.caches.delete(key));
     });
   }
 
   // Disable the service worker if asked, in development, or on localhost.
   if (disableServiceWorker || isDevEnv || isLocalhost) {
     // Explicit escape hatch for debugging cache-related issues.
-    navigator.serviceWorker.getRegistrations().then(registrations => {
-      registrations.forEach(registration => registration.unregister());
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      registrations.forEach((registration) => registration.unregister());
     });
   } else {
     // Resolve against the current page URL so production asset paths don't
     // redirect registration into /assets.
-    const serviceWorkerUrl =
-        new URL('./service-worker.js', window.location.href);
+    const serviceWorkerUrl = new URL(
+        './service-worker.js',
+        window.location.href,
+    );
     navigator.serviceWorker
         .register(serviceWorkerUrl, {scope: './', updateViaCache: 'none'})
-        .then(async registration => {
+        .then(async (registration) => {
           await navigator.serviceWorker.ready;
           if (!navigator.serviceWorker.controller) {
             const key = 'manifoldcad-sw-controller-refresh';
@@ -72,7 +75,7 @@ if (navigator.serviceWorker) {
           }
           registration.update();
         })
-        .catch(error => {
+        .catch((error) => {
           console.error('Service worker registration failed:', error);
         });
   }
@@ -95,7 +98,7 @@ function memoizeAsync(loadFn, {resetOnReject = false} = {}) {
     if (!promise) {
       promise = Promise.resolve().then(loadFn);
       if (resetOnReject) {
-        promise = promise.catch(error => {
+        promise = promise.catch((error) => {
           promise = null;
           throw error;
         });
@@ -105,36 +108,43 @@ function memoizeAsync(loadFn, {resetOnReject = false} = {}) {
   };
 }
 
-const loadMonacoModules = memoizeAsync(async () => {
-  monacoModulesPromise =
-      Promise
-          .all([
-            import('monaco-editor/esm/vs/editor/editor.api'),
-            // Load TS tokenizer early so first paint has syntax colors
-            // without waiting for hover-driven language-service activation.
-            import(
-                'monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution'),
-            import(
-                'monaco-editor/esm/vs/language/typescript/monaco.contribution'),
-            // '?worker' is vite convention to load a module as a web worker.
-            import('monaco-editor/esm/vs/editor/editor.worker?worker'),
-            import('monaco-editor/esm/vs/language/typescript/ts.worker?worker'),
-          ])
-          .then(
-              ([monacoModule, _, __, editorWorkerModule, tsWorkerModule]) => ({
-                monaco: monacoModule,
-                editorWorker: editorWorkerModule.default,
-                tsWorker: tsWorkerModule.default,
-              }));
-  return monacoModulesPromise;
-}, {resetOnReject: true});
+const loadMonacoModules = memoizeAsync(
+    async () => {
+      monacoModulesPromise =
+          Promise
+              .all([
+                import('monaco-editor/esm/vs/editor/editor.api'),
+                // Load TS tokenizer early so first paint has syntax colors
+                // without waiting for hover-driven language-service activation.
+                import(
+                    'monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution'),
+                import(
+                    'monaco-editor/esm/vs/language/typescript/monaco.contribution'),
+                // '?worker' is vite convention to load a module as a web
+                // worker.
+                import('monaco-editor/esm/vs/editor/editor.worker?worker'),
+                import(
+                    'monaco-editor/esm/vs/language/typescript/ts.worker?worker'),
+              ])
+              .then(
+                  ([monacoModule, _, __, editorWorkerModule, tsWorkerModule]) =>
+                      ({
+                        monaco: monacoModule,
+                        editorWorker: editorWorkerModule.default,
+                        tsWorker: tsWorkerModule.default,
+                      }));
+      return monacoModulesPromise;
+    },
+    {resetOnReject: true},
+);
 
 const ensureMonacoContributionsLoaded = memoizeAsync(
-    () => import('monaco-editor/esm/vs/editor/editor.all').then(module => {
+    () => import('monaco-editor/esm/vs/editor/editor.all').then((module) => {
       monacoContributionsReady = true;
       return module;
     }),
-    {resetOnReject: true});
+    {resetOnReject: true},
+);
 
 function ensureMonacoSuggestLoaded() {
   // Load only the minimal contributions needed for autocomplete/parameter
@@ -151,7 +161,8 @@ const ensureMonacoSuggestLoadedMemoized = memoizeAsync(
       import(
           'monaco-editor/esm/vs/editor/contrib/parameterHints/browser/parameterHints.js'),
     ]),
-    {resetOnReject: true});
+    {resetOnReject: true},
+);
 
 function ensureMonacoNavigationLoaded() {
   // Minimal contributions that enable clickable links + hover + "go to
@@ -169,16 +180,32 @@ const ensureMonacoNavigationLoadedMemoized = memoizeAsync(
       import(
           'monaco-editor/esm/vs/editor/contrib/gotoSymbol/browser/goToCommands.js'),
     ]),
-    {resetOnReject: true});
+    {resetOnReject: true},
+);
+
+const ensurePrettierLoaded = memoizeAsync(
+    () => Promise
+              .all([
+                import('prettier/standalone'),
+                import('prettier/plugins/estree'),
+                import('prettier/plugins/typescript'),
+              ])
+              .then(([prettierModule, estreePlugin, typescriptPlugin]) => ({
+                      prettier: prettierModule,
+                      plugins: [estreePlugin, typescriptPlugin],
+                    })),
+    {resetOnReject: true},
+);
 
 const ensureEsbuildWasmPreloaded = memoizeAsync(
-    () => fetch(esbuildWasmUrl, {cache: 'force-cache'}).then(response => {
+    () => fetch(esbuildWasmUrl, {cache: 'force-cache'}).then((response) => {
       if (!response.ok) {
         throw new Error(`Failed to preload esbuild.wasm (${response.status})`);
       }
       return response.arrayBuffer();
     }),
-    {resetOnReject: true});
+    {resetOnReject: true},
+);
 
 // Pane resizing - draggable pane dividers ---------------------
 
@@ -197,15 +224,15 @@ function clampToRange(value, minValue, maxValue) {
 function attachSplitterDrag(splitterElement, handleDragMove) {
   if (!splitterElement) return;
 
-  splitterElement.addEventListener('pointerdown', pointerDownEvent => {
+  splitterElement.addEventListener('pointerdown', (pointerDownEvent) => {
     const isMobileLayout = window.matchMedia('(max-width: 820px)').matches;
     if (isMobileLayout) return;
 
     pointerDownEvent.preventDefault();
     splitterElement.setPointerCapture(pointerDownEvent.pointerId);
 
-    const onPointerMove = moveEvent => handleDragMove(moveEvent);
-    const onPointerEnd = endEvent => {
+    const onPointerMove = (moveEvent) => handleDragMove(moveEvent);
+    const onPointerEnd = (endEvent) => {
       splitterElement.releasePointerCapture(endEvent.pointerId);
       splitterElement.removeEventListener('pointermove', onPointerMove);
       splitterElement.removeEventListener('pointerup', onPointerEnd);
@@ -233,27 +260,39 @@ function setupPaneSplitters() {
   const savedLeftPane = Number(window.localStorage.getItem(leftPaneStorageKey));
   if (Number.isFinite(savedLeftPane)) {
     const clampedLeftPanePercent = clampToRange(
-        savedLeftPane, LEFT_PANE_MIN_PERCENT, LEFT_PANE_MAX_PERCENT);
+        savedLeftPane,
+        LEFT_PANE_MIN_PERCENT,
+        LEFT_PANE_MAX_PERCENT,
+    );
     pageElement.style.setProperty('--left-pane', `${clampedLeftPanePercent}%`);
   }
 
-  const savedViewerPane =
-      Number(window.localStorage.getItem(viewerPaneStorageKey));
+  const savedViewerPane = Number(
+      window.localStorage.getItem(viewerPaneStorageKey),
+  );
   if (Number.isFinite(savedViewerPane)) {
     const clampedViewerPanePercent = clampToRange(
-        savedViewerPane, VIEWER_PANE_MIN_PERCENT, VIEWER_PANE_MAX_PERCENT);
+        savedViewerPane,
+        VIEWER_PANE_MIN_PERCENT,
+        VIEWER_PANE_MAX_PERCENT,
+    );
     pageElement.style.setProperty(
-        '--viewer-pane', `${clampedViewerPanePercent}%`);
+        '--viewer-pane',
+        `${clampedViewerPanePercent}%`,
+    );
   }
 
-  attachSplitterDrag(horizontalSplitterElement, moveEvent => {
+  attachSplitterDrag(horizontalSplitterElement, (moveEvent) => {
     // Convert pointer X position to a percentage of the full workbench width.
     const workbenchBounds = workbenchElement.getBoundingClientRect();
     const leftPanePercent =
         ((moveEvent.clientX - workbenchBounds.left) / workbenchBounds.width) *
         100;
     const clampedLeftPanePercent = clampToRange(
-        leftPanePercent, LEFT_PANE_MIN_PERCENT, LEFT_PANE_MAX_PERCENT);
+        leftPanePercent,
+        LEFT_PANE_MIN_PERCENT,
+        LEFT_PANE_MAX_PERCENT,
+    );
     pageElement.style.setProperty('--left-pane', `${clampedLeftPanePercent}%`);
     window.localStorage.setItem(leftPaneStorageKey, clampedLeftPanePercent);
 
@@ -262,16 +301,21 @@ function setupPaneSplitters() {
     editor?.layout({});
   });
 
-  attachSplitterDrag(verticalSplitterElement, moveEvent => {
+  attachSplitterDrag(verticalSplitterElement, (moveEvent) => {
     // Convert pointer Y position to a percentage of the right pane height.
     const rightPaneBounds = rightPaneElement.getBoundingClientRect();
     const viewerPanePercent =
         ((moveEvent.clientY - rightPaneBounds.top) / rightPaneBounds.height) *
         100;
     const clampedViewerPanePercent = clampToRange(
-        viewerPanePercent, VIEWER_PANE_MIN_PERCENT, VIEWER_PANE_MAX_PERCENT);
+        viewerPanePercent,
+        VIEWER_PANE_MIN_PERCENT,
+        VIEWER_PANE_MAX_PERCENT,
+    );
     pageElement.style.setProperty(
-        '--viewer-pane', `${clampedViewerPanePercent}%`);
+        '--viewer-pane',
+        `${clampedViewerPanePercent}%`,
+    );
     window.localStorage.setItem(viewerPaneStorageKey, clampedViewerPanePercent);
   });
 }
@@ -287,14 +331,16 @@ const shareButton = document.querySelector('#share');
 
 undoButton.onclick = () => editor.trigger('ignored', 'undo');
 redoButton.onclick = () => editor.trigger('ignored', 'redo');
-formatButton.onclick = () =>
-    editor.trigger('ignored', 'editor.action.formatDocument');
+formatButton.onclick = () => formatCurrentScript().catch((error) => {
+  console.error('Formatting failed:', error);
+});
 shareButton.onclick = () => {
   const url = new URL(window.location.toString());
   url.hash =
       '#' +
       encodeURIComponent(
-          currentFileElement.textContent + CODE_START + editor.getValue());
+          currentFileElement.textContent + CODE_START + editor.getValue(),
+      );
   navigator.clipboard.writeText(url.toString());
   console.log('Shareable link copied to clipboard!');
   console.log('Consider shortening this URL using tinyURL.com');
@@ -357,7 +403,7 @@ function getAllScripts() {
   for (let i = 0; i < window.localStorage.length; i++) {
     const key = nthKey(i);
     if (!key || key === 'currentName' || key === 'safe') continue;
-    files[key] = getScript(key)
+    files[key] = getScript(key);
   }
   return files;
 }
@@ -373,6 +419,19 @@ function getModelForScript(filename) {
   return model;
 }
 
+async function formatCurrentScript() {
+  if (!editor) return;
+  const model = editor.getModel();
+  if (!model) return;
+
+  const {prettier, plugins} = await ensurePrettierLoaded();
+  const formattedCode = await prettier.format(model.getValue(), {
+    parser: 'typescript',
+    plugins,
+  });
+  model.setValue(formattedCode);
+}
+
 function saveCurrent() {
   if (editor) {
     const currentName = currentFileElement.textContent;
@@ -380,7 +439,7 @@ function saveCurrent() {
       setScript(currentName, editor.getValue());
     }
   }
-};
+}
 
 window.onpagehide = saveCurrent;
 window.beforeunload = saveCurrent;
@@ -404,7 +463,7 @@ function switchTo(scriptName) {
     isExample = exampleFunctions.get(scriptName) != null;
     syncCurrentEditVisibility(scriptName);
     const code = isExample ? exampleFunctions.get(scriptName) :
-                             getScript(scriptName) ?? '';
+                             (getScript(scriptName) ?? '');
     window.location.hash = '#' + scriptName;
     const model = getModelForScript(scriptName);
     editor.setModel(model);
@@ -467,10 +526,14 @@ function addEdit(button) {
       lastClick = performance.now();
       button.classList.remove('blue');
       button.classList.add('red');
-      document.body.addEventListener('click', function() {
-        button.classList.add('blue');
-        button.classList.remove('red');
-      }, {once: true});
+      document.body.addEventListener(
+          'click',
+          function() {
+            button.classList.add('blue');
+            button.classList.remove('red');
+          },
+          {once: true},
+      );
     } else if (performance.now() - lastClick > 500) {
       removeScript(label.textContent);
       if (currentFileElement.textContent == label.textContent) {
@@ -523,7 +586,7 @@ function startRenameCurrentScript() {
     syncCurrentEditVisibility(currentFileElement.textContent);
   }
 
-  currentFileElement.onkeydown = event => {
+  currentFileElement.onkeydown = (event) => {
     // Enter = save, Escape = cancel.
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -537,7 +600,7 @@ function startRenameCurrentScript() {
 }
 
 if (currentEditElement) {
-  currentEditElement.onclick = event => {
+  currentEditElement.onclick = (event) => {
     event.preventDefault();
     event.stopPropagation();
     startRenameCurrentScript();
@@ -552,7 +615,7 @@ function newItem(code, scriptName = undefined) {
   newButton.insertAdjacentElement('afterend', nextButton.parentElement);
   addEdit(nextButton);
   return {button: nextButton, name};
-};
+}
 newButton.onclick = function() {
   newItem('').button.click();
 };
@@ -586,7 +649,7 @@ async function createEditor() {
       } else {
         return new editorWorker();
       }
-    }
+    },
   };
 
   editor = monaco.editor.create(document.getElementById('editor'), {
@@ -597,7 +660,6 @@ async function createEditor() {
     quickSuggestions: true,
     suggestOnTriggerCharacters: true,
     parameterHints: {enabled: true},
-
 
     // make monaco editor to wrap the content,and hide horizontal
     // scrollbar----start----:
@@ -612,8 +674,6 @@ async function createEditor() {
     },
     // make monaco editor to wrap the content,and hide horizontal
     // scrollbar----end-------.
-
-
   });
 
   monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
@@ -622,21 +682,30 @@ async function createEditor() {
   });
 
   // Make sure `manifold-3d/manifoldCAD` types are available for import.
-  const manifoldCADTypesUrl =
-      new URL('./manifoldCAD.d.ts', window.location.href);
-  const manifoldCADGlobalsTypesUrl =
-      new URL('./manifoldCADGlobals.d.ts', window.location.href);
+  const manifoldCADTypesUrl = new URL(
+      './manifoldCAD.d.ts',
+      window.location.href,
+  );
+  const manifoldCADGlobalsTypesUrl = new URL(
+      './manifoldCADGlobals.d.ts',
+      window.location.href,
+  );
 
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
       await (await fetch(manifoldCADTypesUrl)).text(),
-      'inmemory://model/node_modules/manifold-3d/manifoldCAD.d.ts');
+      'inmemory://model/node_modules/manifold-3d/manifoldCAD.d.ts',
+  );
 
   // Types in the global namespace for top-level scripts.
   // This could be improved in the future.  API-Extractor intentionally doesn't
   // global variables, so another tool may be a better fit.
   monaco.languages.typescript.typescriptDefaults.addExtraLib(
       (await (await fetch(manifoldCADGlobalsTypesUrl)).text())
-          .replace(/^export /gm, ''));
+          .replace(
+              /^export /gm,
+              '',
+              ),
+  );
 
   // Load up all scripts so that monaco can check types of multi-file models.
   for (const [filename, content] of Object.entries(getAllScripts())) {
@@ -667,10 +736,13 @@ async function createEditor() {
   const ensureAutoTypings = () => {
     if (!autoTypingsPromise) {
       autoTypingsPromise =
-          initializeAutoTypings(showTypeIndicator).catch(error => {
-            autoTypingsPromise = null;
-            console.error('Failed to initialize auto typings:', error);
-          });
+          initializeAutoTypings(showTypeIndicator)
+              .catch(
+                  (error) => {
+                    autoTypingsPromise = null;
+                    console.error('Failed to initialize auto typings:', error);
+                  },
+              );
     }
     return autoTypingsPromise;
   };
@@ -680,10 +752,10 @@ async function createEditor() {
     if (enhancementsStarted) return;
     enhancementsStarted = true;
     // Start downloads in background; don't block editor interactivity.
-    ensureEsbuildWasmPreloaded().catch(error => {
+    ensureEsbuildWasmPreloaded().catch((error) => {
       console.warn('Failed to preload esbuild.wasm:', error);
     });
-    ensureMonacoContributionsLoaded().catch(error => {
+    ensureMonacoContributionsLoaded().catch((error) => {
       console.error('Failed to load Monaco contributions:', error);
     });
     ensureAutoTypings();
@@ -721,7 +793,8 @@ async function createEditor() {
       autoExecute = true;
       const name = fragment.substring(0, codeIdx);
       switchTo(
-          newItem(fragment.substring(codeIdx + CODE_START.length), name).name);
+          newItem(fragment.substring(codeIdx + CODE_START.length), name).name,
+      );
     } else {
       if (fragment != currentName) {
         autoExecute = true;
@@ -736,7 +809,7 @@ async function createEditor() {
     initializeRun();
   }
 
-  editor.onDidChangeModelContent(e => {
+  editor.onDidChangeModelContent((e) => {
     const activeName = currentFileElement.textContent;
 
     // The user switched models.
@@ -769,7 +842,7 @@ async function createEditor() {
   window.onresize = () => {
     editor.layout({});
   };
-};
+}
 
 createEditor();
 
@@ -784,9 +857,12 @@ async function initializeAutoTypings(showTypeIndicator) {
   // This skip list only affects Monaco auto-typing CDN lookups, not runtime
   // imports.
   const jsDelivrResolver = new JsDelivrSourceResolver();
-  const skippedTypingPackages =
-      new Set(['manifold-3d', 'text-shaper', '@types/require']);
-  const shouldSkipTypingPackage = packageName => {
+  const skippedTypingPackages = new Set([
+    'manifold-3d',
+    'text-shaper',
+    '@types/require',
+  ]);
+  const shouldSkipTypingPackage = (packageName) => {
     return skippedTypingPackages.has(packageName);
   };
   const sourceResolver = {
@@ -797,7 +873,7 @@ async function initializeAutoTypings(showTypeIndicator) {
     resolveSourceFile: async (packageName, version, path) => {
       if (shouldSkipTypingPackage(packageName)) return '';
       return jsDelivrResolver.resolveSourceFile(packageName, version, path);
-    }
+    },
   };
 
   autoTypings = await AutoTypings.create(editor, {
@@ -807,17 +883,17 @@ async function initializeAutoTypings(showTypeIndicator) {
     // fan-out that adds noise and slows editor/offline workflows.
     packageRecursionDepth: 1,
     fileRecursionDepth: 2,
-    onUpdate: update => {
+    onUpdate: (update) => {
       if (update.type === 'ResolveNewImports') {
         showTypeIndicator();
       }
     },
-    onError: e => {
+    onError: (e) => {
       if (String(e?.message ?? e).includes('Not implemented yet')) {
         return;
       }
       console.error(e);
-    }
+    },
   });
   updateTypeIndicator();
 }
@@ -825,7 +901,7 @@ async function initializeAutoTypings(showTypeIndicator) {
 // Viewer additions -----------------------------------------------------
 const mv = document.querySelector('model-viewer');
 const scene =
-    mv[Object.getOwnPropertySymbols(mv).find(x => x.description === 'scene')];
+    mv[Object.getOwnPropertySymbols(mv).find((x) => x.description === 'scene')];
 
 const animationContainer = document.querySelector('#animation');
 let showEdges = false;
@@ -976,7 +1052,7 @@ function ceilNiceNumber(value) {
 }
 
 function formatMetricLength(meters) {
-  const trim = x => x.toFixed(0);
+  const trim = (x) => x.toFixed(0);
   const absMeters = Math.abs(meters);
   if (absMeters >= 10) {
     return `${trim(meters)} m`;
@@ -1007,9 +1083,9 @@ function createAxisLabelMesh(text, size) {
   context.font = '700 52px "Arial", sans-serif';
 
   const lineHeight = 60;
-  const startY = (canvasSize / 2) - ((lines.length - 1) * lineHeight / 2);
+  const startY = canvasSize / 2 - ((lines.length - 1) * lineHeight) / 2;
   lines.forEach((line, index) => {
-    context.fillText(line, canvasSize, startY + (index * lineHeight));
+    context.fillText(line, canvasSize, startY + index * lineHeight);
   });
 
   const texture = new CanvasTexture(canvas);
@@ -1033,13 +1109,37 @@ function createGridLinesGeometry(gridHalfExtent, numLines, spacing) {
   for (let i = 1; i <= numLines; i++) {
     const coordinate = i * spacing;
     vertices.push(
-        -gridHalfExtent, 0, coordinate, gridHalfExtent, 0, coordinate);
+        -gridHalfExtent,
+        0,
+        coordinate,
+        gridHalfExtent,
+        0,
+        coordinate,
+    );
     vertices.push(
-        coordinate, 0, -gridHalfExtent, coordinate, 0, gridHalfExtent);
+        coordinate,
+        0,
+        -gridHalfExtent,
+        coordinate,
+        0,
+        gridHalfExtent,
+    );
     vertices.push(
-        -gridHalfExtent, 0, -coordinate, gridHalfExtent, 0, -coordinate);
+        -gridHalfExtent,
+        0,
+        -coordinate,
+        gridHalfExtent,
+        0,
+        -coordinate,
+    );
     vertices.push(
-        -coordinate, 0, -gridHalfExtent, -coordinate, 0, gridHalfExtent);
+        -coordinate,
+        0,
+        -gridHalfExtent,
+        -coordinate,
+        0,
+        gridHalfExtent,
+    );
   }
   if (vertices.length === 0) return null;
   const geometry = new BufferGeometry();
@@ -1050,7 +1150,7 @@ function createGridLinesGeometry(gridHalfExtent, numLines, spacing) {
 function disposeOrientationGrid(grid) {
   if (!grid) return;
 
-  grid.traverse(obj => {
+  grid.traverse((obj) => {
     if (obj.geometry) {
       obj.geometry.dispose();
     }
@@ -1089,9 +1189,13 @@ function updateOrientationGrid() {
   }
 
   const extentX = Math.max(
-      Math.abs(center.x + extent.x / 2), Math.abs(center.x - extent.x / 2));
+      Math.abs(center.x + extent.x / 2),
+      Math.abs(center.x - extent.x / 2),
+  );
   const extentZ = Math.max(
-      Math.abs(center.z + extent.z / 2), Math.abs(center.z - extent.z / 2));
+      Math.abs(center.z + extent.z / 2),
+      Math.abs(center.z - extent.z / 2),
+  );
   const modelHalfExtent = Math.max(extentX, extentZ);
   const paddedHalfExtent = modelHalfExtent * 1.2;
   const minorStep = ceilNiceNumber(paddedHalfExtent / 50);
@@ -1099,10 +1203,16 @@ function updateOrientationGrid() {
   const gridHalfExtent = numMinor * minorStep;
   const maxGridDimension = gridHalfExtent * 2;
 
-  const minorGeometry =
-      createGridLinesGeometry(gridHalfExtent, numMinor, minorStep);
-  const majorGeometry =
-      createGridLinesGeometry(gridHalfExtent, numMinor / 10, 10 * minorStep);
+  const minorGeometry = createGridLinesGeometry(
+      gridHalfExtent,
+      numMinor,
+      minorStep,
+  );
+  const majorGeometry = createGridLinesGeometry(
+      gridHalfExtent,
+      numMinor / 10,
+      10 * minorStep,
+  );
 
   const grid = new Group();
   grid.userData[ORIENTATION_GRID_FLAG] = true;
@@ -1119,33 +1229,40 @@ function updateOrientationGrid() {
         side: 2,
         depthWrite: false,
         toneMapped: false,
-      }));
+      }),
+  );
   gridPlane.rotation.x = -Math.PI / 2;
   gridPlane.userData[ORIENTATION_GRID_FLAG] = true;
   gridPlane.userData.noHit = true;  // using <model-viewer>'s internals
   grid.add(gridPlane);
 
   if (minorGeometry) {
-    const minorLines = new LineSegments(minorGeometry, new LineBasicMaterial({
-                                          color: 0,
-                                          transparent: true,
-                                          opacity: 0.4,
-                                          depthWrite: false,
-                                          toneMapped: false,
-                                        }));
+    const minorLines = new LineSegments(
+        minorGeometry,
+        new LineBasicMaterial({
+          color: 0,
+          transparent: true,
+          opacity: 0.4,
+          depthWrite: false,
+          toneMapped: false,
+        }),
+    );
     minorLines.userData[ORIENTATION_GRID_FLAG] = true;
     minorLines.userData.noHit = true;  // using <model-viewer>'s internals
     grid.add(minorLines);
   }
 
   if (majorGeometry) {
-    const majorLines = new LineSegments(majorGeometry, new LineBasicMaterial({
-                                          color: 0,
-                                          transparent: true,
-                                          opacity: 0.8,
-                                          depthWrite: false,
-                                          toneMapped: false,
-                                        }));
+    const majorLines = new LineSegments(
+        majorGeometry,
+        new LineBasicMaterial({
+          color: 0,
+          transparent: true,
+          opacity: 0.8,
+          depthWrite: false,
+          toneMapped: false,
+        }),
+    );
     majorLines.userData[ORIENTATION_GRID_FLAG] = true;
     majorLines.userData.noHit = true;  // using <model-viewer>'s internals
     grid.add(majorLines);
@@ -1163,7 +1280,8 @@ function updateOrientationGrid() {
 
   const xAxis = new Mesh(
       new PlaneGeometry(maxGridDimension, axisStripWidth),
-      axisMaterial.clone());
+      axisMaterial.clone(),
+  );
   xAxis.rotation.x = -Math.PI / 2;
   xAxis.userData[ORIENTATION_GRID_FLAG] = true;
   xAxis.userData.noHit = true;  // using <model-viewer>'s internals
@@ -1171,7 +1289,8 @@ function updateOrientationGrid() {
 
   const yAxis = new Mesh(
       new PlaneGeometry(axisStripWidth, maxGridDimension),
-      axisMaterial.clone());
+      axisMaterial.clone(),
+  );
   yAxis.rotation.x = -Math.PI / 2;
   yAxis.userData[ORIENTATION_GRID_FLAG] = true;
   yAxis.userData.noHit = true;  // using <model-viewer>'s internals
@@ -1230,7 +1349,7 @@ function finishRun() {
 
 const output = {
   glbURL: null,
-  threeMFURL: null
+  threeMFURL: null,
 };
 let manifoldWorker = null;
 
@@ -1245,7 +1364,6 @@ function createWorker() {
         initializeRun();
       }
       manifoldInitialized = true;
-
     } else if (message?.type === 'error') {
       // Clean up.
       setScript('safe', 'false');
@@ -1271,7 +1389,6 @@ function createWorker() {
 
       // Start all over again.
       createWorker();
-
     } else if (message?.type === 'log') {
       const logMessage = String(message.message ?? '');
       // Hide noisy per-module CDN fetch traces, keep other worker logs.
@@ -1279,7 +1396,6 @@ function createWorker() {
         consoleElement.textContent += logMessage + '\r\n';
         consoleElement.scrollTop = consoleElement.scrollHeight;
       }
-
     } else if (message?.type === 'done') {
       setScript('safe', 'true');
       manifoldWorker.postMessage({type: 'export', extension: 'glb'});
@@ -1287,7 +1403,6 @@ function createWorker() {
 
       finishRun();
       runButton.disabled = true;
-
     } else if (message?.type === 'blob') {
       if (message.extension === 'glb') {
         if (output.glbURL) URL.revokeObjectURL(output.glbURL);
@@ -1307,8 +1422,11 @@ function createWorker() {
     }
   };
 
-  manifoldWorker.postMessage(
-      {type: 'initialize', esbuildWasmUrl, manifoldWasmUrl});
+  manifoldWorker.postMessage({
+    type: 'initialize',
+    esbuildWasmUrl,
+    manifoldWasmUrl,
+  });
 }
 
 createWorker();
@@ -1331,7 +1449,7 @@ async function run() {
     filename,
     files,
     jsCDN: 'jsDelivr',
-    baseUrl: window.location.href
+    baseUrl: window.location.href,
   });
 }
 
