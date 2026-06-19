@@ -50,21 +50,6 @@ void AccumulateBounds(const Polygons& polys, Rect& box) {
   }
 }
 
-vec2 MakeLocalOrigin(const Polygons& a, const Polygons& b = {}) {
-  Rect box;
-  AccumulateBounds(a, box);
-  AccumulateBounds(b, box);
-  return box.IsFinite() ? box.Center() : vec2(0.0);
-}
-
-Polygons TranslatePolygons(const Polygons& polys, vec2 delta) {
-  Polygons out = polys;
-  for (auto& loop : out) {
-    for (vec2& v : loop) v = v + delta;
-  }
-  return out;
-}
-
 // Classify the CCW turn from `ref` to `dir` for deterministic polar ordering.
 // Group 0 is (0, pi], group 1 is (pi, 2pi), and group 2 is the zero turn.
 // A zero turn is ordered last so loop tracing does not immediately reverse
@@ -142,19 +127,19 @@ Polygons ApplyFillRule(const Polygons& a, const Polygons& b, int bSign,
   DEBUG_ASSERT(bSign == 1 || bSign == -1, logicErr,
                "Boolean2 input multiplicity must be +/-1");
   if (!AllFinite(a) || !AllFinite(b)) return {};
-  const vec2 origin = MakeLocalOrigin(a, b);
-  Polygons localA = TranslatePolygons(a, -origin);
-  Polygons localB = TranslatePolygons(b, -origin);
-  if (eps <= 0.0) eps = InferEps(localA, localB);
+  // No local-origin recenter: the inferred eps is position-inclusive
+  // (bBox.Scale()), matching Boolean3's MaxEpsilon and the polygon
+  // triangulator, so the arrangement stays resolvable far from origin.
+  if (eps <= 0.0) eps = InferEps(a, b);
 
   std::vector<vec2> verts;
   std::vector<EdgeM> edges;
-  AppendInput(localA, 1, verts, edges);
-  AppendInput(localB, bSign, verts, edges);
+  AppendInput(a, 1, verts, edges);
+  AppendInput(b, bSign, verts, edges);
   if (verts.empty()) return {};
 
   OverlapResult r = RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, rule);
-  return TranslatePolygons(OutEdgesToPolygons(r.verts, r.edges), origin);
+  return OutEdgesToPolygons(r.verts, r.edges);
 }
 
 }  // namespace
@@ -238,16 +223,17 @@ Polygons ApplyFillRule(const Polygons& polys, double eps) {
   return ApplyFillRule(polys, {}, 1, WindRule::Add, eps);
 }
 
-// Infer eps from a polygon set's coordinate half-extent via Smith's
-// alpha-budget formula. Keep this translation invariant so callers can safely
-// use it before any local-origin translation.
+// Infer eps from a polygon set's absolute coordinate scale via Smith's
+// alpha-budget formula. Position-inclusive (bBox.Scale() = max abs coordinate),
+// matching Boolean3's MaxEpsilon and the polygon triangulator: eps tracks
+// absolute magnitude so the arrangement stays resolvable far from origin
+// without a recenter. Not translation invariant by design.
 double InferEps(const Polygons& a, const Polygons& b) {
   Rect box;
   AccumulateBounds(a, box);
   AccumulateBounds(b, box);
   if (!box.IsFinite()) return 0.0;
-  const vec2 halfSize = 0.5 * box.Size();
-  return EpsilonFromScale(Rect(-halfSize, halfSize).Scale());
+  return EpsilonFromScale(box.Scale());
 }
 
 // Binary boolean over one combined edge set; Subtract flips B's multiplicity.
