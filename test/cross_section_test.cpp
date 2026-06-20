@@ -343,11 +343,10 @@ TEST(CrossSection, ConcurrentIndependentEdgePairs) {
   }
 }
 
-// DISABLED by the position-inclusive eps change: InferEps now scales with
-// bBox.Scale() (absolute coordinate), matching Boolean3, so the shallow
-// concurrency of these ~1-unit rhombi is not preserved when translated to 2^40.
-// Translation invariance is intentionally given up; see the InferEps contract.
-TEST(CrossSection, DISABLED_TranslatedShallowConcurrentEdges) {
+// The 4 shallow-concurrency rhombi (~1-unit, 0.08 wide) resolve at the origin
+// but sit below eps at 2^40 under position-inclusive eps, so the shifted copy
+// merges to empty - translation is intentionally not invariant there.
+TEST(CrossSection, TranslatedShallowConcurrentEdges) {
   auto rhomb = [](double angleDegrees, vec2 offset) {
     const double angle = angleDegrees * kPi / 180.;
     const double cosA = std::cos(angle);
@@ -369,35 +368,24 @@ TEST(CrossSection, DISABLED_TranslatedShallowConcurrentEdges) {
   const double base = std::ldexp(1.0, 40);
   CrossSection origin(polysAt({0., 0.}));
   CrossSection shifted(polysAt({base, -base}));
-  CrossSection shiftedBack = shifted.Translate({-base, base});
 
   EXPECT_EQ(origin.NumContour(), 1);
-  EXPECT_EQ(shifted.NumContour(), 1);
-  EXPECT_EQ(shiftedBack.NumContour(), origin.NumContour());
-  EXPECT_NEAR(shiftedBack.Area(), origin.Area(), 1e-4);
-  EXPECT_NEAR(shiftedBack.Bounds().Size().x, origin.Bounds().Size().x, 1e-4);
-  EXPECT_NEAR(shiftedBack.Bounds().Size().y, origin.Bounds().Size().y, 1e-4);
+  EXPECT_TRUE(shifted.IsEmpty()) << "rhombi sit below eps at 2^40";
 }
 
-// DISABLED by the position-inclusive eps change: with eps scaled to
-// bBox.Scale() (matching Boolean3), a 10-unit square at ~2^49 sits far below
-// eps and is intentionally not resolved - a feature much smaller than its
-// distance from the origin is no longer preserved. See the InferEps contract in
+// With eps scaled to bBox.Scale() (matching Boolean3), a 10-unit square at
+// ~2^49 sits far below eps: a feature much smaller than its distance from the
+// origin is intentionally not resolved. See the InferEps contract in
 // boolean2.cpp.
-TEST(CrossSection, DISABLED_TranslatedSmallPolygonKeepsFeatures) {
+TEST(CrossSection, TranslatedSmallPolygonDropped) {
   const double base = std::ldexp(1.0, 49) * 1.5;
   SimplePolygon square = {{base, -base},
                           {base + 10.0, -base},
                           {base + 10.0, -base + 10.0},
                           {base, -base + 10.0}};
 
-  CrossSection cs(square);
-
-  EXPECT_EQ(cs.NumContour(), 1);
-  EXPECT_EQ(cs.NumVert(), 4);
-  const vec2 size = cs.Bounds().Size();
-  EXPECT_NEAR(size.x, 10.0, 1e-9);
-  EXPECT_NEAR(size.y, 10.0, 1e-9);
+  EXPECT_TRUE(CrossSection(square).IsEmpty())
+      << "a 10-unit feature sits below eps at ~2^49";
 }
 
 TEST(CrossSection, TinyFeatureNearCornerEdgeSoupParity) {
@@ -520,18 +508,13 @@ TEST(CrossSection, NearCoincidentLargeCoordIsValid) {
   }
 }
 
-// DISABLED: a centered near-degenerate corner touch whose two un-merged
-// crossings sit ~2.8x eps apart - just outside the merge band - so the
-// arrangement is non-manifold (a retained vertex with in != out degree) and
-// OutEdgesToPolygons correctly hits the closed-walk assert. The assert is not
-// in question: a non-closing walk is a real defect. Position-inclusive eps is a
-// no-op at the origin, so it does not address this (it fixed HostDrop/Lane B
-// only by inflating eps at their large coords until the tangle merges). In
-// Release the macro area is incidentally correct (only a sub-eps sliver drops),
-// but the arrangement is still non-manifold - the fix belongs in the
-// arrangement, not the assert. Below-resolution floor, StressB/StressD class.
-// Re-enable when the arrangement is made manifold here.
-TEST(CrossSection, DISABLED_CenteredSubEpsNonClosingWalk) {
+// A centered near-degenerate corner touch: the two un-merged crossings sit
+// ~2.1x eps apart, so FilterByWinding drops the sole interior bridge and the
+// retained graph is imbalanced (in != out). MergeWindingVerts fuses that
+// within-eps canceling pair so the walk closes. big and tiny only point-touch
+// (each is outside the other), so the union is two disjoint contours summing to
+// 30107.44255 with empty intersection.
+TEST(CrossSection, CenteredSubEpsNonClosingWalk) {
   const SimplePolygon big = {{16.326654361604518, -168.72132050147599},
                              {126.43622068872992, 170.16107906902442},
                              {-126.4362206896044, -64.998020356457175},
@@ -542,10 +525,54 @@ TEST(CrossSection, DISABLED_CenteredSubEpsNonClosingWalk) {
                               {125.43554197004028, 170.16166685379164},
                               {124.77049882701533, 169.67730915692113},
                               {125.51465251505573, 169.92009174481331}};
-  // Release-correct result (only a ~6e-8 sub-eps sliver is dropped).
-  const auto u = CrossSection(big) + CrossSection(tiny);
+  const CrossSection cbig(big), ctiny(tiny);
+  const auto u = cbig + ctiny;
   EXPECT_NEAR(u.Area(), 30107.44255, 1e-3);
-  EXPECT_EQ(u.NumContour(), 1);
+  // nc==2 holds for this vertex order; an equally valid 1-contour pinched form
+  // exists for other orderings of the shared corner.
+  EXPECT_EQ(u.NumContour(), 2u);
+  const auto inter = cbig.Boolean(ctiny, OpType::Intersect);
+  EXPECT_NEAR(inter.Area(), 0.0, 1e-3) << "big and tiny only point-touch";
+}
+
+// Two genuinely distinct square features a few eps apart must stay two
+// contours: MergeWindingVerts must never fuse real geometry. The squares are
+// large enough (>> eps) to survive the eps-merge as separate loops, so each is
+// a balanced closed loop and no vertex is imbalanced - the repair is a no-op
+// for them regardless of separation. Swept across gaps of 1.6, 2.0 and 3.0 eps
+// (the last inside the repair's cluster radius), the union stays two disjoint
+// contours of area 2*S^2 with empty intersection. (The literal 0.4-eps squares
+// from the lane spec are below the merge resolution: their corners are within
+// eps of each other, so MergeVerts collapses each square to a point and the
+// union is empty before winding even runs - that geometry never reaches the
+// repair, so it is not a useful no-fuse probe; these survivable squares are.)
+TEST(CrossSection, MergeWindingVertsKeepsDistinctFeatures) {
+  const double base = 170.0;        // fixes the position-inclusive op eps
+  const double eps = 3.519281e-10;  // EpsilonFromScale(170)
+  for (const double sideMul : {4.0, 10.0}) {
+    for (const double gapMul : {1.6, 2.0, 3.0}) {
+      const double S = sideMul * eps;
+      const double G = gapMul * eps;
+      const SimplePolygon f1 = {{base, base},
+                                {base + S, base},
+                                {base + S, base + S},
+                                {base, base + S}};
+      SimplePolygon f2;
+      for (const auto& v : f1) f2.push_back({v.x + S + G, v.y});
+      const CrossSection a(f1), b(f2);
+      const auto u = a + b;
+      const auto inter = a.Boolean(b, OpType::Intersect);
+      EXPECT_EQ(u.NumContour(), 2u)
+          << "distinct features fused at side=" << sideMul
+          << "eps gap=" << gapMul << "eps";
+      EXPECT_NEAR(u.Area(), 2 * S * S, 1e-3 * (2 * S * S))
+          << "union area wrong at side=" << sideMul << "eps gap=" << gapMul
+          << "eps";
+      EXPECT_NEAR(inter.Area(), 0.0, 1e-3 * (2 * S * S))
+          << "distinct features overlap at side=" << sideMul
+          << "eps gap=" << gapMul << "eps";
+    }
+  }
 }
 
 // A big square built together with a tiny self-intersecting feature whose edges
@@ -651,24 +678,18 @@ TEST(CrossSection, InclusionExclusionSliver) {
       << "inclusion-exclusion area outside the eps*length floor";
 }
 
-// A genuine ~4*eps-wide rectangle overlap; a sub-eps binary-incidence
-// knife-edge. DISABLED by the position-inclusive eps change: at these
-// off-origin (~2048) coordinates eps scales to bBox.Scale() (matching
-// Boolean3), ~2x the old span-based value, so this ~4*eps overlap now falls
-// under eps and merges to empty. See the InferEps contract in boolean2.cpp.
-TEST(CrossSection, DISABLED_SubEpsRectangleOverlap) {
+// A ~5.6e-9-wide rectangle overlap at ~2048: eps scales to bBox.Scale()
+// (matching Boolean3), so the overlap sits under eps and the intersection
+// merges to empty. See the InferEps contract in boolean2.cpp.
+TEST(CrossSection, SubEpsRectangleOverlap) {
   const CrossSection a(
       SimplePolygon{{0, 0}, {2048, 0}, {2048, 2048}, {0, 2048}});
   const CrossSection b(SimplePolygon{{2047.9999999943693, 512},
                                      {2303.9999999943693, 512},
                                      {2303.9999999943693, 768},
                                      {2047.9999999943693, 768}});
-  // Overlap = [2047.9999999943693, 2048] x [512, 768]: width ~5.6e-9 (~4*eps)
-  // by height 256, area ~1.44e-6 by rectangle arithmetic (independent of the
-  // engine).
-  const double expected = (2048.0 - 2047.9999999943693) * 256.0;
-  EXPECT_NEAR(a.Boolean(b, OpType::Intersect).Area(), expected, 1e-3 * expected)
-      << "sub-eps rectangle overlap dropped to empty";
+  EXPECT_TRUE(a.Boolean(b, OpType::Intersect).IsEmpty())
+      << "sub-eps rectangle overlap drops to empty";
 }
 
 // A tiny square unioned with a huge thin strip (~1e6:1 aspect
@@ -2029,11 +2050,12 @@ TEST(CrossSection, NonFiniteInputReturnsEmpty) {
   EXPECT_TRUE(constructed.IsEmpty());
 }
 
-// DISABLED by the position-inclusive eps change: InferEps now scales with the
-// absolute coordinate (matching Boolean3), so Offset is intentionally NOT
-// invariant under a large translation - the eps at 1e12 differs from the eps at
-// the origin. See the InferEps contract in boolean2.cpp.
-TEST(CrossSection, DISABLED_OffsetIsInvariantUnderLargeTranslation) {
+// InferEps scales with the absolute coordinate (matching Boolean3), so Offset
+// is intentionally NOT invariant under a large translation: at 1e12 the round
+// join's small arcs sit below eps and collapse, so the result keeps fewer
+// verts than the same offset at the origin. See the InferEps contract in
+// boolean2.cpp.
+TEST(CrossSection, OffsetNotInvariantUnderLargeTranslation) {
   const CrossSection square = CrossSection::Square({10.0, 10.0}, true);
   const CrossSection origin =
       square.Offset(1.0, CrossSection::JoinType::Round, 2.0, 8);
@@ -2042,9 +2064,8 @@ TEST(CrossSection, DISABLED_OffsetIsInvariantUnderLargeTranslation) {
           .Offset(1.0, CrossSection::JoinType::Round, 2.0, 8)
           .Translate({-1e12, 1e12});
 
-  EXPECT_EQ(translated.NumContour(), origin.NumContour());
-  EXPECT_EQ(translated.NumVert(), origin.NumVert());
-  EXPECT_NEAR(translated.Area(), origin.Area(), 1e-3);
+  EXPECT_GT(origin.NumVert(), translated.NumVert())
+      << "round-join arcs collapse below eps at 1e12";
 }
 
 TEST(CrossSection, SimplifyPostFiltersBoolean2Output) {

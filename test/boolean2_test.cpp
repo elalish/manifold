@@ -1276,3 +1276,153 @@ TEST(Boolean2, ShortEdgeFusionAddIntersect) {
               9.99, 5e-2 * 9.99)
       << "intersection area outside the eps*length floor";
 }
+
+// ===== MergeWindingVerts unit tests =====
+// These drive MergeWindingVerts directly on synthetic OutEdge sets so the
+// graph-level behaviour (component collapse, leave-alone, determinism) can be
+// checked without realizing the geometry as CrossSection input.
+
+namespace {
+
+// Per-vertex out-degree minus in-degree over a directed OutEdge set.
+std::map<int, int> Surplus(const std::vector<OutEdge>& edges) {
+  std::map<int, int> s;
+  for (const auto& e : edges) {
+    s[e.v0] += 1;
+    s[e.v1] -= 1;
+  }
+  return s;
+}
+
+// Canonicalize an OutEdge set to an order-independent sorted (v0,v1) list so
+// two runs can be compared as sets regardless of emission order.
+std::vector<std::pair<int, int>> EdgeSet(const std::vector<OutEdge>& edges) {
+  std::vector<std::pair<int, int>> out;
+  out.reserve(edges.size());
+  for (const auto& e : edges) out.emplace_back(e.v0, e.v1);
+  std::sort(out.begin(), out.end());
+  return out;
+}
+
+}  // namespace
+
+// (b) Four near-coincident vertices on a small circle (r = 0.85 eps) with
+// alternating +/-1 surplus that nets to zero. Pairwise fusion is ambiguous (no
+// canonical pair to merge first); component-collapse is unambiguous - the whole
+// within-eps cluster folds to one representative and the cluster is balanced.
+// Two far anchors carry the surplus and stay imbalanced (non-canceling
+// singletons, correctly left alone). Shuffling the input edge order must give a
+// byte-identical edge set.
+TEST(Boolean2, MergeWindingVertsCircleClusterCollapses) {
+  const double eps = 3.519e-10;
+  const double r = 0.85 * eps;
+  const double deg = kPi / 180.0;
+  std::vector<vec2> verts = {
+      {r * std::cos(0 * deg), r * std::sin(0 * deg)},
+      {r * std::cos(85 * deg), r * std::sin(85 * deg)},
+      {r * std::cos(175 * deg), r * std::sin(175 * deg)},
+      {r * std::cos(265 * deg), r * std::sin(265 * deg)},
+      {1000.0, 0.0},    // anchor 4 (far, never collapses)
+      {1000.0, 1000.0}  // anchor 5 (far, never collapses)
+  };
+  // surplus(0)=+1, surplus(1)=-1, surplus(2)=+1, surplus(3)=-1 (alternating);
+  // anchors absorb the other ends. After collapse the duplicate 0->4 / 5->0
+  // edges must dedup.
+  const std::vector<OutEdge> base = {
+      {0, 4, 1}, {5, 1, 1}, {2, 4, 1}, {5, 3, 1}};
+
+  const auto merged = MergeWindingVerts(base, verts, eps);
+  const auto s = Surplus(merged);
+  // The cluster (now folded onto vertex 0) is balanced.
+  EXPECT_EQ(s.count(0) ? s.at(0) : 0, 0) << "collapsed cluster not balanced";
+  EXPECT_EQ(s.count(1) ? s.at(1) : 0, 0);
+  EXPECT_EQ(s.count(2) ? s.at(2) : 0, 0);
+  EXPECT_EQ(s.count(3) ? s.at(3) : 0, 0);
+  // The far anchors stay imbalanced (genuine residual, left alone).
+  EXPECT_EQ(s.at(4), -1) << "non-canceling anchor was wrongly altered";
+  EXPECT_EQ(s.at(5), +1);
+  // Duplicate directed edges folded out: 4 inputs -> 2 unique edges.
+  EXPECT_EQ(merged.size(), 2u) << "exact-duplicate directed edges not dropped";
+  EXPECT_EQ(EdgeSet(merged),
+            (std::vector<std::pair<int, int>>{{0, 4}, {5, 0}}));
+
+  // Determinism: every permutation of the input yields the identical edge set.
+  std::mt19937_64 rng(12345);
+  std::vector<OutEdge> perm = base;
+  const auto reference = EdgeSet(merged);
+  for (int trial = 0; trial < 200; ++trial) {
+    for (int i = static_cast<int>(perm.size()) - 1; i > 0; --i)
+      std::swap(perm[i], perm[rng() % (i + 1)]);
+    EXPECT_EQ(EdgeSet(MergeWindingVerts(perm, verts, eps)), reference)
+        << "MergeWindingVerts output depends on input edge order (trial "
+        << trial << ")";
+  }
+}
+
+// (c) A five-vertex collinear chain spaced 1.5 eps. Consecutive vertices are
+// within the cluster radius and transitively connect into ONE component, so
+// pairwise fusion would be order-dependent and non-convergent while
+// component-collapse (transitive closure) is a single deterministic answer.
+// Two cases share the chain:
+//   - non-canceling: alternating +1,-1,+1,-1,+1 nets +1, so the chain is a
+//     genuine residual and is left untouched.
+//   - canceling: +1,-1,+1,-1 over the chain (plus a within-chain edge that
+//     becomes a dropped self-loop) nets 0, so the whole chain folds to one
+//     balanced vertex.
+// Both must be order-independent under a shuffle.
+TEST(Boolean2, MergeWindingVertsChainDeterministic) {
+  const double eps = 3.519e-10;
+  const double s = 1.5 * eps;
+  std::vector<vec2> verts = {{0, 0},       {s, 0},     {2 * s, 0},
+                             {3 * s, 0},   {4 * s, 0}, {-1000.0, 0.0},
+                             {1000.0, 0.0}};
+  const int A = 5, B = 6;  // far anchors carrying surplus
+
+  // Non-canceling chain: surplus 0..4 = +1,-1,+1,-1,+1 (net +1). Left alone.
+  {
+    const std::vector<OutEdge> base = {
+        {0, A, 1}, {B, 1, 1}, {2, A, 1}, {B, 3, 1}, {4, A, 1}};
+    const auto merged = MergeWindingVerts(base, verts, eps);
+    EXPECT_EQ(EdgeSet(merged), EdgeSet(base))
+        << "non-canceling chain (net surplus != 0) must be left untouched";
+    std::mt19937_64 rng(777);
+    std::vector<OutEdge> perm = base;
+    for (int trial = 0; trial < 200; ++trial) {
+      for (int i = static_cast<int>(perm.size()) - 1; i > 0; --i)
+        std::swap(perm[i], perm[rng() % (i + 1)]);
+      EXPECT_EQ(EdgeSet(MergeWindingVerts(perm, verts, eps)), EdgeSet(base))
+          << "non-canceling chain output order-dependent (trial " << trial
+          << ")";
+    }
+  }
+
+  // Canceling chain: surplus 0..3 = +1,-1,+1,-1 (net 0) carried by the far
+  // anchors, plus a within-cluster 2-cycle 0<->2 that becomes two dropped
+  // self-loops after collapse. The whole chain folds to one balanced vertex.
+  {
+    const std::vector<OutEdge> base = {{0, A, 1}, {B, 1, 1}, {2, A, 1},
+                                       {B, 3, 1}, {0, 2, 1}, {2, 0, 1}};
+    const auto merged = MergeWindingVerts(base, verts, eps);
+    const auto surp = Surplus(merged);
+    // Every chain vertex folds onto the representative and is balanced.
+    for (int v = 0; v <= 3; ++v)
+      EXPECT_EQ(surp.count(v) ? surp.at(v) : 0, 0)
+          << "canceling chain vertex " << v << " left imbalanced";
+    // No self-loops survive; the 0<->2 cycle and duplicate anchor edges are
+    // gone, leaving exactly {0->A, B->0}.
+    for (const auto& e : merged)
+      EXPECT_NE(e.v0, e.v1) << "self-loop not dropped after collapse";
+    EXPECT_EQ(EdgeSet(merged),
+              (std::vector<std::pair<int, int>>{{0, A}, {B, 0}}));
+    // Determinism under shuffle.
+    std::mt19937_64 rng(999);
+    std::vector<OutEdge> perm = base;
+    const auto reference = EdgeSet(merged);
+    for (int trial = 0; trial < 200; ++trial) {
+      for (int i = static_cast<int>(perm.size()) - 1; i > 0; --i)
+        std::swap(perm[i], perm[rng() % (i + 1)]);
+      EXPECT_EQ(EdgeSet(MergeWindingVerts(perm, verts, eps)), reference)
+          << "canceling chain output order-dependent (trial " << trial << ")";
+    }
+  }
+}
