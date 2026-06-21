@@ -649,13 +649,20 @@ jobs:
         packages: libgtest-dev libtbb-dev cmake
         version: 1
     - name: Prepare base and head worktrees
+      id: prepare_worktrees
       continue-on-error: true
       shell: bash
       run: bash ./scripts/prepare_pr_perf_guard_worktrees.sh "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
     - name: Benchmark base and head
+      id: benchmark_perf
+      if: steps.prepare_worktrees.outcome == 'success'
       continue-on-error: true
       shell: bash
       run: bash ./scripts/benchmark_pr_perf_guard.sh "${PERF_REPEATS}"
     - name: Compare benchmark results
+      if: always()
       shell: bash
+      env:
+        PREPARE_WORKTREES_OUTCOME: ${{ steps.prepare_worktrees.outcome }}
+        BENCHMARK_OUTCOME: ${{ steps.benchmark_perf.outcome }}
       run: bash ./scripts/report_pr_perf_guard.sh ./bench/base ./bench/head "${REGRESSION_WARN_PCT}" "${REGRESSION_WARN_ABS_MS}"

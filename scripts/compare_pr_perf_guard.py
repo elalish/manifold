@@ -232,6 +232,7 @@ def main() -> int:
     parser.add_argument("--head-dir", required=True, type=Path)
     parser.add_argument("--warn-pct", type=float, default=20.0)
     parser.add_argument("--warn-abs-ms", type=float, default=10.0)
+    parser.add_argument("--invalid-reason")
     parser.add_argument("--markdown-out", required=True, type=Path)
     parser.add_argument("--json-out", required=True, type=Path)
     parser.add_argument("--commit-sha")
@@ -242,19 +243,26 @@ def main() -> int:
     args = parser.parse_args()
     metadata = resolve_metadata(args)
 
-    try:
-        base = parse_suite(args.base_dir)
-        head = parse_suite(args.head_dir)
-        if len(base["runs"]) != len(head["runs"]):
-            raise RuntimeError(
-                f"Run count mismatch: base has {len(base['runs'])}, head has {len(head['runs'])}."
-            )
-        markdown, regressed, payload = build_summary(base, head, args.warn_pct, args.warn_abs_ms)
-        payload["data_valid"] = True
-    except Exception as exc:
-        markdown, payload = build_invalid_summary(str(exc))
+    if args.invalid_reason:
+        markdown, payload = build_invalid_summary(args.invalid_reason)
         regressed = False
-        print(f"::warning::PR benchmark guard data invalid: {exc}")
+        print(f"::warning::PR benchmark guard data invalid: {args.invalid_reason}")
+    else:
+        try:
+            base = parse_suite(args.base_dir)
+            head = parse_suite(args.head_dir)
+            if len(base["runs"]) != len(head["runs"]):
+                raise RuntimeError(
+                    f"Run count mismatch: base has {len(base['runs'])}, head has {len(head['runs'])}."
+                )
+            markdown, regressed, payload = build_summary(
+                base, head, args.warn_pct, args.warn_abs_ms
+            )
+            payload["data_valid"] = True
+        except Exception as exc:
+            markdown, payload = build_invalid_summary(str(exc))
+            regressed = False
+            print(f"::warning::PR benchmark guard data invalid: {exc}")
 
     payload["metadata"] = metadata
     args.markdown_out.write_text(markdown + "\n", encoding="utf-8")
