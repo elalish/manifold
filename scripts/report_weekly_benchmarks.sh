@@ -24,7 +24,7 @@ cat "${SUITE_DIR}/result.json"
 echo "::endgroup::"
 
 echo "::group::Weekly benchmark raw outputs"
-for run_file in "${SUITE_DIR}"/run*.txt; do
+find "$SUITE_DIR" -path "${SUITE_DIR}/build" -prune -o -name 'run*.txt' -type f -print | sort | while read -r run_file; do
   [ -f "${run_file}" ] || continue
   echo "--- ${run_file} ---"
   cat "${run_file}"

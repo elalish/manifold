@@ -10,9 +10,14 @@ import subprocess
 from pathlib import Path
 
 SCHEMA_VERSION = "1.0.0"
-CASE_PATTERN = re.compile(r"^### case\s+([0-9]+)\s+\(([0-9]+)\s+vs\s+([0-9]+)\)")
+EMBER_SUITE = "weekly_ember_phase"
+PERF_SUITE = "perf_size_sweep"
+
+EMBER_CASE_PATTERN = re.compile(r"^### case\s+([0-9]+)\s+\(([0-9]+)\s+vs\s+([0-9]+)\)")
 PHASE_PATTERN = re.compile(r"^-+\s+([0-9]+)\s+ms for\s+(.*)$")
 VERTS_PATTERN = re.compile(r"^[0-9]+\s+verts and\s+[0-9]+\s+tris$")
+PERF_PATTERN = re.compile(r"^nTri\s*=\s*([0-9]+),\s*time\s*=\s*([0-9.eE+-]+)\s+sec$")
+
 INDEPENDENT_PHASES = [
     "Assembly",
     "Triangulation",
@@ -35,7 +40,7 @@ def stdev(values: list[float]) -> float:
     return statistics.stdev(values)
 
 
-def summarize(values: list[float]) -> dict:
+def summarize_ms(values: list[float]) -> dict:
     return {
         "samples_ms": values,
         "mean_ms": mean(values),
@@ -59,7 +64,14 @@ def summarize_ratio(values: list[float]) -> dict:
     }
 
 
-def parse_run(run_path: Path, run_index: int) -> dict:
+def run_files(suite_dir: Path) -> list[Path]:
+    files = sorted(suite_dir.glob("run*.txt"))
+    if not files:
+        raise RuntimeError(f"No run*.txt files found in {suite_dir}")
+    return files
+
+
+def parse_ember_run(run_path: Path, run_index: int) -> dict:
     cases = []
     current = None
     accepting_phases = False
@@ -69,7 +81,7 @@ def parse_run(run_path: Path, run_index: int) -> dict:
             cases.append(current)
 
     for line in run_path.read_text(encoding="utf-8").splitlines():
-        case_match = CASE_PATTERN.match(line)
+        case_match = EMBER_CASE_PATTERN.match(line)
         if case_match:
             if current is not None and not accepting_phases:
                 same_case = (
@@ -104,7 +116,7 @@ def parse_run(run_path: Path, run_index: int) -> dict:
 
     finish_current()
     if not cases:
-        raise RuntimeError(f"No weekly benchmark cases found in {run_path}")
+        raise RuntimeError(f"No Ember benchmark cases found in {run_path}")
 
     for case in cases:
         for phase in INDEPENDENT_PHASES:
@@ -113,12 +125,8 @@ def parse_run(run_path: Path, run_index: int) -> dict:
     return {"path": str(run_path), "run_index": run_index, "cases": cases}
 
 
-def parse_suite(suite_dir: Path) -> dict:
-    run_files = sorted(suite_dir.glob("run*.txt"))
-    if not run_files:
-        raise RuntimeError(f"No run*.txt files found in {suite_dir}")
-
-    runs = [parse_run(run_file, i + 1) for i, run_file in enumerate(run_files)]
+def parse_ember_suite(suite_dir: Path) -> dict:
+    runs = [parse_ember_run(path, i + 1) for i, path in enumerate(run_files(suite_dir))]
     case_order = [case["case_index"] for case in runs[0]["cases"]]
     for run in runs[1:]:
         run_order = [case["case_index"] for case in run["cases"]]
@@ -145,7 +153,9 @@ def parse_suite(suite_dir: Path) -> dict:
             for phase in INDEPENDENT_PHASES:
                 phase_samples[phase].append(phases[phase])
 
-        phase_metrics = {phase: summarize(samples) for phase, samples in phase_samples.items()}
+        phase_metrics = {
+            phase: summarize_ms(samples) for phase, samples in phase_samples.items()
+        }
         dominant_phase = max(
             INDEPENDENT_PHASES, key=lambda phase: phase_metrics[phase]["mean_ms"]
         )
@@ -154,7 +164,7 @@ def parse_suite(suite_dir: Path) -> dict:
                 "case_index": case_index,
                 "id_a": first["id_a"],
                 "id_b": first["id_b"],
-                "full_phase_sum_ms": summarize(full_phase_samples),
+                "full_phase_sum_ms": summarize_ms(full_phase_samples),
                 "intersect12_share": summarize_ratio(intersect12_share_samples),
                 "dominant_phase": dominant_phase,
                 "phases": phase_metrics,
@@ -162,10 +172,53 @@ def parse_suite(suite_dir: Path) -> dict:
         )
 
     return {
-        "runs": runs,
-        "cases": cases,
-        "case_order": case_order,
+        "type": "ember_phase",
+        "description": "Selected Ember boolean phase timing cases",
         "phase_order": INDEPENDENT_PHASES,
+        "case_order": case_order,
+        "cases": cases,
+        "runs": runs,
+    }
+
+
+def parse_perf_run(run_path: Path, run_index: int) -> dict:
+    workloads = []
+    for line in run_path.read_text(encoding="utf-8").splitlines():
+        match = PERF_PATTERN.match(line.strip())
+        if not match:
+            continue
+        workloads.append(
+            {
+                "n_tri": int(match.group(1)),
+                "time_ms": float(match.group(2)) * 1000.0,
+            }
+        )
+    if not workloads:
+        raise RuntimeError(f"No perfTest rows found in {run_path}")
+    return {"path": str(run_path), "run_index": run_index, "workloads": workloads}
+
+
+def parse_perf_suite(suite_dir: Path) -> dict:
+    runs = [parse_perf_run(path, i + 1) for i, path in enumerate(run_files(suite_dir))]
+    workload_order = [item["n_tri"] for item in runs[0]["workloads"]]
+    for run in runs[1:]:
+        run_order = [item["n_tri"] for item in run["workloads"]]
+        if run_order != workload_order:
+            raise RuntimeError(
+                f"perfTest layout mismatch in {run['path']}: expected {workload_order}, got {run_order}"
+            )
+
+    workloads = []
+    for position, n_tri in enumerate(workload_order):
+        samples = [run["workloads"][position]["time_ms"] for run in runs]
+        workloads.append({"n_tri": n_tri, "time_ms": summarize_ms(samples)})
+
+    return {
+        "type": "perf_size_sweep",
+        "description": "perfTest sphere boolean size sweep",
+        "workload_order": workload_order,
+        "workloads": workloads,
+        "runs": runs,
     }
 
 
@@ -208,16 +261,9 @@ def resolve_metadata(args: argparse.Namespace) -> dict:
     }
 
 
-def build_summary(suite: dict, metadata: dict, repeats: int) -> str:
+def build_ember_summary(suite: dict) -> list[str]:
     lines = []
-    lines.append("### Weekly Benchmark (Ember phase timings)")
-    lines.append("")
-    lines.append(f"Commit: `{metadata.get('commit_sha') or 'unknown'}`")
-    lines.append(f"Runner: `{metadata.get('runner') or 'unknown'}`")
-    lines.append(f"OS: `{metadata.get('os') or 'unknown'}`")
-    lines.append(f"CPU: `{metadata.get('cpu_model') or 'unknown'}`")
-    lines.append(f"CPU count: `{metadata.get('cpu_count') or 'unknown'}`")
-    lines.append(f"Repeats: `{repeats}`")
+    lines.append("#### Ember Phase Timings")
     lines.append("")
     lines.append(
         "| Case | Dominant phase | Full mean (ms) | Intersect12 share | Assembly | Triangulation | Simplification | Sorting | P->Q | Q->P | Winding P | Winding Q | Runs |"
@@ -252,9 +298,70 @@ def build_summary(suite: dict, metadata: dict, repeats: int) -> str:
         )
 
     lines.append("")
-    lines.append("Note: phase timings use independent phases only; `Intersections (total)` is not added to the denominator.")
+    lines.append(
+        "Note: phase timings use independent phases only; `Intersections (total)` is not added to the denominator."
+    )
     lines.append("")
+    return lines
+
+
+def build_perf_summary(suite: dict) -> list[str]:
+    lines = []
+    lines.append("#### perfTest Size Sweep")
+    lines.append("")
+    lines.append("| nTri | Mean (ms) | Median (ms) | Min (ms) | Max (ms) | Runs |")
+    lines.append("|---:|---:|---:|---:|---:|---:|")
+    for workload in suite["workloads"]:
+        timing = workload["time_ms"]
+        lines.append(
+            "| {n_tri} | {mean:.2f} | {median:.2f} | {min_:.2f} | {max_:.2f} | {runs} |".format(
+                n_tri=workload["n_tri"],
+                mean=timing["mean_ms"],
+                median=timing["median_ms"],
+                min_=timing["min_ms"],
+                max_=timing["max_ms"],
+                runs=timing["n_runs"],
+            )
+        )
+    lines.append("")
+    return lines
+
+
+def build_summary(suites: dict, metadata: dict, repeats: int) -> str:
+    lines = []
+    lines.append("### Weekly Benchmarks")
+    lines.append("")
+    lines.append(f"Commit: `{metadata.get('commit_sha') or 'unknown'}`")
+    lines.append(f"Runner: `{metadata.get('runner') or 'unknown'}`")
+    lines.append(f"OS: `{metadata.get('os') or 'unknown'}`")
+    lines.append(f"CPU: `{metadata.get('cpu_model') or 'unknown'}`")
+    lines.append(f"CPU count: `{metadata.get('cpu_count') or 'unknown'}`")
+    lines.append(f"Repeats: `{repeats}`")
+    lines.append("")
+
+    if EMBER_SUITE in suites:
+        lines.extend(build_ember_summary(suites[EMBER_SUITE]))
+    if PERF_SUITE in suites:
+        lines.extend(build_perf_summary(suites[PERF_SUITE]))
     return "\n".join(lines)
+
+
+def parse_suites(root_dir: Path) -> dict:
+    suites = {}
+    ember_dir = root_dir / "ember_phase"
+    perf_dir = root_dir / "perf_size_sweep"
+
+    if ember_dir.exists():
+        suites[EMBER_SUITE] = parse_ember_suite(ember_dir)
+    elif list(root_dir.glob("run*.txt")):
+        suites[EMBER_SUITE] = parse_ember_suite(root_dir)
+
+    if perf_dir.exists():
+        suites[PERF_SUITE] = parse_perf_suite(perf_dir)
+
+    if not suites:
+        raise RuntimeError(f"No weekly benchmark suites found in {root_dir}")
+    return suites
 
 
 def main() -> int:
@@ -263,8 +370,6 @@ def main() -> int:
     parser.add_argument("--markdown-out", required=True, type=Path)
     parser.add_argument("--json-out", required=True, type=Path)
     parser.add_argument("--repeats", required=True, type=int)
-    parser.add_argument("--suite-name", default="weekly_ember_phase")
-    parser.add_argument("--suite-type", default="ember_phase")
     parser.add_argument("--commit-sha")
     parser.add_argument("--workflow")
     parser.add_argument("--runner")
@@ -275,24 +380,16 @@ def main() -> int:
     args = parser.parse_args()
 
     metadata = resolve_metadata(args)
-    suite = parse_suite(args.suite_dir)
-    markdown = build_summary(suite, metadata, args.repeats)
+    suites = parse_suites(args.suite_dir)
+    suite_names = list(suites.keys())
+    markdown = build_summary(suites, metadata, args.repeats)
     payload = {
         "metadata": metadata,
         "config": {
             "repeats": args.repeats,
-            "suites": [args.suite_name],
+            "suites": suite_names,
         },
-        "suites": {
-            args.suite_name: {
-                "type": args.suite_type,
-                "description": "Selected Ember boolean phase timing cases",
-                "phase_order": INDEPENDENT_PHASES,
-                "case_order": suite["case_order"],
-                "cases": suite["cases"],
-                "runs": suite["runs"],
-            }
-        },
+        "suites": suites,
     }
 
     args.markdown_out.write_text(markdown + "\n", encoding="utf-8")
