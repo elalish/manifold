@@ -1008,76 +1008,6 @@ IntersectionInsertion FindAndInsertIntersections(
   return {std::move(verts), std::move(lists)};
 }
 
-// ===== Merge winding verts =====
-std::vector<OutEdge> MergeWindingVerts(std::vector<OutEdge> outEdges,
-                                       const std::vector<vec2>& verts,
-                                       double eps) {
-  // surplus = out-degree minus in-degree per vertex (OutEdge mult is always 1).
-  const int nV = static_cast<int>(verts.size());
-  std::vector<int> surplus(nV, 0);
-  for (const auto& e : outEdges) {
-    ++surplus[e.v0];
-    --surplus[e.v1];
-  }
-  std::vector<int> imbalanced;
-  for (int v = 0; v < nV; ++v)
-    if (surplus[v] != 0) imbalanced.push_back(v);
-  if (imbalanced.empty()) return outEdges;  // balanced: nothing to merge
-
-  // Union the imbalanced verts within eps. They are few, so an O(k^2) scan
-  // beats a broad phase; 3*eps spans a split corner (the input merge pairs over
-  // a 2*eps box). The net-zero gate below, not this radius, is the safety.
-  const double radius2 = 9.0 * eps * eps;  // (3 eps)^2
-  DisjointSets uf(nV);
-  for (size_t a = 0; a < imbalanced.size(); ++a)
-    for (size_t b = a + 1; b < imbalanced.size(); ++b) {
-      const vec2 d = verts[imbalanced[a]] - verts[imbalanced[b]];
-      if (la::dot(d, d) <= radius2) uf.unite(imbalanced[a], imbalanced[b]);
-    }
-
-  // Per component (keyed by root): net surplus and lowest-index representative.
-  std::vector<int> netSurplus(nV, 0);
-  std::vector<int> rep(nV, -1);
-  for (int v : imbalanced) {
-    const int r = static_cast<int>(uf.find(v));
-    netSurplus[r] += surplus[v];
-    rep[r] = rep[r] < 0 ? v : std::min(rep[r], v);
-  }
-  // Collapse only canceling (net-zero) components; a nonzero net is a genuine
-  // residual, left as identity (a singleton keeps its surplus, so never folds).
-  std::vector<int> remap(nV);
-  std::iota(remap.begin(), remap.end(), 0);
-  bool anyCollapse = false;
-  for (int v : imbalanced) {
-    const int r = static_cast<int>(uf.find(v));
-    if (netSurplus[r] == 0 && rep[r] != v) {
-      remap[v] = rep[r];
-      anyCollapse = true;
-    }
-  }
-  if (!anyCollapse) return outEdges;
-
-  // Remap, drop the self-loops left by the collapsed bridge, then sort and
-  // dedup like Canonicalize. Edge order is irrelevant to OutEdgesToPolygons.
-  std::vector<OutEdge> merged;
-  merged.reserve(outEdges.size());
-  for (const auto& e : outEdges) {
-    const int v0 = remap[e.v0];
-    const int v1 = remap[e.v1];
-    if (v0 != v1) merged.push_back({v0, v1, 1});
-  }
-  std::sort(merged.begin(), merged.end(),
-            [](const OutEdge& a, const OutEdge& b) {
-              return a.v0 != b.v0 ? a.v0 < b.v0 : a.v1 < b.v1;
-            });
-  merged.erase(std::unique(merged.begin(), merged.end(),
-                           [](const OutEdge& a, const OutEdge& b) {
-                             return a.v0 == b.v0 && a.v1 == b.v1;
-                           }),
-               merged.end());
-  return merged;
-}
-
 // ===== Driver =====
 // End-to-end Boolean2 driver. Stitches together vertex merging, edge
 // collapse, near-vertex indexing, proper edge-edge crossing insertion,
@@ -1176,9 +1106,6 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
     out = FilterByWinding(canon, merge.verts, pred);
   }
   traceRecorder.RecordFilteredOutput(merge.verts, out);
-  // FilterByWinding can leave a split corner imbalanced; fuse it so the walk
-  // closes (contract on the declaration).
-  out = MergeWindingVerts(std::move(out), merge.verts, eps);
   CountTimingCase();
   return {std::move(merge.verts), std::move(out),
           std::move(merge.inputVert2Merged), numMerged};

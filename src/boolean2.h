@@ -292,19 +292,6 @@ std::vector<OutEdge> FilterByWinding(const CanonicalSubEdges& canon,
                                      const std::vector<vec2>& verts,
                                      WindRule rule = WindRule::Add);
 
-// Merge the near-coincident vertices the input MergeVerts was too conservative
-// to fuse but the winding has now revealed are one point. FilterByWinding can
-// split such a corner across vertices more than eps apart, leaving them with
-// canceling in/out imbalance; fusing each within-eps connected component of
-// imbalanced vertices whose surpluses cancel (net zero) to one representative -
-// dropping the resulting self-loops and duplicate edges - restores
-// in-degree == out-degree so OutEdgesToPolygons always closes. A no-op on an
-// already-balanced arrangement. The net-zero gate is exact on the isolated
-// canceling pairs the winding produces, not a general same-point test.
-std::vector<OutEdge> MergeWindingVerts(std::vector<OutEdge> outEdges,
-                                       const std::vector<vec2>& verts,
-                                       double eps);
-
 struct OverlapResult {
   std::vector<vec2> verts;
   std::vector<OutEdge> edges;
