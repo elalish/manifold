@@ -479,11 +479,9 @@ jobs:
       with:
         packages: libassimp-dev libtbb-dev git pkg-config cmake
         version: 1
-    - name: Clone Clipper2
-      run: git clone --depth 1 https://github.com/AngusJohnson/Clipper2.git ./clipper2
     - name: Run weekly benchmarks
       shell: bash
-      run: python3 ./scripts/run_weekly_benchmarks.py . ./clipper2 ./bench/weekly "${WEEKLY_BENCHMARK_REPEATS}"
+      run: python3 ./scripts/run_weekly_benchmarks.py . ./bench/weekly "${WEEKLY_BENCHMARK_REPEATS}"
     - name: Report weekly benchmarks
       shell: bash
       run: bash ./scripts/report_weekly_benchmarks.sh ./bench/weekly "${WEEKLY_BENCHMARK_REPEATS}"

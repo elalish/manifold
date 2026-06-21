@@ -19,7 +19,6 @@ DEFAULT_EMBER_CASES = "16 84 667 695 260 406 551 582"
 @dataclass(frozen=True)
 class BuildContext:
     source_dir: Path
-    clipper2_dir: Path
     out_dir: Path
     repeats: int
     build_dir: Path
@@ -73,7 +72,6 @@ def configure_build(ctx: BuildContext) -> None:
             "-DMANIFOLD_PAR=ON",
             "-DMANIFOLD_TIMING=ON",
             "-DASSIMP_ENABLE=ON",
-            f"-DFETCHCONTENT_SOURCE_DIR_CLIPPER2={ctx.clipper2_dir}",
         ]
     )
 
@@ -236,14 +234,12 @@ SUITES = [
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run weekly benchmark suites.")
     parser.add_argument("source_dir", type=Path)
-    parser.add_argument("clipper2_dir", type=Path)
     parser.add_argument("out_dir", type=Path)
     parser.add_argument("repeats", type=int)
     args = parser.parse_args()
 
     ctx = BuildContext(
         source_dir=args.source_dir.resolve(),
-        clipper2_dir=args.clipper2_dir.resolve(),
         out_dir=args.out_dir.resolve(),
         repeats=args.repeats,
         build_dir=(args.out_dir / "build").resolve(),
