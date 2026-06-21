@@ -535,6 +535,32 @@ TEST(CrossSection, CenteredSubEpsNonClosingWalk) {
   EXPECT_NEAR(inter.Area(), 0.0, 1e-3) << "big and tiny only point-touch";
 }
 
+// Sibling of CenteredSubEpsNonClosingWalk that MergeWindingVerts does NOT fix.
+// Three triangles share a nearly-common corner on y = 0 (the corners sit within
+// eps of each other but stay distinct), and two of their sides cross just below
+// it. That crossing lands within eps of a neighbor's corner, so insertion's
+// on-edge-incidence rule treats the corner as the meeting point and drops the
+// crossing - leaving the two sides crossing with no shared vertex, a non-planar
+// arrangement whose boundary walk cannot close. The resulting in/out imbalance
+// is macro-separated (the corner and the true crossing are far apart), so the
+// merge cannot fuse it. Re-enable once insertion keeps that crossing (reaches
+// general position) - not by relaxing the closed-walk assert.
+TEST(CrossSection, DISABLED_NearCoincidentCornersNonClosingWalk) {
+  const double eps = 3.519281e-10;  // EpsilonFromScale(160)
+  const SimplePolygon t0 = {{100, 0}, {70, -20}, {120, 0}};
+  const SimplePolygon t1 = {{100 - 1.5 * eps, 0}, {40, -50}, {150, 0}};
+  const SimplePolygon t2 = {{100 - 3.0 * eps, 0}, {150, -20}, {160, 0}};
+  // The joint constructor arranges all three together (where the drop happens);
+  // the sequential union pre-cleans each operand and is the correct reference
+  // (area 1630.196399, one contour).
+  const CrossSection joint(Polygons{t0, t1, t2});
+  const CrossSection sequential =
+      CrossSection(t0) + CrossSection(t1) + CrossSection(t2);
+  EXPECT_NEAR(joint.Area(), sequential.Area(),
+              1e-6 * (1.0 + sequential.Area()));
+  EXPECT_EQ(joint.NumContour(), sequential.NumContour());
+}
+
 // Two genuinely distinct square features a few eps apart must stay two
 // contours: MergeWindingVerts must never fuse real geometry. The squares are
 // large enough (>> eps) to survive the eps-merge as separate loops, so each is
