@@ -14,7 +14,18 @@ THINGI10K_URL = (
     "https://huggingface.co/datasets/Thingi10K/Thingi10K/resolve/main/raw_meshes"
 )
 DEFAULT_EMBER_CASES = "16 84 667 695 260 406 551 582"
-
+DEFAULT_GTEST_FILTER = ":".join(
+    [
+        "Manifold.DeepChainDoesNotOverflowNumLeaves",
+        "Boolean.BatchBoolean",
+        "CrossSection.BatchBoolean",
+        "Polygon.Sponge4",
+        "Polygon.Zebra1",
+        "Polygon.Zebra3",
+        "ExecutionContextFromMeshGL.CancelConcurrent",
+    ]
+)
+#perf test is added seperately 
 
 @dataclass(frozen=True)
 class BuildContext:
@@ -77,16 +88,20 @@ def configure_build(ctx: BuildContext) -> None:
 
 
 def build_targets(ctx: BuildContext, suites: list[BenchmarkSuite]) -> None:
-    targets = [suite.target for suite in suites]
+    targets = list(dict.fromkeys(suite.target for suite in suites))
     run_command(["cmake", "--build", str(ctx.build_dir), "--target", *targets])
 
 
 def find_binary(ctx: BuildContext, name: str) -> Path:
     candidates = [
         ctx.build_dir / "extras" / name,
+        ctx.build_dir / "test" / name,
         ctx.build_dir / "bin" / name,
+        ctx.build_dir / name,
         ctx.build_dir / "extras" / f"{name}.exe",
+        ctx.build_dir / "test" / f"{name}.exe",
         ctx.build_dir / "bin" / f"{name}.exe",
+        ctx.build_dir / f"{name}.exe",
     ]
     for candidate in candidates:
         if candidate.exists() and candidate.is_file():
@@ -221,12 +236,36 @@ def run_perf_size_sweep_suite(ctx: BuildContext, binary: Path) -> None:
         sys.stdout.flush()
 
 
-# Add future benchmark suites here. Each suite owns its output subdirectory and
+def run_existing_gtests_suite(ctx: BuildContext, binary: Path) -> None:
+    out_dir = ctx.out_dir / "existing_gtests"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    gtest_filter = os.getenv("WEEKLY_BENCHMARK_GTEST_FILTER", DEFAULT_GTEST_FILTER)
+    for run_index in range(1, ctx.repeats + 1):
+        result = subprocess.run(
+            [str(binary), f"--gtest_filter={gtest_filter}"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        output = result.stdout
+        if result.stderr:
+            output += "\n" + result.stderr
+        if "[==========] Running 0 tests" in output:
+            raise RuntimeError(f"gtest filter selected no tests: {gtest_filter}")
+        (out_dir / f"run{run_index}.txt").write_text(output, encoding="utf-8")
+        print(f"completed existing gtest run {run_index}/{ctx.repeats}")
+        sys.stdout.flush()
+
+
+# Add future benchmark suites here.
 # emits run<N>.txt files that parse_weekly_benchmarks.py can collect.
 SUITES = [
     BenchmarkSuite("ember_phase", "man_bench", "man_bench", run_ember_suite),
     BenchmarkSuite(
         "perf_size_sweep", "perfTest", "perfTest", run_perf_size_sweep_suite
+    ),
+    BenchmarkSuite(
+        "existing_gtests", "manifold_test", "manifold_test", run_existing_gtests_suite
     ),
 ]
 

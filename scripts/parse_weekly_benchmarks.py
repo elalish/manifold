@@ -12,11 +12,13 @@ from pathlib import Path
 SCHEMA_VERSION = "1.0.0"
 EMBER_SUITE = "weekly_ember_phase"
 PERF_SUITE = "perf_size_sweep"
+GTEST_SUITE = "existing_gtests"
 
 EMBER_CASE_PATTERN = re.compile(r"^### case\s+([0-9]+)\s+\(([0-9]+)\s+vs\s+([0-9]+)\)")
 PHASE_PATTERN = re.compile(r"^-+\s+([0-9]+)\s+ms for\s+(.*)$")
 VERTS_PATTERN = re.compile(r"^[0-9]+\s+verts and\s+[0-9]+\s+tris$")
 PERF_PATTERN = re.compile(r"^nTri\s*=\s*([0-9]+),\s*time\s*=\s*([0-9.eE+-]+)\s+sec$")
+GTEST_OK_PATTERN = re.compile(r"^\[\s+OK\s+\]\s+([^\s]+)\s+\(([0-9]+) ms\)")
 
 INDEPENDENT_PHASES = [
     "Assembly",
@@ -222,6 +224,42 @@ def parse_perf_suite(suite_dir: Path) -> dict:
     }
 
 
+def parse_gtest_run(run_path: Path, run_index: int) -> dict:
+    tests = []
+    for line in run_path.read_text(encoding="utf-8").splitlines():
+        match = GTEST_OK_PATTERN.match(line.strip())
+        if not match:
+            continue
+        tests.append({"name": match.group(1), "time_ms": float(match.group(2))})
+    if not tests:
+        raise RuntimeError(f"No gtest timing rows found in {run_path}")
+    return {"path": str(run_path), "run_index": run_index, "tests": tests}
+
+
+def parse_gtest_suite(suite_dir: Path) -> dict:
+    runs = [parse_gtest_run(path, i + 1) for i, path in enumerate(run_files(suite_dir))]
+    test_order = [item["name"] for item in runs[0]["tests"]]
+    for run in runs[1:]:
+        run_order = [item["name"] for item in run["tests"]]
+        if run_order != test_order:
+            raise RuntimeError(
+                f"gtest layout mismatch in {run['path']}: expected {test_order}, got {run_order}"
+            )
+
+    tests = []
+    for position, name in enumerate(test_order):
+        samples = [run["tests"][position]["time_ms"] for run in runs]
+        tests.append({"name": name, "time_ms": summarize_ms(samples)})
+
+    return {
+        "type": "existing_gtests",
+        "description": "Selected existing regression tests used as weekly benchmark signals",
+        "test_order": test_order,
+        "tests": tests,
+        "runs": runs,
+    }
+
+
 def detect_compiler() -> str | None:
     for binary in ("c++", "g++", "clang++"):
         try:
@@ -327,6 +365,28 @@ def build_perf_summary(suite: dict) -> list[str]:
     return lines
 
 
+def build_gtest_summary(suite: dict) -> list[str]:
+    lines = []
+    lines.append("#### Existing Regression Tests")
+    lines.append("")
+    lines.append("| Test | Mean (ms) | Median (ms) | Min (ms) | Max (ms) | Runs |")
+    lines.append("|---|---:|---:|---:|---:|---:|")
+    for test in suite["tests"]:
+        timing = test["time_ms"]
+        lines.append(
+            "| {name} | {mean:.2f} | {median:.2f} | {min_:.2f} | {max_:.2f} | {runs} |".format(
+                name=test["name"],
+                mean=timing["mean_ms"],
+                median=timing["median_ms"],
+                min_=timing["min_ms"],
+                max_=timing["max_ms"],
+                runs=timing["n_runs"],
+            )
+        )
+    lines.append("")
+    return lines
+
+
 def build_summary(suites: dict, metadata: dict, repeats: int) -> str:
     lines = []
     lines.append("### Weekly Benchmarks")
@@ -343,6 +403,8 @@ def build_summary(suites: dict, metadata: dict, repeats: int) -> str:
         lines.extend(build_ember_summary(suites[EMBER_SUITE]))
     if PERF_SUITE in suites:
         lines.extend(build_perf_summary(suites[PERF_SUITE]))
+    if GTEST_SUITE in suites:
+        lines.extend(build_gtest_summary(suites[GTEST_SUITE]))
     return "\n".join(lines)
 
 
@@ -350,6 +412,7 @@ def parse_suites(root_dir: Path) -> dict:
     suites = {}
     ember_dir = root_dir / "ember_phase"
     perf_dir = root_dir / "perf_size_sweep"
+    gtest_dir = root_dir / "existing_gtests"
 
     if ember_dir.exists():
         suites[EMBER_SUITE] = parse_ember_suite(ember_dir)
@@ -358,6 +421,9 @@ def parse_suites(root_dir: Path) -> dict:
 
     if perf_dir.exists():
         suites[PERF_SUITE] = parse_perf_suite(perf_dir)
+
+    if gtest_dir.exists():
+        suites[GTEST_SUITE] = parse_gtest_suite(gtest_dir)
 
     if not suites:
         raise RuntimeError(f"No weekly benchmark suites found in {root_dir}")
