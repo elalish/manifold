@@ -8,7 +8,7 @@ import statistics
 import subprocess
 from pathlib import Path
 
-SCHEMA_VERSION = "1.0.0"
+SCHEMA_VERSION = "1.1.0"
 # fallback: extract only time value when nTri label is not present
 TIME_PATTERN = re.compile(r"time\s*=\s*([0-9]*\.?[0-9]+)\s*sec")
 # primary: extract both nTri bucket and timing from perfTest output
@@ -114,8 +114,8 @@ def build_summary(
     lines = []
     lines.append("### PR Benchmark Guard (perfTest)")
     lines.append("")
-    lines.append("| Benchmark | Base median (sec) | Head median (sec) | Delta | Status |")
-    lines.append("|---|---:|---:|---:|---|")
+    lines.append("| Benchmark | Base median (sec) | Head median (sec) | Delta | Base ±stdev | Head ±stdev | Status |")
+    lines.append("|---|---:|---:|---:|---:|---:|---|")
 
     per_benchmark = []
     regressed = False
@@ -124,6 +124,8 @@ def build_summary(
         head_mean = head["benchmarks"][benchmark]["mean_sec"]
         base_median = base["benchmarks"][benchmark]["median_sec"]
         head_median = head["benchmarks"][benchmark]["median_sec"]
+        base_stdev = base["benchmarks"][benchmark]["stdev_sec"]
+        head_stdev = head["benchmarks"][benchmark]["stdev_sec"]
         delta_sec = head_median - base_median
         delta_ms = delta_sec * 1000.0
         pct = (delta_sec / base_median * 100.0) if base_median > 0 else 0.0
@@ -132,7 +134,7 @@ def build_summary(
         status = "WARNING" if this_regressed else "OK"
 
         lines.append(
-            f"| {benchmark} | {base_median:.6f} | {head_median:.6f} | {delta_sec:+.6f} ({pct:+.2f}%) | {status} |"
+            f"| {benchmark} | {base_median:.6f} | {head_median:.6f} | {delta_sec:+.6f} ({pct:+.2f}%) | ±{base_stdev:.6f} | ±{head_stdev:.6f} | {status} |"
         )
 
         per_benchmark.append(
@@ -143,9 +145,11 @@ def build_summary(
                 "head_mean_sec": head_mean,
                 "base_median_sec": base_median,
                 "head_median_sec": head_median,
-                "delta_sec": delta_sec,
-                "delta_ms": delta_ms,
-                "delta_pct": pct,
+                "base_stdev_sec": base_stdev,
+                "head_stdev_sec": head_stdev,
+                "delta_median_sec": delta_sec,
+                "delta_median_ms": delta_ms,
+                "delta_median_pct": pct,
                 "regressed": this_regressed,
             }
         )
@@ -158,10 +162,10 @@ def build_summary(
     lines.append("")
 
     regressed_rows = [row for row in per_benchmark if row["regressed"]]
-    worst_regression = max(regressed_rows, key=lambda row: row["delta_ms"]) if regressed_rows else None
+    worst_regression = max(regressed_rows, key=lambda row: row["delta_median_ms"]) if regressed_rows else None
 
     payload = {
-        "primary_metric": "per_benchmark_median_sec",
+        "primary_metric": "median_sec",
         "base": base,
         "head": head,
         "per_benchmark": per_benchmark,
@@ -233,8 +237,8 @@ def resolve_metadata(args: argparse.Namespace) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Compare perfTest runs for PR benchmark guard.")
-    parser.add_argument("--base-dir", required=True, type=Path)
-    parser.add_argument("--head-dir", required=True, type=Path)
+    parser.add_argument("--base-dir", type=Path)
+    parser.add_argument("--head-dir", type=Path)
     parser.add_argument("--warn-pct", type=float, default=20.0)
     parser.add_argument("--warn-abs-ms", type=float, default=10.0)
     parser.add_argument("--invalid-reason")
@@ -253,6 +257,8 @@ def main() -> int:
         regressed = False
         print(f"::warning::PR benchmark guard data invalid: {args.invalid_reason}")
     else:
+        if not args.base_dir or not args.head_dir:
+            parser.error("--base-dir and --head-dir are required when --invalid-reason is not set")
         try:
             base = parse_suite(args.base_dir)
             head = parse_suite(args.head_dir)
@@ -279,7 +285,7 @@ def main() -> int:
             print(
                 "::warning::PR benchmark regression detected: "
                 f"{payload['regressed_count']} benchmark(s) exceeded thresholds. "
-                f"Worst: {worst['benchmark']} {worst['delta_pct']:.2f}% ({worst['delta_ms']:.2f} ms) slower."
+                f"Worst: {worst['benchmark']} {worst['delta_median_pct']:.2f}% ({worst['delta_median_ms']:.2f} ms) slower."
             )
         else:
             print("::warning::PR benchmark regression detected.")
