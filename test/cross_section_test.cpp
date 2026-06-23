@@ -557,7 +557,7 @@ TEST(CrossSection, DISABLED_CenteredSubEpsNonClosingWalk) {
 // close. The retained in/out imbalance is macro-separated (the corner and the
 // true crossing are far apart). Re-enable once insertion keeps that crossing
 // (reaches general position) - not by relaxing the closed-walk assert.
-TEST(CrossSection, DISABLED_NearCoincidentCornersNonClosingWalk) {
+TEST(CrossSection, NearCoincidentCornersNonClosingWalk) {
   const double eps = 3.519281e-10;  // EpsilonFromScale(160)
   const SimplePolygon t0 = {{100, 0}, {70, -20}, {120, 0}};
   const SimplePolygon t1 = {{100 - 1.5 * eps, 0}, {40, -50}, {150, 0}};

@@ -1286,7 +1286,7 @@ TEST(Boolean2, ShortEdgeFusionAddIntersect) {
 // explicit op-eps (production InferEps would not reach the cluster). Same class
 // as the disabled near-coincident-corner case; re-enable once insertion keeps
 // the dropped crossing (reaches general position).
-TEST(Boolean2, DISABLED_VisibleMissedCrossingLargeEps) {
+TEST(Boolean2, VisibleMissedCrossingLargeEps) {
   const double eps = 1.75;
   const std::vector<vec2> verts = {
       {100, 0},    {93.99241891, -2.888671352},  {99.58902672, -0.3730219929},

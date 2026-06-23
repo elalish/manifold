@@ -249,10 +249,11 @@ struct NarrowPhaseResult {
 // Combined narrow phase over broad-phase edge pairs. Produces sorted
 // edge-vertex split lists and independent proper edge-edge intersection
 // candidates without mutating `verts` or `edges`; serial vs TBB execution is
-// an internal thresholded implementation detail.
+// an internal thresholded implementation detail. With `findCrossings` false,
+// only the split lists are produced and `intersections` is left empty.
 NarrowPhaseResult BuildListsAndFindIntersections(
     const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
-    const std::vector<std::pair<int, int>>& pairs);
+    const std::vector<std::pair<int, int>>& pairs, bool findCrossings = true);
 
 void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
                               const std::vector<vec2>& verts, double eps,
