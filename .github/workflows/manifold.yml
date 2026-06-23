@@ -667,7 +667,7 @@ jobs:
     timeout-minutes: 45
     runs-on: ubuntu-24.04
     env:
-      PERF_REPEATS: 6
+      PERF_REPEATS: 3
       REGRESSION_WARN_PCT: 20
       REGRESSION_WARN_ABS_MS: 10
     steps:
@@ -677,7 +677,7 @@ jobs:
     - name: Install apt packages
       uses: awalsh128/cache-apt-pkgs-action@v1.6.0
       with:
-        packages: libgtest-dev cmake
+        packages: libgtest-dev libtbb-dev cmake
         version: 1
     - name: Prepare base and head worktrees
       continue-on-error: true

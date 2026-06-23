@@ -104,7 +104,7 @@ def parse_suite(suite_dir: Path) -> dict:
 def build_summary(
     base: dict, head: dict, warn_pct: float, warn_abs_ms: float
 ) -> tuple[str, bool, dict]:
-    # Compare benchmark medians between base and head with dual-threshold warnings.
+    # compare benchmark means between base and head with dual-threshold warnings
     if base["benchmark_order"] != head["benchmark_order"]:
         raise RuntimeError(
             "Benchmark set/order mismatch between base and head: "
@@ -114,35 +114,30 @@ def build_summary(
     lines = []
     lines.append("### PR Benchmark Guard (perfTest)")
     lines.append("")
-    lines.append("| Benchmark | Base median (sec) | Head median (sec) | Delta | Status |")
-    lines.append("|---|---:|---:|---:|---|")
+    lines.append("| Benchmark | Base mean (sec) | Head mean (sec) | Delta | Status |")
+    lines.append("|---|---:|---:|---:|")
 
     per_benchmark = []
     regressed = False
     for benchmark in base["benchmark_order"]:
         base_mean = base["benchmarks"][benchmark]["mean_sec"]
         head_mean = head["benchmarks"][benchmark]["mean_sec"]
-        base_median = base["benchmarks"][benchmark]["median_sec"]
-        head_median = head["benchmarks"][benchmark]["median_sec"]
-        delta_sec = head_median - base_median
+        delta_sec = head_mean - base_mean
         delta_ms = delta_sec * 1000.0
-        pct = (delta_sec / base_median * 100.0) if base_median > 0 else 0.0
+        pct = (delta_sec / base_mean * 100.0) if base_mean > 0 else 0.0
         this_regressed = (pct >= warn_pct) and (delta_ms >= warn_abs_ms)
         regressed = regressed or this_regressed
         status = "WARNING" if this_regressed else "OK"
 
         lines.append(
-            f"| {benchmark} | {base_median:.6f} | {head_median:.6f} | {delta_sec:+.6f} ({pct:+.2f}%) | {status} |"
+            f"| {benchmark} | {base_mean:.6f} | {head_mean:.6f} | {delta_sec:+.6f} ({pct:+.2f}%) | {status} |"
         )
 
         per_benchmark.append(
             {
                 "benchmark": benchmark,
-                "metric": "median_sec",
                 "base_mean_sec": base_mean,
                 "head_mean_sec": head_mean,
-                "base_median_sec": base_median,
-                "head_median_sec": head_median,
                 "delta_sec": delta_sec,
                 "delta_ms": delta_ms,
                 "delta_pct": pct,
@@ -161,7 +156,7 @@ def build_summary(
     worst_regression = max(regressed_rows, key=lambda row: row["delta_ms"]) if regressed_rows else None
 
     payload = {
-        "primary_metric": "per_benchmark_median_sec",
+        "primary_metric": "per_benchmark_mean_sec",
         "base": base,
         "head": head,
         "per_benchmark": per_benchmark,
