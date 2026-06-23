@@ -1276,3 +1276,36 @@ TEST(Boolean2, ShortEdgeFusionAddIntersect) {
               9.99, 5e-2 * 9.99)
       << "intersection area outside the eps*length floor";
 }
+
+// A visible, large-eps repro of the near-coincident missed-crossing open walk.
+// Three triangles share a corner cluster on y=0 (gaps 1.5eps/3eps); a dropped
+// transversal crossing leaves the retained edges with an in/out imbalance (an
+// open walk -> empty union in release / closed-walk assert in debug). Unlike
+// the production case where eps is ~3e-12 of the bbox, here eps is ~17% of the
+// bbox (eps=1.75, bbox ~10.3) - the whole figure is eye-resolvable. It needs an
+// explicit op-eps (production InferEps would not reach the cluster). Same class
+// as the disabled near-coincident-corner case; re-enable once insertion keeps
+// the dropped crossing (reaches general position).
+TEST(Boolean2, DISABLED_VisibleMissedCrossingLargeEps) {
+  const double eps = 1.75;
+  const std::vector<vec2> verts = {
+      {100, 0},    {93.99241891, -2.888671352},  {99.58902672, -0.3730219929},
+      {97.375, 0}, {93.6604499, -5.188383117},   {103.521365, 0.7557026304},
+      {94.75, 0},  {103.9628746, -0.9388442207}, {102.2214598, -2.31277084}};
+  std::vector<EdgeM> edges;
+  for (int t = 0; t < 3; ++t)
+    for (int i = 0; i < 3; ++i)
+      edges.push_back({3 * t + i, 3 * t + (i + 1) % 3, 1});
+  const auto r =
+      RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::Add);
+  std::map<int, std::pair<int, int>> deg;  // vert -> (in, out)
+  for (const auto& e : r.edges) {
+    deg[e.v0].second++;
+    deg[e.v1].first++;
+  }
+  int imbalanced = 0;
+  for (const auto& kv : deg)
+    if (kv.second.first != kv.second.second) ++imbalanced;
+  EXPECT_EQ(imbalanced, 0) << "retained edges must form closed walks (dropped "
+                              "crossing -> open walk)";
+}
