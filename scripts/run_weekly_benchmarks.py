@@ -61,11 +61,31 @@ def transform_args(prefix: str, transform: dict) -> list[str]:
 
 
 def run_command(
-    args: list[str], cwd: Path | None = None
+    args: list[str], cwd: Path | None = None, log_path: Path | None = None
 ) -> subprocess.CompletedProcess:
     print("+ " + " ".join(args))
     sys.stdout.flush()
-    return subprocess.run(args, check=True, cwd=cwd)
+    if log_path is None:
+        return subprocess.run(args, check=True, cwd=cwd)
+
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(
+        args,
+        check=False,
+        cwd=cwd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+    )
+    output = result.stdout or ""
+    if output:
+        print(output, end="")
+    log_path.write_text("+ " + " ".join(args) + "\n" + output, encoding="utf-8")
+    if result.returncode != 0:
+        raise subprocess.CalledProcessError(
+            result.returncode, args, output=result.stdout
+        )
+    return result
 
 
 def configure_build(ctx: BuildContext) -> None:
@@ -83,7 +103,8 @@ def configure_build(ctx: BuildContext) -> None:
             "-DMANIFOLD_PAR=ON",
             "-DMANIFOLD_TIMING=ON",
             "-DASSIMP_ENABLE=ON",
-        ]
+        ],
+        log_path=ctx.out_dir / "cmake_configure.log",
     )
 
 
@@ -195,10 +216,7 @@ def run_ember_suite(ctx: BuildContext, binary: Path) -> None:
         benchmark_csv.unlink(missing_ok=True)
         with run_file.open("w", encoding="utf-8") as out:
             for spec in specs:
-                out.write(
-                    f"### case {spec['case_index']} "
-                    f"({spec['id_a']} vs {spec['id_b']})\n"
-                )
+                out.write(f"### case {spec['case_index']}\n")
                 stdout = run_ember_case(
                     binary.resolve(),
                     spec,

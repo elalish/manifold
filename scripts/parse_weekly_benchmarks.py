@@ -6,7 +6,6 @@ import os
 import platform
 import re
 import statistics
-import subprocess
 from pathlib import Path
 
 SCHEMA_VERSION = "1.0.0"
@@ -14,11 +13,12 @@ EMBER_SUITE = "weekly_ember_phase"
 PERF_SUITE = "perf_size_sweep"
 GTEST_SUITE = "existing_gtests"
 
-EMBER_CASE_PATTERN = re.compile(r"^### case\s+([0-9]+)\s+\(([0-9]+)\s+vs\s+([0-9]+)\)")
+EMBER_CASE_PATTERN = re.compile(r"^### case\s+([0-9]+)(?:\s+\([0-9]+\s+vs\s+[0-9]+\))?")
 PHASE_PATTERN = re.compile(r"^-+\s+([0-9]+)\s+ms for\s+(.*)$")
 VERTS_PATTERN = re.compile(r"^[0-9]+\s+verts and\s+[0-9]+\s+tris$")
 PERF_PATTERN = re.compile(r"^nTri\s*=\s*([0-9]+),\s*time\s*=\s*([0-9.eE+-]+)\s+sec$")
 GTEST_OK_PATTERN = re.compile(r"^\[\s+OK\s+\]\s+([^\s]+)\s+\(([0-9]+) ms\)")
+CMAKE_SUMMARY_PATTERN = re.compile(r"^--\s+([A-Z0-9_]+):\s*(.*)$")
 
 INDEPENDENT_PHASES = [
     "Assembly",
@@ -73,6 +73,17 @@ def run_files(suite_dir: Path) -> list[Path]:
     return files
 
 
+def load_ember_specs(source_dir: Path) -> list[dict]:
+    spec_path = (
+        source_dir
+        / "extras"
+        / "ember_tests"
+        / "testfiles"
+        / "ember-benchmark-cases.json"
+    )
+    return json.loads(spec_path.read_text(encoding="utf-8"))
+
+
 def parse_ember_run(run_path: Path, run_index: int) -> dict:
     cases = []
     current = None
@@ -82,22 +93,17 @@ def parse_ember_run(run_path: Path, run_index: int) -> dict:
         if current is not None:
             cases.append(current)
 
-    for line in run_path.read_text(encoding="utf-8").splitlines():
+    for raw_line in run_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip().lstrip("\ufeff")
         case_match = EMBER_CASE_PATTERN.match(line)
         if case_match:
             if current is not None and not accepting_phases:
-                same_case = (
-                    current["case_index"] == int(case_match.group(1))
-                    and current["id_a"] == int(case_match.group(2))
-                    and current["id_b"] == int(case_match.group(3))
-                )
+                same_case = current["case_index"] == int(case_match.group(1))
                 if same_case:
                     continue
             finish_current()
             current = {
                 "case_index": int(case_match.group(1)),
-                "id_a": int(case_match.group(2)),
-                "id_b": int(case_match.group(3)),
                 "phases_ms": {},
             }
             accepting_phases = True
@@ -127,8 +133,9 @@ def parse_ember_run(run_path: Path, run_index: int) -> dict:
     return {"path": str(run_path), "run_index": run_index, "cases": cases}
 
 
-def parse_ember_suite(suite_dir: Path) -> dict:
+def parse_ember_suite(suite_dir: Path, source_dir: Path) -> dict:
     runs = [parse_ember_run(path, i + 1) for i, path in enumerate(run_files(suite_dir))]
+    ember_specs = load_ember_specs(source_dir)
     case_order = [case["case_index"] for case in runs[0]["cases"]]
     for run in runs[1:]:
         run_order = [case["case_index"] for case in run["cases"]]
@@ -139,7 +146,9 @@ def parse_ember_suite(suite_dir: Path) -> dict:
 
     cases = []
     for position, case_index in enumerate(case_order):
-        first = runs[0]["cases"][position]
+        if case_index < 0 or case_index >= len(ember_specs):
+            raise IndexError(f"Case index {case_index} is outside 0..{len(ember_specs) - 1}")
+        spec = ember_specs[case_index]
         phase_samples = {phase: [] for phase in INDEPENDENT_PHASES}
         full_phase_samples = []
         intersect12_share_samples = []
@@ -164,8 +173,8 @@ def parse_ember_suite(suite_dir: Path) -> dict:
         cases.append(
             {
                 "case_index": case_index,
-                "id_a": first["id_a"],
-                "id_b": first["id_b"],
+                "id_a": spec["id_a"],
+                "id_b": spec["id_b"],
                 "full_phase_sum_ms": summarize_ms(full_phase_samples),
                 "intersect12_share": summarize_ratio(intersect12_share_samples),
                 "dominant_phase": dominant_phase,
@@ -260,18 +269,31 @@ def parse_gtest_suite(suite_dir: Path) -> dict:
     }
 
 
-def detect_compiler() -> str | None:
-    for binary in ("c++", "g++", "clang++"):
-        try:
-            result = subprocess.run(
-                [binary, "--version"], check=True, capture_output=True, text=True
-            )
-        except (subprocess.CalledProcessError, OSError):
-            continue
-        first_line = result.stdout.splitlines()[0].strip() if result.stdout else ""
-        if first_line:
-            return first_line
-    return None
+def parse_cmake_configure_log(log_path: Path) -> dict:
+    if not log_path.exists():
+        return {}
+
+    values = {}
+    for line in log_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        match = CMAKE_SUMMARY_PATTERN.match(line.strip())
+        if match:
+            values[match.group(1)] = match.group(2).strip()
+
+    return {
+        "version": values.get("CMAKE_VERSION"),
+        "generator": values.get("CMAKE_GENERATOR"),
+        "build_type": values.get("CMAKE_BUILD_TYPE"),
+        "cxx_compiler_id": values.get("CMAKE_CXX_COMPILER_ID"),
+        "cxx_compiler_version": values.get("CMAKE_CXX_COMPILER_VERSION"),
+    }
+
+
+def cmake_compiler(cmake: dict) -> str | None:
+    compiler_id = cmake.get("cxx_compiler_id")
+    compiler_version = cmake.get("cxx_compiler_version")
+    if compiler_id and compiler_version:
+        return f"{compiler_id} {compiler_version}"
+    return compiler_id or compiler_version
 
 
 def cpu_model() -> str | None:
@@ -286,13 +308,15 @@ def cpu_model() -> str | None:
 
 def resolve_metadata(args: argparse.Namespace) -> dict:
     timestamp = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    cmake = parse_cmake_configure_log(args.suite_dir / "cmake_configure.log")
     return {
         "schema_version": SCHEMA_VERSION,
         "commit_sha": args.commit_sha or os.getenv("GITHUB_SHA"),
         "workflow": args.workflow or os.getenv("GITHUB_WORKFLOW"),
         "runner": args.runner or os.getenv("RUNNER_NAME"),
         "os": args.os_name or os.getenv("RUNNER_OS"),
-        "compiler": args.compiler or detect_compiler(),
+        "compiler": args.compiler or cmake_compiler(cmake),
+        "cmake": cmake,
         "cpu_model": args.cpu_model or cpu_model(),
         "cpu_count": args.cpu_count or os.cpu_count(),
         "timestamp": timestamp.isoformat().replace("+00:00", "Z"),
@@ -394,6 +418,7 @@ def build_summary(suites: dict, metadata: dict, repeats: int) -> str:
     lines.append(f"Commit: `{metadata.get('commit_sha') or 'unknown'}`")
     lines.append(f"Runner: `{metadata.get('runner') or 'unknown'}`")
     lines.append(f"OS: `{metadata.get('os') or 'unknown'}`")
+    lines.append(f"Compiler: `{metadata.get('compiler') or 'unknown'}`")
     lines.append(f"CPU: `{metadata.get('cpu_model') or 'unknown'}`")
     lines.append(f"CPU count: `{metadata.get('cpu_count') or 'unknown'}`")
     lines.append(f"Repeats: `{repeats}`")
@@ -408,16 +433,16 @@ def build_summary(suites: dict, metadata: dict, repeats: int) -> str:
     return "\n".join(lines)
 
 
-def parse_suites(root_dir: Path) -> dict:
+def parse_suites(root_dir: Path, source_dir: Path) -> dict:
     suites = {}
     ember_dir = root_dir / "ember_phase"
     perf_dir = root_dir / "perf_size_sweep"
     gtest_dir = root_dir / "existing_gtests"
 
     if ember_dir.exists():
-        suites[EMBER_SUITE] = parse_ember_suite(ember_dir)
+        suites[EMBER_SUITE] = parse_ember_suite(ember_dir, source_dir)
     elif list(root_dir.glob("run*.txt")):
-        suites[EMBER_SUITE] = parse_ember_suite(root_dir)
+        suites[EMBER_SUITE] = parse_ember_suite(root_dir, source_dir)
 
     if perf_dir.exists():
         suites[PERF_SUITE] = parse_perf_suite(perf_dir)
@@ -433,6 +458,7 @@ def parse_suites(root_dir: Path) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Parse weekly benchmark runs.")
     parser.add_argument("--suite-dir", required=True, type=Path)
+    parser.add_argument("--source-dir", default=Path("."), type=Path)
     parser.add_argument("--markdown-out", required=True, type=Path)
     parser.add_argument("--json-out", required=True, type=Path)
     parser.add_argument("--repeats", required=True, type=int)
@@ -446,7 +472,7 @@ def main() -> int:
     args = parser.parse_args()
 
     metadata = resolve_metadata(args)
-    suites = parse_suites(args.suite_dir)
+    suites = parse_suites(args.suite_dir, args.source_dir)
     suite_names = list(suites.keys())
     markdown = build_summary(suites, metadata, args.repeats)
     payload = {
