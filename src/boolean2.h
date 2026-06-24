@@ -77,7 +77,7 @@ GraphOrder2D CompareProjectedOrder(const GraphSegment2D& a,
                                    double overlapL, double overlapR,
                                    double eps = 0.0);
 bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
-                       double eps, vec2* out);
+                       double eps, vec2& out);
 
 inline constexpr int kEdgePairBvhThreshold = 1024;
 // The radix-tree BVH is binary and has at most 32 Morton-code bits plus
@@ -237,7 +237,7 @@ struct VertexMerge {
 
 VertexMerge MergeVerts(const std::vector<vec2>& in, double eps);
 bool VESetContains(const std::vector<int>& vec, int x);
-void VESetInsert(std::vector<int>* vec, int x);
+void VESetInsert(std::vector<int>& vec, int x);
 std::vector<EdgeM> RemapAndCollapse(const std::vector<EdgeM>& edges,
                                     const std::vector<int>& inputVert2Merged);
 
@@ -249,29 +249,25 @@ struct NarrowPhaseResult {
 // Combined narrow phase over broad-phase edge pairs. Produces sorted
 // edge-vertex split lists and independent proper edge-edge intersection
 // candidates without mutating `verts` or `edges`; serial vs TBB execution is
-// an internal thresholded implementation detail.
+// an internal thresholded implementation detail. With `findCrossings` false,
+// only the split lists are produced and `intersections` is left empty.
 NarrowPhaseResult BuildListsAndFindIntersections(
     const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
-    const std::vector<std::pair<int, int>>& pairs);
+    const std::vector<std::pair<int, int>>& pairs, bool findCrossings = true);
 
 void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
                               const std::vector<vec2>& verts, double eps,
                               const std::vector<Box2>& edgeBoxes,
                               const BVH& bvh,
-                              std::vector<std::pair<int, int>>* pairs);
+                              std::vector<std::pair<int, int>>& pairs);
 
 // Serially materialize precomputed proper intersections into caller-owned
 // containers. `verts` and `lists` are taken by value so callers can move in the
 // post-narrow-phase state; the returned fields are those same containers after
 // appending/snapping intersection vertices and updating edge split lists.
-// `vertEdges` records which edges meet at each materialized or snapped
-// intersection vertex; nearby-intersection merge uses that incidence to
-// distinguish unrelated near vertices from vertices that share an intersection
-// source.
 struct IntersectionInsertion {
   std::vector<vec2> verts;
   std::vector<std::vector<int>> lists;
-  std::vector<std::vector<int>> vertEdges;
 };
 
 IntersectionInsertion FindAndInsertIntersections(
@@ -287,11 +283,15 @@ enum class WindRule {
   Intersect,
 };
 
-std::vector<OutEdge> FilterByWindingHalfedges(const CanonicalSubEdges& canon,
-                                              const std::vector<vec2>& verts,
-                                              bool debug = false,
-                                              WindRule rule = WindRule::Add,
-                                              Trace* trace = nullptr);
+// Per-edge winding filter: for each canonical sub-edge, evaluate the winding of
+// the face just left of vMin->vMax at the start vertex (a +x ray-cast under a
+// symbolic perturbation into that face), take the right winding as leftW-mult,
+// and keep the edge iff the rule disagrees across it. Correct only on a true
+// arrangement. The ray-cast reuses boolean2's BVH over the canonical sub-edges,
+// so the pass is ~O(E log E) amortized rather than O(E^2).
+std::vector<OutEdge> FilterByWinding(const CanonicalSubEdges& canon,
+                                     const std::vector<vec2>& verts,
+                                     WindRule rule = WindRule::Add);
 
 struct OverlapResult {
   std::vector<vec2> verts;

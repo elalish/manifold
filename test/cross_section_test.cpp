@@ -343,6 +343,11 @@ TEST(CrossSection, ConcurrentIndependentEdgePairs) {
   }
 }
 
+// Position-inclusive eps scales with bBox.Scale() (the absolute coordinate),
+// matching Boolean3, so the shallow concurrency of these ~1-unit rhombi is not
+// preserved when shifted to 2^40: the rhombi fall far below eps and collapse to
+// empty. Translation invariance is intentionally given up; see the InferEps
+// contract.
 TEST(CrossSection, TranslatedShallowConcurrentEdges) {
   auto rhomb = [](double angleDegrees, vec2 offset) {
     const double angle = angleDegrees * kPi / 180.;
@@ -365,17 +370,20 @@ TEST(CrossSection, TranslatedShallowConcurrentEdges) {
   const double base = std::ldexp(1.0, 40);
   CrossSection origin(polysAt({0., 0.}));
   CrossSection shifted(polysAt({base, -base}));
-  CrossSection shiftedBack = shifted.Translate({-base, base});
 
+  // At the origin the shallow concurrency resolves to one contour.
   EXPECT_EQ(origin.NumContour(), 1);
-  EXPECT_EQ(shifted.NumContour(), 1);
-  EXPECT_EQ(shiftedBack.NumContour(), origin.NumContour());
-  EXPECT_NEAR(shiftedBack.Area(), origin.Area(), 1e-4);
-  EXPECT_NEAR(shiftedBack.Bounds().Size().x, origin.Bounds().Size().x, 1e-4);
-  EXPECT_NEAR(shiftedBack.Bounds().Size().y, origin.Bounds().Size().y, 1e-4);
+  EXPECT_NEAR(origin.Area(), 0.420546, 1e-4);
+  // At 2^40 the radius-1 rhombi sit far below the position-scaled eps and
+  // collapse to nothing.
+  EXPECT_TRUE(shifted.IsEmpty());
 }
 
-TEST(CrossSection, TranslatedSmallPolygonKeepsFeatures) {
+// Position-inclusive eps scales with bBox.Scale() (matching Boolean3), so a
+// 10-unit square at ~2^49 sits far below eps and is intentionally not resolved
+// - a feature much smaller than its distance from the origin is dropped. See
+// the InferEps contract in boolean2.cpp.
+TEST(CrossSection, TranslatedSmallPolygonDroppedBelowEps) {
   const double base = std::ldexp(1.0, 49) * 1.5;
   SimplePolygon square = {{base, -base},
                           {base + 10.0, -base},
@@ -384,11 +392,7 @@ TEST(CrossSection, TranslatedSmallPolygonKeepsFeatures) {
 
   CrossSection cs(square);
 
-  EXPECT_EQ(cs.NumContour(), 1);
-  EXPECT_EQ(cs.NumVert(), 4);
-  const vec2 size = cs.Bounds().Size();
-  EXPECT_NEAR(size.x, 10.0, 1e-9);
-  EXPECT_NEAR(size.y, 10.0, 1e-9);
+  EXPECT_TRUE(cs.IsEmpty());
 }
 
 TEST(CrossSection, TinyFeatureNearCornerEdgeSoupParity) {
@@ -405,19 +409,13 @@ TEST(CrossSection, TinyFeatureNearCornerHostFeatureSwap) {
       {0.9901767613117145, 0.60823663500743508});
 }
 
-// DISABLED: known winding-robustness failures, not yet fixed. A tiny piece that
-// point-touches a big piece ~1e-9 from one of the big piece's vertices (the two
-// pieces are genuinely disjoint, so the correct union is the big plus the tiny
-// piece) drops one of the two pieces. Which piece drops, and whether, depends
-// on sub-eps details (the intersection-merge emission and the absolute
-// coordinate offset), so the arrangement's winding face-walk is unstable far
-// below eps. These are the fuzzer seeds for that bug; enable them when the
-// winding fix lands.
-
-// Big-piece drop: the big piece's zero-radius star vertex makes it a thin spike
-// that collapses. Built from raw radii (StarRing's 0.1 floor would remove the
-// spike).
-TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset4096) {
+// A tiny piece point-touches a big piece ~1e-9 from one of the big piece's
+// vertices; the two are disjoint, so the correct union keeps both. Both the
+// 1024 and 4096 cases now hold: position-inclusive eps (InferEps) resolves the
+// near-corner crossing tangle at offset magnitude instead of dropping it to a
+// non-closing walk. (Previously the 4096 case asserted "retained directed edges
+// must form closed walks".)
+TEST(CrossSection, TinyFeatureNearCornerHostDropAtOffset4096) {
   const std::vector<double> bigRadii = {
       0., 356.3220416075996, 176.46461822660299, 2.451081611797258, 1.};
   SimplePolygon big;
@@ -471,9 +469,130 @@ TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset4096) {
   EXPECT_NEAR(aUb.Area(), ca.Area() + cb.Area() - inter.Area(), tol);
 }
 
-// Big-piece drop only at large offset (passes at the origin): the StarRing big
+// Two disjoint polygons point-touch ~2e-9 at a corner; the correct union keeps
+// both, including the ~422k-area b. Position-inclusive eps (InferEps) merges
+// the near-corner pair so the walk closes and b survives. Previously the macro
+// traced first consumed the shared corner edges, starved b's walk, and a
+// release build silently dropped the whole ~422k feature (assertion builds
+// caught it).
+TEST(CrossSection, NearCornerTouchDropsMacroFeature) {
+  const SimplePolygon a = {{0, 0},
+                           {83.857939034036775, 258.08819842650098},
+                           {-172.27469772718226, 125.16489439806644},
+                           {-2.9290637642324677, -2.1280893919543549},
+                           {0.15484825622114765, -0.47657392893212197}};
+  const SimplePolygon b = {{83.857939035728577, 258.08819842543426},
+                           {-1433.9774541367817, 260.0062722781451},
+                           {-1435.7133694432041, 258.89661890546085},
+                           {-1434.6006741103567, 258.08819842543426},
+                           {-1254.542401839961, -296.07418187338237}};
+  const CrossSection ca(a), cb(b);
+  const auto inter = ca.Boolean(cb, OpType::Intersect);
+  const double tol = 1e-3 * (1.0 + ca.Area() + cb.Area());
+  EXPECT_NEAR(inter.Area(), 0.0, tol) << "disjoint: empty intersection";
+  EXPECT_NEAR((ca + cb).Area(), ca.Area() + cb.Area(), tol)
+      << "union must keep both disjoint pieces; the bug drops the ~422k b";
+  EXPECT_EQ((ca + cb).NumContour(), 2) << "two disjoint contours";
+}
+
+// Guards the position-inclusive InferEps: two heavily-overlapping
+// near-duplicate shapes far from the origin must still produce a valid
+// arrangement (no closed-walk assertion, no dropped area). The axis-aligned
+// (now disabled) OffsetIsInvariantUnderLargeTranslation could not catch this
+// (zero slope = no cancellation).
+TEST(CrossSection, NearCoincidentLargeCoordIsValid) {
+  const SimplePolygon shape = {{0, 0}, {100, 13}, {37, 100}, {-20, 40}};
+  for (const double t : {1e6, 1e9, 1e12}) {
+    SimplePolygon pa, pb;
+    for (const vec2 p : shape) pa.push_back(p + vec2(t, t));
+    for (const vec2 p : shape) pb.push_back(p + vec2(t + 1e-3, t - 1e-3));
+    const CrossSection a(pa), b(pb);
+    const auto u = a + b;
+    EXPECT_GT(u.Area(), 0.0) << "near-coincident union dropped at scale " << t;
+    EXPECT_GE(u.Area(), a.Area() - 1e-9 * a.Area())
+        << "union smaller than a single operand at scale " << t;
+    EXPECT_LE(u.NumContour(), 2u);
+  }
+}
+
+// DISABLED: a centered near-degenerate corner touch whose two un-merged
+// crossings sit ~2.8x eps apart - just outside the merge band - so the
+// arrangement is non-manifold (a retained vertex with in != out degree) and
+// OutEdgesToPolygons correctly hits the closed-walk assert. The assert is not
+// in question: a non-closing walk is a real defect. Position-inclusive eps is a
+// no-op at the origin, so it does not address this (it fixed HostDrop/Lane B
+// only by inflating eps at their large coords until the tangle merges). In
+// Release the macro area is incidentally correct (only a sub-eps sliver drops),
+// but the arrangement is still non-manifold - the fix belongs in the
+// arrangement, not the assert. Below-resolution floor, StressB/StressD class.
+// Re-enable when the arrangement is made manifold here.
+TEST(CrossSection, DISABLED_CenteredSubEpsNonClosingWalk) {
+  const SimplePolygon big = {{16.326654361604518, -168.72132050147599},
+                             {126.43622068872992, 170.16107906902442},
+                             {-126.4362206896044, -64.998020356457175},
+                             {14.343687683060599, -170.16203012505568},
+                             {16.635671355979465, -169.67237701777114}};
+  const SimplePolygon tiny = {{126.4362206896044, 170.16107906853938},
+                              {125.43666000402905, 170.16203012505565},
+                              {125.43554197004028, 170.16166685379164},
+                              {124.77049882701533, 169.67730915692113},
+                              {125.51465251505573, 169.92009174481331}};
+  // Release-correct result (only a ~6e-8 sub-eps sliver is dropped).
+  const auto u = CrossSection(big) + CrossSection(tiny);
+  EXPECT_NEAR(u.Area(), 30107.44255, 1e-3);
+  EXPECT_EQ(u.NumContour(), 1);
+}
+
+// Companion to DISABLED_CenteredSubEpsNonClosingWalk: three triangles share a
+// nearly-common corner on y = 0 (corners within eps but distinct), and two of
+// their sides cross just below it. That crossing lands within eps of a
+// neighbor's corner, so insertion's on-edge-incidence rule treats the corner as
+// the meeting point and drops the crossing - leaving the two sides crossing
+// with no shared vertex, a non-planar arrangement whose boundary walk cannot
+// close. The retained in/out imbalance is macro-separated (the corner and the
+// true crossing are far apart). Re-enable once insertion keeps that crossing
+// (reaches general position) - not by relaxing the closed-walk assert.
+TEST(CrossSection, NearCoincidentCornersNonClosingWalk) {
+  const double eps = 3.519281e-10;  // EpsilonFromScale(160)
+  const SimplePolygon t0 = {{100, 0}, {70, -20}, {120, 0}};
+  const SimplePolygon t1 = {{100 - 1.5 * eps, 0}, {40, -50}, {150, 0}};
+  const SimplePolygon t2 = {{100 - 3.0 * eps, 0}, {150, -20}, {160, 0}};
+  // The joint constructor arranges all three together (where the drop happens);
+  // the sequential union pre-cleans each operand and is the correct reference
+  // (area 1630.196399, one contour).
+  const CrossSection joint(Polygons{t0, t1, t2});
+  const CrossSection sequential =
+      CrossSection(t0) + CrossSection(t1) + CrossSection(t2);
+  EXPECT_NEAR(joint.Area(), sequential.Area(),
+              1e-6 * (1.0 + sequential.Area()));
+  EXPECT_EQ(joint.NumContour(), sequential.NumContour());
+}
+
+// A big square built together with a tiny self-intersecting feature whose edges
+// cross the square's edge at nearly the same spot (within epsilon). Those
+// crossings are distinct and must stay distinct: treating them as one collapses
+// the square's boundary and drops the whole square (area -> 0). A regression
+// guard against a crossing merge that reaches too far.
+TEST(CrossSection, TinyEdgeFeatureKeepsSquare) {
+  const SimplePolygon square = {{-2097152.0, 0.0},
+                                {2097152.0, 0.0},
+                                {2097152.0, 4194304.0},
+                                {-2097152.0, 4194304.0}};
+  const SimplePolygon feature = {
+      {1500000.0, -4e-05},     {1500000.000024, 5e-05}, {1500000.000012, 2e-05},
+      {1500000.00002, -5e-05}, {1500000.000016, 5e-05}, {1500000.00002, 4e-05},
+      {1500000.00002, -5e-05}};
+  const CrossSection cs(Polygons{square, feature});
+  // 2^22 x 2^22, independent of the engine; the tiny feature adds < 1.
+  const double squareArea = 4194304.0 * 4194304.0;
+  EXPECT_NEAR(cs.Area(), squareArea, 1e-3 * squareArea)
+      << "clustered edge crossings merged and dropped the square";
+  EXPECT_GT(cs.NumContour(), 0) << "square dropped entirely";
+}
+
+// The large-offset variant (this class passes at the origin): the StarRing big
 // piece plus an 8-vertex tiny piece anchored 1e-9 from big[1].
-TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset1024) {
+TEST(CrossSection, TinyFeatureNearCornerHostDropAtOffset1024) {
   SimplePolygon big = StarRing({0., 1., 0., 181.7694024845519});
   SimplePolygon tiny =
       StarRing({712.03169893044037, 1., 549.34829370834473, 0., 0.,
@@ -515,6 +634,88 @@ TEST(CrossSection, DISABLED_TinyFeatureNearCornerHostDropAtOffset1024) {
     EXPECT_NEAR(aUb.Area(), ca.Area() + cb.Area() - inter.Area(), tol)
         << "offset=" << offset;
   }
+}
+
+// Near-degenerate cases at the eps scale.
+
+// A unit square unioned with a tiny triangle whose middle vertex is exactly
+// 2*eps from a corner.
+//
+TEST(CrossSection, SquareAnnihilation) {
+  const CrossSection a(SimplePolygon{{0, 0}, {1, 0}, {1, 1}, {0, 1}});
+  const CrossSection b(
+      SimplePolygon{{1.5000023810829433e-06, -8.6602402906521135e-07},
+                    {2.3810953209135732e-12, 1.3747192273300745e-12},
+                    {2.3810953209135732e-12, -1.7320494328496497e-06}});
+  EXPECT_GT((a + b).Area(), a.Area() - AreaTol(a, b)) << "square annihilated";
+}
+
+// Two disjoint triangles, one's vertex ~0.80 eps off the other's long sloped
+// edge. The topology is exact (disjoint, empty intersection); only the union
+// area wobbles by ~eps*length below the resolution floor. See the body.
+TEST(CrossSection, InclusionExclusionSliver) {
+  // a and b are disjoint: a's middle vertex (0.5, 5e-9) sits ~0.80 eps off b's
+  // nearest (sloped) edge (eps = InferEps ~5.6e-9, from the 2048 half-extent).
+  // The engine keeps the exact topology - union is two contours, intersection
+  // empty - so NumContour is the load-bearing check. The union boundary can
+  // still shift ~eps, and b's ~4096-long base levers that into an ~eps*length
+  // area wobble (~4e-6 here) past a tight AreaTol, so the area bound is loose.
+  const CrossSection a(SimplePolygon{{0.0, 1e-8}, {0.5, 5e-9}, {1.0, 0.5}});
+  const CrossSection b(
+      SimplePolygon{{2048.0, 0.0}, {4096.0, 4.096e-6}, {0.0, 0.0}});
+  const auto u = a + b;
+  const auto inter = a.Boolean(b, OpType::Intersect);
+  EXPECT_EQ(u.NumContour(), 2) << "disjoint inputs must remain two contours";
+  EXPECT_EQ(inter.NumContour(), 0) << "disjoint inputs have empty intersection";
+  EXPECT_NEAR(u.Area(), a.Area() + b.Area() - inter.Area(), 5e-5)
+      << "inclusion-exclusion area outside the eps*length floor";
+}
+
+// A genuine ~4*eps-wide rectangle overlap; a sub-eps binary-incidence
+// knife-edge. At these off-origin (~2048) coordinates position-inclusive eps
+// scales to bBox.Scale() (matching Boolean3), ~2x the old span-based value, so
+// this ~4*eps overlap falls under eps and intentionally merges to empty. See
+// the InferEps contract in boolean2.cpp.
+TEST(CrossSection, SubEpsRectangleOverlap) {
+  const CrossSection a(
+      SimplePolygon{{0, 0}, {2048, 0}, {2048, 2048}, {0, 2048}});
+  const CrossSection b(SimplePolygon{{2047.9999999943693, 512},
+                                     {2303.9999999943693, 512},
+                                     {2303.9999999943693, 768},
+                                     {2047.9999999943693, 768}});
+  // True overlap = [2047.9999999943693, 2048] x [512, 768]: width ~5.6e-9
+  // (~4*eps) by height 256, area ~1.44e-6 - but ~4*eps is below the
+  // position-scaled eps here, so the engine intentionally drops it.
+  EXPECT_TRUE(a.Boolean(b, OpType::Intersect).IsEmpty())
+      << "sub-eps overlap should merge to empty at this scale";
+}
+
+// A tiny square unioned with a huge thin strip (~1e6:1 aspect
+// ratio) that clips the square's corner. The corner sits ~0.12 eps off the
+// strip's ~1.4e6-long edge; the engine keeps the topology exact (one connected
+// region), but that sub-eps placement, levered by the strip length, shifts the
+// area by ~eps*length - here ~0.06 on 20.07 (0.3%). A tight relative area bound
+// is unachievable at this aspect ratio, so NumContour is the load-bearing check
+// and the area tolerance below is deliberately loose.
+TEST(CrossSection, CornerCrossingStrip) {
+  const CrossSection a(SimplePolygon{{0, 0},
+                                     {4.1400636649775659, 0},
+                                     {4.1400636649775659, 4.1400636649775659},
+                                     {0, 4.1400636649775659}});
+  const CrossSection b(
+      SimplePolygon{{-708434.62837340333, -85773.605469182352},
+                    {708434.62837640126, 85773.605469897113},
+                    {708434.62837615469, 85773.605471933799},
+                    {-708434.62837364990, -85773.605467145666}});
+  // Independent shoelace + convex clip: the strip clips the square's corner
+  // with a ~8.6e-6 overlap, so the union is one connected region of area
+  // ~20.0681.
+  const auto u = a + b;
+  // Loose by design (~1%): per the aspect-ratio note above, the area floor here
+  // is ~eps*length, not the usual tight relative bound.
+  EXPECT_NEAR(u.Area(), 20.068131036304429, 1e-2 * 20.068131036304429)
+      << "corner-crossing strip union area outside the aspect-ratio floor";
+  EXPECT_EQ(u.NumContour(), 1) << "union split into multiple contours";
 }
 
 // Regression test for the BR-cell hole pattern from Samples.Sponge4. Two
@@ -1847,7 +2048,11 @@ TEST(CrossSection, NonFiniteInputReturnsEmpty) {
   EXPECT_TRUE(constructed.IsEmpty());
 }
 
-TEST(CrossSection, OffsetIsInvariantUnderLargeTranslation) {
+// Position-inclusive eps scales with the absolute coordinate (matching
+// Boolean3), so Offset is intentionally NOT invariant under a large
+// translation: at 1e12 the round-join arc falls below eps and collapses, while
+// at the origin it is kept. See the InferEps contract in boolean2.cpp.
+TEST(CrossSection, OffsetNotInvariantUnderLargeTranslation) {
   const CrossSection square = CrossSection::Square({10.0, 10.0}, true);
   const CrossSection origin =
       square.Offset(1.0, CrossSection::JoinType::Round, 2.0, 8);
@@ -1856,9 +2061,11 @@ TEST(CrossSection, OffsetIsInvariantUnderLargeTranslation) {
           .Offset(1.0, CrossSection::JoinType::Round, 2.0, 8)
           .Translate({-1e12, 1e12});
 
-  EXPECT_EQ(translated.NumContour(), origin.NumContour());
-  EXPECT_EQ(translated.NumVert(), origin.NumVert());
-  EXPECT_NEAR(translated.Area(), origin.Area(), 1e-3);
+  // The macro shape survives (one contour), but the round join's arc verts are
+  // below eps at 1e12 and collapse, so the two offsets diverge.
+  EXPECT_EQ(origin.NumContour(), translated.NumContour());
+  EXPECT_GT(origin.NumVert(), translated.NumVert());
+  EXPECT_GT(std::abs(origin.Area() - translated.Area()), 1.0);
 }
 
 TEST(CrossSection, SimplifyPostFiltersBoolean2Output) {

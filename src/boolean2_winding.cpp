@@ -12,31 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Winding-rule filter over the canonical sub-edges. Builds the halfedge
-// arrangement, walks each face once via BFS to propagate winding numbers
-// (seeded by symbolic ray-casts from local outer faces),
-// then keeps only the sub-edges that separate "inside" from "outside"
-// under the chosen rule (Add / Intersect).
-//
-// FastEdge + CastExternalWindingRay are the ray-cast helpers for local outer
-// face seeds; FilterByWindingHalfedges is the entry point. iostream usage is
-// gated by MANIFOLD_DEBUG.
+// Implements FilterByWinding; its contract lives on the declaration in
+// boolean2.h. The helpers below are file-local.
 
 #include <algorithm>
 #include <cmath>
-#include <cstdint>
-#ifdef MANIFOLD_DEBUG
-#include <iostream>
-#include <map>
-#include <string>
-#endif
+#include <limits>
 #include <utility>
 #include <vector>
 
 #include "boolean2.h"
-#include "boolean2_diagnostics.h"
-#include "manifold/optional_assert.h"
-#include "parallel.h"
+#include "shared.h"
 
 namespace manifold {
 
@@ -52,503 +38,144 @@ bool IsInside(WindRule rule, int w) {
   return false;
 }
 
-// Pre-flattened canonical sub-edges for symbolic seed ray-casts. `a` and `b`
-// are ordered upward, while signedMult preserves the canonical edge direction.
-struct FastEdge {
-  vec2 a, b;
-  int edge;
-  int signedMult;
-};
+// Winding of the face immediately to the LEFT of the directed sub-edge
+// `start`->`end`, evaluated AT the start vertex.
+//
+// The query point is the start vertex P pushed an infinitesimal distance into
+// the left face: Q = P + e*d + e^2*n, where e is a symbolic infinitesimal
+// (e -> 0+) for tie-breaking, not the machine eps used elsewhere in boolean2;
+// d = end - start, and n = (-d.y, d.x) is the left normal. The primary step is
+// ALONG the sub-edge,
+// the secondary a tiny push to its left: this hugs start->end so Q lands in its
+// left face even when other edges incident to P fall between the bare left
+// normal and the edge (the bare normal can overshoot past them into a different
+// face). We then count signed crossings of a +x ray from Q over the edges the
+// BVH reports (the slab [P.x, maxX] x {P.y} bounds every edge that can cross to
+// the right). The two-level perturbation also resolves the ties a +x ray hits
+// at a vertex - an axis can leave d.y == 0 (horizontal edge) or cross(d, w) ==
+// 0 (an incident edge collinear with this one's direction).
+//
+// Edges incident to P (sharing it as a vertex, including this sub-edge itself)
+// pass through the ray origin, so the standard "is the crossing to the right of
+// P.x" test is degenerate. They are resolved instead by the Smith shadow of
+// their OTHER endpoint O: post-insertion no edges cross and coincidences are
+// one shared vertex, so an incident edge cannot cross the ray at P, and whether
+// the perturbed ray crosses it is fixed by which side of the classified edge O
+// sits on - an Interpolate+Shadows side test (O and the classified far vert
+// share a y-side of P), with no explicit cross product (see the branch below).
+int LeftWindingAtVertex(int start, int end, const BVH& bvh,
+                        const CanonicalSubEdges& canon,
+                        const std::vector<vec2>& verts, double globalMaxX) {
+  const vec2 P = verts[start];
+  const vec2 d = verts[end] - P;
+  const vec2 n(-d.y, d.x);  // left normal of start->end
 
-std::vector<FastEdge> BuildFastEdges(const CanonicalSubEdges& canon,
-                                     const std::vector<vec2>& verts) {
-  std::vector<FastEdge> out;
-  out.reserve(canon.edges.size());
-  for (int i = 0; i < static_cast<int>(canon.edges.size()); ++i) {
-    const auto& edge = canon.edges[i];
-    const int mult = edge.mult;
-    vec2 p0 = verts[edge.vMin];
-    vec2 p1 = verts[edge.vMax];
-    const bool upward = p0.y < p1.y;
-    if (!upward) std::swap(p0, p1);
-    if (p0.y == p1.y) continue;  // horizontal edges contribute nothing
-    out.push_back({p0, p1, i, upward ? mult : -mult});
-  }
-  return out;
-}
+  // Effective sign of the y-perturbation Q.y - P.y under (primary d, secondary
+  // n). d.y == 0 exactly iff start->end is horizontal, and then n.y == d.x !=
+  // 0, so this is always well defined.
+  const bool perturbUp = d.y != 0.0 ? d.y > 0.0 : n.y > 0.0;
+  // dir argument for the on-ray (crossing-x == P.x) tie-break, with the same
+  // (primary d, secondary n) priority: Shadows treats dir < 0 as "P.x < x".
+  const double xTieDir = d.x != 0.0 ? d.x : n.x;
 
-int SignInfinitesimal(double base, double delta) {
-  if (base > 0.0) return 1;
-  if (base < 0.0) return -1;
-  if (delta > 0.0) return 1;
-  if (delta < 0.0) return -1;
-  return 0;
-}
-
-// The symbolic side test is an orientation sign. Scale both vectors first so
-// tiny valid inputs do not turn a nonzero L^2 determinant into signed zero.
-int ScaledCrossSign(vec2 a, vec2 b) {
-  const double aScale = la::maxelem(la::abs(a));
-  const double bScale = la::maxelem(la::abs(b));
-  if (aScale == 0.0 || bScale == 0.0) return 0;
-  if (!std::isfinite(aScale) || !std::isfinite(bScale)) {
-    return SignInfinitesimal(la::cross(a, b), 0.0);
-  }
-  a = a / aScale;
-  b = b / bScale;
-  return SignInfinitesimal(la::cross(a, b), 0.0);
-}
-
-int ScaledCrossSignInfinitesimal(vec2 a, vec2 base, vec2 delta) {
-  const int baseSign = ScaledCrossSign(a, base);
-  return baseSign != 0 ? baseSign : ScaledCrossSign(a, delta);
-}
-
-bool SymbolicYInHalfOpenInterval(double y, double dy, double yMin,
-                                 double yMax) {
-  const int cmpMin = SignInfinitesimal(y - yMin, dy);
-  const int cmpMax = SignInfinitesimal(y - yMax, dy);
-  return cmpMin >= 0 && cmpMax < 0;
-}
-
-int CastExternalWindingRay(vec2 mid, vec2 perturb,
-                           const std::vector<FastEdge>& edges,
-                           const std::vector<int>& edgeComponent,
-                           int skipComponent) {
   int winding = 0;
-  for (const auto& e : edges) {
-    DEBUG_ASSERT(e.edge >= 0 && e.edge < static_cast<int>(edgeComponent.size()),
-                 logicErr, "winding edge component index out of range");
-    DEBUG_ASSERT(edgeComponent[e.edge] >= 0, logicErr,
-                 "winding edge is missing component assignment");
-    if (edgeComponent[e.edge] == skipComponent) continue;
-    if (!SymbolicYInHalfOpenInterval(mid.y, perturb.y, e.a.y, e.b.y)) continue;
-    const vec2 edgeDir = e.b - e.a;
-    const int side = ScaledCrossSignInfinitesimal(edgeDir, mid - e.a, perturb);
-    if (side <= 0) continue;
-    winding += e.signedMult;
-  }
+  const Box2 slab(vec2(P.x, P.y), vec2(globalMaxX, P.y));
+  auto accumulate = [&](int /*queryIdx*/, int leafIdx) {
+    const int ei = bvh.leafToOrig[leafIdx];
+    const CanonEdge& e = canon.edges[ei];
+    const vec2 a = verts[e.vMin];
+    const vec2 b = verts[e.vMax];
+    if (a.y == b.y) return;  // horizontal edges never cross a +x ray
+    const vec2& lo = a.y < b.y ? a : b;
+    const vec2& hi = a.y < b.y ? b : a;
+
+    // Half-open y-membership [lo.y, Q.y) under the perturbed ray height: an
+    // endpoint exactly at P.y is decided by perturbUp.
+    auto below = [&](double y) { return y == P.y ? perturbUp : y < P.y; };
+    if (!(below(lo.y) && !below(hi.y))) return;
+
+    bool rightOf;
+    if (e.vMin == start || e.vMax == start) {
+      // Incident edge through P: its crossing-x is P.x to leading order, so the
+      // perturbation decides. O (its far vert) and E (the classified far vert)
+      // share a y-side of P, so the side test is just Interpolate+Shadows:
+      // interpolate whichever of O, E lies between P and the other (so the
+      // query stays in Interpolate's domain) onto the other edge and
+      // Shadows-compare x. The classified sub-edge itself crosses the ray iff
+      // perturbed up.
+      const int other = e.vMin == start ? e.vMax : e.vMin;
+      if (other == end) {
+        rightOf = perturbUp;
+      } else {
+        const vec2 O = verts[other];
+        const vec2 E = verts[end];
+        const bool oInterior = (O.y - P.y) * (O.y - E.y) <= 0.0;
+        const vec2 farEnd = oInterior ? E : O;
+        const vec3 pYX(P.y, P.x, 0.0);
+        const vec3 farYX(farEnd.y, farEnd.x, 0.0);
+        const double xq = Interpolate(pYX, farYX, oInterior ? O.y : E.y).x;
+        rightOf =
+            oInterior ? Shadows(xq, O.x, xTieDir) : !Shadows(xq, E.x, xTieDir);
+      }
+    } else {
+      // Non-incident edge: crossing-x at height P.y via Smith's Interpolate
+      // (axes swapped so the segment is interpolated at its y). The finite gap
+      // crossX - P.x dominates; xTieDir only matters on an exact tie.
+      const vec3 loYX(lo.y, lo.x, 0.0);
+      const vec3 hiYX(hi.y, hi.x, 0.0);
+      const double crossX = Interpolate(loYX, hiYX, P.y).x;
+      rightOf = Shadows(P.x, crossX, xTieDir);
+    }
+    // CCW=+1: an upward sub-edge (vMin->vMax) crossing to the right of P raises
+    // the winding by its multiplicity, a downward one lowers it.
+    if (rightOf) winding += a.y < b.y ? e.mult : -e.mult;
+  };
+  auto recorder = MakeSimpleRecorder(accumulate);
+  auto qf = [&](int) { return slab; };
+  BVHCollisions(bvh, recorder, qf, /*n=*/1, /*parallel=*/false);
   return winding;
 }
 
-// =============================================================================
-// Planar halfedge face traversal. The actual winding-rule filter.
-//
-// Builds the same halfedge structure manifold's 3D mesh
-// `Manifold::Impl::halfedge_` uses from the canonical sub-edges, walks face
-// cycles to identify each planar face, seeds one face per disconnected edge
-// component by symbolic ray-cast, and propagates winding numbers across
-// halfedge twins. An edge
-// is kept iff its left and right faces disagree under the selected rule.
-// =============================================================================
-
-struct Halfedge {
-  int twin;    // index of the twin halfedge in halfedges[]
-  int next;    // next halfedge along the same face's CCW boundary
-  int origin;  // vertex this halfedge starts at
-  int face;    // face id (-1 until assigned)
-  int mult;    // signed multiplicity in this direction
-};
-
-#ifdef MANIFOLD_DEBUG
-void RecordHalfedgeFaces(Trace* trace, WindRule rule,
-                         const std::vector<vec2>& verts,
-                         const std::vector<Halfedge>& halfedges,
-                         const std::vector<int>& faceStartHE,
-                         const std::vector<int>& faceWind,
-                         const std::vector<long double>& faceArea,
-                         int outerFace) {
-  if (!trace) return;
-  TracePhase& phase = trace->AddPhase("halfedge_faces");
-  const int nFaces = static_cast<int>(faceStartHE.size());
-  for (int f = 0; f < nFaces; ++f) {
-    SimplePolygon loop;
-    const int h0 = faceStartHE[f];
-    if (h0 >= 0) {
-      int h = h0;
-      int safety = 0;
-      do {
-        loop.push_back(verts[halfedges[h].origin]);
-        h = halfedges[h].next;
-        if (h < 0 || ++safety > static_cast<int>(halfedges.size())) break;
-      } while (h != h0);
-    }
-    const bool isOuter = f == outerFace;
-    phase.polygons.push_back(
-        {std::string("face") + std::to_string(f), std::move(loop),
-         isOuter ? "outer_face_unbounded" : "face", "", faceWind[f],
-         IsInside(rule, faceWind[f]), isOuter ? "unbounded outer face" : ""});
-    phase.annotations.push_back({std::string("face") + std::to_string(f),
-                                 "area", std::to_string(faceArea[f])});
-  }
-}
-#endif
-
-// The halfedge filter body, parameterized by the winding rule.
-std::vector<OutEdge> FilterByWindingHalfedgesImpl(
-    const CanonicalSubEdges& canon, const std::vector<vec2>& verts, bool debug,
-    WindRule rule, Trace* trace) {
-#ifdef MANIFOLD_DEBUG
-  if (debug && DebugVerbose()) {
-    std::cout << "[FilterByWindingHalfedges] canon.edges.size()="
-              << canon.edges.size() << " verts.size()=" << verts.size() << "\n";
-  }
-#endif
-  // 1. Build halfedges. Each canonical (vMin, vMax) with mult m becomes:
-  //    - hA: vMin -> vMax, mult = m
-  //    - hB: vMax -> vMin, mult = -m
-  //    Twins are paired (hA.twin = hB, hB.twin = hA).
-  //
-  thread_local static std::vector<Halfedge> halfedgesBuf;
-  auto& halfedges = halfedgesBuf;
-  halfedges.resize(2 * canon.edges.size());
-  for (size_t i = 0; i < canon.edges.size(); ++i) {
-    const auto& edge = canon.edges[i];
-    const int hA = static_cast<int>(2 * i);
-    halfedges[hA] = {hA + 1, -1, edge.vMin, -1, edge.mult};
-    halfedges[hA + 1] = {hA, -1, edge.vMax, -1, -edge.mult};
-  }
-  if (halfedges.empty()) return {};
-
-  // 2. Group halfedges by origin vertex; sort each group by direction angle
-  //    (CCW). This is the "rotational order" needed to compute next pointers.
-  //    Flat CSR layout (outOff[v]..outOff[v+1] indexes into outFlat) avoids
-  //    the per-vert vector<int> allocations a vector-of-vector would pay.
-  const int nVerts = static_cast<int>(verts.size());
-  thread_local static std::vector<int> outOffBuf;
-  thread_local static std::vector<int> outFlatBuf;
-  thread_local static std::vector<int> outCurBuf;
-  auto& outOff = outOffBuf;
-  auto& outFlat = outFlatBuf;
-  auto& outCur = outCurBuf;
-  outOff.assign(nVerts + 1, 0);
-  for (int i = 0; i < static_cast<int>(halfedges.size()); ++i) {
-    ++outOff[halfedges[i].origin + 1];
-  }
-  for (int v = 1; v <= nVerts; ++v) outOff[v] += outOff[v - 1];
-  outFlat.resize(halfedges.size());
-  outCur.assign(outOff.begin(), outOff.end());
-  for (int i = 0; i < static_cast<int>(halfedges.size()); ++i) {
-    outFlat[outCur[halfedges[i].origin]++] = i;
-  }
-  // atan2-free angular comparator: split the plane into two half-planes, then
-  // compare by cross product. Same CCW order from +x, without libm in the
-  // per-comparison hot path.
-  auto bucketOf = [](const vec2& d) {
-    return (d.y > 0 || (d.y == 0 && d.x > 0)) ? 0 : 1;
-  };
-  manifold::for_each(
-      manifold::autoPolicy(nVerts), manifold::countAt(0),
-      manifold::countAt(nVerts), [&](int v) {
-        const int beg = outOff[v];
-        const int end = outOff[v + 1];
-        const int n = end - beg;
-        if (n < 2) return;
-        const vec2 vp = verts[v];
-        if (n == 2) {
-          // Fast path for typical polygon corners (degree 2). Skip the
-          // std::sort overhead - direct compare-and-swap.
-          const vec2 dA =
-              verts[halfedges[halfedges[outFlat[beg]].twin].origin] - vp;
-          const vec2 dB =
-              verts[halfedges[halfedges[outFlat[beg + 1]].twin].origin] - vp;
-          const int bA = bucketOf(dA), bB = bucketOf(dB);
-          bool aFirst;
-          if (bA != bB)
-            aFirst = bA < bB;
-          else
-            aFirst = la::cross(dA, dB) > 0;
-          if (!aFirst) std::swap(outFlat[beg], outFlat[beg + 1]);
-          return;
-        }
-        manifold::stable_sort(
-            outFlat.begin() + beg, outFlat.begin() + end, [&](int a, int b) {
-              const vec2 dA = verts[halfedges[halfedges[a].twin].origin] - vp;
-              const vec2 dB = verts[halfedges[halfedges[b].twin].origin] - vp;
-              const int bA = bucketOf(dA), bB = bucketOf(dB);
-              if (bA != bB) return bA < bB;
-              return la::cross(dA, dB) > 0;
-            });
-      });
-
-  // 3. Compute next pointers: each halfedge takes the smallest left turn at
-  //    its destination, which is the entry just before its twin in the CCW
-  //    outgoing list. Degree-2 vertices hide this choice; intersections do not.
-  // Each .next write is independent; reads are from the sorted outgoing CSR.
-  manifold::for_each(
-      manifold::autoPolicy(halfedges.size()), manifold::countAt(0),
-      manifold::countAt(static_cast<int>(halfedges.size())), [&](int i) {
-        const int twinIdx = halfedges[i].twin;
-        const int destV = halfedges[twinIdx].origin;
-        const int beg = outOff[destV];
-        const int end = outOff[destV + 1];
-        auto it =
-            std::find(outFlat.begin() + beg, outFlat.begin() + end, twinIdx);
-        if (it == outFlat.begin() + end) return;
-        auto prevIt = (it == outFlat.begin() + beg)
-                          ? (outFlat.begin() + end - 1)
-                          : (it - 1);
-        halfedges[i].next = *prevIt;
-      });
-
-  // 4. Walk face cycles, assign face IDs. Each unmarked halfedge starts a
-  //    new face; follow `next` chain back to the start.
-  int nFaces = 0;
-  for (int i = 0; i < static_cast<int>(halfedges.size()); ++i) {
-    if (halfedges[i].face != -1) continue;
-    int h = i;
-    int safety = 0;
-    bool malformed = false;
-    do {
-      if (halfedges[h].next == -1 ||
-          safety++ > static_cast<int>(halfedges.size())) {
-        // Malformed cycle; bail rather than infinite-loop. Indicates an
-        // upstream bug (mismatched twin/next pointers from the angular
-        // sort, or a non-2-manifold canonical edge set). Surface under
-        // MANIFOLD_DEBUG; the silent drop downstream produces wrong
-        // topology that's hard to debug later.
-        malformed = true;
-        break;
-      }
-      halfedges[h].face = nFaces;
-      h = halfedges[h].next;
-    } while (h != i);
-#ifdef MANIFOLD_DEBUG
-    if (malformed && DebugVerbose()) {
-      std::cout
-          << "[FilterByWindingHalfedges] malformed face cycle starting at "
-             "halfedge "
-          << i << " (face " << nFaces << " safety=" << safety
-          << " halfedges=" << halfedges.size() << ")\n";
-    }
-#endif
-    if (malformed) {
-      DEBUG_ASSERT(false, logicErr, "malformed halfedge cycle");
-      return {};
-    }
-    ++nFaces;
-  }
-
-  // 5. Compute signed area per face. Centering the shoelace sum avoids
-  // cancellation from large translations or skinny-but-valid faces; long double
-  // keeps tiny components ordered when selecting local outer faces.
-  // First halfedge encountered per face. Used both as the centering
-  // reference for the shoelace area (below) and as the starting halfedge
-  // for the per-face winding ray-cast.
-  thread_local static std::vector<int> faceStartHE;
-  thread_local static std::vector<long double> faceArea;
-  faceStartHE.assign(nFaces, -1);
-  for (int i = 0; i < static_cast<int>(halfedges.size()); ++i) {
-    if (halfedges[i].face >= 0 && faceStartHE[halfedges[i].face] == -1)
-      faceStartHE[halfedges[i].face] = i;
-  }
-  faceArea.assign(nFaces, 0.0L);
-  for (int i = 0; i < static_cast<int>(halfedges.size()); ++i) {
-    if (halfedges[i].face < 0) continue;
-    const int faceRefHE = faceStartHE[halfedges[i].face];
-    if (faceRefHE < 0) continue;
-    const vec2 refD = verts[halfedges[faceRefHE].origin];
-    const vec2 aD = verts[halfedges[i].origin];
-    const vec2 bD = verts[halfedges[halfedges[i].twin].origin];
-    const long double ax = static_cast<long double>(aD.x) - refD.x;
-    const long double ay = static_cast<long double>(aD.y) - refD.y;
-    const long double bx = static_cast<long double>(bD.x) - refD.x;
-    const long double by = static_cast<long double>(bD.y) - refD.y;
-    faceArea[halfedges[i].face] += (ax * by - bx * ay) * 0.5L;
-  }
-  int outerFace = 0;
-  for (int f = 1; f < nFaces; ++f) {
-    if (faceArea[f] < faceArea[outerFace]) outerFace = f;
-  }
-#ifdef MANIFOLD_DEBUG
-  if (debug && DebugVerbose()) {
-    std::cout << "Halfedges: " << halfedges.size() << " halfedges, " << nFaces
-              << " faces\n";
-    int negAreaCount = 0;
-    for (int f = 0; f < nFaces; ++f) {
-      std::cout << "  face " << f << " area=" << faceArea[f]
-                << (f == outerFace ? "  <-- outer" : "") << "\n";
-      if (faceArea[f] < 0 && f != outerFace) ++negAreaCount;
-    }
-    if (negAreaCount > 0) {
-      std::cout << "  WARNING: " << negAreaCount
-                << " bounded face(s) have negative signed area; cycle "
-                   "convention may be inverted\n";
-    }
-    // Group halfedges by face, count mults.
-    std::map<int, std::map<int, int>> faceMults;
-    for (int i = 0; i < static_cast<int>(halfedges.size()); ++i) {
-      faceMults[halfedges[i].face][halfedges[i].mult]++;
-    }
-    for (auto& [f, m] : faceMults) {
-      std::cout << "  face " << f << " mults:";
-      for (auto& [mu, c] : m) std::cout << " " << mu << "x" << c;
-      std::cout << "\n";
-    }
-  }
-#endif
-
-  // 6. Seed one face per connected component, then propagate winding across
-  // twin pointers: crossing h from left to right subtracts h.mult.
-  std::vector<FastEdge> fastEdges;
-  bool fastEdgesBuilt = false;
-  auto ensureFastEdges = [&]() {
-    if (!fastEdgesBuilt) {
-      fastEdges = BuildFastEdges(canon, verts);
-      fastEdgesBuilt = true;
-    }
-  };
-  thread_local static std::vector<int> faceWind;
-  thread_local static std::vector<uint8_t> wAssigned;
-  faceWind.assign(nFaces, 0);
-  wAssigned.assign(nFaces, 0);
-  thread_local static std::vector<int> faceComponent;
-  thread_local static std::vector<int> edgeComponent;
-  thread_local static std::vector<int> componentOuterFace;
-  thread_local static std::vector<int> componentQ;
-  faceComponent.assign(nFaces, -1);
-  edgeComponent.assign(canon.edges.size(), -1);
-  componentOuterFace.clear();
-  componentQ.clear();
-  componentQ.reserve(nFaces);
-  auto assignComponent = [&](int seed, int component) {
-    componentQ.clear();
-    componentQ.push_back(seed);
-    faceComponent[seed] = component;
-    int localOuter = seed;
-    size_t head = 0;
-    while (head < componentQ.size()) {
-      const int f = componentQ[head++];
-      if (faceArea[f] < faceArea[localOuter]) localOuter = f;
-      const int h0 = faceStartHE[f];
-      if (h0 < 0) continue;
-      int hh = h0;
-      int safety = 0;
-      do {
-        edgeComponent[hh / 2] = component;
-        const int adj = halfedges[halfedges[hh].twin].face;
-        if (adj >= 0 && faceComponent[adj] < 0) {
-          faceComponent[adj] = component;
-          componentQ.push_back(adj);
-        }
-        hh = halfedges[hh].next;
-        if (hh < 0 || ++safety > static_cast<int>(halfedges.size())) break;
-      } while (hh != h0);
-    }
-    componentOuterFace.push_back(localOuter);
-  };
-  for (int f = 0; f < nFaces; ++f) {
-    if (faceComponent[f] < 0) {
-      assignComponent(f, static_cast<int>(componentOuterFace.size()));
-    }
-  }
-
-  auto castFaceHalfedge = [&](int h) {
-    if (h < 0) return 0;
-    const vec2 a = verts[halfedges[h].origin];
-    const vec2 b = verts[halfedges[halfedges[h].twin].origin];
-    const vec2 mid = (a + b) * 0.5;
-    const vec2 d = b - a;
-    const vec2 perturb(-d.y, d.x);
-    ensureFastEdges();
-    return CastExternalWindingRay(mid, perturb, fastEdges, edgeComponent,
-                                  edgeComponent[h / 2]);
-  };
-  auto seedRayCast = [&](int f) {
-    const int h0 = faceStartHE[f];
-    faceWind[f] = h0 < 0 ? 0 : castFaceHalfedge(h0);
-    wAssigned[f] = 1;
-  };
-  // The unbounded outer face is conventionally outside, so winding = 0.
-  faceWind[outerFace] = 0;
-  wAssigned[outerFace] = 1;
-  thread_local static std::vector<int> bfsQ;
-  bfsQ.clear();
-  bfsQ.reserve(nFaces);
-  auto propagateFrom = [&](int seed) {
-    bfsQ.clear();
-    bfsQ.push_back(seed);
-    size_t head = 0;
-    while (head < bfsQ.size()) {
-      const int f = bfsQ[head++];
-      const int h0 = faceStartHE[f];
-      if (h0 < 0) continue;
-      int hh = h0;
-      int safety = 0;
-      do {
-        const int twinH = halfedges[hh].twin;
-        const int adj = halfedges[twinH].face;
-        if (adj >= 0 && !wAssigned[adj]) {
-          // Stepping LEFT of hh (= f) -> RIGHT of hh (= adj):
-          // winding loses the +mult contribution that the LEFT side saw.
-          faceWind[adj] = faceWind[f] - halfedges[hh].mult;
-          wAssigned[adj] = 1;
-          bfsQ.push_back(adj);
-        }
-        hh = halfedges[hh].next;
-        if (hh < 0 || ++safety > static_cast<int>(halfedges.size())) break;
-      } while (hh != h0);
-    }
-  };
-  propagateFrom(outerFace);
-  // Pick up disconnected edge components with a symbolic ray-cast from a local
-  // outer face. The component's own contribution on that side is zero, so the
-  // cast only counts other components.
-  for (int localOuter : componentOuterFace) {
-    if (!wAssigned[localOuter]) {
-      seedRayCast(localOuter);
-      propagateFrom(localOuter);
-    }
-  }
-
-#ifdef MANIFOLD_DEBUG
-  if (debug && DebugVerbose()) {
-    std::cout << "  face windings:";
-    for (int f = 0; f < nFaces; ++f) {
-      std::cout << " f" << f << "=" << faceWind[f];
-    }
-    std::cout << "\n";
-  }
-  RecordHalfedgeFaces(trace, rule, verts, halfedges, faceStartHE, faceWind,
-                      faceArea, outerFace);
-#endif
-
-  // 7. Filter canonical sub-edges by left/right face windings. The first
-  //    halfedge of each pair (the (vMin -> vMax) direction) is at index
-  //    2*i; its twin (vMax -> vMin) is at 2*i + 1.
-  std::vector<OutEdge> out;
-  out.reserve(canon.edges.size());
-  int hi = 0;
-  for (const auto& edge : canon.edges) {
-    const int hA = hi;
-    const int hB = hi + 1;
-    hi += 2;
-    const int leftFace = halfedges[hA].face;
-    const int rightFace = halfedges[hB].face;
-    if (leftFace < 0 || rightFace < 0) continue;
-    const int wL = faceWind[leftFace];
-    const int wR = faceWind[rightFace];
-    const bool leftIn = IsInside(rule, wL);
-    const bool rightIn = IsInside(rule, wR);
-    if (leftIn == rightIn) continue;
-    if (leftIn) {
-      out.push_back({edge.vMin, edge.vMax, 1});
-    } else {
-      out.push_back({edge.vMax, edge.vMin, 1});
-    }
-  }
-  return out;
-}
 }  // namespace
 
-std::vector<OutEdge> FilterByWindingHalfedges(const CanonicalSubEdges& canon,
-                                              const std::vector<vec2>& verts,
-                                              bool debug, WindRule rule,
-                                              Trace* trace) {
-#ifndef MANIFOLD_DEBUG
-  (void)trace;
-#endif
-  return FilterByWindingHalfedgesImpl(canon, verts, debug, rule, trace);
+std::vector<OutEdge> FilterByWinding(const CanonicalSubEdges& canon,
+                                     const std::vector<vec2>& verts,
+                                     WindRule rule) {
+  // Reuse boolean2's BVH over the canonical sub-edges for the per-edge +x
+  // ray-cast winding. One tree, built once, so the pass is ~O(E log E).
+  const int nE = static_cast<int>(canon.edges.size());
+  std::vector<Box2> boxes(nE);
+  double globalMaxX = -std::numeric_limits<double>::infinity();
+  for (int i = 0; i < nE; ++i) {
+    boxes[i] = BoxOf2DEdge(verts[canon.edges[i].vMin],
+                           verts[canon.edges[i].vMax], 0.0);
+  }
+  for (const auto& v : verts) globalMaxX = std::max(globalMaxX, v.x);
+  const BVH bvh = BVHBuildFromBoxes(boxes);
+
+  std::vector<OutEdge> out;
+  out.reserve(canon.edges.size());
+  for (int ei = 0; ei < nE; ++ei) {
+    const auto& edge = canon.edges[ei];
+    if (edge.vMin == edge.vMax) continue;
+    // Winding of the face just left of the directed sub-edge vMin->vMax,
+    // evaluated at the start vertex vMin. Crossing that edge from right to left
+    // raises the winding by its signed multiplicity, so the right face is
+    // leftW - mult (one computation, not two). For a stable arrangement the
+    // step across a retained boundary is +-1; coincident input can sum to a
+    // larger magnitude, hence -mult rather than a literal -1.
+    const int leftW = LeftWindingAtVertex(edge.vMin, edge.vMax, bvh, canon,
+                                          verts, globalMaxX);
+    const int rightW = leftW - edge.mult;
+    const bool leftIn = IsInside(rule, leftW);
+    const bool rightIn = IsInside(rule, rightW);
+    if (leftIn == rightIn) continue;
+    if (leftIn)
+      out.push_back({edge.vMin, edge.vMax, 1});
+    else
+      out.push_back({edge.vMax, edge.vMin, 1});
+  }
+  return out;
 }
 
 }  // namespace manifold

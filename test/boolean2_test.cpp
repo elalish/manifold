@@ -889,20 +889,15 @@ TEST(Boolean2, KeepsNearDistinctPresentationVertex) {
   EXPECT_NEAR(TotalSignedArea(polys), 1.0 + kDelta, 1e-12);
 }
 
-// The new-to-old snap is a 2*eps budget: a generated crossing within 2*eps of
-// an old corner fuses into it; beyond 2*eps it stays a distinct vertex.
-TEST(Boolean2, NewToOldMergeBudgetIsTwoEps) {
+// The new-to-old snap is gated by perpendicular incidence (point-to-line
+// distance), not point-to-point proximity: a generated crossing fuses into a
+// nearby old corner only when one of its transversal source edges actually
+// passes through that corner within the bounded eps perpendicular band. Mere
+// proximity (within the 2*eps broad-phase band) is not enough - distinct
+// near-corner crossings whose source edges miss the corner stay separate.
+TEST(Boolean2, NewToOldMergeIsPerpIncidenceGated) {
   constexpr double eps = 1e-6;
   const Polygons a = {{{0, 0}, {10, 0}, {10, 1}, {0, 1}}};
-  // b's left edge crosses a's bottom edge at (xLeft, 0), a distance xLeft from
-  // corner (0, 0); only that distance differs between the two runs.
-  auto runWithLeftEdgeAt = [&](double xLeft) {
-    const Polygons b = {{{xLeft, -0.5}, {0.5, -0.5}, {0.5, 0.5}, {xLeft, 0.5}}};
-    auto [verts, edges] = CombinedInput(a, b, /*bMult=*/1);
-    auto result =
-        RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::Add);
-    return std::make_pair(std::move(result), std::move(edges));
-  };
   auto countNear = [](const std::vector<vec2>& points, vec2 target, double r) {
     int count = 0;
     for (const vec2& p : points)
@@ -910,18 +905,39 @@ TEST(Boolean2, NewToOldMergeBudgetIsTwoEps) {
     return count;
   };
   const vec2 corner{0, 0};
-  const auto [merged, mergedEdges] = runWithLeftEdgeAt(1.5 * eps);
-  const auto [distinct, distinctEdges] = runWithLeftEdgeAt(2.5 * eps);
-  // Within the budget the corner and the crossing collapse to one vertex;
-  // beyond it the crossing survives alongside the corner.
-  EXPECT_EQ(countNear(merged.verts, corner, 5 * eps), 1);
-  EXPECT_EQ(countNear(distinct.verts, corner, 5 * eps), 2);
-  EXPECT_TRUE(CheckRetainedGraphValidity(merged, mergedEdges,
-                                         merged.inputVert2Merged,
-                                         merged.numMergedVerts, eps));
-  EXPECT_TRUE(CheckRetainedGraphValidity(distinct, distinctEdges,
-                                         distinct.inputVert2Merged,
-                                         distinct.numMergedVerts, eps));
+
+  // Not incident: b's vertical left edge crosses a's bottom edge at (xLeft, 0),
+  // a perpendicular distance xLeft from corner (0, 0). At xLeft = 1.5*eps the
+  // crossing is inside the 2*eps proximity band but its only transversal source
+  // edge (b's vertical left edge) is 1.5*eps off the corner, so it must stay a
+  // distinct vertex rather than fuse.
+  {
+    const Polygons b = {
+        {{1.5 * eps, -0.5}, {0.5, -0.5}, {0.5, 0.5}, {1.5 * eps, 0.5}}};
+    auto [verts, edges] = CombinedInput(a, b, /*bMult=*/1);
+    auto result =
+        RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::Add);
+    EXPECT_EQ(countNear(result.verts, corner, 5 * eps), 2)
+        << "non-incident near-corner crossing was over-fused";
+    EXPECT_TRUE(CheckRetainedGraphValidity(
+        result, edges, result.inputVert2Merged, result.numMergedVerts, eps));
+  }
+
+  // Incident: b's left edge is the sloped line through corner (0, 0), so the
+  // crossing of that edge with a's bottom edge IS the corner; the FP
+  // intersection lands within eps of (0, 0). Because the transversal source
+  // edge genuinely runs through the corner, the crossing fuses to one vertex.
+  // b's left edge runs from (-0.5, 0.5) down through (0, 0) to (0.5, -0.5).
+  {
+    const Polygons b = {{{0.5, -0.5}, {2.0, -0.5}, {2.0, 0.5}, {-0.5, 0.5}}};
+    auto [verts, edges] = CombinedInput(a, b, /*bMult=*/1);
+    auto result =
+        RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::Add);
+    EXPECT_EQ(countNear(result.verts, corner, 5 * eps), 1)
+        << "genuinely incident crossing failed to fuse onto the corner";
+    EXPECT_TRUE(CheckRetainedGraphValidity(
+        result, edges, result.inputVert2Merged, result.numMergedVerts, eps));
+  }
 }
 
 TEST(Boolean2, RemoveOverlapsMergesExactDuplicateCoordinates) {
@@ -1080,13 +1096,16 @@ const SegCase kIntersectSegmentsSeeds[] = {
      true,
      {5.0, 0.0},
      1e-12},
-    {"DropsEpsNearEndpointCrossing",
+    // A genuine transversal crossing that lands within eps of an endpoint is
+    // kept, not dropped: the straddle is sign-confirmed and the near-endpoint
+    // resolution is left to insertion-time snapping.
+    {"KeepsEpsNearEndpointCrossing",
      {{0.0, 0.0}, {10.0, 0.0}, 0},
      {{0.5, -1.0}, {0.5, 1.0}, 1},
      1.0,
-     false,
-     {},
-     0.0},
+     true,
+     {0.5, 0.0},
+     1e-12},
     {"KeepsSteepInteriorCrossing",
      {{0.0, 0.0}, {0.0015, 1000.0}, 0},
      {{-1.0, 500.0}, {1.0, 500.0}, 1},
@@ -1161,7 +1180,7 @@ TEST(Boolean2, IntersectSegmentsSeeds) {
     SCOPED_TRACE(c.name);
     std::cerr << "[seed] " << c.name << std::endl;
     vec2 out;
-    EXPECT_EQ(IntersectSegments(c.a, c.b, c.eps, &out), c.crosses);
+    EXPECT_EQ(IntersectSegments(c.a, c.b, c.eps, out), c.crosses);
     if (c.crosses) {
       EXPECT_NEAR(out.x, c.at.x, c.atTol);
       EXPECT_NEAR(out.y, c.at.y, c.atTol);
@@ -1174,4 +1193,119 @@ TEST(Boolean2, NonFiniteInputReturnsEmpty) {
   Polygons bad = {{{0.0, 0.0}, {1.0, 0.0}, {inf, 1.0}, {0.0, 1.0}}};
   Polygons finite = {{{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}}};
   EXPECT_TRUE(Boolean2D(bad, finite, OpType::Add).empty());
+}
+
+// Near-degenerate cases at the eps scale.
+
+// A near-origin degenerate Subtract whose regularized graph must stay valid; a
+// missed split would leave a retained vertex inside another edge's interior
+// band.
+TEST(Boolean2, NearOriginSubtractStaysValid) {
+  const Polygons a = {{{0, 0},
+                       {0, -1.3875065265425851e-15},
+                       {0.00013875065265428477, -7.4683028744398387e-16},
+                       {0, 1.3875065265425851e-15}}};
+  const Polygons b = {{{-2.7755575615628914e-16, -4.1136016361401099e-16},
+                       {1.0547118733938987e-15, -8.4012326012156754e-16},
+                       {4.0732494168083111e-05, 0.00012536172672923465},
+                       {-1.609823385706477e-15, 1.7402932893545559e-17}},
+                      {{3.3306690738754696e-16, -9.7814953183777337e-16},
+                       {-4.9960036108132044e-16, 1.4436682794117381e-16},
+                       {-0.00010663905417918063, -7.7477808007594485e-05},
+                       {1.1657341758564144e-15, -2.1006658916167206e-15}}};
+  const double eps = InferEps(a, b);
+  const auto [verts, edges] = CombinedInput(a, b, /*bMult=*/-1);
+  const auto result = RemoveOverlaps2D(verts, edges, eps);
+  EXPECT_TRUE(CheckRetainedGraphValidity(result, edges, result.inputVert2Merged,
+                                         result.numMergedVerts, eps));
+}
+
+// A tall thin rectangle (area d*h = 2.6) with two wider rectangles subtracted
+// that overlap its left and right sides; their inner edges cross the short
+// bottom edge 0.4 eps apart. The eps-scale merge fuses those near-coincident
+// crossings, cancelling the subtraction cleanly back to the rectangle.
+TEST(Boolean2, ShortEdgeFusion) {
+  const double eps = 1e-6;
+  const double d = 2.6 * eps, h = 1.0 / eps, x0 = 1.1 * eps, x1 = 1.5 * eps;
+  const SimplePolygon rect = {{0, 0}, {d, 0}, {d, h}, {0, h}};
+  const SimplePolygon left = {{-10 * eps, -0.20 * h},
+                              {x0, -0.20 * h},
+                              {x0, 0.25 * h},
+                              {-10 * eps, 0.25 * h}};
+  const SimplePolygon right = {{x1, -0.25 * h},
+                               {d + 10 * eps, -0.25 * h},
+                               {d + 10 * eps, 0.20 * h},
+                               {x1, 0.20 * h}};
+  const Polygons out =
+      Boolean2D({rect, left, right}, {left, right}, OpType::Subtract, eps);
+  EXPECT_NEAR(std::fabs(TotalSignedArea(out)), d * h, 1e-3 * d * h)
+      << "subtracted rectangles did not cancel back to the rectangle";
+}
+
+// The Add/Intersect variant of the short-edge fusion above. Independent
+// rectangle arithmetic: left/right are x-disjoint, each area 0.45h*1.11e-5 =
+// 4.995; rect area d*h = 2.6; union = 12.59 - 0.275 - 0.22 = 12.095;
+// union n (left u right) = left u right = 9.99. Those are the true areas; the
+// engine fuses a sub-eps gap and lands within a loose eps*length band of them
+// (see the body) - a below-resolution floor, not a regression.
+TEST(Boolean2, ShortEdgeFusionAddIntersect) {
+  const double eps = 1e-6;
+  const double d = 2.6 * eps, h = 1.0 / eps, x0 = 1.1 * eps, x1 = 1.5 * eps;
+  const SimplePolygon rect = {{0, 0}, {d, 0}, {d, h}, {0, h}};
+  const SimplePolygon left = {{-10 * eps, -0.20 * h},
+                              {x0, -0.20 * h},
+                              {x0, 0.25 * h},
+                              {-10 * eps, 0.25 * h}};
+  const SimplePolygon right = {{x1, -0.25 * h},
+                               {d + 10 * eps, -0.25 * h},
+                               {d + 10 * eps, 0.20 * h},
+                               {x1, 0.20 * h}};
+  // The two probe edges sit 0.4 eps apart (x0 = 1.1 eps, x1 = 1.5 eps), so the
+  // eps-scale merge fuses them - an in-budget sub-eps merge. The fused boundary
+  // shifts by <= 0.4 eps, which the h = 1/eps edge levers into an O(0.4) area
+  // wobble - observed 0.09 (Add) and 0.18 (Intersect), so the 5e-2 bound leaves
+  // ~3-7x headroom (the feature is below the eps resolution). Intersect
+  // additionally returns one contour rather than two; that is the same sub-eps
+  // fusion and is accepted here, not a separate bug.
+  EXPECT_NEAR(std::fabs(TotalSignedArea(Boolean2D(
+                  {rect, left, right}, {left, right}, OpType::Add, eps))),
+              12.095, 5e-2 * 12.095)
+      << "union area outside the eps*length floor";
+  EXPECT_NEAR(std::fabs(TotalSignedArea(Boolean2D(
+                  {rect, left, right}, {left, right}, OpType::Intersect, eps))),
+              9.99, 5e-2 * 9.99)
+      << "intersection area outside the eps*length floor";
+}
+
+// A visible, large-eps repro of the near-coincident missed-crossing open walk.
+// Three triangles share a corner cluster on y=0 (gaps 1.5eps/3eps); a dropped
+// transversal crossing leaves the retained edges with an in/out imbalance (an
+// open walk -> empty union in release / closed-walk assert in debug). Unlike
+// the production case where eps is ~3e-12 of the bbox, here eps is ~17% of the
+// bbox (eps=1.75, bbox ~10.3) - the whole figure is eye-resolvable. It needs an
+// explicit op-eps (production InferEps would not reach the cluster). Same class
+// as the disabled near-coincident-corner case; re-enable once insertion keeps
+// the dropped crossing (reaches general position).
+TEST(Boolean2, VisibleMissedCrossingLargeEps) {
+  const double eps = 1.75;
+  const std::vector<vec2> verts = {
+      {100, 0},    {93.99241891, -2.888671352},  {99.58902672, -0.3730219929},
+      {97.375, 0}, {93.6604499, -5.188383117},   {103.521365, 0.7557026304},
+      {94.75, 0},  {103.9628746, -0.9388442207}, {102.2214598, -2.31277084}};
+  std::vector<EdgeM> edges;
+  for (int t = 0; t < 3; ++t)
+    for (int i = 0; i < 3; ++i)
+      edges.push_back({3 * t + i, 3 * t + (i + 1) % 3, 1});
+  const auto r =
+      RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::Add);
+  std::map<int, std::pair<int, int>> deg;  // vert -> (in, out)
+  for (const auto& e : r.edges) {
+    deg[e.v0].second++;
+    deg[e.v1].first++;
+  }
+  int imbalanced = 0;
+  for (const auto& kv : deg)
+    if (kv.second.first != kv.second.second) ++imbalanced;
+  EXPECT_EQ(imbalanced, 0) << "retained edges must form closed walks (dropped "
+                              "crossing -> open walk)";
 }
