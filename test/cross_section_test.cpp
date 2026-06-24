@@ -343,11 +343,12 @@ TEST(CrossSection, ConcurrentIndependentEdgePairs) {
   }
 }
 
-// DISABLED by the position-inclusive eps change: InferEps now scales with
-// bBox.Scale() (absolute coordinate), matching Boolean3, so the shallow
-// concurrency of these ~1-unit rhombi is not preserved when translated to 2^40.
-// Translation invariance is intentionally given up; see the InferEps contract.
-TEST(CrossSection, DISABLED_TranslatedShallowConcurrentEdges) {
+// Position-inclusive eps scales with bBox.Scale() (the absolute coordinate),
+// matching Boolean3, so the shallow concurrency of these ~1-unit rhombi is not
+// preserved when shifted to 2^40: the rhombi fall far below eps and collapse to
+// empty. Translation invariance is intentionally given up; see the InferEps
+// contract.
+TEST(CrossSection, TranslatedShallowConcurrentEdges) {
   auto rhomb = [](double angleDegrees, vec2 offset) {
     const double angle = angleDegrees * kPi / 180.;
     const double cosA = std::cos(angle);
@@ -369,22 +370,20 @@ TEST(CrossSection, DISABLED_TranslatedShallowConcurrentEdges) {
   const double base = std::ldexp(1.0, 40);
   CrossSection origin(polysAt({0., 0.}));
   CrossSection shifted(polysAt({base, -base}));
-  CrossSection shiftedBack = shifted.Translate({-base, base});
 
+  // At the origin the shallow concurrency resolves to one contour.
   EXPECT_EQ(origin.NumContour(), 1);
-  EXPECT_EQ(shifted.NumContour(), 1);
-  EXPECT_EQ(shiftedBack.NumContour(), origin.NumContour());
-  EXPECT_NEAR(shiftedBack.Area(), origin.Area(), 1e-4);
-  EXPECT_NEAR(shiftedBack.Bounds().Size().x, origin.Bounds().Size().x, 1e-4);
-  EXPECT_NEAR(shiftedBack.Bounds().Size().y, origin.Bounds().Size().y, 1e-4);
+  EXPECT_NEAR(origin.Area(), 0.420546, 1e-4);
+  // At 2^40 the radius-1 rhombi sit far below the position-scaled eps and
+  // collapse to nothing.
+  EXPECT_TRUE(shifted.IsEmpty());
 }
 
-// DISABLED by the position-inclusive eps change: with eps scaled to
-// bBox.Scale() (matching Boolean3), a 10-unit square at ~2^49 sits far below
-// eps and is intentionally not resolved - a feature much smaller than its
-// distance from the origin is no longer preserved. See the InferEps contract in
-// boolean2.cpp.
-TEST(CrossSection, DISABLED_TranslatedSmallPolygonKeepsFeatures) {
+// Position-inclusive eps scales with bBox.Scale() (matching Boolean3), so a
+// 10-unit square at ~2^49 sits far below eps and is intentionally not resolved
+// - a feature much smaller than its distance from the origin is dropped. See
+// the InferEps contract in boolean2.cpp.
+TEST(CrossSection, TranslatedSmallPolygonDroppedBelowEps) {
   const double base = std::ldexp(1.0, 49) * 1.5;
   SimplePolygon square = {{base, -base},
                           {base + 10.0, -base},
@@ -393,11 +392,7 @@ TEST(CrossSection, DISABLED_TranslatedSmallPolygonKeepsFeatures) {
 
   CrossSection cs(square);
 
-  EXPECT_EQ(cs.NumContour(), 1);
-  EXPECT_EQ(cs.NumVert(), 4);
-  const vec2 size = cs.Bounds().Size();
-  EXPECT_NEAR(size.x, 10.0, 1e-9);
-  EXPECT_NEAR(size.y, 10.0, 1e-9);
+  EXPECT_TRUE(cs.IsEmpty());
 }
 
 TEST(CrossSection, TinyFeatureNearCornerEdgeSoupParity) {
@@ -677,23 +672,22 @@ TEST(CrossSection, InclusionExclusionSliver) {
 }
 
 // A genuine ~4*eps-wide rectangle overlap; a sub-eps binary-incidence
-// knife-edge. DISABLED by the position-inclusive eps change: at these
-// off-origin (~2048) coordinates eps scales to bBox.Scale() (matching
-// Boolean3), ~2x the old span-based value, so this ~4*eps overlap now falls
-// under eps and merges to empty. See the InferEps contract in boolean2.cpp.
-TEST(CrossSection, DISABLED_SubEpsRectangleOverlap) {
+// knife-edge. At these off-origin (~2048) coordinates position-inclusive eps
+// scales to bBox.Scale() (matching Boolean3), ~2x the old span-based value, so
+// this ~4*eps overlap falls under eps and intentionally merges to empty. See
+// the InferEps contract in boolean2.cpp.
+TEST(CrossSection, SubEpsRectangleOverlap) {
   const CrossSection a(
       SimplePolygon{{0, 0}, {2048, 0}, {2048, 2048}, {0, 2048}});
   const CrossSection b(SimplePolygon{{2047.9999999943693, 512},
                                      {2303.9999999943693, 512},
                                      {2303.9999999943693, 768},
                                      {2047.9999999943693, 768}});
-  // Overlap = [2047.9999999943693, 2048] x [512, 768]: width ~5.6e-9 (~4*eps)
-  // by height 256, area ~1.44e-6 by rectangle arithmetic (independent of the
-  // engine).
-  const double expected = (2048.0 - 2047.9999999943693) * 256.0;
-  EXPECT_NEAR(a.Boolean(b, OpType::Intersect).Area(), expected, 1e-3 * expected)
-      << "sub-eps rectangle overlap dropped to empty";
+  // True overlap = [2047.9999999943693, 2048] x [512, 768]: width ~5.6e-9
+  // (~4*eps) by height 256, area ~1.44e-6 - but ~4*eps is below the
+  // position-scaled eps here, so the engine intentionally drops it.
+  EXPECT_TRUE(a.Boolean(b, OpType::Intersect).IsEmpty())
+      << "sub-eps overlap should merge to empty at this scale";
 }
 
 // A tiny square unioned with a huge thin strip (~1e6:1 aspect
@@ -2054,11 +2048,11 @@ TEST(CrossSection, NonFiniteInputReturnsEmpty) {
   EXPECT_TRUE(constructed.IsEmpty());
 }
 
-// DISABLED by the position-inclusive eps change: InferEps now scales with the
-// absolute coordinate (matching Boolean3), so Offset is intentionally NOT
-// invariant under a large translation - the eps at 1e12 differs from the eps at
-// the origin. See the InferEps contract in boolean2.cpp.
-TEST(CrossSection, DISABLED_OffsetIsInvariantUnderLargeTranslation) {
+// Position-inclusive eps scales with the absolute coordinate (matching
+// Boolean3), so Offset is intentionally NOT invariant under a large
+// translation: at 1e12 the round-join arc falls below eps and collapses, while
+// at the origin it is kept. See the InferEps contract in boolean2.cpp.
+TEST(CrossSection, OffsetNotInvariantUnderLargeTranslation) {
   const CrossSection square = CrossSection::Square({10.0, 10.0}, true);
   const CrossSection origin =
       square.Offset(1.0, CrossSection::JoinType::Round, 2.0, 8);
@@ -2067,9 +2061,11 @@ TEST(CrossSection, DISABLED_OffsetIsInvariantUnderLargeTranslation) {
           .Offset(1.0, CrossSection::JoinType::Round, 2.0, 8)
           .Translate({-1e12, 1e12});
 
-  EXPECT_EQ(translated.NumContour(), origin.NumContour());
-  EXPECT_EQ(translated.NumVert(), origin.NumVert());
-  EXPECT_NEAR(translated.Area(), origin.Area(), 1e-3);
+  // The macro shape survives (one contour), but the round join's arc verts are
+  // below eps at 1e12 and collapse, so the two offsets diverge.
+  EXPECT_EQ(origin.NumContour(), translated.NumContour());
+  EXPECT_GT(origin.NumVert(), translated.NumVert());
+  EXPECT_GT(std::abs(origin.Area() - translated.Area()), 1.0);
 }
 
 TEST(CrossSection, SimplifyPostFiltersBoolean2Output) {
