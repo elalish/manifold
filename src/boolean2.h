@@ -77,7 +77,7 @@ GraphOrder2D CompareProjectedOrder(const GraphSegment2D& a,
                                    double overlapL, double overlapR,
                                    double eps = 0.0);
 bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
-                       double eps, vec2* out);
+                       double eps, vec2& out);
 
 inline constexpr int kEdgePairBvhThreshold = 1024;
 // The radix-tree BVH is binary and has at most 32 Morton-code bits plus
@@ -237,7 +237,7 @@ struct VertexMerge {
 
 VertexMerge MergeVerts(const std::vector<vec2>& in, double eps);
 bool VESetContains(const std::vector<int>& vec, int x);
-void VESetInsert(std::vector<int>* vec, int x);
+void VESetInsert(std::vector<int>& vec, int x);
 std::vector<EdgeM> RemapAndCollapse(const std::vector<EdgeM>& edges,
                                     const std::vector<int>& inputVert2Merged);
 
@@ -259,7 +259,7 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
                               const std::vector<vec2>& verts, double eps,
                               const std::vector<Box2>& edgeBoxes,
                               const BVH& bvh,
-                              std::vector<std::pair<int, int>>* pairs);
+                              std::vector<std::pair<int, int>>& pairs);
 
 // Serially materialize precomputed proper intersections into caller-owned
 // containers. `verts` and `lists` are taken by value so callers can move in the

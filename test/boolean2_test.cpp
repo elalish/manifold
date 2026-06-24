@@ -1180,7 +1180,7 @@ TEST(Boolean2, IntersectSegmentsSeeds) {
     SCOPED_TRACE(c.name);
     std::cerr << "[seed] " << c.name << std::endl;
     vec2 out;
-    EXPECT_EQ(IntersectSegments(c.a, c.b, c.eps, &out), c.crosses);
+    EXPECT_EQ(IntersectSegments(c.a, c.b, c.eps, out), c.crosses);
     if (c.crosses) {
       EXPECT_NEAR(out.x, c.at.x, c.atTol);
       EXPECT_NEAR(out.y, c.at.y, c.atTol);

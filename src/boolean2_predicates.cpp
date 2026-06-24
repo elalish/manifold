@@ -190,7 +190,7 @@ GraphOrder2D CompareProjectedOrder(const GraphSegment2D& a,
 }
 
 bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
-                       double eps, vec2* out) {
+                       double eps, vec2& out) {
   const vec2 a0 = a.p0, a1 = a.p1, b0 = b.p0, b1 = b.p1;
   // Pick the axis where BOTH segments have non-zero spread, with
   // the larger spread of the two preferring stability (smaller |dy| works
@@ -228,8 +228,8 @@ bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
       const vec2& vert1 = aVert ? a1 : b1;
       if (!StrictlyBetween(ix, horiz0.x, horiz1.x)) return false;
       if (!StrictlyBetween(iy, vert0.y, vert1.y)) return false;
-      *out = vec2(ix, iy);
-      return std::isfinite(out->x) && std::isfinite(out->y);
+      out = vec2(ix, iy);
+      return std::isfinite(out.x) && std::isfinite(out.y);
     }
     return false;  // both points, or other degenerate config
   }
@@ -269,12 +269,12 @@ bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
   const vec4 xyzz =
       manifold::Intersect(vec3(overlapL, aOL, 0.0), vec3(overlapR, aOR, 0.0),
                           vec3(overlapL, bOL, 0.0), vec3(overlapR, bOR, 0.0));
-  *out = axis == 0 ? vec2(xyzz.x, xyzz.y) : vec2(xyzz.y, xyzz.x);
+  out = axis == 0 ? vec2(xyzz.x, xyzz.y) : vec2(xyzz.y, xyzz.x);
   // properCrossing already established a sign-confirmed straddle; do not reject
   // a real crossing for landing within eps of an endpoint. A near-endpoint
   // crossing snaps to that endpoint at insertion (FindAndInsertIntersections),
   // which is the correct vertex-on-edge resolution.
-  return std::isfinite(out->x) && std::isfinite(out->y);
+  return std::isfinite(out.x) && std::isfinite(out.y);
 }
 
 }  // namespace manifold
