@@ -13,24 +13,13 @@ WARN_ABS_MS="$4"
 
 mkdir -p ./bench
 
-COMPARE_ARGS=(
-  --base-dir "$BASE_DIR"
-  --head-dir "$HEAD_DIR"
-  --warn-pct "$WARN_PCT"
-  --warn-abs-ms "$WARN_ABS_MS"
-  --markdown-out ./bench/summary.md
+python3 ./scripts/compare_pr_perf_guard.py \
+  --base-dir "$BASE_DIR" \
+  --head-dir "$HEAD_DIR" \
+  --warn-pct "$WARN_PCT" \
+  --warn-abs-ms "$WARN_ABS_MS" \
+  --markdown-out ./bench/summary.md \
   --json-out ./bench/result.json
-)
-
-if [ "${PREPARE_WORKTREES_OUTCOME:-unknown}" != "success" ]; then
-  COMPARE_ARGS+=(--invalid-reason
-    "Prepare base and head worktrees step outcome: ${PREPARE_WORKTREES_OUTCOME:-unknown}.")
-elif [ "${BENCHMARK_OUTCOME:-unknown}" != "success" ]; then
-  COMPARE_ARGS+=(--invalid-reason
-    "Benchmark base and head step outcome: ${BENCHMARK_OUTCOME:-unknown}.")
-fi
-
-python3 ./scripts/compare_pr_perf_guard.py "${COMPARE_ARGS[@]}"
 
 echo "::group::PR benchmark summary"
 cat ./bench/summary.md

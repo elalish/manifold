@@ -148,7 +148,6 @@ def build_summary(
                 "base_stdev_sec": base_stdev,
                 "head_stdev_sec": head_stdev,
                 "delta_median_sec": delta_sec,
-                "delta_median_ms": delta_ms,
                 "delta_median_pct": pct,
                 "regressed": this_regressed,
             }
@@ -162,7 +161,7 @@ def build_summary(
     lines.append("")
 
     regressed_rows = [row for row in per_benchmark if row["regressed"]]
-    worst_regression = max(regressed_rows, key=lambda row: row["delta_median_ms"]) if regressed_rows else None
+    worst_regression = max(regressed_rows, key=lambda row: row["delta_median_sec"]) if regressed_rows else None
 
     payload = {
         "primary_metric": "median_sec",
@@ -237,11 +236,10 @@ def resolve_metadata(args: argparse.Namespace) -> dict:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Compare perfTest runs for PR benchmark guard.")
-    parser.add_argument("--base-dir", type=Path)
-    parser.add_argument("--head-dir", type=Path)
+    parser.add_argument("--base-dir", required=True, type=Path)
+    parser.add_argument("--head-dir", required=True, type=Path)
     parser.add_argument("--warn-pct", type=float, default=20.0)
     parser.add_argument("--warn-abs-ms", type=float, default=10.0)
-    parser.add_argument("--invalid-reason")
     parser.add_argument("--markdown-out", required=True, type=Path)
     parser.add_argument("--json-out", required=True, type=Path)
     parser.add_argument("--commit-sha")
@@ -252,28 +250,21 @@ def main() -> int:
     args = parser.parse_args()
     metadata = resolve_metadata(args)
 
-    if args.invalid_reason:
-        markdown, payload = build_invalid_summary(args.invalid_reason)
-        regressed = False
-        print(f"::warning::PR benchmark guard data invalid: {args.invalid_reason}")
-    else:
-        if not args.base_dir or not args.head_dir:
-            parser.error("--base-dir and --head-dir are required when --invalid-reason is not set")
-        try:
-            base = parse_suite(args.base_dir)
-            head = parse_suite(args.head_dir)
-            if len(base["runs"]) != len(head["runs"]):
-                raise RuntimeError(
-                    f"Run count mismatch: base has {len(base['runs'])}, head has {len(head['runs'])}."
-                )
-            markdown, regressed, payload = build_summary(
-                base, head, args.warn_pct, args.warn_abs_ms
+    try:
+        base = parse_suite(args.base_dir)
+        head = parse_suite(args.head_dir)
+        if len(base["runs"]) != len(head["runs"]):
+            raise RuntimeError(
+                f"Run count mismatch: base has {len(base['runs'])}, head has {len(head['runs'])}."
             )
-            payload["data_valid"] = True
-        except Exception as exc:
-            markdown, payload = build_invalid_summary(str(exc))
-            regressed = False
-            print(f"::warning::PR benchmark guard data invalid: {exc}")
+        markdown, regressed, payload = build_summary(
+            base, head, args.warn_pct, args.warn_abs_ms
+        )
+        payload["data_valid"] = True
+    except Exception as exc:
+        markdown, payload = build_invalid_summary(str(exc))
+        regressed = False
+        print(f"::warning::PR benchmark guard data invalid: {exc}")
 
     payload["metadata"] = metadata
     args.markdown_out.write_text(markdown + "\n", encoding="utf-8")
@@ -285,7 +276,7 @@ def main() -> int:
             print(
                 "::warning::PR benchmark regression detected: "
                 f"{payload['regressed_count']} benchmark(s) exceeded thresholds. "
-                f"Worst: {worst['benchmark']} {worst['delta_median_pct']:.2f}% ({worst['delta_median_ms']:.2f} ms) slower."
+                f"Worst: {worst['benchmark']} {worst['delta_median_pct']:.2f}% ({worst['delta_median_sec'] * 1000:.2f} ms) slower."
             )
         else:
             print("::warning::PR benchmark regression detected.")
