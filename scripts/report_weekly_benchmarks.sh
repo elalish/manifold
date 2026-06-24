@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "$#" -ne 2 ]; then
-  echo "Usage: $0 <suite-dir> <repeats>"
+if [ "$#" -ne 3 ]; then
+  echo "Usage: $0 <source-dir> <suite-dir> <repeats>"
   exit 2
 fi
 
-SUITE_DIR="$1"
-REPEATS="$2"
+SOURCE_DIR="$1"
+SUITE_DIR="$2"
+REPEATS="$3"
 
 python3 ./scripts/parse_weekly_benchmarks.py \
+  --source-dir "$SOURCE_DIR" \
   --suite-dir "$SUITE_DIR" \
   --repeats "$REPEATS" \
   --markdown-out "${SUITE_DIR}/summary.md" \
