@@ -26,15 +26,16 @@ Boolean2 builds a planar arrangement and filters it by winding:
 1. Merge vertices within the operation epsilon.
 2. Collapse edges whose endpoints merge together.
 3. Collect eps-padded AABB candidate edge pairs with a BVH broad phase.
-4. Build per-edge lists of vertices that lie on each edge and precompute proper
-   crossings from the same pair set; the helper chooses serial or TBB execution
-   internally.
-5. Insert the precomputed crossings. A crossing reuses an existing vertex id when
-   one lies within epsilon, and a crossing is skipped when an endpoint of one
-   edge already sits in the other edge's vertex list, since the edges already
-   meet there. Endpoint, T-junction, and coincident-overlap degeneracies stay in
-   the vertex-on-edge list path. Crossings are resolved in this single pass;
-   there is no separate post-hoc merge.
+4. With a narrow phase over those pairs (serial or TBB internally), find the
+   vertices incident to each edge, then split every edge at its incident vertices
+   into two-vertex sub-edges.
+5. Repeat the broad phase over the sub-edges, find proper crossings among them
+   with a second narrow phase, and insert them. A crossing reuses an existing
+   vertex id when one lies within epsilon. Because each edge is already split at
+   its incident vertices, a crossing near such a vertex lands on a sub-edge that
+   does not share it and is kept rather than collapsed onto it. Endpoint,
+   T-junction, and coincident-overlap degeneracies become ordinary sub-edge
+   endpoints. There is no separate post-hoc merge.
 6. Canonicalize sub-edges and cancel opposing multiplicities.
 7. Filter by winding: for each canonical sub-edge, evaluate the winding of the
    face just left of vMin->vMax at the start vertex (a +x ray cast under a
@@ -59,7 +60,7 @@ canonicalization) -> `boolean2_winding.cpp` -> regularized `Polygons`.
 | Layer | Files | Role |
 | --- | --- | --- |
 | Public core API | `boolean2.h`, `boolean2.cpp` (entry points) | Converts `Polygons` to local vertices plus directed edges, invokes one arrangement pass, and turns retained edges back into regularized output. |
-| Arrangement coordinator | `boolean2.cpp` (driver section) | Runs one pass of merge, edge-pair discovery, edge-vertex insertion, crossing insertion, canonicalization, and winding filtering. |
+| Arrangement coordinator | `boolean2.cpp` (driver section) | Runs merge, edge-pair discovery, incidence split into sub-edges, crossing insertion, canonicalization, and winding filtering in one arrangement build. |
 | Geometry leaves | `boolean2.cpp` (BVH, vertex merge, edge-vertex list, intersection sections), `boolean2_predicates.cpp` | Provide the local geometric operations and the projected segment-order predicates used by the arrangement pass. |
 | Output filter | `boolean2.cpp` (canonicalize section), `boolean2_winding.cpp` | Splits directed edges into canonical sub-edges, then evaluates the winding at each sub-edge's start vertex and keeps the boundary edges the rule selects. |
 | Sibling helpers | `boolean2_offset.cpp` | Offset and decomposition support for the rest of the `CrossSection` API. |
@@ -84,10 +85,13 @@ The main implementation differences are:
 - Broad phases use the local boolean2 sweep and BVH helpers. This keeps the core
   independent from the 3D `Collider` surface while preserving the intended
   sub-quadratic candidate search.
-- Proper crossings are discovered from broad-phase edge pairs rather than a
-  Bentley-Ottmann sweep. Endpoint-on-edge and collinear degeneracies are handled
-  by the edge-vertex lists; isolated crossings are inserted, or snapped to a
-  neighboring list vertex when one is within epsilon.
+- Proper crossings are discovered from broad-phase pairs rather than a
+  Bentley-Ottmann sweep. Edges are split at their incident vertices first, so
+  endpoint-on-edge and collinear degeneracies become ordinary sub-edge endpoints
+  and a crossing near such a vertex is kept on its own sub-edge; crossings are
+  then inserted, snapped to a neighboring vertex when one is within epsilon.
+  Splitting first can make the sub-edge broad phase super-quadratic on dense
+  near-collinear input, which has not mattered in practice.
 
 ## Winding Rules
 
