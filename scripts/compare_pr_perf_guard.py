@@ -128,7 +128,7 @@ def build_summary(
         head_stdev = head["benchmarks"][benchmark]["stdev_sec"]
         delta_sec = head_median - base_median
         delta_ms = delta_sec * 1000.0
-        pct = (delta_sec / base_median * 100.0) if base_median > 0 else 0.0
+        pct = delta_sec / base_median * 100.0
         this_regressed = (pct >= warn_pct) and (delta_ms >= warn_abs_ms)
         regressed = regressed or this_regressed
         status = "WARNING" if this_regressed else "OK"
