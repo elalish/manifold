@@ -3,16 +3,11 @@ import argparse
 import csv
 import json
 import os
-import shutil
 import subprocess
 import sys
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-THINGI10K_URL = (
-    "https://huggingface.co/datasets/Thingi10K/Thingi10K/resolve/main/raw_meshes"
-)
 DEFAULT_EMBER_CASES = "16 84 667 695 260 406 551 582"
 DEFAULT_GTEST_FILTER = ":".join(
     [
@@ -131,19 +126,11 @@ def find_binary(ctx: BuildContext, name: str) -> Path:
     raise FileNotFoundError(f"{name} binary not found in expected paths: {joined}")
 
 
-def download_mesh(mesh_id: int, mesh_dir: Path) -> Path:
-    mesh_dir.mkdir(parents=True, exist_ok=True)
+def get_mesh(mesh_id: int, mesh_dir: Path) -> Path:
     path = mesh_dir / f"{mesh_id}.stl"
     if path.exists() and path.stat().st_size > 0:
         return path
-
-    tmp = path.with_suffix(".stl.part")
-    url = f"{THINGI10K_URL}/{mesh_id}.stl"
-    with urllib.request.urlopen(url, timeout=120) as response:
-        with tmp.open("wb") as out:
-            shutil.copyfileobj(response, out)
-    tmp.replace(path)
-    return path
+    raise FileNotFoundError(f"Required Ember benchmark mesh missing: {path}")
 
 
 def load_ember_specs(spec_path: Path, cases: list[int]) -> list[dict]:
@@ -175,8 +162,8 @@ def write_ember_cases_metadata(out_dir: Path, specs: list[dict]) -> None:
 def run_ember_case(
     binary: Path, spec: dict, mesh_dir: Path, threads: int, verbose: int, cwd: Path
 ) -> str:
-    mesh_a = download_mesh(int(spec["id_a"]), mesh_dir)
-    mesh_b = download_mesh(int(spec["id_b"]), mesh_dir)
+    mesh_a = get_mesh(int(spec["id_a"]), mesh_dir)
+    mesh_b = get_mesh(int(spec["id_b"]), mesh_dir)
     args = [
         str(binary),
         str(mesh_a),
@@ -194,7 +181,9 @@ def run_ember_case(
 
 def run_ember_suite(ctx: BuildContext, binary: Path) -> None:
     out_dir = ctx.out_dir / "ember_phase"
-    mesh_dir = ctx.out_dir / "raw_meshes"
+    mesh_dir = (
+        ctx.source_dir / "extras" / "ember_tests" / "testfiles" / "raw_meshes"
+    )
     spec_file = (
         ctx.source_dir
         / "extras"

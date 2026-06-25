@@ -133,7 +133,23 @@ CMakeSettings.json
 [._]sw[a-p]
 
 # Benchmark stl files
-extras/ember_tests/testfiles/raw_meshes
+extras/ember_tests/testfiles/raw_meshes/*
+!extras/ember_tests/testfiles/raw_meshes/58011.stl
+!extras/ember_tests/testfiles/raw_meshes/65004.stl
+!extras/ember_tests/testfiles/raw_meshes/72214.stl
+!extras/ember_tests/testfiles/raw_meshes/73416.stl
+!extras/ember_tests/testfiles/raw_meshes/79741.stl
+!extras/ember_tests/testfiles/raw_meshes/88566.stl
+!extras/ember_tests/testfiles/raw_meshes/99865.stl
+!extras/ember_tests/testfiles/raw_meshes/112932.stl
+!extras/ember_tests/testfiles/raw_meshes/390936.stl
+!extras/ember_tests/testfiles/raw_meshes/472042.stl
+!extras/ember_tests/testfiles/raw_meshes/520644.stl
+!extras/ember_tests/testfiles/raw_meshes/908460.stl
+!extras/ember_tests/testfiles/raw_meshes/1063852.stl
+!extras/ember_tests/testfiles/raw_meshes/1147240.stl
+!extras/ember_tests/testfiles/raw_meshes/1514499.stl
+!extras/ember_tests/testfiles/raw_meshes/1706459.stl
 
 #Eclipse project files
 /.project
