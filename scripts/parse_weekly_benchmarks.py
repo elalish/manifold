@@ -42,29 +42,26 @@ def stdev(values: list[float]) -> float:
     return statistics.stdev(values)
 
 
-def summarize_ms(values: list[float]) -> dict:
-    return {
-        "samples_ms": values,
-        "mean_ms": mean(values),
-        "median_ms": statistics.median(values),
-        "stdev_ms": stdev(values),
-        "min_ms": min(values),
-        "max_ms": max(values),
-        "n_runs": len(values),
-    }
-
-
-def summarize_ratio(values: list[float]) -> dict:
-    return {
+def summarize(values: list[float], suffix: str = "") -> dict:
+    fields = {
         "samples": values,
         "mean": mean(values),
         "median": statistics.median(values),
         "stdev": stdev(values),
         "min": min(values),
         "max": max(values),
+    }
+    return {
+        **{f"{name}{suffix}": value for name, value in fields.items()},
         "n_runs": len(values),
     }
 
+
+def summarize_ms(values: list[float]) -> dict:
+    return summarize(values, "_ms")
+
+def summarize_ratio(values: list[float]) -> dict:
+    return summarize(values)
 
 def run_files(suite_dir: Path) -> list[Path]:
     files = sorted(suite_dir.glob("run*.txt"))
