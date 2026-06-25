@@ -40,6 +40,13 @@ export enum TokenType {
   Or,        // ||
   Bang,      // !
 
+  // Bitwise
+  Amp,       // &
+  Pipe,      // |
+  Tilde,     // ~
+  Shl,       // <<
+  Shr,       // >>
+
   // Member access
   Dot,       // .
 
@@ -107,6 +114,11 @@ export function tokenTypeToString(type: TokenType): string {
     case TokenType.And: return "'&&'";
     case TokenType.Or: return "'||'";
     case TokenType.Bang: return "'!'";
+    case TokenType.Amp: return "'&'";
+    case TokenType.Pipe: return "'|'";
+    case TokenType.Tilde: return "'~'";
+    case TokenType.Shl: return "'<<'";
+    case TokenType.Shr: return "'>>'";
     case TokenType.Dot: return "'.'";
     case TokenType.Question: return "'?'";
     case TokenType.LineComment: return "LineComment";
@@ -128,6 +140,8 @@ export class Lexer {
   private pos = 0;
   private line = 1;
   private column = 1;
+
+  private pathState: "none" | "expectOpen" | "inPath" = "none";
 
   constructor(private input: string, public filename: string = "<unknown>") { }
 
@@ -178,6 +192,23 @@ export class Lexer {
 
     const ch = this.peek();
 
+    if (this.pathState === "inPath") {
+      if (ch === ">") {
+        this.advance();
+        this.pathState = "none";
+        return { type: TokenType.Gt, range: { start, end: this.loc() } };
+      }
+      return this.readIncludePath(start);
+    }
+    if (this.pathState === "expectOpen") {
+      if (ch === "<") {
+        this.advance();
+        this.pathState = "inPath";
+        return { type: TokenType.Lt, range: { start, end: this.loc() } };
+      }
+      this.pathState = "none";
+    }
+
     if (ch === "/" && this.peekNext() === "/") {
       return this.readLineComment(start);
     }
@@ -188,6 +219,13 @@ export class Lexer {
 
     // Number or Identifier (handles identifiers starting with digits)
     const remaining = this.input.slice(this.pos);
+
+    const hexMatch = remaining.match(/^0[xX][0-9a-fA-F]+/);
+    if (hexMatch) {
+      for (let i = 0; i < hexMatch[0].length; i++) this.advance();
+      return { type: TokenType.Number, value: hexMatch[0], range: { start, end: this.loc() } };
+    }
+
     const idMatch = remaining.match(/^[0-9]*[a-zA-Z_$][a-zA-Z0-9_$]*/);
     const numMatch = remaining.match(/^(?:(?:[0-9]*\.[0-9]+)|(?:[0-9]+(?:\.[0-9]*)?))(?:[eE][+-]?[0-9]+)?/);
 
@@ -230,6 +268,7 @@ export class Lexer {
       case "*": return mk(TokenType.Star);
       case "%": return mk(TokenType.Percent);
       case "^": return mk(TokenType.Caret);
+      case "~": return mk(TokenType.Tilde);
 
       case "/": return mk(TokenType.Slash);
 
@@ -243,19 +282,21 @@ export class Lexer {
 
       case "<":
         if (this.peek() === "=") { this.advance(); return mk(TokenType.LtEq); }
+        if (this.peek() === "<") { this.advance(); return mk(TokenType.Shl); }
         return mk(TokenType.Lt);
 
       case ">":
         if (this.peek() === "=") { this.advance(); return mk(TokenType.GtEq); }
+        if (this.peek() === ">") { this.advance(); return mk(TokenType.Shr); }
         return mk(TokenType.Gt);
 
       case "&":
         if (this.peek() === "&") { this.advance(); return mk(TokenType.And); }
-        throw new Error(`Unexpected character '&' (did you mean '&&'?) at ${fmtLoc(start, this.filename)}`);
+        return mk(TokenType.Amp);
 
       case "|":
         if (this.peek() === "|") { this.advance(); return mk(TokenType.Or); }
-        throw new Error(`Unexpected character '|' (did you mean '||'?) at ${fmtLoc(start, this.filename)}`);
+        return mk(TokenType.Pipe);
     }
 
     throw new Error(`Unexpected character '${ch}' at ${fmtLoc(start, this.filename)}`);
@@ -363,7 +404,17 @@ export class Lexer {
   private readIdentifier(start: SourceLocation): Token {
     const startPos = this.pos;
     while (/[a-zA-Z_$0-9]/.test(this.peek())) this.advance();
-    return { type: TokenType.Identifier, value: this.input.slice(startPos, this.pos), range: { start, end: this.loc() } };
+    const value = this.input.slice(startPos, this.pos);
+    if (value === "include" || value === "use") this.pathState = "expectOpen";
+    return { type: TokenType.Identifier, value, range: { start, end: this.loc() } };
+  }
+
+  private readIncludePath(start: SourceLocation): Token {
+    const startPos = this.pos;
+    while (!this.isAtEnd() && this.peek() !== ">" && this.peek() !== "\n") {
+      this.advance();
+    }
+    return { type: TokenType.String, value: this.input.slice(startPos, this.pos), range: { start, end: this.loc() } };
   }
 
   private readLineComment(start: SourceLocation): Token {

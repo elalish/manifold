@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import fs from "fs";
-import { compile } from "../core/compiler.js";
-import { resolveProgram, getOpenSCADLibraryPaths } from "../core/resolver.js";
+import { getOpenSCADLibraryPaths } from "../core/resolver.js";
+import { compileConsumer } from "../core/orchestrate.js";
 import path from "path";
 
 const compileSingleFileCommand = new Command();
@@ -35,28 +35,15 @@ compileSingleFileCommand.name("compile")
                     ...getOpenSCADLibraryPaths(),
                 ];
 
-                // Resolve all include/use directives recursively
-                const resolved = resolveProgram(absFile, libraryPaths);
-
-                if (resolved.resolvedFiles.length > 1) {
-                    console.log(`Resolved ${resolved.resolvedFiles.length} files:`);
-                    for (const f of resolved.resolvedFiles) {
-                        console.log(`  ${path.relative(process.cwd(), f)}`);
-                    }
-                }
-
                 const outputFile = userGivenOutPutPath || path.join("test/out", path.basename(file, path.extname(file)) + ".ts");
 
-                let relativePath = path.relative(path.dirname(outputFile), process.cwd());
-                if (relativePath === "") relativePath = ".";
-                let runtimePath = relativePath.replace(/\\/g, "/");
-                if (!runtimePath.startsWith(".") && !runtimePath.startsWith("/")) {
-                    runtimePath = "./" + runtimePath;
+                const { code: js, externalLibraries, resolvedFiles } = compileConsumer(absFile, outputFile, libraryPaths, process.cwd(), msg => console.log(`  ${msg}`));
+                if (resolvedFiles.length > 1) {
+                  console.log(`Resolved ${resolvedFiles.length} local files`);
                 }
-                const runtimeJSPath = runtimePath + "/runtime/runtime.js";
-
-                const ast = { kind: "program" as const, statements: resolved.statements };
-                const js = compile(ast, { runtimePath: runtimeJSPath });
+                if (externalLibraries.length > 0) {
+                  console.log(`External libraries: ${externalLibraries.join(", ")}`);
+                }
                 console.log(`Generated TypeScript (${js.length.toLocaleString()} chars)`);
                 fs.mkdirSync(path.dirname(outputFile), { recursive: true });
                 fs.writeFileSync(outputFile, js);

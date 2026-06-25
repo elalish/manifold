@@ -34,13 +34,13 @@ function atan_fn(x: any) { return Math.atan(x) * 180 / Math.PI; }
 function atan2_fn(y: any, x: any) { return Math.atan2(y, x) * 180 / Math.PI; }
 
 // Math (OpenSCAD built-ins)
-var abs_fn = Math.abs;
-var sign_fn = Math.sign;
-var floor_fn = Math.floor;
-var ceil_fn = Math.ceil;
-var round_fn = Math.round;
-var sqrt_fn = Math.sqrt;
-var exp_fn = Math.exp;
+let abs_fn = Math.abs;
+let sign_fn = Math.sign;
+let floor_fn = Math.floor;
+let ceil_fn = Math.ceil;
+let round_fn = Math.round;
+let sqrt_fn = Math.sqrt;
+let exp_fn = Math.exp;
 function ln_fn(x: any) { return Math.log(x); }
 function log_fn(x: any) { return Math.log(x); }
 function min_fn(...a: any[]) { return a.length === 1 && Array.isArray(a[0]) ? Math.min(...a[0]) : Math.min(...a); }
@@ -89,17 +89,17 @@ function __search_match(needle: any, entry: any, idx_col: any) {
 function search_fn(needle: any, haystack: any, num_returns: any, idx_col: any) {
   if (!is_list_fn(needle) && !is_string_fn(needle)) {
     const indices: any[] = [];
-    for (var i = 0; i < haystack.length; i++) {
+    for (let i = 0; i < haystack.length; i++) {
       if (__search_match(needle, haystack[i], idx_col)) indices.push(i);
     }
     if (num_returns === 0) return indices;
     return indices.length > 0 ? [indices[0]] : [];
   }
   if (is_string_fn(needle) && is_string_fn(haystack)) {
-    var result: any[] = [];
-    for (var ch of needle) {
-      var indices = [];
-      for (var i = 0; i < haystack.length; i++) { if (haystack[i] === ch) indices.push(i); }
+    let result: any[] = [];
+    for (let ch of needle) {
+      let indices = [];
+      for (let i = 0; i < haystack.length; i++) { if (haystack[i] === ch) indices.push(i); }
       if (num_returns === 1 || num_returns === undefined) {
         // omits characters with no match from the result
         if (indices.length > 0) result.push(indices[0]);
@@ -111,8 +111,8 @@ function search_fn(needle: any, haystack: any, num_returns: any, idx_col: any) {
   }
   if (is_list_fn(haystack) && is_list_fn(needle)) {
     return needle.map(function(n: any) {
-      var indices = [];
-      for (var i = 0; i < haystack.length; i++) {
+      let indices = [];
+      for (let i = 0; i < haystack.length; i++) {
         if (__search_match(n, haystack[i], idx_col)) indices.push(i);
       }
       return num_returns === 0 ? indices : (indices.length > 0 ? indices[0] : []);
@@ -120,9 +120,9 @@ function search_fn(needle: any, haystack: any, num_returns: any, idx_col: any) {
   }
   if (is_string_fn(needle) && is_list_fn(haystack)) {
     return [...needle].map(function(n) {
-      var indices = [];
-      for (var i = 0; i < haystack.length; i++) {
-        var item = idx_col !== undefined ? haystack[i][idx_col] : haystack[i];
+      let indices = [];
+      for (let i = 0; i < haystack.length; i++) {
+        let item = idx_col !== undefined ? haystack[i][idx_col] : haystack[i];
         if (__eq(item, n)) indices.push(i);
       }
       if (num_returns === 0) return indices;
@@ -137,9 +137,9 @@ function search_fn(needle: any, haystack: any, num_returns: any, idx_col: any) {
 function lookup_fn(key: any, table: any) {
   if (key <= table[0][0]) return table[0][1];
   if (key >= table[table.length - 1][0]) return table[table.length - 1][1];
-  for (var i = 0; i < table.length - 1; i++) {
+  for (let i = 0; i < table.length - 1; i++) {
     if (table[i][0] <= key && key <= table[i + 1][0]) {
-      var t = (key - table[i][0]) / (table[i + 1][0] - table[i][0]);
+      let t = (key - table[i][0]) / (table[i + 1][0] - table[i][0]);
       return table[i][1] + t * (table[i+1][1] - table[i][1]);
     }
   }
@@ -166,7 +166,7 @@ function __eq(a: any, b: any) {
   if (a === b) return true;
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false;
-    for (var i = 0; i < a.length; i++) { if (!__eq(a[i], b[i])) return false; }
+    for (let i = 0; i < a.length; i++) { if (!__eq(a[i], b[i])) return false; }
     return true;
   }
   return false;
@@ -182,7 +182,7 @@ function __cmpCat(x: any): string {
 }
 function __veccmp(a: any[], b: any[]): number {
   const n = Math.min(a.length, b.length);
-  for (var i = 0; i < n; i++) {
+  for (let i = 0; i < n; i++) {
     if (a[i] < b[i]) return -1;
     if (a[i] > b[i]) return 1;
   }
@@ -210,8 +210,8 @@ function __isVec(x: any): boolean { return Array.isArray(x) && !(x as any).__isR
 function __add(a: any, b: any): any {
   if (__isNum(a) && __isNum(b)) return a + b;
   if (__isVec(a) && __isVec(b)) {
-    var n = Math.min(a.length, b.length), r: any[] = [];
-    for (var i = 0; i < n; i++) r.push(__add(a[i], b[i]));
+    let n = Math.min(a.length, b.length), r: any[] = [];
+    for (let i = 0; i < n; i++) r.push(__add(a[i], b[i]));
     return r;
   }
   return undefined;
@@ -219,8 +219,8 @@ function __add(a: any, b: any): any {
 function __sub(a: any, b: any): any {
   if (__isNum(a) && __isNum(b)) return a - b;
   if (__isVec(a) && __isVec(b)) {
-    var n = Math.min(a.length, b.length), r: any[] = [];
-    for (var i = 0; i < n; i++) r.push(__sub(a[i], b[i]));
+    let n = Math.min(a.length, b.length), r: any[] = [];
+    for (let i = 0; i < n; i++) r.push(__sub(a[i], b[i]));
     return r;
   }
   return undefined;
@@ -232,12 +232,12 @@ function __mul(a: any, b: any): any {
   if (__isVec(a) && __isVec(b)) {
     if (a.length > 0 && Array.isArray(a[0])) {
       if (b.length > 0 && Array.isArray(b[0])) {
-        var res: any[] = [];                                               // matrix * matrix
-        for (var i = 0; i < a.length; i++) {
+        let res: any[] = [];                                               // matrix * matrix
+        for (let i = 0; i < a.length; i++) {
           res[i] = [];
-          for (var j = 0; j < b[0].length; j++) {
-            var sum = 0;
-            for (var k = 0; k < a[0].length; k++) sum += a[i][k] * b[k][j];
+          for (let j = 0; j < b[0].length; j++) {
+            let sum = 0;
+            for (let k = 0; k < a[0].length; k++) sum += a[i][k] * b[k][j];
             res[i].push(sum);
           }
         }
@@ -246,16 +246,16 @@ function __mul(a: any, b: any): any {
       return a.map((row: any): any => __mul(row, b));                      // matrix * vector
     }
     if (b.length > 0 && Array.isArray(b[0])) {
-      var res2: any[] = [];                                                // vector * matrix
-      for (var j2 = 0; j2 < b[0].length; j2++) {
-        var sum2 = 0;
-        for (var k2 = 0; k2 < a.length; k2++) sum2 += a[k2] * b[k2][j2];
+      let res2: any[] = [];                                                // vector * matrix
+      for (let j2 = 0; j2 < b[0].length; j2++) {
+        let sum2 = 0;
+        for (let k2 = 0; k2 < a.length; k2++) sum2 += a[k2] * b[k2][j2];
         res2.push(sum2);
       }
       return res2;
     }
-    var sum3 = 0;                                                          // vector . vector
-    for (var i3 = 0; i3 < Math.min(a.length, b.length); i3++) sum3 += a[i3] * b[i3];
+    let sum3 = 0;                                                          // vector . vector
+    for (let i3 = 0; i3 < Math.min(a.length, b.length); i3++) sum3 += a[i3] * b[i3];
     return sum3;
   }
   return undefined;
@@ -265,8 +265,8 @@ function __div(a: any, b: any): any {
   if (__isVec(a) && __isNum(b)) return a.map((x: any): any => __div(x, b)); // vector / scalar
   if (__isNum(a) && __isVec(b)) return b.map((x: any): any => __div(a, x)); // scalar / vector
   if (__isVec(a) && __isVec(b)) {
-    var n = Math.min(a.length, b.length), r: any[] = [];
-    for (var i = 0; i < n; i++) r.push(__div(a[i], b[i]));
+    let n = Math.min(a.length, b.length), r: any[] = [];
+    for (let i = 0; i < n; i++) r.push(__div(a[i], b[i]));
     return r;
   }
   return undefined;
@@ -274,6 +274,39 @@ function __div(a: any, b: any): any {
 function __mod(a: any, b: any): any {
   if (__isNum(a) && __isNum(b)) return a % b;
   return undefined;
+}
+
+// Bitwise operators
+function __toI64(x: any): bigint | undefined {
+  if (typeof x !== "number" || !isFinite(x)) return undefined;
+  return BigInt.asIntN(64, BigInt(Math.trunc(x)));
+}
+function __band(a: any, b: any): any {
+  const ia = __toI64(a), ib = __toI64(b);
+  if (ia === undefined || ib === undefined) return undefined;
+  return Number(BigInt.asIntN(64, ia & ib));
+}
+function __bor(a: any, b: any): any {
+  const ia = __toI64(a), ib = __toI64(b);
+  if (ia === undefined || ib === undefined) return undefined;
+  return Number(BigInt.asIntN(64, ia | ib));
+}
+function __bnot(a: any): any {
+  const ia = __toI64(a);
+  if (ia === undefined) return undefined;
+  return Number(BigInt.asIntN(64, ~ia));
+}
+function __shl(a: any, b: any): any {
+  const ia = __toI64(a), ib = __toI64(b);
+  if (ia === undefined || ib === undefined) return undefined;
+  if (ib < 0n || ib >= 64n) return undefined; // shifts of 64+ bits are undef
+  return Number(BigInt.asIntN(64, ia << ib));
+}
+function __shr(a: any, b: any): any {
+  const ia = __toI64(a), ib = __toI64(b);
+  if (ia === undefined || ib === undefined) return undefined;
+  if (ib < 0n || ib >= 64n) return undefined;
+  return Number(BigInt.asIntN(64, ia >> ib));
 }
 function __neg(a: any): any {
   if (__isNum(a)) return -a;
@@ -298,14 +331,29 @@ function version_fn() { return [2019, 5, 0]; }
 function version_num_fn() { return 20190500; }
 
 // Constants
-var PI = Math.PI;
-var INF = Infinity;
-var NAN = NaN;
-var undef = undefined;
-var _EPSILON = 1e-9;
+let PI = Math.PI;
+let INF = Infinity;
+let NAN = NaN;
+let undef = undefined;
+let _EPSILON = 1e-9;
+
+// Special-variable context
+const __ctx: Record<string, any> = {
+  $fn: 0, $fa: 12, $fs: 2,
+  $vpr: [55, 0, 25], $vpt: [0, 0, 0], $vpd: 140, $vpf: 22.5,
+  $t: 0, $preview: false, $parent_modules: 0,
+  $color: undefined, $idx: undefined,
+};
+
+function __withSpecials(overrides: Record<string, any>, body: () => any) {
+  const saved: Record<string, any> = {};
+  for (const k in overrides) { saved[k] = __ctx[k]; __ctx[k] = overrides[k]; }
+  try { return body(); }
+  finally { Object.assign(__ctx, saved); }
+}
 
 // Children stack for module calls
-var __children_stack: any[] = [];
+let __children_stack: any[] = [];
 const __color_prop_layout = new WeakMap();
 function __with_children(fn: any, count: any, call: any, name?: string) {
   __children_stack.push({ fn: fn, count: count, name: name });
@@ -361,22 +409,6 @@ function __safe_transform(shape: any, m: any) {
 
 function __identity4() {
   return [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
-}
-
-function __safe_attach_transform(fn: any, ...args: any[]) { // TO BE REMOVED LATER (UNWANTED LIBRARY SPECIFIC RUNTIME HELPER)
-  // BOSL2's _attach_transform(anchor,spin,orient,geom,p) returns a 4x4 matrix
-  // when p is undef, but the transformed geometry (path/region/VNF) when p is given.
-  const p = args[4];
-  try {
-    const res = fn(...args);
-    if (p === undefined || p === null) {
-      return __is_finite_matrix4(res) ? res : __identity4();
-    }
-    return res;
-  } catch (e) {
-    console.warn("__safe_attach_transform fallback:", (e as any)?.message ?? e);
-    return p === undefined || p === null ? __identity4() : p;
-  }
 }
 
 // 2D helpers used by offset()/projection() fallbacks
@@ -580,15 +612,15 @@ function __flat_map_iter(v: any, fn: any) {
 
 function __rangeCount(start: any, step: any, end: any): number {
   if (step === 0 || Number.isNaN(start) || Number.isNaN(step) || Number.isNaN(end)) return 0;
-  var n = (end - start) / step;
+  let n = (end - start) / step;
   if (!Number.isFinite(n) || n < 0) return 0;
   return Math.floor(n + 1e-10) + 1;
 }
 
 function __range(start: any, step: any, end: any) {
-  var result: any[] = [];
-  var n = __rangeCount(start, step, end);
-  for (var i = 0; i < n; i++) result.push(start + i * step);
+  let result: any[] = [];
+  let n = __rangeCount(start, step, end);
+  for (let i = 0; i < n; i++) result.push(start + i * step);
   Object.defineProperty(result, "__isRange", {
     value: true, enumerable: false, writable: true, configurable: true,
   });
@@ -640,17 +672,25 @@ function __withTol3d(items: any[]): any[] {
   });
 }
 
+// OpenSCAD cannot mix 2D and 3D in a boolean op - it keeps the dimension of the first child and ignores (with a warning) any children of the other dimension.
+function __sameDim(items: any[], ref2D: boolean): any[] {
+  return items.filter(x => __is2D(x) === ref2D);
+}
+
 // Boolean ops: use CrossSection for 2D, Manifold for 3D
 function __union2d3d(items: any[]) {
   const valid = items.filter(x => !__isEmpty(x));
   if (valid.length === 0) return Manifold.union([]);
-  return __is2D(valid[0]) ? CrossSection.union(valid) : Manifold.union(__withTol3d(valid));
+  const is2D = __is2D(valid[0]);
+  const same = __sameDim(valid, is2D);
+  return is2D ? CrossSection.union(same) : Manifold.union(__withTol3d(same));
 }
 function __difference2d3d(first: any, rest: any[]) {
   if (__isEmpty(first)) return first;
-  const validRest = rest.filter(x => !__isEmpty(x));
+  const is2D = __is2D(first);
+  const validRest = __sameDim(rest.filter(x => !__isEmpty(x)), is2D);
   if (validRest.length === 0) return first;
-  if (__is2D(first)) return CrossSection.difference([first, ...validRest]);
+  if (is2D) return CrossSection.difference([first, ...validRest]);
   const [tf, ...tr] = __withTol3d([first, ...validRest]);
   return tr.length === 1 ? tf.subtract(tr[0]) : tf.subtract(Manifold.union(tr));
 }
@@ -661,7 +701,11 @@ function __intersection2d3d(items: any[]) {
     const firstValid2D = valid.find(__is2D);
     return firstValid2D ? CrossSection.union([]) : Manifold.union([]);
   }
-  return __is2D(valid[0]) ? CrossSection.intersection(valid) : Manifold.intersection(__withTol3d(valid));
+  const is2D = __is2D(valid[0]);
+  const same = __sameDim(valid, is2D);
+  // Intersecting across dimensions (e.g. a 3D solid with a 2D shape) has no common volume, so OpenSCAD yields an empty result.
+  if (same.length < valid.length) return is2D ? CrossSection.union([]) : Manifold.union([]);
+  return is2D ? CrossSection.intersection(same) : Manifold.intersection(__withTol3d(same));
 }
 function __hull2d3d(items: any[]) {
   const valid = items.filter(x => !__isEmpty(x));
@@ -765,12 +809,21 @@ function __minkowski2d3d(items: any[]) {
   return acc;
 }
 
+// Returns `x` when it is a finite number, otherwise `dflt`
+function __finiteOr(x: any, dflt: number): number {
+  return (typeof x === "number" && Number.isFinite(x)) ? x : dflt;
+}
+
 function __normalizeScale(scale: number | number[] | undefined): [number, number] | undefined {
-  if (scale === undefined) return undefined;
+  if (scale === undefined || scale === null) return undefined;
+  // A range (e.g. [1:3]) is not a valid scale - OpenSCAD falls back to no scaling
+  if (Array.isArray(scale) && (scale as any).__isRange) return undefined;
+  // Each component defaults to 1 (no scaling) when it isn't a finite number
+  const num = (v: any) => __finiteOr(v, 1);
   const [sx, sy] = Array.isArray(scale)
-    ? [scale[0], scale[1]]
-    : [scale, scale];
-  return [Math.max(0, sx as number), Math.max(0, sy as number)];
+    ? [num(scale[0]), num(scale[1])]
+    : [num(scale), num(scale)];
+  return [Math.max(0, sx), Math.max(0, sy)];
 }
 
 function __getHelixLength(rMax: number, height: number, twist: number, scaleX: number, scaleY: number): number {
@@ -796,11 +849,12 @@ function __getHelixLength(rMax: number, height: number, twist: number, scaleX: n
 }
 
 function __computeExtrudeDivisions(shape: any, height: number, options: { twist?: number; scale?: number | number[] | undefined; fn?: number; fa?: number; fs?: number; fe?: number; slices?: number; }): number {
-  if (options.slices !== undefined) {
+  // Explicit, finite slices count - an invalid value (undef, inf, nan, string, bool, range) is ignored and the count is auto-computed
+  if (typeof options.slices === "number" && Number.isFinite(options.slices)) {
     return Math.max(1, options.slices);
   }
 
-  const twist = Math.abs(options.twist ?? 0);
+  const twist = Math.abs(__finiteOr(options.twist, 0));
   const fn = options.fn ?? 0;
   const fa = options.fa ?? 12;
   const fs = options.fs ?? 2;
@@ -1036,7 +1090,7 @@ function __extrudeTwisted(shape: any, height: number, twistDeg: number, slices: 
   return new Manifold({ vertProperties: verts, triVerts: new Uint32Array(tris), numProp: 3 } as any);
 }
 
-function __extrude(shape: any, height = 1, options: {twist?: number; scale?: number | number[] | undefined; center?: boolean; fn?: number; fa?: number; fs?: number; fe?: number; slices?: number;} = {}) {
+function __extrude(shape: any, height = 100, options: {twist?: number; scale?: number | number[] | undefined; center?: boolean; fn?: number; fa?: number; fs?: number; fe?: number; slices?: number;} = {}) {
   if (__isEmpty(shape)) {
     return Manifold.union([]);
   }
@@ -1045,7 +1099,10 @@ function __extrude(shape: any, height = 1, options: {twist?: number; scale?: num
     return shape;
   }
 
-  const twist = options.twist ?? 0;
+  // An invalid height defaults to OpenSCAD's linear_extrude default of 100
+  height = __finiteOr(height, 100);
+  // An invalid twist means "no twist"
+  const twist = __finiteOr(options.twist, 0);
   const normScale = __normalizeScale(options.scale);
 
   const nDivisions = __computeExtrudeDivisions(shape, height, { ...options, scale: normScale });
@@ -1409,8 +1466,6 @@ function __text(text: string, size: number = 10, font: string, halign: string = 
 
   void fn;
 
-  console.log("font passed for text: ", font);
-
   const dir = (direction || "ltr").toLowerCase();
   const chars = dir === "rtl" ? Array.from(text).reverse() : Array.from(text);
 
@@ -1425,8 +1480,6 @@ function __text(text: string, size: number = 10, font: string, halign: string = 
     } else if (typeof fontBase64Data === "object" && fontBase64Data !== null) {
       const filename = __fontSpecToFilename(font);
       base64 = fontBase64Data[filename];
-      console.log("filename: ", filename);
-      // console.log("base64 data: ", base64)
       if (!base64) {
         const keys = Object.keys(fontBase64Data);
         if (keys.length > 0) {
@@ -1634,9 +1687,14 @@ function __mirror(shape: any, v: any) {
 }
 
 function __sphere(radius: number, fn = 0, fa = 12, fs = 2) {
+  // A non-finite (or non-positive) size produces no geometry instead of crashing
+  if (!Number.isFinite(radius) || radius <= 0) {
+    return Manifold.union([]);
+  }
   let N: number;
   if (fn > 0) {
-    N = Math.max(3, Math.ceil(fn));
+    // OpenSCAD takes the explicit-$fn path whenever $fn > 0, clamping to a minimum of 3 - a non-finite $fn is clamped to that minimum
+    N = Number.isFinite(fn) ? Math.max(3, Math.ceil(fn)) : 3;
   } else {
     const N_fa = 360 / fa;
     const N_fs = (2 * Math.PI * radius) / fs;
@@ -1707,8 +1765,16 @@ function __radius(dSpec: any, rSpec: any, dGen: any, rGen: any, dflt: any) {
 }
 
 function __cylinder(height: number, radiusLow: number, radiusHigh = -1.0, fn = 0, center = false, fa = 12, fs = 2) {
+  // Non-finite dimensions produce no geometry
+  if (!Number.isFinite(height) || !Number.isFinite(radiusLow) ||
+      (radiusHigh >= 0 && !Number.isFinite(radiusHigh))) {
+    return Manifold.union([]);
+  }
   let segs = fn;
-  if (segs <= 0) {
+  if (segs > 0) {
+    // OpenSCAD clamps a non-finite $fn to the minimum of 3 fragments.
+    if (!Number.isFinite(segs)) segs = 3;
+  } else {
     const r = Math.max(radiusLow, radiusHigh < 0 ? radiusLow : radiusHigh);
     const N_fa = 360 / fa;
     const N_fs = (2 * Math.PI * r) / fs;
@@ -1718,9 +1784,14 @@ function __cylinder(height: number, radiusLow: number, radiusHigh = -1.0, fn = 0
 }
 
 function __circle(radius: number, fn = 0, fa = 12, fs = 2) {
+  // Match OpenSCAD: a non-finite (or non-positive) radius produces no geometry.
+  if (!Number.isFinite(radius) || radius <= 0) {
+    return CrossSection.square(0);
+  }
   let N: number;
   if (fn > 0) {
-    N = Math.max(3, Math.ceil(fn));
+    // OpenSCAD clamps a non-finite $fn to the minimum of 3 fragments.
+    N = Number.isFinite(fn) ? Math.max(3, Math.ceil(fn)) : 3;
   } else {
     const N_fa = 360 / fa;
     const N_fs = (2 * Math.PI * radius) / fs;
@@ -1755,6 +1826,11 @@ function __polygon(points: any, paths?: any) {
     return CrossSection.ofPolygons([]);
   }
 
+  // A point with a non-finite coordinate yields no geometry
+  if (points.some((p: any) => Array.isArray(p) && p.some((c: any) => !Number.isFinite(Number(c))))) {
+    return CrossSection.square(0);
+  }
+
   if (paths === undefined || paths === null) {
     const ccwPoints = __forceWinding([...points], true);
     return CrossSection.ofPolygons([ccwPoints]);
@@ -1785,6 +1861,11 @@ function __polygon(points: any, paths?: any) {
 }
 
 function __polyhedron(points: any, faces: any) {
+  // A point with a non-finite coordinate yields no geometry
+  if (Array.isArray(points) &&
+      points.some((p: any) => Array.isArray(p) && p.some((c: any) => !Number.isFinite(Number(c))))) {
+    return Manifold.union([]);
+  }
   const verts: number[] = [];
   if (Array.isArray(points)) {
     for (const p of points) {
@@ -1800,11 +1881,15 @@ function __polyhedron(points: any, faces: any) {
       }
     }
   }
-  return new Manifold(new wasm.Mesh({
+  const mesh = new wasm.Mesh({
     numProp: 3,
     vertProperties: new Float32Array(verts),
     triVerts: new Uint32Array(tris),
-  }));
+  });
+  // OpenSCAD accepts "polyhedron soup" where coincident vertices are duplicated per-face (so edges aren't shared)
+  // Manifold requires shared edges, so weld coincident vertices along open edges before constructing the solid
+  mesh.merge();
+  return new Manifold(mesh);
 }
 
 function __parse_color_for_scope(c: any, alpha: any): any {
@@ -1956,12 +2041,13 @@ export {
   abs_fn, sign_fn, floor_fn, ceil_fn, round_fn, sqrt_fn, exp_fn, ln_fn, log_fn, pow_fn,
   min_fn, max_fn, norm_fn, cross_fn,
   len_fn, str_fn, chr_fn, ord_fn, concat_fn, search_fn, lookup_fn,
-  openscad_assert_fn, __truthy, __eq, __lt, __gt, __le, __ge, __add, __sub, __mul, __div, __mod, __neg, __pos, __index,
+  openscad_assert_fn, __truthy, __eq, __lt, __gt, __le, __ge, __add, __sub, __mul, __div, __mod, __band, __bor, __shl, __shr, __bnot, __neg, __pos, __index,
   version_fn, version_num_fn,
   PI, INF, NAN, undef, _EPSILON,
+  __ctx, __withSpecials,
   __children_stack, __with_children, parent_module_fn,
   __is_finite_matrix4, __to_manifold_mat4, __safe_transform, __identity4,
-  __safe_attach_transform, __safe_offset2d, __safe_project3d,
+  __safe_offset2d, __safe_project3d,
   __apply_color,
   __flat_map_iter, __range, __rangeCount, __is2D, __union2d3d, __difference2d3d, __intersection2d3d, __hull2d3d, __minkowski2d3d,
   __extrude, __revolve,

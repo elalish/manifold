@@ -7,7 +7,7 @@ import { promisify } from 'util';
 const execAsync = promisify(exec);
 
 
-const allOpenScadFiles = getAllFiles('./examples');
+const allOpenScadFiles = getAllFiles('./examples/OpenScad/Openscad-Test/3d-features/');
 console.log("Total files found: ", allOpenScadFiles.length);
 
 for (const file of allOpenScadFiles) {

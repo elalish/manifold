@@ -86,6 +86,7 @@ export interface ModuleCallStmt extends ASTNode {
 export interface BlockStmt extends ASTNode {
   kind: "block";
   statements: Statement[];
+  modifier?: string | undefined;   // *, !, #, %
 }
 
 export interface VariableDeclStmt extends ASTNode {
@@ -112,6 +113,7 @@ export interface ForStmt extends ASTNode {
   kind: "for";
   variables: ForVariable[];
   body: Statement;
+  modifier?: string | undefined;   // *, !, #, %
 }
 
 export interface IfStmt extends ASTNode {
@@ -119,6 +121,7 @@ export interface IfStmt extends ASTNode {
   condition: Expr;
   thenBody: Statement;
   elseBody?: Statement | undefined;
+  modifier?: string | undefined;   // *, !, #, %
 }
 
 export interface EmptyStmt extends ASTNode {

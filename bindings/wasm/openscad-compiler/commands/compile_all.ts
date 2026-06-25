@@ -1,7 +1,7 @@
 import { Command } from "commander";
 import fs from "fs";
-import { compile } from "../core/compiler.js";
-import { resolveProgram, getOpenSCADLibraryPaths } from "../core/resolver.js";
+import { getOpenSCADLibraryPaths } from "../core/resolver.js";
+import { compileConsumer } from "../core/orchestrate.js";
 
 import path from "path";
 
@@ -34,48 +34,32 @@ compileAllCommand.name("compile-all")
             const failed: string[] = [];
 
             for (const file of allFiles) {
-                console.log(`\n=== Compiling ${file} ===`);
-                const absFile = path.resolve(exampleDir, file);
+              console.log(`\n=== Compiling ${file} ===`);
+              const absFile = path.resolve(exampleDir, file);
 
-                try {
-                    const libraryPaths = [
-                        path.dirname(absFile),
-                        process.cwd(),
-                        ...getOpenSCADLibraryPaths(),
-                    ];
+              try {
+                  const libraryPaths = [
+                      path.dirname(absFile),
+                      process.cwd(),
+                      ...getOpenSCADLibraryPaths(),
+                  ];
 
-                    // Resolve all include/use directives recursively
-                    const resolved = resolveProgram(absFile, libraryPaths);
+                  const basename = path.basename(file, path.extname(file));
+                  const outputFile = path.join("test/out", path.dirname(file), basename + ".ts");
 
-                    if (resolved.resolvedFiles.length > 1) {
-                        console.log(`Resolved ${resolved.resolvedFiles.length} files:`);
-                        for (const f of resolved.resolvedFiles) {
-                            console.log(`  ${path.relative(process.cwd(), f)}`);
-                        }
-                    }
-
-                    const basename = path.basename(file, path.extname(file));
-                    const outputFile = path.join("test/out", path.dirname(file), basename + ".ts");
-
-                    let relativePath = path.relative(path.dirname(outputFile), process.cwd());
-                    if (relativePath === "") relativePath = ".";
-                    let runtimePath = relativePath.replace(/\\/g, "/");
-                    if (!runtimePath.startsWith(".") && !runtimePath.startsWith("/")) {
-                        runtimePath = "./" + runtimePath;
-                    }
-                    const runtimeJSPath = runtimePath + "/runtime/runtime.js";
-
-                    const ast = { kind: "program" as const, statements: resolved.statements };
-                    const js = compile(ast, { runtimePath: runtimeJSPath });
-                    console.log(`Generated TypeScript (${js.length.toLocaleString()} chars)`);
-                    fs.mkdirSync(path.dirname(outputFile), { recursive: true });
-                    fs.writeFileSync(outputFile, js);
-                    console.log(`Output written to ${outputFile}`);
-                } catch (err) {
-                    const message = (err as Error).message;
-                    console.error(`Error compiling ${file}: ${message}`);
-                    failed.push(file);
-                }
+                  const { code: js, externalLibraries } = compileConsumer(absFile, outputFile, libraryPaths, process.cwd(), msg => console.log(`  ${msg}`));
+                  if (externalLibraries.length > 0) {
+                    console.log(`External libraries: ${externalLibraries.join(", ")}`);
+                  }
+                  console.log(`Generated TypeScript (${js.length.toLocaleString()} chars)`);
+                  fs.mkdirSync(path.dirname(outputFile), { recursive: true });
+                  fs.writeFileSync(outputFile, js);
+                  console.log(`Output written to ${outputFile}`);
+              } catch (err) {
+                  const message = (err as Error).message;
+                  console.error(`Error compiling ${file}: ${message}`);
+                  failed.push(file);
+              }
             }
 
             if (failed.length > 0) {
