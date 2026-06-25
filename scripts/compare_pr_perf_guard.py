@@ -8,7 +8,6 @@ import statistics
 import subprocess
 from pathlib import Path
 
-SCHEMA_VERSION = "1.1.0"
 # fallback: extract only time value when nTri label is not present
 TIME_PATTERN = re.compile(r"time\s*=\s*([0-9]*\.?[0-9]+)\s*sec")
 # primary: extract both nTri bucket and timing from perfTest output
@@ -224,7 +223,6 @@ def resolve_metadata(args: argparse.Namespace) -> dict:
     # resolve metadata from explicit args first, then GitHub env vars
     timestamp = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
     return {
-        "schema_version": SCHEMA_VERSION,
         "commit_sha": args.commit_sha or os.getenv("GITHUB_SHA"),
         "workflow": args.workflow or os.getenv("GITHUB_WORKFLOW"),
         "runner": args.runner or os.getenv("RUNNER_NAME"),
