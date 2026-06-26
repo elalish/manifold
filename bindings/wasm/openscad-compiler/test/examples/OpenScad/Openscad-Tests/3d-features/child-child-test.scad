@@ -1,0 +1,13 @@
+// Volume: 306.14673427414436, SurfaceArea: 561.0751434436334
+module up() {
+  translate([0,0,1]) children(0);
+}
+
+module red() {
+  color("Red") children(0);
+}
+
+up() cylinder(r=5);
+translate([5,0,0]) up() up() cylinder(r=5);
+translate([10,0,0]) up() up() up() red() cylinder(r=5);
+translate([15,0,0]) red() up() up() up() up() cylinder(r=5);

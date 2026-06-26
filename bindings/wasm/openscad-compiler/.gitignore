@@ -1,0 +1,9 @@
+/node_modules
+.env
+.env.local
+/test/out
+/test/output.3mf
+/runtime/runtime.js
+/runtime/*/
+/test/source-location-single.test.ts
+/test/single.test.ts
