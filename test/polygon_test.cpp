@@ -17,9 +17,15 @@
 #include "manifold/polygon.h"
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <fstream>
 #include <iomanip>
+#include <limits>
+#include <sstream>
+#include <stdexcept>
+#include <utility>
+#include <vector>
 
 #include "../src/vec.h"
 #include "manifold/cross_section.h"
@@ -28,6 +34,46 @@
 namespace {
 
 using namespace manifold;
+
+struct FilletResult {
+  bool valid;
+  double area;
+};
+
+class PositiveFilletAreaTracker {
+ public:
+  void Check(double radius, const FilletResult& result) {
+    if (radius <= 0 || !result.valid) return;
+
+    for (const auto& sample : samples_) {
+      const double otherRadius = sample.first;
+      const double otherArea = sample.second;
+
+      if (radius == otherRadius) continue;
+
+      const double smallerRadius = std::min(radius, otherRadius);
+      const double largerRadius = std::max(radius, otherRadius);
+      const double smallerArea = radius < otherRadius ? result.area : otherArea;
+      const double largerArea = radius < otherRadius ? otherArea : result.area;
+      const double tolerance =
+          1e-9 * std::max({1.0, std::abs(smallerArea), std::abs(largerArea)});
+
+      if (largerArea > smallerArea + tolerance) {
+        std::ostringstream message;
+        message << std::setprecision(std::numeric_limits<double>::max_digits10)
+                << "Positive fillet area increased as radius increased: "
+                << "r=" << smallerRadius << " area=" << smallerArea
+                << ", r=" << largerRadius << " area=" << largerArea;
+        // throw std::runtime_error(message.str());
+      }
+    }
+
+    samples_.push_back({radius, result.area});
+  }
+
+ private:
+  std::vector<std::pair<double, double>> samples_;
+};
 
 Polygons Turn180(Polygons polys) {
   for (SimplePolygon& poly : polys) {
@@ -73,11 +119,12 @@ void TestPoly(const Polygons& polys, int expectedNumTri,
   EXPECT_EQ(triangles.size(), 2 * expectedNumTri) << "Duplicate";
 }
 
-bool TestFillet(const Polygons& polys, CrossSection input, double radius,
-                int inputCircularSegments) {
-  const int circularSegments = inputCircularSegments > 2
-                                   ? inputCircularSegments
-                                   : Quality::GetCircularSegments(std::abs(radius));
+FilletResult TestFillet(const Polygons& polys, CrossSection input,
+                        double radius, int inputCircularSegments) {
+  const int circularSegments =
+      inputCircularSegments > 2
+          ? inputCircularSegments
+          : Quality::GetCircularSegments(std::abs(radius));
 
   auto r = input.Fillet(radius, circularSegments);
   auto rc = manifold::CrossSection::Compose(r);
@@ -143,7 +190,8 @@ bool TestFillet(const Polygons& polys, CrossSection input, double radius,
     EXPECT_NEAR(rc.Area(), rrc.Area(), 0.1 * (input.Area() - rc.Area()));
   }
 
-  return rc.Area() > 0 && std::abs((input.Area() - rc.Area())) > 1E-12;
+  return {rc.Area() > 0 && std::abs((input.Area() - rc.Area())) > 1E-12,
+          outArea};
 };
 
 void BuildFillet(const Polygons& polys, double epsilon = -1.0,
@@ -152,6 +200,13 @@ void BuildFillet(const Polygons& polys, double epsilon = -1.0,
 
   const int inputCircularSegments = 20;
   const CrossSection input = CrossSection(polys);
+  PositiveFilletAreaTracker positiveAreaTracker;
+  auto testFillet = [&](double radius) {
+    FilletResult result =
+        TestFillet(polys, input, radius, inputCircularSegments);
+    positiveAreaTracker.Check(radius, result);
+    return result.valid;
+  };
 
 #ifdef MANIFOLD_DEBUG
   manifold::ManifoldParams().verbose = false;
@@ -159,7 +214,7 @@ void BuildFillet(const Polygons& polys, double epsilon = -1.0,
 
   if (idx == 0) {
     double radius = 0.1;
-    TestFillet(polys, input, radius, inputCircularSegments);
+    testFillet(radius);
   } else if (idx == 1) {
     auto bbox = input.Bounds().Size();
 
@@ -189,7 +244,7 @@ void BuildFillet(const Polygons& polys, double epsilon = -1.0,
     std::sort(radiusVec.begin(), radiusVec.end());
 
     for (auto it = radiusVec.begin(); it != radiusVec.end(); it++)
-      TestFillet(polys, input, *it, inputCircularSegments);
+      testFillet(*it);
   } else {
 #endif
 
@@ -199,9 +254,11 @@ void BuildFillet(const Polygons& polys, double epsilon = -1.0,
     // Testing Positive Radius
 
     double low = 1E-6;
-    double high = maxCircleRadius > low ? 1.05 * maxCircleRadius : 0.8 * min;
+    const double positiveHigh =
+        maxCircleRadius > low ? 1.05 * maxCircleRadius : 0.8 * min;
+    double high = positiveHigh;
 
-    TestFillet(polys, input, low, inputCircularSegments);
+    testFillet(low);
 
     // Maximum attempt 20 times
     // Early stop if 10 case result non zero.
@@ -213,21 +270,49 @@ void BuildFillet(const Polygons& polys, double epsilon = -1.0,
       if (std::abs(low - mid) < 1E-20) break;
 
       // Area non zero
-      if (TestFillet(polys, input, mid, inputCircularSegments)) {
+      if (testFillet(mid)) {
         low = mid;
         j++;
       } else {
         high = mid;
       }
     }
-    EXPECT_NEAR(low, maxCircleRadius,
-                std::max(1E-6, 1E-3 * maxCircleRadius));
+
+    if (maxCircleRadius > 0 &&
+        (low < maxCircleRadius || !testFillet((low + maxCircleRadius) * 0.5)) &&
+        testFillet(maxCircleRadius)) {
+      low = maxCircleRadius;
+      high = positiveHigh;
+      const size_t SCAN = 128;
+      for (size_t i = 1; i <= SCAN; ++i) {
+        const double radius =
+            maxCircleRadius + (positiveHigh - maxCircleRadius) * i / SCAN;
+        if (testFillet(radius)) {
+          low = radius;
+          continue;
+        }
+
+        high = radius;
+        for (size_t j = 0; j != MAXIMUM; ++j) {
+          double mid = low + (high - low) * 0.5;
+
+          if (testFillet(mid)) {
+            low = mid;
+          } else {
+            high = mid;
+          }
+        }
+        break;
+      }
+    }
+
+    EXPECT_NEAR(low, maxCircleRadius, std::max(1E-6, 1E-3 * maxCircleRadius));
 
     // Testing Negative Radius
 
     low = -1E-6, high = -0.8 * min;
 
-    TestFillet(polys, input, low, inputCircularSegments);
+    testFillet(low);
 
     // Maximum attempt 20 times
     // Early stop if 10 case result non zero.
@@ -235,7 +320,7 @@ void BuildFillet(const Polygons& polys, double epsilon = -1.0,
       double mid = low + (high - low) * 0.5;
 
       // Area non zero
-      if (TestFillet(polys, input, mid, inputCircularSegments)) {
+      if (testFillet(mid)) {
         high = mid;
         j++;
       } else {
