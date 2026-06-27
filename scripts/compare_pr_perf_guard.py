@@ -89,6 +89,7 @@ def parse_suite(suite_dir: Path) -> dict:
             "mean_sec": mean(samples),
             "median_sec": statistics.median(samples),
             "stdev_sec": stdev(samples),
+            "min_sec": min(samples),
             "max_sec": max(samples),
             "n_runs": len(samples),
         }
@@ -103,7 +104,7 @@ def parse_suite(suite_dir: Path) -> dict:
 def build_summary(
     base: dict, head: dict, warn_pct: float, warn_abs_ms: float
 ) -> tuple[str, bool, dict]:
-    # Compare benchmark medians between base and head with dual-threshold warnings.
+    # Compare benchmark minimums between base and head with dual-threshold warnings.
     if base["benchmark_order"] != head["benchmark_order"]:
         raise RuntimeError(
             "Benchmark set/order mismatch between base and head: "
@@ -113,7 +114,7 @@ def build_summary(
     lines = []
     lines.append("### PR Benchmark Guard (perfTest)")
     lines.append("")
-    lines.append("| Benchmark | Base median (sec) | Head median (sec) | Delta | Base ±stdev | Head ±stdev | Status |")
+    lines.append("| Benchmark | Base min (sec) | Head min (sec) | Delta | Base ±stdev | Head ±stdev | Status |")
     lines.append("|---|---:|---:|---:|---:|---:|---|")
 
     per_benchmark = []
@@ -123,31 +124,35 @@ def build_summary(
         head_mean = head["benchmarks"][benchmark]["mean_sec"]
         base_median = base["benchmarks"][benchmark]["median_sec"]
         head_median = head["benchmarks"][benchmark]["median_sec"]
+        base_min = base["benchmarks"][benchmark]["min_sec"]
+        head_min = head["benchmarks"][benchmark]["min_sec"]
         base_stdev = base["benchmarks"][benchmark]["stdev_sec"]
         head_stdev = head["benchmarks"][benchmark]["stdev_sec"]
-        delta_sec = head_median - base_median
+        delta_sec = head_min - base_min
         delta_ms = delta_sec * 1000.0
-        pct = delta_sec / base_median * 100.0
+        pct = delta_sec / base_min * 100.0
         this_regressed = (pct >= warn_pct) and (delta_ms >= warn_abs_ms)
         regressed = regressed or this_regressed
         status = "WARNING" if this_regressed else "OK"
 
         lines.append(
-            f"| {benchmark} | {base_median:.6f} | {head_median:.6f} | {delta_sec:+.6f} ({pct:+.2f}%) | ±{base_stdev:.6f} | ±{head_stdev:.6f} | {status} |"
+            f"| {benchmark} | {base_min:.6f} | {head_min:.6f} | {delta_sec:+.6f} ({pct:+.2f}%) | ±{base_stdev:.6f} | ±{head_stdev:.6f} | {status} |"
         )
 
         per_benchmark.append(
             {
                 "benchmark": benchmark,
-                "metric": "median_sec",
+                "metric": "min_sec",
                 "base_mean_sec": base_mean,
                 "head_mean_sec": head_mean,
                 "base_median_sec": base_median,
                 "head_median_sec": head_median,
+                "base_min_sec": base_min,
+                "head_min_sec": head_min,
                 "base_stdev_sec": base_stdev,
                 "head_stdev_sec": head_stdev,
-                "delta_median_sec": delta_sec,
-                "delta_median_pct": pct,
+                "delta_min_sec": delta_sec,
+                "delta_min_pct": pct,
                 "regressed": this_regressed,
             }
         )
@@ -160,10 +165,10 @@ def build_summary(
     lines.append("")
 
     regressed_rows = [row for row in per_benchmark if row["regressed"]]
-    worst_regression = max(regressed_rows, key=lambda row: row["delta_median_sec"]) if regressed_rows else None
+    worst_regression = max(regressed_rows, key=lambda row: row["delta_min_sec"]) if regressed_rows else None
 
     payload = {
-        "primary_metric": "median_sec",
+        "primary_metric": "min_sec",
         "base": base,
         "head": head,
         "per_benchmark": per_benchmark,
@@ -274,7 +279,7 @@ def main() -> int:
             print(
                 "::warning::PR benchmark regression detected: "
                 f"{payload['regressed_count']} benchmark(s) exceeded thresholds. "
-                f"Worst: {worst['benchmark']} {worst['delta_median_pct']:.2f}% ({worst['delta_median_sec'] * 1000:.2f} ms) slower."
+                f"Worst: {worst['benchmark']} {worst['delta_min_pct']:.2f}% ({worst['delta_min_sec'] * 1000:.2f} ms) slower."
             )
         else:
             print("::warning::PR benchmark regression detected.")

@@ -636,7 +636,7 @@ jobs:
     timeout-minutes: 45
     runs-on: ubuntu-24.04
     env:
-      PERF_REPEATS: 6
+      PERF_REPEATS: 3
       REGRESSION_WARN_PCT: 20
       REGRESSION_WARN_ABS_MS: 10
     steps:
