@@ -11,15 +11,22 @@ OUT_DIR="$2"
 REPEATS="$3"
 BUILD_DIR="${OUT_DIR}/build"
 
-cmake \
-  -S "$SRC_DIR" \
-  -B "$BUILD_DIR" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DMANIFOLD_STRICT=ON \
-  -DMANIFOLD_DOWNLOADS=OFF \
-  -DMANIFOLD_PYBIND=OFF \
-  -DMANIFOLD_TEST=ON \
+cmake_args=(
+  -S "$SRC_DIR"
+  -B "$BUILD_DIR"
+  -DCMAKE_BUILD_TYPE=Release
+  -DMANIFOLD_STRICT=ON
+  -DMANIFOLD_DOWNLOADS=OFF
+  -DMANIFOLD_PYBIND=OFF
+  -DMANIFOLD_TEST=ON
   -DMANIFOLD_PAR=OFF
+)
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  cmake_args+=(-DCMAKE_OSX_ARCHITECTURES="${CMAKE_OSX_ARCHITECTURES:-arm64}")
+fi
+
+cmake "${cmake_args[@]}"
 
 cmake --build "$BUILD_DIR" --target perfTest
 
