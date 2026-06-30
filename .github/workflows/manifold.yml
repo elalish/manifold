@@ -465,20 +465,22 @@ jobs:
     name: Weekly benchmarks
     if: github.event_name == 'pull_request' && (github.head_ref == 'weekly-benchmark' || contains(github.event.pull_request.labels.*.name, 'weekly-benchmark'))
     timeout-minutes: 60
-    runs-on: ubuntu-24.04
+    runs-on: macos-15
     env:
       WEEKLY_BENCHMARK_REPEATS: 5
       WEEKLY_BENCHMARK_THREADS: 1
+      CMAKE_OSX_ARCHITECTURES: arm64
     steps:
     - uses: actions/checkout@v6
     - uses: actions/setup-python@v5
       with:
         python-version: '3.x'
-    - name: Install apt packages
-      uses: awalsh128/cache-apt-pkgs-action@v1.6.0
-      with:
-        packages: libassimp-dev libtbb-dev git pkg-config cmake
-        version: 1
+    - name: Verify macOS ARM runner
+      run: |
+        test "$(uname -s)" = "Darwin"
+        test "$(uname -m)" = "arm64"
+    - name: Install brew packages
+      run: brew install googletest assimp tbb cmake
     - name: Run weekly benchmarks
       shell: bash
       run: python3 ./scripts/run_weekly_benchmarks.py . ./bench/weekly "${WEEKLY_BENCHMARK_REPEATS}"

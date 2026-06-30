@@ -84,21 +84,27 @@ def run_command(
 
 
 def configure_build(ctx: BuildContext) -> None:
+    cmake_args = [
+        "cmake",
+        "-S",
+        str(ctx.source_dir),
+        "-B",
+        str(ctx.build_dir),
+        "-DCMAKE_BUILD_TYPE=Release",
+        "-DMANIFOLD_STRICT=ON",
+        "-DMANIFOLD_PYBIND=OFF",
+        "-DMANIFOLD_TEST=ON",
+        "-DMANIFOLD_PAR=ON",
+        "-DMANIFOLD_TIMING=ON",
+        "-DASSIMP_ENABLE=ON",
+    ]
+    if sys.platform == "darwin":
+        cmake_args.append(
+            f"-DCMAKE_OSX_ARCHITECTURES={os.getenv('CMAKE_OSX_ARCHITECTURES', 'arm64')}"
+        )
+
     run_command(
-        [
-            "cmake",
-            "-S",
-            str(ctx.source_dir),
-            "-B",
-            str(ctx.build_dir),
-            "-DCMAKE_BUILD_TYPE=Release",
-            "-DMANIFOLD_STRICT=ON",
-            "-DMANIFOLD_PYBIND=OFF",
-            "-DMANIFOLD_TEST=ON",
-            "-DMANIFOLD_PAR=ON",
-            "-DMANIFOLD_TIMING=ON",
-            "-DASSIMP_ENABLE=ON",
-        ],
+        cmake_args,
         log_path=ctx.out_dir / "cmake_configure.log",
     )
 
