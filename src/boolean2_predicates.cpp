@@ -52,13 +52,12 @@ bool OppositeSigns(double a, double b) {
   return (a < 0.0 && b > 0.0) || (a > 0.0 && b < 0.0);
 }
 
-bool StrictlyBetweenWithEndpointBand(double x, double p, double q, double eps) {
-  return std::min(p, q) + eps < x && x < std::max(p, q) - eps;
-}
-
-bool AwayFromEndpoints(vec2 p, vec2 a, vec2 b, double eps) {
-  const double eps2 = eps * eps;
-  return dot(p - a, p - a) > eps2 && dot(p - b, p - b) > eps2;
+// Strict interior by sign: x lies between the endpoints with no eps band.
+// An exact endpoint coincidence (x == p or x == q) returns false, deferring
+// that degeneracy to the vertex-on-edge incidence phase rather than minting a
+// transversal crossing a hair off the endpoint.
+bool StrictlyBetween(double x, double p, double q) {
+  return std::min(p, q) < x && x < std::max(p, q);
 }
 
 int CompareDouble(double a, double b) { return (a > b) - (a < b); }
@@ -98,9 +97,7 @@ double SignedArea(const SimplePolygon& loop) {
   for (size_t i = 0; i < loop.size(); ++i) {
     const auto& a = loop[i];
     const auto& b = loop[(i + 1) % loop.size()];
-    const double ax = a.x - r.x, ay = a.y - r.y;
-    const double bx = b.x - r.x, by = b.y - r.y;
-    sum += ax * by - bx * ay;
+    sum += la::cross(a - r, b - r);
   }
   return 0.5 * sum;
 }
@@ -193,7 +190,7 @@ GraphOrder2D CompareProjectedOrder(const GraphSegment2D& a,
 }
 
 bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
-                       double eps, vec2* out) {
+                       double eps, vec2& out) {
   const vec2 a0 = a.p0, a1 = a.p1, b0 = b.p0, b1 = b.p1;
   // Pick the axis where BOTH segments have non-zero spread, with
   // the larger spread of the two preferring stability (smaller |dy| works
@@ -213,9 +210,10 @@ bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
   // Special case: both segments are axis-aligned to opposite axes (one
   // horizontal, one vertical, exactly), so neither axis has both
   // segments contributing spread. Trim-and-Interpolate would degenerate
-  // (zero-width overlap interval). Compute only strict interior crossings
-  // directly; endpoint/near-line sliver contacts are degeneracies for the
-  // vertex-on-edge phase.
+  // (zero-width overlap interval). The crossing is at (vertical x, horizontal
+  // y); it is transversal iff that point is strictly interior to both spans,
+  // decided by sign. Endpoint coincidence (orientation 0) is a vertex-on-edge
+  // incidence, not a crossing, and is left to that phase.
   if (xUsable == 0 && yUsable == 0) {
     const bool aHoriz = aSpreadX > 0 && aSpreadY == 0;
     const bool aVert = aSpreadY > 0 && aSpreadX == 0;
@@ -224,16 +222,14 @@ bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
     if ((aHoriz && bVert) || (aVert && bHoriz)) {
       const double ix = aVert ? a0.x : b0.x;
       const double iy = aHoriz ? a0.y : b0.y;
-      if (!StrictlyBetweenWithEndpointBand(ix, a0.x, a1.x, eps) &&
-          !StrictlyBetweenWithEndpointBand(iy, a0.y, a1.y, eps)) {
-        return false;
-      }
-      if (!StrictlyBetweenWithEndpointBand(ix, b0.x, b1.x, eps) &&
-          !StrictlyBetweenWithEndpointBand(iy, b0.y, b1.y, eps)) {
-        return false;
-      }
-      *out = vec2(ix, iy);
-      return std::isfinite(out->x) && std::isfinite(out->y);
+      const vec2& horiz0 = aHoriz ? a0 : b0;
+      const vec2& horiz1 = aHoriz ? a1 : b1;
+      const vec2& vert0 = aVert ? a0 : b0;
+      const vec2& vert1 = aVert ? a1 : b1;
+      if (!StrictlyBetween(ix, horiz0.x, horiz1.x)) return false;
+      if (!StrictlyBetween(iy, vert0.y, vert1.y)) return false;
+      out = vec2(ix, iy);
+      return std::isfinite(out.x) && std::isfinite(out.y);
     }
     return false;  // both points, or other degenerate config
   }
@@ -273,10 +269,12 @@ bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
   const vec4 xyzz =
       manifold::Intersect(vec3(overlapL, aOL, 0.0), vec3(overlapR, aOR, 0.0),
                           vec3(overlapL, bOL, 0.0), vec3(overlapR, bOR, 0.0));
-  *out = axis == 0 ? vec2(xyzz.x, xyzz.y) : vec2(xyzz.y, xyzz.x);
-  return std::isfinite(out->x) && std::isfinite(out->y) &&
-         AwayFromEndpoints(*out, a0, a1, eps) &&
-         AwayFromEndpoints(*out, b0, b1, eps);
+  out = axis == 0 ? vec2(xyzz.x, xyzz.y) : vec2(xyzz.y, xyzz.x);
+  // properCrossing already established a sign-confirmed straddle; do not reject
+  // a real crossing for landing within eps of an endpoint. A near-endpoint
+  // crossing snaps to that endpoint at insertion (FindAndInsertIntersections),
+  // which is the correct vertex-on-edge resolution.
+  return std::isfinite(out.x) && std::isfinite(out.y);
 }
 
 }  // namespace manifold

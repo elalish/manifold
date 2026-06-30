@@ -26,6 +26,7 @@ Here is an incomplete list of our users, whose integrations may be anywhere from
 | [Cadova](https://github.com/tomasf/Cadova) | [BREP.io](https://github.com/mmiscool/BREP)  | [Otterplans](https://otterplans.com) |
 | [Bracket Engineer](https://bracket.engineer) | [Nodillo](https://nodillo3d.com) | [CaDoodle CAD](https://cadoodlecad.com/) |
 | [Bridge Designer](https://www.asce.org/career-growth/pre-college-outreach/bridge-designer) |[AdaShape](https://adashape.com)| [PyVista](https://github.com/pyvista/pyvista-manifold) |
+| [NASSCAD](https://www.nasscad.com) — Free browser-based parametric CAD in a single HTML file. Boolean CSG, 18 watertight primitives, offline-ready. ([GitHub](https://github.com/Nx-Nass/Nasscad_4.2.7)) |
 
 ### Bindings & Packages
 

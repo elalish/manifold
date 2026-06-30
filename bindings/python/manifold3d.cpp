@@ -839,16 +839,6 @@ NB_MODULE(manifold3d, m) {
       .value("InvalidTangents", Manifold::Error::InvalidTangents)
       .value("Cancelled", Manifold::Error::Cancelled);
 
-  nb::enum_<CrossSection::FillRule>(m, "FillRule")
-      .value("EvenOdd", CrossSection::FillRule::EvenOdd,
-             "Only odd numbered sub-regions are filled.")
-      .value("NonZero", CrossSection::FillRule::NonZero,
-             "Only non-zero sub-regions are filled.")
-      .value("Positive", CrossSection::FillRule::Positive,
-             "Only sub-regions with winding counts > 0 are filled.")
-      .value("Negative", CrossSection::FillRule::Negative,
-             "Only sub-regions with winding counts < 0 are filled.");
-
   nb::enum_<CrossSection::JoinType>(m, "JoinType")
       .value("Square", CrossSection::JoinType::Square,
              "Squaring is applied uniformly at all joins where the internal "
@@ -889,10 +879,8 @@ NB_MODULE(manifold3d, m) {
       "onwards). Polygon clipping (boolean) and offsetting use Manifold's own "
       "robust floating-point predicates.")
       .def(nb::init<>(), cross_section__cross_section)
-      .def(nb::init<std::vector<std::vector<vec2>>, CrossSection::FillRule>(),
-           nb::arg("contours"),
-           nb::arg("fillrule") = CrossSection::FillRule::Positive,
-           cross_section__cross_section__contours__fillrule)
+      .def(nb::init<std::vector<std::vector<vec2>>>(), nb::arg("contours"),
+           cross_section__cross_section__contours)
       .def("area", &CrossSection::Area, cross_section__area)
       .def("num_vert", &CrossSection::NumVert, cross_section__num_vert)
       .def("num_contour", &CrossSection::NumContour, cross_section__num_contour)
@@ -949,8 +937,12 @@ NB_MODULE(manifold3d, m) {
             });
           },
           nb::arg("warp_func"), cross_section__warp_batch__warp_func)
-      .def("simplify", &CrossSection::Simplify, nb::arg("epsilon") = 1e-6,
-           cross_section__simplify__epsilon)
+      .def("simplify", &CrossSection::Simplify, nb::arg("tolerance") = 0,
+           cross_section__simplify__tolerance)
+      .def("get_tolerance", &CrossSection::GetTolerance,
+           cross_section__get_tolerance)
+      .def("set_tolerance", &CrossSection::SetTolerance, nb::arg("tolerance"),
+           cross_section__set_tolerance__tolerance)
       .def(
           "offset", &CrossSection::Offset, nb::arg("delta"),
           nb::arg("join_type") = CrossSection::JoinType::Round,
@@ -974,8 +966,6 @@ NB_MODULE(manifold3d, m) {
       .def_static("batch_boolean", &CrossSection::BatchBoolean,
                   nb::arg("cross_sections"), nb::arg("op"),
                   cross_section__batch_boolean__cross_sections__op)
-      .def_static("compose", &CrossSection::Compose, nb::arg("cross_sections"),
-                  cross_section__compose__cross_sections)
       .def("to_polygons", &CrossSection::ToPolygons, cross_section__to_polygons)
       .def(
           "extrude",

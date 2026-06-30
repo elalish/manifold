@@ -147,16 +147,16 @@ void AddCandidatePairs(TracePhase* phase, const std::vector<vec2>& verts,
   }
 }
 
-void AddEdgeVertListAnnotations(TracePhase* phase,
+void AddEdgeVertListAnnotations(TracePhase& phase,
                                 const std::vector<std::vector<int>>& lists) {
-  phase->annotations.reserve(phase->annotations.size() + lists.size());
+  phase.annotations.reserve(phase.annotations.size() + lists.size());
   for (int i = 0; i < static_cast<int>(lists.size()); ++i) {
     std::ostringstream value;
     for (size_t j = 0; j < lists[i].size(); ++j) {
       if (j > 0) value << ",";
       value << lists[i][j];
     }
-    phase->annotations.push_back({Id("e", i), "edgeVertList", value.str()});
+    phase.annotations.push_back({Id("e", i), "edgeVertList", value.str()});
   }
 }
 
@@ -243,7 +243,7 @@ void TraceRecorder::RecordEdgeVertLists(
   TracePhase& phase = trace_->AddPhase("edge_vert_lists");
   AddPoints(&phase, verts, "list_vertex");
   AddSplitSubsegments(&phase, verts, edges, lists, "listed_subsegment");
-  AddEdgeVertListAnnotations(&phase, lists);
+  AddEdgeVertListAnnotations(phase, lists);
 #else
   (void)verts;
   (void)edges;
@@ -259,23 +259,7 @@ void TraceRecorder::RecordInsertedIntersections(
   TracePhase& phase = trace_->AddPhase("inserted_intersections");
   AddPoints(&phase, verts, "arrangement_vertex");
   AddSplitSubsegments(&phase, verts, edges, lists, "arrangement_subsegment");
-  AddEdgeVertListAnnotations(&phase, lists);
-#else
-  (void)verts;
-  (void)edges;
-  (void)lists;
-#endif
-}
-
-void TraceRecorder::RecordNearbyIntersectionMerge(
-    const std::vector<vec2>& verts, const std::vector<EdgeM>& edges,
-    const std::vector<std::vector<int>>& lists) {
-#ifdef MANIFOLD_DEBUG
-  if (!trace_) return;
-  TracePhase& phase = trace_->AddPhase("nearby_intersection_merge");
-  AddPoints(&phase, verts, "nearby_intersection_vertex");
-  AddSplitSubsegments(&phase, verts, edges, lists, "nearby_intersection");
-  AddEdgeVertListAnnotations(&phase, lists);
+  AddEdgeVertListAnnotations(phase, lists);
 #else
   (void)verts;
   (void)edges;

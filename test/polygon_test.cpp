@@ -20,6 +20,7 @@
 #endif
 #include <limits>
 
+#include "polygon_corpus.h"
 #include "test.h"
 
 namespace {
@@ -83,42 +84,18 @@ class PolygonTestFixture : public testing::Test {
 
 #ifndef MANIFOLD_NO_IOSTREAM
 void RegisterPolygonTestsFile(const std::string& filename) {
-  auto f = std::ifstream(filename);
-  EXPECT_TRUE(f.is_open());
-
-  // for each test:
-  //   test name, expectedNumTri, epsilon, num polygons
-  //   for each polygon:
-  //     num points
-  //     for each vertex:
-  //       x coord, y coord
-  //
-  // note that we should not have commas in the file
-
-  std::string name;
-  double epsilon, x, y;
-  int expectedNumTri, numPolys, numPoints;
-
-  while (1) {
-    f >> name;
-    if (f.eof()) break;
-    f >> expectedNumTri >> epsilon >> numPolys;
-    Polygons polys;
-    for (int i = 0; i < numPolys; i++) {
-      polys.emplace_back();
-      f >> numPoints;
-      for (int j = 0; j < numPoints; j++) {
-        f >> x >> y;
-        polys.back().emplace_back(x, y);
-      }
-    }
+  const std::vector<PolygonCorpusEntry> corpus = ReadPolygonCorpus(filename);
+  // The corpus files are committed, so an empty read means a missing or
+  // unreadable file; fail loudly rather than silently registering no tests.
+  EXPECT_FALSE(corpus.empty()) << "no polygon corpus read from " << filename;
+  for (const auto& entry : corpus) {
     testing::RegisterTest(
-        "Polygon", name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
-        [=, polys = std::move(polys)]() -> PolygonTestFixture* {
+        "Polygon", entry.name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
+        [polys = entry.polys, epsilon = entry.epsilon,
+         expectedNumTri = entry.expectedNumTri]() -> PolygonTestFixture* {
           return new PolygonTestFixture(polys, epsilon, expectedNumTri);
         });
   }
-  f.close();
 }
 #endif
 }  // namespace

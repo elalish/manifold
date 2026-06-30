@@ -31,14 +31,13 @@ ManifoldCrossSection* manifold_cross_section_copy(void* mem,
 }
 
 ManifoldCrossSection* manifold_cross_section_of_simple_polygon(
-    void* mem, ManifoldSimplePolygon* p, ManifoldFillRule fr) {
-  return to_c(new (mem) CrossSection(*from_c(p), from_c(fr)));
+    void* mem, ManifoldSimplePolygon* p) {
+  return to_c(new (mem) CrossSection(*from_c(p)));
 }
 
 ManifoldCrossSection* manifold_cross_section_of_polygons(void* mem,
-                                                         ManifoldPolygons* p,
-                                                         ManifoldFillRule fr) {
-  return to_c(new (mem) CrossSection(*from_c(p), from_c(fr)));
+                                                         ManifoldPolygons* p) {
+  return to_c(new (mem) CrossSection(*from_c(p)));
 }
 
 ManifoldCrossSectionVec* manifold_cross_section_empty_vec(void* mem) {
@@ -196,8 +195,8 @@ ManifoldCrossSection* manifold_cross_section_warp_context(
 
 ManifoldCrossSection* manifold_cross_section_simplify(void* mem,
                                                       ManifoldCrossSection* cs,
-                                                      double epsilon) {
-  auto simplified = from_c(cs)->Simplify(epsilon);
+                                                      double tolerance) {
+  auto simplified = from_c(cs)->Simplify(tolerance);
   return to_c(new (mem) CrossSection(simplified));
 }
 
@@ -237,10 +236,14 @@ ManifoldPolygons* manifold_cross_section_to_polygons(void* mem,
   return to_c(new (mem) Polygons(ps));
 }
 
-ManifoldCrossSection* manifold_cross_section_compose(
-    void* mem, ManifoldCrossSectionVec* csv) {
-  auto cs = CrossSection::Compose(*from_c(csv));
-  return to_c(new (mem) CrossSection(cs));
+double manifold_cross_section_get_tolerance(ManifoldCrossSection* cs) {
+  return from_c(cs)->GetTolerance();
+}
+
+ManifoldCrossSection* manifold_cross_section_set_tolerance(
+    void* mem, ManifoldCrossSection* cs, double tolerance) {
+  auto out = from_c(cs)->SetTolerance(tolerance);
+  return to_c(new (mem) CrossSection(out));
 }
 
 ManifoldCrossSectionVec* manifold_cross_section_decompose(

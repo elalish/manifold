@@ -87,27 +87,23 @@ Module.setup = function() {
     return vec[0];
   }
 
-  function fillRuleToInt(fillRule) {
-    return fillRule == 'EvenOdd' ? 0 :
-        fillRule == 'NonZero'    ? 1 :
-        fillRule == 'Negative'   ? 3 :
-                                   /* Positive */ 2;
-  }
-
   function joinTypeToInt(joinType) {
-    return joinType == 'Round' ? 1 : joinType == 'Miter' ? 2 : /* Square */ 0;
+    return joinType == 'Round' ? 1 :
+        joinType == 'Miter'    ? 2 :
+        joinType == 'Bevel'    ? 3 :
+                                 /* Square */ 0;
   }
 
   // CrossSection methods
 
   const CrossSectionCtor = Module.CrossSection;
 
-  function cross(polygons, fillRule = 'Positive') {
+  function cross(polygons) {
     if (polygons instanceof CrossSectionCtor) {
       return polygons;
     } else {
       const polygonsVec = polygons2vec(polygons);
-      const cs = new CrossSectionCtor(polygonsVec, fillRuleToInt(fillRule));
+      const cs = new CrossSectionCtor(polygonsVec);
       disposePolygons(polygonsVec);
       return cs;
     }
@@ -164,8 +160,8 @@ Module.setup = function() {
         delta, joinTypeToInt(joinType), miterLimit, circularSegments);
   };
 
-  Module.CrossSection.prototype.simplify = function(epsilon = 1e-6) {
-    return this._Simplify(epsilon);
+  Module.CrossSection.prototype.simplify = function(tolerance = 0) {
+    return this._Simplify(tolerance);
   };
 
   Module.CrossSection.prototype.extrude = function(
@@ -317,14 +313,14 @@ Module.setup = function() {
 
   Module.Manifold.prototype.slice = function(height = 0.) {
     const polygonsVec = this._Slice(height);
-    const result = new CrossSectionCtor(polygonsVec, fillRuleToInt('Positive'));
+    const result = new CrossSectionCtor(polygonsVec);
     disposePolygons(polygonsVec);
     return result;
   };
 
   Module.Manifold.prototype.project = function() {
     const polygonsVec = this._Project();
-    const result = new CrossSectionCtor(polygonsVec, fillRuleToInt('Positive'));
+    const result = new CrossSectionCtor(polygonsVec);
     disposePolygons(polygonsVec);
     return result;
   };
@@ -537,15 +533,15 @@ Module.setup = function() {
 
   // CrossSection Constructors
 
-  Module.CrossSection = function(polygons, fillRule = 'Positive') {
+  Module.CrossSection = function(polygons) {
     const polygonsVec = polygons2vec(polygons);
-    const cs = new CrossSectionCtor(polygonsVec, fillRuleToInt(fillRule));
+    const cs = new CrossSectionCtor(polygonsVec);
     disposePolygons(polygonsVec);
     return cs;
   };
 
-  Module.CrossSection.ofPolygons = function(polygons, fillRule = 'Positive') {
-    return new Module.CrossSection(polygons, fillRule);
+  Module.CrossSection.ofPolygons = function(polygons) {
+    return new Module.CrossSection(polygons);
   };
 
   Module.CrossSection.square = function(...args) {
@@ -577,7 +573,6 @@ Module.setup = function() {
     };
   }
 
-  Module.CrossSection.compose = crossSectionBatchbool('Compose');
   Module.CrossSection.union = crossSectionBatchbool('UnionN');
   Module.CrossSection.difference = crossSectionBatchbool('DifferenceN');
   Module.CrossSection.intersection = crossSectionBatchbool('IntersectionN');

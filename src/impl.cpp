@@ -80,14 +80,6 @@ double FromChars(T buffer) {
 
 namespace manifold {
 
-#if (MANIFOLD_PAR == 1)
-#if (TBB_VERSION_MAJOR < 2021)
-tbb::task_arena gc_arena(1, 1);
-#else
-tbb::task_arena gc_arena(1, 1, tbb::task_arena::priority::low);
-#endif
-#endif
-
 std::atomic<uint32_t> Manifold::Impl::meshIDCounter_(1);
 
 uint32_t Manifold::Impl::ReserveIDs(uint32_t n) {
