@@ -461,6 +461,38 @@ jobs:
       shell: bash
       run: bash ./scripts/ci/sanitizer_test.sh
 
+  weekly_benchmark:
+    name: Weekly benchmarks
+    if: github.event_name == 'pull_request' && (github.head_ref == 'weekly-benchmark' || contains(github.event.pull_request.labels.*.name, 'weekly-benchmark'))
+    timeout-minutes: 60
+    runs-on: macos-15
+    env:
+      WEEKLY_BENCHMARK_REPEATS: 5
+      WEEKLY_BENCHMARK_THREADS: 1
+      CMAKE_OSX_ARCHITECTURES: arm64
+    steps:
+    - uses: actions/checkout@v6
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+    - name: Verify macOS ARM runner
+      run: |
+        test "$(uname -s)" = "Darwin"
+        test "$(uname -m)" = "arm64"
+    - name: Install brew packages
+      run: brew install googletest assimp tbb cmake
+    - name: Run weekly benchmarks
+      shell: bash
+      run: python3 ./scripts/run_weekly_benchmarks.py . ./bench/weekly "${WEEKLY_BENCHMARK_REPEATS}"
+    - name: Report weekly benchmarks
+      run: python3 ./scripts/report_weekly_benchmarks.py . ./bench/weekly "${WEEKLY_BENCHMARK_REPEATS}"
+    - name: Upload weekly benchmark artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: weekly-benchmark
+        path: ./bench/weekly/
+        retention-days: 30
+
   build_mxe:
     name: MXE (TBB:${{matrix.parallelization == 'ON'}})
     timeout-minutes: 30
