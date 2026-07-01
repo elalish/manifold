@@ -6,6 +6,7 @@ import os
 import platform
 import re
 import statistics
+import subprocess
 from pathlib import Path
 
 SCHEMA_VERSION = "1.0.0"
@@ -293,7 +294,33 @@ def cmake_compiler(cmake: dict) -> str | None:
     return compiler_id or compiler_version
 
 
-def cpu_model() -> str | None:
+def sysctl_value(name: str) -> str | None:
+    try:
+        result = subprocess.run(
+            ["sysctl", "-n", name],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (subprocess.CalledProcessError, OSError):
+        return None
+
+    value = result.stdout.strip()
+    return value or None
+
+
+def int_or_none(value: str | None) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+def default_cpu_model() -> str | None:
+    #/proc/cpuinfo on Linux because it gives a much better CPU name
+    # than platform.processor() on GitHub-hosted Ubuntu runners.
     cpuinfo = Path("/proc/cpuinfo")
     if not cpuinfo.exists():
         return platform.processor() or None
@@ -303,9 +330,42 @@ def cpu_model() -> str | None:
     return None
 
 
+def cpu_details() -> dict:
+    if platform.system() == "Darwin":
+        brand = sysctl_value("machdep.cpu.brand_string")
+        model = sysctl_value("hw.model")
+        return {
+            "model": brand or model or platform.processor() or None,
+            "brand": brand,
+            "model_identifier": model,
+            "arch": platform.machine() or None,
+            "logical_count": int_or_none(sysctl_value("hw.logicalcpu"))
+            or os.cpu_count(),
+            "physical_count": int_or_none(sysctl_value("hw.physicalcpu")),
+            "performance_core_count": int_or_none(
+                sysctl_value("hw.perflevel0.physicalcpu")
+            ),
+            "efficiency_core_count": int_or_none(
+                sysctl_value("hw.perflevel1.physicalcpu")
+            ),
+        }
+
+    return {
+        "model": default_cpu_model(),
+        "brand": None,
+        "model_identifier": None,
+        "arch": platform.machine() or None,
+        "logical_count": os.cpu_count(),
+        "physical_count": None,
+        "performance_core_count": None,
+        "efficiency_core_count": None,
+    }
+
+
 def resolve_metadata(args: argparse.Namespace) -> dict:
     timestamp = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
     cmake = parse_cmake_configure_log(args.suite_dir / "cmake_configure.log")
+    cpu = cpu_details()
     return {
         "schema_version": SCHEMA_VERSION,
         "commit_sha": args.commit_sha or os.getenv("GITHUB_SHA"),
@@ -314,8 +374,15 @@ def resolve_metadata(args: argparse.Namespace) -> dict:
         "os": args.os_name or os.getenv("RUNNER_OS"),
         "compiler": args.compiler or cmake_compiler(cmake),
         "cmake": cmake,
-        "cpu_model": args.cpu_model or cpu_model(),
-        "cpu_count": args.cpu_count or os.cpu_count(),
+        "cpu_model": args.cpu_model or cpu["model"],
+        "cpu_count": args.cpu_count or cpu["logical_count"],
+        "cpu_brand": cpu["brand"],
+        "cpu_model_identifier": cpu["model_identifier"],
+        "cpu_arch": cpu["arch"],
+        "cpu_logical_count": cpu["logical_count"],
+        "cpu_physical_count": cpu["physical_count"],
+        "cpu_performance_core_count": cpu["performance_core_count"],
+        "cpu_efficiency_core_count": cpu["efficiency_core_count"],
         "timestamp": timestamp.isoformat().replace("+00:00", "Z"),
     }
 
@@ -418,6 +485,18 @@ def build_summary(suites: dict, metadata: dict, repeats: int) -> str:
     lines.append(f"Compiler: `{metadata.get('compiler') or 'unknown'}`")
     lines.append(f"CPU: `{metadata.get('cpu_model') or 'unknown'}`")
     lines.append(f"CPU count: `{metadata.get('cpu_count') or 'unknown'}`")
+    if metadata.get("cpu_model_identifier"):
+        lines.append(f"CPU model identifier: `{metadata['cpu_model_identifier']}`")
+    if metadata.get("cpu_physical_count"):
+        lines.append(f"CPU physical cores: `{metadata['cpu_physical_count']}`")
+    if metadata.get("cpu_performance_core_count") is not None:
+        lines.append(
+            f"CPU performance cores: `{metadata['cpu_performance_core_count']}`"
+        )
+    if metadata.get("cpu_efficiency_core_count") is not None:
+        lines.append(
+            f"CPU efficiency cores: `{metadata['cpu_efficiency_core_count']}`"
+        )
     lines.append(f"Repeats: `{repeats}`")
     lines.append("")
 
