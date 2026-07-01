@@ -11,6 +11,8 @@ HEAD_DIR="$2"
 WARN_PCT="$3"
 WARN_ABS_MS="$4"
 
+mkdir -p ./bench
+
 python3 ./scripts/compare_pr_perf_guard.py \
   --base-dir "$BASE_DIR" \
   --head-dir "$HEAD_DIR" \

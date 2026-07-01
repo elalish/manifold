@@ -3,12 +3,12 @@ import argparse
 import datetime
 import json
 import os
+import platform
 import re
 import statistics
 import subprocess
 from pathlib import Path
 
-SCHEMA_VERSION = "1.0.0"
 # fallback: extract only time value when nTri label is not present
 TIME_PATTERN = re.compile(r"time\s*=\s*([0-9]*\.?[0-9]+)\s*sec")
 # primary: extract both nTri bucket and timing from perfTest output
@@ -90,6 +90,7 @@ def parse_suite(suite_dir: Path) -> dict:
             "mean_sec": mean(samples),
             "median_sec": statistics.median(samples),
             "stdev_sec": stdev(samples),
+            "min_sec": min(samples),
             "max_sec": max(samples),
             "n_runs": len(samples),
         }
@@ -104,7 +105,7 @@ def parse_suite(suite_dir: Path) -> dict:
 def build_summary(
     base: dict, head: dict, warn_pct: float, warn_abs_ms: float
 ) -> tuple[str, bool, dict]:
-    # compare benchmark means between base and head with dual-threshold warnings
+    # Compare benchmark minimums between base and head with dual-threshold warnings.
     if base["benchmark_order"] != head["benchmark_order"]:
         raise RuntimeError(
             "Benchmark set/order mismatch between base and head: "
@@ -114,33 +115,45 @@ def build_summary(
     lines = []
     lines.append("### PR Benchmark Guard (perfTest)")
     lines.append("")
-    lines.append("| Benchmark | Base mean (sec) | Head mean (sec) | Delta | Status |")
-    lines.append("|---|---:|---:|---:|")
+    lines.append("| Benchmark | Base min (sec) | Head min (sec) | Delta | Base ±stdev | Head ±stdev | Status |")
+    lines.append("|---|---:|---:|---:|---:|---:|---|")
 
     per_benchmark = []
     regressed = False
     for benchmark in base["benchmark_order"]:
         base_mean = base["benchmarks"][benchmark]["mean_sec"]
         head_mean = head["benchmarks"][benchmark]["mean_sec"]
-        delta_sec = head_mean - base_mean
+        base_median = base["benchmarks"][benchmark]["median_sec"]
+        head_median = head["benchmarks"][benchmark]["median_sec"]
+        base_min = base["benchmarks"][benchmark]["min_sec"]
+        head_min = head["benchmarks"][benchmark]["min_sec"]
+        base_stdev = base["benchmarks"][benchmark]["stdev_sec"]
+        head_stdev = head["benchmarks"][benchmark]["stdev_sec"]
+        delta_sec = head_min - base_min
         delta_ms = delta_sec * 1000.0
-        pct = (delta_sec / base_mean * 100.0) if base_mean > 0 else 0.0
+        pct = delta_sec / base_min * 100.0
         this_regressed = (pct >= warn_pct) and (delta_ms >= warn_abs_ms)
         regressed = regressed or this_regressed
         status = "WARNING" if this_regressed else "OK"
 
         lines.append(
-            f"| {benchmark} | {base_mean:.6f} | {head_mean:.6f} | {delta_sec:+.6f} ({pct:+.2f}%) | {status} |"
+            f"| {benchmark} | {base_min:.6f} | {head_min:.6f} | {delta_sec:+.6f} ({pct:+.2f}%) | ±{base_stdev:.6f} | ±{head_stdev:.6f} | {status} |"
         )
 
         per_benchmark.append(
             {
                 "benchmark": benchmark,
+                "metric": "min_sec",
                 "base_mean_sec": base_mean,
                 "head_mean_sec": head_mean,
-                "delta_sec": delta_sec,
-                "delta_ms": delta_ms,
-                "delta_pct": pct,
+                "base_median_sec": base_median,
+                "head_median_sec": head_median,
+                "base_min_sec": base_min,
+                "head_min_sec": head_min,
+                "base_stdev_sec": base_stdev,
+                "head_stdev_sec": head_stdev,
+                "delta_min_sec": delta_sec,
+                "delta_min_pct": pct,
                 "regressed": this_regressed,
             }
         )
@@ -153,10 +166,10 @@ def build_summary(
     lines.append("")
 
     regressed_rows = [row for row in per_benchmark if row["regressed"]]
-    worst_regression = max(regressed_rows, key=lambda row: row["delta_ms"]) if regressed_rows else None
+    worst_regression = max(regressed_rows, key=lambda row: row["delta_min_sec"]) if regressed_rows else None
 
     payload = {
-        "primary_metric": "per_benchmark_mean_sec",
+        "primary_metric": "min_sec",
         "base": base,
         "head": head,
         "per_benchmark": per_benchmark,
@@ -212,16 +225,93 @@ def detect_compiler() -> str | None:
     return None
 
 
+def sysctl_value(name: str) -> str | None:
+    try:
+        result = subprocess.run(
+            ["sysctl", "-n", name],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (subprocess.CalledProcessError, OSError):
+        return None
+
+    value = result.stdout.strip()
+    return value or None
+
+
+def int_or_none(value: str | None) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
+
+
+def default_cpu_model() -> str | None:
+    # Prefer /proc/cpuinfo on Linux because it gives a much better CPU name
+    # than platform.processor() on GitHub-hosted Ubuntu runners.
+    cpuinfo = Path("/proc/cpuinfo")
+    if not cpuinfo.exists():
+        return platform.processor() or None
+    for line in cpuinfo.read_text(encoding="utf-8", errors="ignore").splitlines():
+        if line.startswith("model name"):
+            return line.split(":", 1)[1].strip()
+    return None
+
+
+def cpu_details() -> dict:
+    if platform.system() == "Darwin":
+        brand = sysctl_value("machdep.cpu.brand_string")
+        model = sysctl_value("hw.model")
+        return {
+            "model": brand or model or platform.processor() or None,
+            "brand": brand,
+            "model_identifier": model,
+            "arch": platform.machine() or None,
+            "logical_count": int_or_none(sysctl_value("hw.logicalcpu"))
+            or os.cpu_count(),
+            "physical_count": int_or_none(sysctl_value("hw.physicalcpu")),
+            "performance_core_count": int_or_none(
+                sysctl_value("hw.perflevel0.physicalcpu")
+            ),
+            "efficiency_core_count": int_or_none(
+                sysctl_value("hw.perflevel1.physicalcpu")
+            ),
+        }
+
+    return {
+        "model": default_cpu_model(),
+        "brand": None,
+        "model_identifier": None,
+        "arch": platform.machine() or None,
+        "logical_count": os.cpu_count(),
+        "physical_count": None,
+        "performance_core_count": None,
+        "efficiency_core_count": None,
+    }
+
+
 def resolve_metadata(args: argparse.Namespace) -> dict:
     # resolve metadata from explicit args first, then GitHub env vars
     timestamp = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    cpu = cpu_details()
     return {
-        "schema_version": SCHEMA_VERSION,
         "commit_sha": args.commit_sha or os.getenv("GITHUB_SHA"),
         "workflow": args.workflow or os.getenv("GITHUB_WORKFLOW"),
         "runner": args.runner or os.getenv("RUNNER_NAME"),
         "os": args.os_name or os.getenv("RUNNER_OS"),
         "compiler": args.compiler or detect_compiler(),
+        "cpu_model": cpu["model"],
+        "cpu_count": cpu["logical_count"],
+        "cpu_brand": cpu["brand"],
+        "cpu_model_identifier": cpu["model_identifier"],
+        "cpu_arch": cpu["arch"],
+        "cpu_logical_count": cpu["logical_count"],
+        "cpu_physical_count": cpu["physical_count"],
+        "cpu_performance_core_count": cpu["performance_core_count"],
+        "cpu_efficiency_core_count": cpu["efficiency_core_count"],
         "timestamp": timestamp.isoformat().replace("+00:00", "Z"),
     }
 
@@ -249,7 +339,9 @@ def main() -> int:
             raise RuntimeError(
                 f"Run count mismatch: base has {len(base['runs'])}, head has {len(head['runs'])}."
             )
-        markdown, regressed, payload = build_summary(base, head, args.warn_pct, args.warn_abs_ms)
+        markdown, regressed, payload = build_summary(
+            base, head, args.warn_pct, args.warn_abs_ms
+        )
         payload["data_valid"] = True
     except Exception as exc:
         markdown, payload = build_invalid_summary(str(exc))
@@ -266,7 +358,7 @@ def main() -> int:
             print(
                 "::warning::PR benchmark regression detected: "
                 f"{payload['regressed_count']} benchmark(s) exceeded thresholds. "
-                f"Worst: {worst['benchmark']} {worst['delta_pct']:.2f}% ({worst['delta_ms']:.2f} ms) slower."
+                f"Worst: {worst['benchmark']} {worst['delta_min_pct']:.2f}% ({worst['delta_min_sec'] * 1000:.2f} ms) slower."
             )
         else:
             print("::warning::PR benchmark regression detected.")

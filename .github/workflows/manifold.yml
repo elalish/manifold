@@ -634,26 +634,26 @@ jobs:
     name: perfTest base-vs-head guard
     if: github.event_name == 'pull_request'
     timeout-minutes: 45
-    runs-on: ubuntu-24.04
+    runs-on: macos-latest
     env:
       PERF_REPEATS: 3
       REGRESSION_WARN_PCT: 20
       REGRESSION_WARN_ABS_MS: 10
+      CMAKE_OSX_ARCHITECTURES: arm64
     steps:
     - uses: actions/checkout@v6
       with:
         fetch-depth: 0
-    - name: Install apt packages
-      uses: awalsh128/cache-apt-pkgs-action@v1.6.0
-      with:
-        packages: libgtest-dev libtbb-dev cmake
-        version: 1
+    - name: Verify macOS ARM runner
+      run: |
+        test "$(uname -s)" = "Darwin"
+        test "$(uname -m)" = "arm64"
+    - name: Install brew packages
+      run: brew install googletest cmake
     - name: Prepare base and head worktrees
-      continue-on-error: true
       shell: bash
       run: bash ./scripts/prepare_pr_perf_guard_worktrees.sh "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
     - name: Benchmark base and head
-      continue-on-error: true
       shell: bash
       run: bash ./scripts/benchmark_pr_perf_guard.sh "${PERF_REPEATS}"
     - name: Compare benchmark results
