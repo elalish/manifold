@@ -42,7 +42,40 @@ if [ -z "$BIN" ]; then
   exit 1
 fi
 
+run_measured_perf_size() {
+  local size_index="$1"
+  local output status ntri peak_rss_mb peak_rss_bytes peak_rss_kb
+
+  set +e
+  if [ "$(uname -s)" = "Darwin" ]; then
+    output="$(/usr/bin/time -l "$BIN" --size-index "$size_index" 2>&1)"
+    status="$?"
+    peak_rss_bytes="$(printf "%s\n" "$output" | awk '/maximum resident set size/ {print $1; exit}')"
+    peak_rss_mb="$(awk -v bytes="${peak_rss_bytes:-0}" 'BEGIN {printf "%.2f", bytes / 1024 / 1024}')"
+  else
+    output="$(/usr/bin/time -v "$BIN" --size-index "$size_index" 2>&1)"
+    status="$?"
+    peak_rss_kb="$(printf "%s\n" "$output" | awk -F: '/Maximum resident set size/ {gsub(/^[ \t]+/, "", $2); print $2; exit}')"
+    peak_rss_bytes="$(awk -v kb="${peak_rss_kb:-0}" 'BEGIN {printf "%.0f", kb * 1024}')"
+    peak_rss_mb="$(awk -v kb="${peak_rss_kb:-0}" 'BEGIN {printf "%.2f", kb / 1024}')"
+  fi
+  set -e
+
+  printf "%s\n" "$output"
+  ntri="$(printf "%s\n" "$output" | sed -nE 's/^nTri = ([0-9]+),.*/\1/p' | head -n 1)"
+  echo "PEAK_RSS nTri=${ntri:-unknown} size_index=${size_index} peak_rss_mb=${peak_rss_mb} peak_rss_bytes=${peak_rss_bytes:-0}"
+  return "$status"
+}
+
 mkdir -p "$OUT_DIR"
 for i in $(seq 1 "$REPEATS"); do
-  "$BIN" > "${OUT_DIR}/run${i}.txt"
+  run_file="${OUT_DIR}/run${i}.txt"
+  : > "$run_file"
+  for size_index in $(seq 0 7); do
+    {
+      echo "### perfTest size_index=${size_index}"
+      run_measured_perf_size "$size_index"
+      echo
+    } >> "$run_file"
+  done
 done
