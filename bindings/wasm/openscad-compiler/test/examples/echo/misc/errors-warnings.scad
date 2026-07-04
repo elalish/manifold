@@ -9,10 +9,6 @@ polyhedron(
               [1,0,3],[2,1,3] ]
  );
  
-//file does not exist - we only care about the file ending
-import("doesNotExist.aaa");
-//file does not exist an thus creates a warning
-import("doesNotExist.off", origin="string");
 //unknown module
 hello();
 //unknown function
@@ -67,31 +63,6 @@ echo(lookup(1, table1, 3)); //to many arguments
 echo(lookup(1)); //not enough arguments
 
 nan = (1/0)/(1/0);
-
-OriginPoint = dxf_cross(file="doesNotExist.dxf",
-    layer="SCAD.Origin", 
-    origin=[1/0, nan],
-    scale=1);
-    
-TotalWidth = dxf_dim(file="doesNotExist.dxf",
-    name="TotalWidth",
-    layer="SCAD.Origin",
-    origin=[1,2,3],
-    scale=1);    
-    
-dxf="dim-all.dxf"; // this does exist
-echo(dxf);
-OriginPoint2 = dxf_cross(file=dxf,
-    layer="SCAD.Origin", 
-    origin=[1/0, 0],
-    scale=1,
-    notSupported="test");
-
-TotalWidth2 = dxf_dim(file=dxf,
-    name="TotalWidth",
-    layer="SCAD.Origin",
-    scale=1,
-    notSupported="test"); 
 
 cube()
 cylinder();

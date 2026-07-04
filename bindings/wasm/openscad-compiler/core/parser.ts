@@ -453,7 +453,7 @@ export class Parser {
   }
 
   private parseMultiplication(): Expr {
-    let left = this.parseExponentiation();
+    let left = this.parseUnary();
     while (
       this.current.type === TokenType.Star ||
       this.current.type === TokenType.Slash ||
@@ -463,19 +463,8 @@ export class Parser {
         this.current.type === TokenType.Star ? "*" :
           this.current.type === TokenType.Slash ? "/" : "%";
       this.advance();
-      const right = this.parseExponentiation();
+      const right = this.parseUnary();
       left = { kind: "binary", op, left, right, loc: { start: left.loc!.start, end: right.loc!.end } };
-    }
-    return left;
-  }
-
-  private parseExponentiation(): Expr {
-    const start = this.startLoc();
-    let left = this.parseUnary();
-    if (this.current.type === TokenType.Caret) {
-      this.advance();
-      const right = this.parseExponentiation(); // right-associative
-      left = { kind: "binary", op: "^", left, right, loc: this.rangeSince(start) };
     }
     return left;
   }
@@ -502,7 +491,18 @@ export class Parser {
       const operand = this.parseUnary();
       return { kind: "unary", op: "~", operand, loc: this.rangeSince(start) };
     }
-    return this.parsePostfix();
+    return this.parseExponentiation();
+  }
+
+  private parseExponentiation(): Expr {
+    const start = this.startLoc();
+    const left = this.parsePostfix();
+    if (this.current.type === TokenType.Caret) {
+      this.advance();
+      const right = this.parseUnary();
+      return { kind: "binary", op: "^", left, right, loc: this.rangeSince(start) };
+    }
+    return left;
   }
 
   private parsePostfix(): Expr {
@@ -518,7 +518,7 @@ export class Parser {
         this.advance();
         const property = this.expect(TokenType.Identifier).value!;
         expr = { kind: "member", object: expr, property, loc: { start: expr.loc!.start, end: this.prev.range.end } };
-      } else if (this.current.type === TokenType.LParen && expr.kind !== "number" && expr.kind !== "string" && expr.kind !== "boolean" && expr.kind !== "undef") {
+      } else if (this.current.type === TokenType.LParen) {
         this.advance();
         const args = this.parseArgumentList();
         this.expect(TokenType.RParen);
@@ -694,6 +694,19 @@ export class Parser {
   private parseListCompGenerator(): ListCompGenerator {
     const start = this.startLoc();
 
+    if (this.current.type === TokenType.LParen) {
+      const next = this.peekNext();
+      if (
+        next.type === TokenType.Identifier &&
+        (next.value === "for" || next.value === "if" || next.value === "let" || next.value === "each")
+      ) {
+        this.advance(); // consume '('
+        const inner = this.parseListCompGenerator();
+        this.expect(TokenType.RParen);
+        return inner;
+      }
+    }
+
     if (this.isIdentifier("for")) {
       this.advance();
       this.expect(TokenType.LParen);
@@ -783,7 +796,10 @@ export class Parser {
       const name = this.expect(TokenType.Identifier).value!;
       this.expect(TokenType.Equals);
       const value = this.parseExpr();
-      assignments.push({ name, value, loc: this.rangeSince(as) });
+      // OpenSCAD ignores a duplicate assignment to the same name within one `let` (the first binding wins) and warns; drop later occurrences so we don't apply last-wins reassignment.
+      if (!assignments.some(a => a.name === name)) {
+        assignments.push({ name, value, loc: this.rangeSince(as) });
+      }
     } while (this.match(TokenType.Comma));
 
     return assignments;

@@ -1,4 +1,4 @@
-use <lib.scad>
+use <test_lib.scad>
 
 test(); // 10
 test2(); // 10

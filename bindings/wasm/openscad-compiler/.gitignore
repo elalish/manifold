@@ -3,6 +3,7 @@
 .env.local
 /test/out
 /test/output.3mf
+/test/output.echo
 /runtime/runtime.js
 /runtime/*/
 /test/source-location-single.test.ts

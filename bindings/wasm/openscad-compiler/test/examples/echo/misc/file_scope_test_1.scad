@@ -1,4 +1,4 @@
-use <lib.scad>
+use <test_lib.scad>
 $foo = 20;
 bar = 20;
 

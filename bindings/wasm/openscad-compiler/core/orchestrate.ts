@@ -91,7 +91,7 @@ export function compileConsumer(entryFile: string, outputFile: string, libraryPa
   if (!rp.startsWith(".") && !rp.startsWith("/")) rp = "./" + rp;
   const runtimeJSPath = rp + "/runtime/runtime.js";
 
-  const ast = { kind: "program" as const, statements: resolved.statements };
+  const ast = { kind: "program" as const, statements: resolved.statements, filename: entryAbs };
   const code = compile(ast, { runtimePath: runtimeJSPath, externalLibraries });
 
   return {

@@ -1,25 +1,46 @@
 import { describe, test, expect } from "vitest";
 import { execFileSync } from "node:child_process";
 import { readFileSync, existsSync, mkdtempSync } from "node:fs";
+import fs from "fs";
 import path from "path";
 import { tmpdir } from "node:os";
 
-const inputFile = process.env.TEST_FILE!;
-
-if (!inputFile) throw new Error("Missing input file");
+const matchFiles = getAllFiles("./examples/echo").filter(f => f.endsWith(".scad"));
 
 const tsForMatch = (scadPath: string) => path.join(path.dirname(scadPath).replace("examples", "out"), `${path.basename(scadPath, ".scad")}.ts`);
 
 describe("echo equality", () => {
-  test(`Test for ${inputFile}`, async () => {
-    const tsPath = tsForMatch(inputFile);
+  test.each(matchFiles)("%s", (scadPath) => {
+    const tsPath = tsForMatch(scadPath);
     if (!existsSync(tsPath)) throw new Error(`No compiled file at ${tsPath}`);
-    const expected = normalize(runOpenscad(inputFile), "openscad");
+    const expected = normalize(runOpenscad(scadPath), "openscad");
     const actual = normalize(runCompiled(tsPath), "ts");
     expect(actual.length).toBe(expected.length);
     expected.forEach((e, i) => expectEchoEqual(actual[i], e, i));
-  })
+  });
 });
+
+function getAllFiles(dir: string): string[] {
+  let results: string[] = [];
+
+  const items = fs.readdirSync(dir, {
+    withFileTypes: true
+  });
+
+  for (const item of items) {
+    const fullPath = path.join(dir, item.name);
+
+    if (item.isDirectory()) {
+      results = results.concat(getAllFiles(fullPath));
+    } else {
+      if (fullPath.endsWith(".scad")) {
+        results.push(fullPath);
+      }
+    }
+  }
+
+  return results;
+}
 
 function runOpenscad(scadPath: string): string[] {
   const out = path.join(mkdtempSync(path.join(tmpdir(), "scad-")), "out.echo");
@@ -41,15 +62,31 @@ function runCompiled(tsPath: string): string[] {
 }
 
 function normalize(lines: string[], source: "openscad" | "ts"): Tok[][] {
-  return lines
-    .map((l) => l.replace(/\r$/, ""))
-    .map((l) =>
-      source === "openscad"
-        ? (l.startsWith("ECHO: ") ? l.slice(6) : null)
-        : (l.trim() === "" ? null : l.trim())
-    )
-    .filter((l): l is string => l !== null)
-    .map((l) => expandRanges(lexLine(l)));
+  const records = source === "openscad" ? echoRecordsOpenscad(lines) : echoRecordsTs(lines);
+  return records.map((r) => expandRanges(lexLine(r)));
+}
+
+function echoRecordsOpenscad(lines: string[]): string[] {
+  const out: string[] = [];
+  let cur: string | null = null;
+  for (const raw of lines) {
+    const l = raw.replace(/\r$/, "");
+    if (l.startsWith("ECHO: ")) {
+      if (cur) out.push(cur);
+      cur = l.slice(6);
+    } else if (/^(WARNING|ERROR|TRACE|DEPRECATED|UI-WARNING|UI-ERROR):/.test(l)) {
+      if (cur) out.push(cur);
+      cur = null;
+    } else if (cur !== null) {
+      cur += "\n" + l;
+    }
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+function echoRecordsTs(lines: string[]): string[] {
+  return lines.map((l) => l.replace(/\r$/, "")).filter((l) => l !== "");
 }
 
 // numeric token as number and anything else as string
@@ -67,9 +104,12 @@ const LITERAL_MAP: Record<string, string> = {
   "-Infinity": "-inf",
 };
 
-// Split a printed echo line into a flat token stream dropping quotes
 function lexLine(line: string): Tok[] {
-  const s = line.replace(/["']/g, "");
+  const s = line
+    .replace(/\\[trn]/g, " ")
+    .replace(/[\t\r\n]/g, " ")
+    .replace(/\\/g, "")
+    .replace(/["']/g, "");
   const seps = " \t,[]:=";
   const toks: Tok[] = [];
   let i = 0;

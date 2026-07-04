@@ -3,7 +3,7 @@ import path from "path";
 import os from "os";
 import { Lexer } from "./lexer.js";
 import { Parser } from "./parser.js";
-import type { Program, Statement } from "./ast.js";
+import type { Program, Statement, Expr, ListCompGenerator } from "./ast.js";
 
 let dotEnvLoaded = false;
 export function loadDotEnv(): void {
@@ -64,6 +64,203 @@ export function getOpenSCADLibraryPaths(): string[] {
   return paths.filter(p => fs.existsSync(p));
 }
 
+let usedFileScopeCounter = 0;
+
+function privatizeUsedScope(scopeStmts: Statement[]): void {
+  const varNames = new Set<string>();
+  for (const s of scopeStmts) {
+    if (s.kind === "variableDecl") varNames.add(s.name);
+  }
+  if (varNames.size === 0) return;
+  const suffix = `$u${usedFileScopeCounter++}`;
+  for (const s of scopeStmts) renameStmt(s, varNames, suffix, new Set());
+}
+
+function renamed(name: string, vars: Set<string>, suffix: string, bound: Set<string>): string {
+  return vars.has(name) && !bound.has(name) ? name + suffix : name;
+}
+
+function scopeWith(bound: Set<string>, stmts: Statement[]): Set<string> {
+  const inner = new Set(bound);
+  for (const s of stmts) {
+    if (s.kind === "variableDecl" || s.kind === "moduleDecl" || s.kind === "functionDecl") {
+      inner.add(s.name);
+    }
+  }
+  return inner;
+}
+
+function renameStmt(stmt: Statement, vars: Set<string>, suffix: string, bound: Set<string>): void {
+  switch (stmt.kind) {
+    case "variableDecl":
+      stmt.name = renamed(stmt.name, vars, suffix, bound);
+      renameExpr(stmt.value, vars, suffix, bound);
+      break;
+    case "functionDecl": {
+      const inner = new Set(bound);
+      for (const p of stmt.params) {
+        if (p.defaultValue) renameExpr(p.defaultValue, vars, suffix, bound);
+        inner.add(p.name);
+      }
+      renameExpr(stmt.body, vars, suffix, inner);
+      break;
+    }
+    case "moduleDecl": {
+      const inner = new Set(bound);
+      for (const p of stmt.params) {
+        if (p.defaultValue) renameExpr(p.defaultValue, vars, suffix, bound);
+        inner.add(p.name);
+      }
+      renameStmt(stmt.body, vars, suffix, inner);
+      break;
+    }
+    case "moduleCall":
+      for (const a of stmt.args) renameExpr(a.value, vars, suffix, bound);
+      if (stmt.child) renameStmt(stmt.child, vars, suffix, bound);
+      break;
+    case "block": {
+      const inner = scopeWith(bound, stmt.statements);
+      for (const s of stmt.statements) renameStmt(s, vars, suffix, inner);
+      break;
+    }
+    case "for": {
+      const inner = new Set(bound);
+      for (const v of stmt.variables) {
+        renameExpr(v.range, vars, suffix, bound);
+        inner.add(v.name);
+      }
+      renameStmt(stmt.body, vars, suffix, inner);
+      break;
+    }
+    case "if":
+      renameExpr(stmt.condition, vars, suffix, bound);
+      renameStmt(stmt.thenBody, vars, suffix, bound);
+      if (stmt.elseBody) renameStmt(stmt.elseBody, vars, suffix, bound);
+      break;
+  }
+}
+
+function renameExpr(expr: Expr | undefined, vars: Set<string>, suffix: string, bound: Set<string>): void {
+  if (!expr) return;
+  switch (expr.kind) {
+    case "identifier":
+      expr.name = renamed(expr.name, vars, suffix, bound);
+      break;
+    case "number":
+    case "string":
+    case "boolean":
+    case "undef":
+      break;
+    case "vector":
+      for (const e of expr.elements) renameExpr(e, vars, suffix, bound);
+      break;
+    case "range":
+      renameExpr(expr.start, vars, suffix, bound);
+      renameExpr(expr.end, vars, suffix, bound);
+      renameExpr(expr.step, vars, suffix, bound);
+      break;
+    case "binary":
+      renameExpr(expr.left, vars, suffix, bound);
+      renameExpr(expr.right, vars, suffix, bound);
+      break;
+    case "unary":
+      renameExpr(expr.operand, vars, suffix, bound);
+      break;
+    case "group":
+    case "each":
+      renameExpr(expr.expr, vars, suffix, bound);
+      break;
+    case "ternary":
+      renameExpr(expr.condition, vars, suffix, bound);
+      renameExpr(expr.ifTrue, vars, suffix, bound);
+      renameExpr(expr.ifFalse, vars, suffix, bound);
+      break;
+    case "call":
+      // expr.name is a function name (exported by `use`), never a variable.
+      for (const a of expr.args) renameExpr(a.value, vars, suffix, bound);
+      break;
+    case "index":
+      renameExpr(expr.object, vars, suffix, bound);
+      renameExpr(expr.index, vars, suffix, bound);
+      break;
+    case "member":
+      renameExpr(expr.object, vars, suffix, bound);
+      break;
+    case "echo":
+    case "assert":
+      for (const a of expr.args) renameExpr(a.value, vars, suffix, bound);
+      renameExpr(expr.expr, vars, suffix, bound);
+      break;
+    case "let": {
+      const inner = new Set(bound);
+      for (const a of expr.assignments) {
+        renameExpr(a.value, vars, suffix, inner);
+        inner.add(a.name);
+      }
+      renameExpr(expr.body, vars, suffix, inner);
+      break;
+    }
+    case "lambda": {
+      const inner = new Set(bound);
+      for (const p of expr.params) {
+        if (p.defaultValue) renameExpr(p.defaultValue, vars, suffix, bound);
+        inner.add(p.name);
+      }
+      renameExpr(expr.body, vars, suffix, inner);
+      break;
+    }
+    case "dynCall":
+      renameExpr(expr.callee, vars, suffix, bound);
+      for (const a of expr.args) renameExpr(a.value, vars, suffix, bound);
+      break;
+    case "listComp":
+      renameGenerator(expr.generator, vars, suffix, bound);
+      break;
+  }
+}
+
+function renameGenerator(gen: ListCompGenerator, vars: Set<string>, suffix: string, bound: Set<string>): void {
+  switch (gen.kind) {
+    case "lcFor": {
+      const inner = new Set(bound);
+      for (const v of gen.variables) {
+        renameExpr(v.range, vars, suffix, bound);
+        inner.add(v.name);
+      }
+      renameGenerator(gen.body, vars, suffix, inner);
+      break;
+    }
+    case "lcCFor": {
+      const inner = new Set(bound);
+      for (const a of gen.inits) {
+        renameExpr(a.value, vars, suffix, inner);
+        inner.add(a.name);
+      }
+      renameExpr(gen.condition, vars, suffix, inner);
+      for (const a of gen.updates) renameExpr(a.value, vars, suffix, inner);
+      renameGenerator(gen.body, vars, suffix, inner);
+      break;
+    }
+    case "lcIf":
+      renameExpr(gen.condition, vars, suffix, bound);
+      renameGenerator(gen.ifTrue, vars, suffix, bound);
+      if (gen.ifFalse) renameGenerator(gen.ifFalse, vars, suffix, bound);
+      break;
+    case "lcLet": {
+      const inner = new Set(bound);
+      for (const a of gen.assignments) {
+        renameExpr(a.value, vars, suffix, inner);
+        inner.add(a.name);
+      }
+      renameGenerator(gen.body, vars, suffix, inner);
+      break;
+    }
+    case "lcExpr":
+      renameExpr(gen.expr, vars, suffix, bound);
+      break;
+  }
+}
+
 export function resolveProgram(
   entryFile: string,
   libraryPaths: string[] = [],
@@ -119,6 +316,10 @@ function resolveFile(
   }
 
   const result: Statement[] = [];
+  // Statements forming THIS file's own scope (its own declarations plus the
+  // contents of files it `include`s). Used only in `use` mode to privatize the
+  // file's top-level variables; a nested `use` is its own already-isolated scope.
+  const ownScope: Statement[] = [];
   const fileDir = path.dirname(absPath);
 
   for (const stmt of program.statements) {
@@ -127,6 +328,7 @@ function resolveFile(
       if (resolvedPath) {
         const imported = resolveFile(resolvedPath, stmt.kind, visited, resolvedFiles, libraryPaths, entryAbsPath);
         result.push(...imported);
+        if (mode === "use" && stmt.kind === "include") ownScope.push(...imported);
       } else {
         console.warn(`Warning: could not resolve ${stmt.kind} <${stmt.path}> from ${filePath}`);
       }
@@ -134,15 +336,19 @@ function resolveFile(
     }
 
     if (mode === "use") {
-      // use only imports module and function declarations
-      if (stmt.kind === "moduleDecl" || stmt.kind === "functionDecl") {
+      // `use` imports module and function declarations. Top-level variables are kept (so those functions/modules can close over them) but privatized below so they don't leak into the consumer's scope.
+      if (stmt.kind === "moduleDecl" || stmt.kind === "functionDecl" || stmt.kind === "variableDecl") {
+        if (stmt.kind === "variableDecl" && stmt.name.startsWith("$")) continue;
         result.push(stmt);
+        ownScope.push(stmt);
       }
     } else {
       // include imports everything
       result.push(stmt);
     }
   }
+
+  if (mode === "use") privatizeUsedScope(ownScope);
 
   return result;
 }
@@ -244,6 +450,7 @@ function resolveConsumerFile(filePath: string, mode: "include" | "use", visited:
   }
 
   const result: Statement[] = [];
+  const ownScope: Statement[] = [];
   const fileDir = path.dirname(absPath);
 
   for (const stmt of program.statements) {
@@ -258,17 +465,25 @@ function resolveConsumerFile(filePath: string, mode: "include" | "use", visited:
         recordExternalLibrary(externalLibraries, cls, stmt.kind);
       } else {
         // Local file: inline
-        result.push(...resolveConsumerFile(cls.resolved, stmt.kind, visited, resolvedFiles, libraryPaths, entryAbsPath, externalLibraries));
+        const sub = resolveConsumerFile(cls.resolved, stmt.kind, visited, resolvedFiles, libraryPaths, entryAbsPath, externalLibraries);
+        result.push(...sub);
+        if (mode === "use" && stmt.kind === "include") ownScope.push(...sub);
       }
       continue;
     }
 
     if (mode === "use") {
-      if (stmt.kind === "moduleDecl" || stmt.kind === "functionDecl") result.push(stmt);
+      if (stmt.kind === "moduleDecl" || stmt.kind === "functionDecl" || stmt.kind === "variableDecl") {
+        if (stmt.kind === "variableDecl" && stmt.name.startsWith("$")) continue;
+        result.push(stmt);
+        ownScope.push(stmt);
+      }
     } else {
       result.push(stmt);
     }
   }
+
+  if (mode === "use") privatizeUsedScope(ownScope);
 
   return result;
 }

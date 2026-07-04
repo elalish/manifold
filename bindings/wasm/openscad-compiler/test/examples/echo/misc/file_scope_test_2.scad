@@ -1,6 +1,6 @@
-include <lib.scad>
+include <test_lib.scad>
 $foo = 20;
-bar = 20
+bar = 20;
 
 test(); // 20 
 test2(); // 20 

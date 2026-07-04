@@ -341,18 +341,16 @@ export class Lexer {
           case "\\": result += "\\"; break;
           case '"': result += '"'; break;
           case "x": {
-            let hex = "";
-            for (let i = 0; i < 2; i++) {
+            if (/[0-7]/.test(this.peek())) {
+              const hi = this.advance();
               if (/[0-9a-fA-F]/.test(this.peek())) {
-                hex += this.advance();
+                const code = parseInt(hi + this.advance(), 16);
+                if (code !== 0) result += String.fromCharCode(code);
               } else {
-                break;
+                result += "x" + hi;
               }
-            }
-            if (hex.length === 2) {
-              result += String.fromCharCode(parseInt(hex, 16));
             } else {
-              result += "x" + hex;
+              result += "x";
             }
             break;
           }
@@ -366,7 +364,8 @@ export class Lexer {
               }
             }
             if (hex.length === 4) {
-              result += String.fromCharCode(parseInt(hex, 16));
+              const code = parseInt(hex, 16);
+              if (code !== 0) result += String.fromCharCode(code); // OpenSCAD drops NUL
             } else {
               result += "u" + hex;
             }
@@ -382,7 +381,8 @@ export class Lexer {
               }
             }
             if (hex.length === 6) {
-              result += String.fromCodePoint(parseInt(hex, 16));
+              const code = parseInt(hex, 16);
+              if (code !== 0) result += String.fromCodePoint(code); // OpenSCAD drops NUL
             } else {
               result += "U" + hex;
             }

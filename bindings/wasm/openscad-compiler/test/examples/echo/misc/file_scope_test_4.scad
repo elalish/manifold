@@ -1,4 +1,4 @@
-include <lib.scad>
+include <test_lib.scad>
 
 test(); // 10
 test2(); // 10

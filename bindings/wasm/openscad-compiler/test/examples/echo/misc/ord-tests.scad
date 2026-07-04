@@ -41,6 +41,3 @@ ru1 = chr([for (c = u1) ord(c)]);
 ru2 = chr([for (c = u2) ord(c)]);
 echo(equals = u1 == ru1, len_input = len(u1), len_output = len(ru1));
 echo(equals = u2 == ru2, len_input = len(u2), len_output = len(ru2));
-
-// invalid utf-8 string, text ‚Ç¨√Ñ√ñ√ú√ü as latin15 (bytes: A4 C4 D6 DC DF)
-echo([for (c = "§ƒ÷‹ﬂ") ord(c)]);

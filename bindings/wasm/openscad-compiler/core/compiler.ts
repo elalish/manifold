@@ -201,6 +201,12 @@ let encounteredSurfaceData = new Map<string, { stem: string; exportName: string;
 
 let currentRuntimePath: string = "./runtime/runtime.js";
 
+// Name of the file currently being compiled
+let currentMainFilename: string = "";
+
+// Aborts a C-style for loop once its counter exceeds this many iterations, guarding against infinite loops
+const MAX_FOR_ITERATIONS = 1000000;
+
 function fontSpecToFilename(fontSpec: string): string {
   const cleaned = fontSpec.replace(/"/g, "").trim();
   const parts = cleaned.split(":");
@@ -572,42 +578,51 @@ function compileArgList(name: string, args: Argument[]): string {
 }
 
 const BUILTIN_FUNCTIONS = new Set([
-  "is_undef", "is_bool", "is_num", "is_string", "is_list", "is_function", "is_object",
+  "is_undef", "is_bool", "is_num", "is_string", "is_list", "is_function",
   "sin", "cos", "tan", "asin", "acos", "atan", "atan2",
   "abs", "sign", "floor", "ceil", "round", "sqrt", "exp", "ln", "log", "pow",
   "min", "max", "norm", "cross",
   "len", "str", "chr", "ord", "concat", "search", "lookup",
+  "rands",
   "version", "version_num",
-  "parent_module", 
+  "parent_module",
+]);
+
+// Experimental or Enable only builtins
+const EXPERIMENTAL_BUILTIN_FUNCTIONS = new Set([
+  "is_object",
 ]);
 
 
 const RUNTIME_SYMBOLS: string[] = [
-  "__sphere", "__cylinder", "__circle", "__radius", "__polygon", "__polyhedron",
+  "__cube", "__square", "__sphere", "__cylinder", "__circle", "__radius", "__polygon", "__polyhedron",
   "Manifold", "CrossSection", "wasm",
-  "is_undef_fn", "is_object_fn", "is_bool_fn", "is_num_fn", "is_string_fn", "is_list_fn", "is_function_fn",
+  "is_undef_fn", "is_bool_fn", "is_num_fn", "is_string_fn", "is_list_fn", "is_function_fn",
+  "__unknown_fn",
   "sin_fn", "cos_fn", "tan_fn", "asin_fn", "acos_fn", "atan_fn", "atan2_fn",
   "abs_fn", "sign_fn", "floor_fn", "ceil_fn", "round_fn", "sqrt_fn", "exp_fn", "ln_fn", "log_fn", "pow_fn",
   "min_fn", "max_fn", "norm_fn", "cross_fn",
-  "len_fn", "str_fn", "chr_fn", "ord_fn", "concat_fn", "search_fn", "lookup_fn",
+  "len_fn", "str_fn", "chr_fn", "ord_fn", "concat_fn", "search_fn", "lookup_fn", "rands_fn",
   "parent_module_fn", "openscad_assert_fn",
   "__truthy", "__eq", "__lt", "__gt", "__le", "__ge",
   "__add", "__sub", "__mul", "__div", "__mod", "__band", "__bor", "__shl", "__shr", "__bnot", "__neg", "__pos", "__index",
   "version_fn", "version_num_fn",
   "__ctx", "__withSpecials",
-  "__children_stack", "__with_children",
+  "__children_stack", "__with_children", "__pick_children",
   "__is_finite_matrix4", "__to_manifold_mat4", "__safe_transform", "__identity4",
   "__safe_offset2d", "__safe_project3d", "__apply_color",
-  "__flat_map_iter", "__range", "__rangeCount",
+  "__each", "__flat_map_iter", "__range", "__rangeCount",
   "__union2d3d", "__difference2d3d", "__intersection2d3d", "__hull2d3d", "__minkowski2d3d",
   "__extrude", "__revolve", "__rotate", "__translate", "__scale", "__mirror",
   "__text", "__parse_color_for_scope", "__surface",
+  "__echo", "__oecho", "__fnlit", "__tc", "__call",
 ];
 
-// Emit target for a (possibly special) variable name. Special $-prefixed vars
-// are stored in the shared runtime context object (`__ctx`); every other name is
-// a plain lexical binding. Used wherever the emitter reads/writes a variable
-// that might be a special variable (dynamic-scope save/assign/restore sites).
+/* Emit target for a (possibly special) variable name. Special $-prefixed vars
+ are stored in the shared runtime context object (`__ctx`); every other name is
+ a plain lexical binding. Used wherever the emitter reads/writes a variable
+ that might be a special variable (dynamic-scope save/assign/restore sites).
+*/
 function svTarget(name: string): string {
   return name.startsWith("$") ? `__ctx.${name}` : name;
 }
@@ -619,18 +634,20 @@ function buildRuntimeImport(runtimePath: string): string {
   );
 }
 
-// Names of modules/functions/variables that are defined in a separately
-// compiled external library and imported (not inlined). Populated from the
-// libraries' manifests at the start of compile(); consulted so calls to them
-// are recognized rather than reported as unknown modules.
+/* Names of modules/functions/variables that are defined in a separately
+  compiled external library and imported (not inlined). Populated from the
+  libraries' manifests at the start of compile(); consulted so calls to them
+  are recognized rather than reported as unknown modules. 
+*/
 let externalModuleNames: Set<string> = new Set();
 let externalFunctionNames: Set<string> = new Set();
 let externalVariableNames: Set<string> = new Set();
 
-// Keyword for top-level (file-scope) variable declarations. `let` for normal
-// single-file output; `var` for library files, where cross-file circular ES
-// imports would otherwise hit the temporal dead zone on `let` exports. `var`
-// hoists to `undefined`, matching OpenSCAD's declarative `undef`-by-default.
+/* Keyword for top-level (file-scope) variable declarations. `let` for normal
+  single-file output; `var` for library files, where cross-file circular ES
+  imports would otherwise hit the temporal dead zone on `let` exports. `var`
+  hoists to `undefined`, matching OpenSCAD's declarative `undef`-by-default.
+*/
 let globalVarDeclKeyword = "let";
 
 // Track $ variables that need module-level declarations for dynamic scoping
@@ -1033,6 +1050,7 @@ function collectFontRelatedLiterals(program: Program): Set<string> {
 // Main entry
 export function compile(program: Program, options?: CompileOptions): string {
   currentRuntimePath = options?.runtimePath ?? "./runtime/runtime.js";
+  currentMainFilename = program.filename ?? "";
   dynamicScopeVars = new Set();
   encounteredFonts = new Set();
   encounteredSurfaceData.clear();
@@ -1056,6 +1074,11 @@ export function compile(program: Program, options?: CompileOptions): string {
   }
   collectSignatures(program.statements);
   moduleDeclRegistry = collectModuleDeclarations(program.statements);
+
+  // Reject top-level constant-argument calls to non-tail recursive functions that provably never terminate 
+  userFunctionDefs = new Map();
+  collectFunctionDefs(program.statements, userFunctionDefs);
+  detectDivergentCalls(program.statements);
 
   globalVarNames = new Set();
   activeShadowRenames = new Map();
@@ -1135,7 +1158,7 @@ export function compile(program: Program, options?: CompileOptions): string {
       else key = `fn:${escapeName(stmt.name)}_fn`;
 
       if (!declMap.has(key)) declOrder.push(key);
-      declMap.set(key, { stmt, code: compileDeclaration(stmt) });
+      declMap.set(key, { stmt, code: compileDeclaration(stmt, { assignmentOnly: true }) });
     } else if (stmt.kind === "use" || stmt.kind === "include") {
       const key = `comment:${stmt.path}`;
       if (!declMap.has(key)) declOrder.push(key);
@@ -1162,61 +1185,30 @@ export function compile(program: Program, options?: CompileOptions): string {
   };
   for (const stmt of program.statements) processStmt(stmt);
 
-  // Order declarations to respect dependencies. Variable declarations compile to
-  // `let name = expr` (not hoisted-initialized), so a variable that references
-  // another top-level binding must be emitted after it — even when the reference
-  // appears textually earlier (OpenSCAD scopes are declarative). Modules and
-  // functions compile to hoisted `function` declarations and impose no ordering.
-  // A stable topological sort keeps the original order wherever possible and
-  // falls back to original order for any variables caught in a dependency cycle.
-  const sortedDeclOrder = ((): string[] => {
-    const varKeyByName = new Map<string, string>();
-    for (const k of declOrder) {
-      const e = declMap.get(k)!;
-      if (e.stmt.kind === "variableDecl") varKeyByName.set(e.stmt.name, k);
-    }
-    // deps: key -> set of declaration keys that must be emitted before it.
-    const indeg = new Map<string, number>();
-    const adj = new Map<string, string[]>();
-    for (const k of declOrder) { indeg.set(k, 0); adj.set(k, []); }
-    for (const k of declOrder) {
-      const e = declMap.get(k)!;
-      if (e.stmt.kind !== "variableDecl") continue;
-      const ids = new Set<string>();
-      collectIdentifiers((e.stmt as any).value, ids);
-      for (const id of ids) {
-        const dk = varKeyByName.get(id);
-        if (dk && dk !== k) {
-          adj.get(dk)!.push(k);
-          indeg.set(k, indeg.get(k)! + 1);
-        }
-      }
-    }
-    const origIndex = new Map(declOrder.map((k, i) => [k, i] as const));
-    const ready = declOrder.filter(k => indeg.get(k) === 0);
-    const result: string[] = [];
-    const emitted = new Set<string>();
-    while (ready.length) {
-      // Pick the lowest original index among ready nodes to stay stable.
-      ready.sort((a, b) => origIndex.get(a)! - origIndex.get(b)!);
-      const k = ready.shift()!;
-      result.push(k);
-      emitted.add(k);
-      for (const m of adj.get(k)!) {
-        indeg.set(m, indeg.get(m)! - 1);
-        if (indeg.get(m) === 0) ready.push(m);
-      }
-    }
-    // Cycle fallback: append any unresolved declarations in original order.
-    if (result.length < declOrder.length) {
-      for (const k of declOrder) if (!emitted.has(k)) result.push(k);
-    }
-    return result;
-  })();
+  /* 
+    Variables get hoisted to undef first, then assigned in the order they first appear in the source.
+    Not in dependency order, so a forward reference reads undef just like OpenSCAD, without tripping JS's temporal-dead-zone. 
+    Functions and modules skip this entirely since they're plain hoisted declarations.
+  */
+  const hoistNames: string[] = [];
+  const seenHoist = new Set<string>();
+  for (const k of declOrder) {
+    const e = declMap.get(k)!;
+    if (e.stmt.kind !== "variableDecl") continue;
+    const nm = e.stmt.name;
+    if (nm.startsWith("$") || PRE_DECLARED_VARS.has(nm)) continue;
+    const en = escapeName(nm);
+    if (seenHoist.has(en)) continue;
+    seenHoist.add(en);
+    hoistNames.push(en);
+  }
 
   const declarations: string[] = [];
+  if (hoistNames.length) {
+    declarations.push(hoistNames.map(n => `${globalVarDeclKeyword} ${n}: any = undef;`).join("\n"));
+  }
   let lastFilename = "";
-  for (const k of sortedDeclOrder) {
+  for (const k of declOrder) {
     const entry = declMap.get(k)!;
     const filename = entry.stmt.filename;
     if (filename && filename !== lastFilename) {
@@ -1353,6 +1345,8 @@ export function compile(program: Program, options?: CompileOptions): string {
 
   // Provide a global container for user variables and helpers
   output += `let __NO_ARG: any = Symbol("NO_ARG");\n`;
+  // children() used outside a module's scope - warns and yields nothing. The children stack is empty at top level, so this resolves to empty geometry.
+  output += `function children(i?: any): any { const __c: any = __children_stack.length > 0 ? __children_stack[__children_stack.length - 1] : { fn: undefined, count: 0 }; return __c.fn ? __c.fn(i) : Manifold.union([]); }\n`;
 
   if (geometryLines.length === 0) {
     output += `export const result = Manifold.union([]);\n`;
@@ -1507,6 +1501,7 @@ function emitLibraryFile(
   encounteredFonts = new Set();
   encounteredSurfaceData.clear();
   currentRuntimePath = ctx.runtimePath;
+  currentMainFilename = program.filename ?? "";
 
   // Top-level declarations, deduped last-wins (matching compile())
   const declMap = new Map<string, { stmt: Statement; code: string }>();
@@ -1637,7 +1632,7 @@ const PRE_DECLARED_VARS = new Set([
   "PI", "INF", "NAN", "undef", "_EPSILON"
 ]);
 
-function compileDeclaration(stmt: Statement): string {
+function compileDeclaration(stmt: Statement, opts?: { assignmentOnly?: boolean }): string {
   const withLeading = (code: string) => {
     const leading = leadingCommentLines(stmt);
     const suffix = trailingCommentText(stmt);
@@ -1651,6 +1646,10 @@ function compileDeclaration(stmt: Statement): string {
         return withLeading(`${svTarget(stmt.name)} = ${compileExpr(stmt.value)};`);
       }
       if (PRE_DECLARED_VARS.has(stmt.name)) {
+        return withLeading(`${name} = ${compileExpr(stmt.value)};`);
+      }
+      // When the variable is hoisted to `undef` up front, emit a bare assignment so it lands at its first-occurrence position without a redeclaration
+      if (opts?.assignmentOnly) {
         return withLeading(`${name} = ${compileExpr(stmt.value)};`);
       }
       return withLeading(`${globalVarDeclKeyword} ${name}: any = ${compileExpr(stmt.value)};`);
@@ -1676,6 +1675,11 @@ function compileDeclaration(stmt: Statement): string {
           ? `${pname}: any = ${compileExpr(p.defaultValue)}`
           : `${pname}: any`;
       }).join(", ");
+      if (!dedup.some(p => p.name === stmt.name) && moduleAlwaysRecurses(stmt.body, stmt.name)) {
+        const base = currentMainFilename ? path.basename(currentMainFilename) : "<unknown>";
+        const line = stmt.loc?.start.line ?? 0;
+        throw new Error(`Recursion detected calling module '${stmt.name}' in file ${base}, line ${line}`);
+      }
       const localParams = dedup.map(p => escapeName(p.name));
       const dollarParams = dedup.filter(p => isDyn(p.name)).map(p => escapeName(p.name));
       const body = compileModuleBody(stmt.body, stmt.name, localParams, dollarParams, renamedParams);
@@ -1698,8 +1702,18 @@ function compileDeclaration(stmt: Statement): string {
           : `${pname}: any`;
       }).join(", ");
       const localParams = dedup.map(p => escapeName(p.name));
-      const bodyExpr = withLocalScope(localParams, () => compileExpr(stmt.body));
       const rebinds = renamedParams.map(n => `  let ${n}: any = ${n}__arg;\n`).join("");
+      // Tail-recursive functions are lowered into an iterative loop so deep recursion doesn't overflow
+      if (!dedup.some(p => p.name === stmt.name) && hasSelfTailCall(stmt.body, stmt.name)) {
+        if (tailAlwaysRecurses(stmt.body, stmt.name)) {
+          const base = currentMainFilename ? path.basename(currentMainFilename) : "<unknown>";
+          const line = stmt.loc?.start.line ?? 0;
+          throw new Error(`Recursion detected calling function '${stmt.name}' in file ${base}, line ${line}`);
+        }
+        const loopBody = withLocalScope(localParams, () => emitTailBody(stmt.body, stmt.name, dedup, "    "));
+        return withLeading(`function ${escapeName(stmt.name)}_fn(${params}): any {\n${rebinds}  while (true) {\n${loopBody}\n  }\n}`);
+      }
+      const bodyExpr = withLocalScope(localParams, () => compileExpr(stmt.body));
       return withLeading(`function ${escapeName(stmt.name)}_fn(${params}): any {\n${rebinds}  return ${bodyExpr};\n}`);
     }
 
@@ -1725,19 +1739,165 @@ function nodeReferencesIdentifier(node: unknown, name: string): boolean {
   return false;
 }
 
-function collectIdentifiers(node: unknown, out: Set<string>): void {
-  if (!node || typeof node !== "object") return;
+// Compile-time divergence detection for non-tail recursion
+let userFunctionDefs: Map<string, import("./ast.js").FunctionDeclStmt> = new Map();
+
+// Depth at which constant evaluation gives up and declares divergence. Kept below the JS engine's own stack limit so the cap fires before evalConstExpr overflows
+const CONST_EVAL_DEPTH_CAP = 4000;
+const CONST_UNKNOWN = Symbol("const-unknown");
+const CONST_DIVERGE = Symbol("const-diverge");
+
+function collectFunctionDefs(stmts: Statement[], into: Map<string, import("./ast.js").FunctionDeclStmt>): void {
+  for (const s of stmts) {
+    switch (s.kind) {
+      case "functionDecl": into.set(s.name, s); break;
+      case "block": collectFunctionDefs(s.statements, into); break;
+      case "if":
+        if (s.thenBody.kind === "block") collectFunctionDefs(s.thenBody.statements, into);
+        if (s.elseBody?.kind === "block") collectFunctionDefs(s.elseBody.statements, into);
+        break;
+      case "for":
+        if (s.body.kind === "block") collectFunctionDefs(s.body.statements, into);
+        break;
+      case "moduleDecl":
+        if (s.body.kind === "block") collectFunctionDefs(s.body.statements, into);
+        break;
+    }
+  }
+}
+
+// True when `node` contains a call to `name` anywhere (over-approximate; used only to decide whether a function is worth attempting to evaluate)
+function containsCallTo(node: unknown, name: string): boolean {
+  if (!node || typeof node !== "object") return false;
   const n = node as Record<string, unknown>;
-  if (n.kind === "identifier" && typeof n.name === "string") out.add(n.name);
+  if (n.kind === "call" && n.name === name) return true;
   for (const key in n) {
     if (key === "loc" || key === "leadingComments" || key === "trailingComments") continue;
     const v = n[key];
-    if (Array.isArray(v)) {
-      for (const item of v) collectIdentifiers(item, out);
-    } else if (v && typeof v === "object") {
-      collectIdentifiers(v, out);
-    }
+    if (Array.isArray(v)) { for (const item of v) if (containsCallTo(item, name)) return true; }
+    else if (v && typeof v === "object") { if (containsCallTo(v, name)) return true; }
   }
+  return false;
+}
+
+// Evaluate a purely-constant expression. Returns the value, CONST_UNKNOWN when it depends on anything not statically known (vectors, builtins, $vars, etc), or throws CONST_DIVERGE when recursion exceeds the cap
+function evalConstExpr(expr: Expr, env: Map<string, any>, depth: number): any {
+  if (depth > CONST_EVAL_DEPTH_CAP) throw CONST_DIVERGE;
+  switch (expr.kind) {
+    case "number": return expr.value;
+    case "boolean": return expr.value;
+    case "string": return expr.value;
+    case "undef": return undefined;
+    case "identifier": return env.has(expr.name) ? env.get(expr.name) : CONST_UNKNOWN;
+    case "group": return evalConstExpr(expr.expr, env, depth);
+    case "unary": {
+      const v = evalConstExpr(expr.operand, env, depth);
+      if (v === CONST_UNKNOWN) return CONST_UNKNOWN;
+      if (expr.op === "-") return typeof v === "number" ? -v : CONST_UNKNOWN;
+      if (expr.op === "+") return typeof v === "number" ? +v : CONST_UNKNOWN;
+      if (expr.op === "!") return typeof v === "boolean" ? !v : CONST_UNKNOWN;
+      return CONST_UNKNOWN;
+    }
+    case "binary": {
+      const l = evalConstExpr(expr.left, env, depth); if (l === CONST_UNKNOWN) return CONST_UNKNOWN;
+      const r = evalConstExpr(expr.right, env, depth); if (r === CONST_UNKNOWN) return CONST_UNKNOWN;
+      const nums = typeof l === "number" && typeof r === "number";
+      switch (expr.op) {
+        case "+": return nums ? l + r : CONST_UNKNOWN;
+        case "-": return nums ? l - r : CONST_UNKNOWN;
+        case "*": return nums ? l * r : CONST_UNKNOWN;
+        case "/": return nums ? l / r : CONST_UNKNOWN;
+        case "%": return nums ? l % r : CONST_UNKNOWN;
+        case "<": return nums ? l < r : CONST_UNKNOWN;
+        case ">": return nums ? l > r : CONST_UNKNOWN;
+        case "<=": return nums ? l <= r : CONST_UNKNOWN;
+        case ">=": return nums ? l >= r : CONST_UNKNOWN;
+        case "==": return l === r;
+        case "!=": return l !== r;
+        case "&&": return (typeof l === "boolean" && typeof r === "boolean") ? (l && r) : CONST_UNKNOWN;
+        case "||": return (typeof l === "boolean" && typeof r === "boolean") ? (l || r) : CONST_UNKNOWN;
+        default: return CONST_UNKNOWN;
+      }
+    }
+    case "ternary": {
+      const c = evalConstExpr(expr.condition, env, depth);
+      if (typeof c !== "boolean") return CONST_UNKNOWN;
+      return evalConstExpr(c ? expr.ifTrue : expr.ifFalse, env, depth);
+    }
+    case "let": {
+      const newEnv = new Map(env);
+      for (const a of expr.assignments) {
+        if (a.name.startsWith("$")) return CONST_UNKNOWN;
+        const v = evalConstExpr(a.value, newEnv, depth);
+        if (v === CONST_UNKNOWN) return CONST_UNKNOWN;
+        newEnv.set(a.name, v);
+      }
+      return evalConstExpr(expr.body, newEnv, depth);
+    }
+    case "call": {
+      const fn = userFunctionDefs.get(expr.name);
+      if (!fn) return CONST_UNKNOWN; // builtin / unknown — not statically evaluable
+      const dedup = deduplicateParams(fn.params);
+      const provided = resolveArgsToParams(expr.args, dedup);
+      const callEnv = new Map<string, any>();
+      for (let i = 0; i < dedup.length; i++) {
+        let v: any;
+        if (provided[i] !== undefined) v = evalConstExpr(provided[i]!, env, depth);
+        else if (dedup[i]!.defaultValue) v = evalConstExpr(dedup[i]!.defaultValue!, callEnv, depth);
+        else v = undefined;
+        if (v === CONST_UNKNOWN) return CONST_UNKNOWN;
+        callEnv.set(dedup[i]!.name, v);
+      }
+      return evalConstExpr(fn.body, callEnv, depth + 1);
+    }
+    default: return CONST_UNKNOWN; // vector, range, index, member, lambda, each, echo, assert, list-comp
+  }
+}
+
+// Walk top-level expressions for constant-argument calls to non-tail recursive functions and throw a compile error if any provably diverges. Does not descend into function/module bodies (those run only when called).
+function detectDivergentCalls(stmts: Statement[]): void {
+  const visitExpr = (expr: Expr | undefined): void => {
+    if (!expr || typeof expr !== "object") return;
+    if (expr.kind === "call") {
+      const fn = userFunctionDefs.get(expr.name);
+      // Only non-tail self-recursive functions can run away on the stack; tail ones are compiled to loops and are intentionally not evaluated here
+      if (fn && containsCallTo(fn.body, fn.name) && !hasSelfTailCall(fn.body, fn.name)) {
+        try {
+          evalConstExpr(expr, new Map(), 0);
+        } catch (e) {
+          if (e === CONST_DIVERGE || e instanceof RangeError) {
+            const base = currentMainFilename ? path.basename(currentMainFilename) : "<unknown>";
+            const line = fn.loc?.start.line ?? expr.loc?.start.line ?? 0;
+            throw new Error(`Recursion detected calling function '${fn.name}' in file ${base}, line ${line}`);
+          }
+          throw e;
+        }
+      }
+    }
+    for (const key in expr) {
+      if (key === "loc" || key === "leadingComments" || key === "trailingComments") continue;
+      const v = (expr as Record<string, unknown>)[key];
+      if (Array.isArray(v)) { for (const item of v) visitExpr(item as Expr); }
+      else if (v && typeof v === "object") visitExpr(v as Expr);
+    }
+  };
+  const visitStmt = (s: Statement): void => {
+    switch (s.kind) {
+      case "variableDecl": visitExpr(s.value); break;
+      case "moduleCall":
+        s.args.forEach(a => visitExpr(a.value));
+        if (s.child) visitStmt(s.child);
+        break;
+      case "block": s.statements.forEach(visitStmt); break;
+      case "if":
+        visitExpr(s.condition); visitStmt(s.thenBody);
+        if (s.elseBody) visitStmt(s.elseBody);
+        break;
+      case "for": s.variables.forEach(v => visitExpr(v.range)); visitStmt(s.body); break;
+      // functionDecl / moduleDecl bodies are not evaluated until called, so skip
+    }
+  };
+  stmts.forEach(visitStmt);
 }
 
 // Deduplicate parameters: keep last occurrence of each name (OpenSCAD allows duplicates)
@@ -1747,6 +1907,166 @@ function deduplicateParams(params: import("./ast.js").Parameter[]): import("./as
     seen.set(params[i]!.name, i);
   }
   return params.filter((p, i) => seen.get(p.name) === i);
+}
+
+// Tail-recursion elimination
+let tailTempCounter = 0;
+
+// True when `expr` can reach a tail call to `funcName` along the positions the loop lowering actually handles (so detection stays in sync with emitTailBody)
+function hasSelfTailCall(expr: Expr, funcName: string): boolean {
+  switch (expr.kind) {
+    case "group": return hasSelfTailCall(expr.expr, funcName);
+    case "ternary":
+      return hasSelfTailCall(expr.ifTrue, funcName) || hasSelfTailCall(expr.ifFalse, funcName);
+    case "assert":
+    case "echo": return hasSelfTailCall(expr.expr, funcName);
+    case "let":
+      if (expr.assignments.some(a => a.name.startsWith("$"))) return false;
+      if (expr.assignments.some(a => a.name === funcName)) return false;
+      return hasSelfTailCall(expr.body, funcName);
+    case "call": return expr.name === funcName;
+    default: return false;
+  }
+}
+
+/* True when EVERY tail-position leaf of `expr` is a call back to `funcName`, i.e.
+  the function has no terminating branch and recurses unconditionally. This is
+  statically-detectable non-termination (e.g. `function f() = f();`), which we
+  reject at compile time rather than emitting a loop that would spin forever.
+*/
+function tailAlwaysRecurses(expr: Expr, funcName: string): boolean {
+  switch (expr.kind) {
+    case "group": return tailAlwaysRecurses(expr.expr, funcName);
+    case "ternary":
+      return tailAlwaysRecurses(expr.ifTrue, funcName) && tailAlwaysRecurses(expr.ifFalse, funcName);
+    case "assert":
+    case "echo": return tailAlwaysRecurses(expr.expr, funcName);
+    case "let":
+      if (expr.assignments.some(a => a.name.startsWith("$"))) return false;
+      if (expr.assignments.some(a => a.name === funcName)) return false;
+      return tailAlwaysRecurses(expr.body, funcName);
+    case "call": return expr.name === funcName;
+    default: return false;
+  }
+}
+
+/* True when instantiating `stmt` unconditionally calls module `moduleName`, i.e.
+  the module recurses on every path with no base case (e.g. `module m() m();`).
+  Conservative: only direct self-calls count, and any conditional/loop makes a
+  branch escapable, so legitimate recursive modules (which always have a base
+  case behind an `if`) are never flagged. OpenSCAD aborts such a module at
+  runtime with a recursion error; we detect the static case at compile time.
+*/
+function moduleAlwaysRecurses(stmt: Statement, moduleName: string): boolean {
+  switch (stmt.kind) {
+    case "moduleCall": return stmt.name === moduleName;
+    case "block": return stmt.statements.some(s => moduleAlwaysRecurses(s, moduleName));
+    case "if":
+      return !!stmt.elseBody
+        && moduleAlwaysRecurses(stmt.thenBody, moduleName)
+        && moduleAlwaysRecurses(stmt.elseBody, moduleName);
+    default: return false;
+  }
+}
+
+type Param = import("./ast.js").Parameter;
+
+// Map a call's arguments onto the parameter list, returning the supplied value expression for each parameter index (or undefined when omitted). Mirrors the positional/named resolution in compileArgList.
+function resolveArgsToParams(args: Argument[], params: Param[]): (Expr | undefined)[] {
+  const result: (Expr | undefined)[] = new Array(params.length).fill(undefined);
+  const claimed: boolean[] = new Array(params.length).fill(false);
+  let pos = 0;
+  for (const a of args) {
+    if (a.name) {
+      if (a.name.startsWith("$")) continue;
+      const idx = params.findIndex(p => p.name === a.name);
+      if (idx >= 0) { result[idx] = a.value; claimed[idx] = true; }
+    } else {
+      while (pos < params.length && claimed[pos]) pos++;
+      if (pos < params.length) { result[pos] = a.value; claimed[pos] = true; pos++; }
+    }
+  }
+  return result;
+}
+
+/* Emit the loop continuation for a self tail call: stage the supplied arguments
+ into temporaries (so they read the old parameter values), then re-bind every
+ parameter - omitted ones reset to their defaults, matching a fresh call.
+*/
+function emitSelfTailCall(call: { args: Argument[] }, params: Param[], indent: string): string {
+  // A call passing $-special args needs dynamic-scope save/restore; fall back to an ordinary recursive call rather than lowering it into the loop
+  if (call.args.some(a => a.name && a.name.startsWith("$"))) {
+    return `${indent}return ${compileCallExpr({ kind: "call", name: "", args: call.args } as any)};`;
+  }
+  const provided = resolveArgsToParams(call.args, params);
+  const stage: string[] = [];
+  const assign: string[] = [];
+  for (let i = 0; i < params.length; i++) {
+    const pname = escapeName(params[i]!.name);
+    if (provided[i] !== undefined) {
+      const tmp = `__tc${tailTempCounter++}`;
+      stage.push(`${indent}const ${tmp}: any = ${compileExpr(provided[i]!)};`);
+      assign.push(`${indent}${pname} = ${tmp};`);
+    } else if (params[i]!.defaultValue) {
+      assign.push(`${indent}${pname} = ${compileExpr(params[i]!.defaultValue!)};`);
+    } else {
+      assign.push(`${indent}${pname} = undefined;`);
+    }
+  }
+  return [...stage, ...assign, `${indent}continue;`].join("\n");
+}
+
+// Lower an expression in tail position into statements that either `return` a value or re-bind parameters and `continue` the enclosing `while (true)` loop.
+function emitTailBody(expr: Expr, funcName: string, params: Param[], indent: string): string {
+  switch (expr.kind) {
+    case "group":
+      return emitTailBody(expr.expr, funcName, params, indent);
+    case "ternary": {
+      const cond = compileExpr(expr.condition);
+      const t = emitTailBody(expr.ifTrue, funcName, params, indent + "  ");
+      const f = emitTailBody(expr.ifFalse, funcName, params, indent + "  ");
+      return `${indent}if (__truthy(${cond})) {\n${t}\n${indent}} else {\n${f}\n${indent}}`;
+    }
+    case "assert": {
+      const condition = expr.args[0] ? compileExpr(expr.args[0].value) : "true";
+      const message = expr.args[1] ? compileExpr(expr.args[1].value) : '"Assertion failed"';
+      return `${indent}openscad_assert_fn(${condition}, ${message});\n${emitTailBody(expr.expr, funcName, params, indent)}`;
+    }
+    case "echo": {
+      const eArgs = expr.args.map(a =>
+        a.name
+          ? `(${JSON.stringify(a.name + " = ")} + __oecho(${compileExpr(a.value)}))`
+          : `__oecho(${compileExpr(a.value)})`
+      ).join(", ");
+      return `${indent}__echo(${eArgs});\n${emitTailBody(expr.expr, funcName, params, indent)}`;
+    }
+    case "let": {
+      // A $-special `let`, or one that shadows the function's own name, isn't lowered into the loop - compile it through the normal (scope-aware) path
+      if (expr.assignments.some(a => a.name.startsWith("$") || a.name === funcName)) {
+        return `${indent}return ${compileExpr(expr)};`;
+      }
+      const localAssignNames = expr.assignments.map(a => escapeName(a.name));
+      return withLocalScope(localAssignNames, () => {
+        const savedRenames = activeShadowRenames;
+        activeShadowRenames = new Map(savedRenames);
+        const lines: string[] = [];
+        // Sequential let: each value sees the bindings established before it
+        for (const a of expr.assignments) {
+          const tmp = `__tl${tailTempCounter++}`;
+          lines.push(`${indent}const ${tmp}: any = ${compileExpr(a.value)};`);
+          activeShadowRenames.set(escapeName(a.name), tmp);
+        }
+        const body = emitTailBody(expr.body, funcName, params, indent);
+        activeShadowRenames = savedRenames;
+        return lines.join("\n") + "\n" + body;
+      });
+    }
+    case "call":
+      if (expr.name === funcName) return emitSelfTailCall(expr, params, indent);
+      return `${indent}return ${compileExpr(expr)};`;
+    default:
+      return `${indent}return ${compileExpr(expr)};`;
+  }
 }
 
 // Module body compilation
@@ -2320,19 +2640,17 @@ function buildWithChildrenCall(callExpr: string, children: string[], moduleName:
   if (hasAwait) {
     return `await (() => { ` +
       `const __childFns = [\n  ${children.map(child => `async () => (${child})`).join(",\n  ")}\n]; ` +
-      `return __with_children(async (i) => (` +
-      `i === undefined ? __union2d3d(await Promise.all(__childFns.map(fn => fn()))) : ` +
-      `((i >= 0 && i < __childFns.length) ? await __childFns[i]() : Manifold.union([]))` +
-      `), __childFns.length, async () => await ${callExpr}, ${JSON.stringify(moduleName)}); ` +
+      `return __with_children(async (i) => ` +
+      `__union2d3d(await Promise.all(__pick_children(__childFns, i).map(fn => fn())))` +
+      `, __childFns.length, async () => await ${callExpr}, ${JSON.stringify(moduleName)}); ` +
       `})()`;
   }
 
   return `(() => { ` +
     `const __childFns = [\n  ${children.map(child => `() => (${child})`).join(",\n  ")}\n]; ` +
-    `return __with_children((i) => (` +
-    `i === undefined ? __union2d3d(__childFns.map(fn => fn())) : ` +
-    `((i >= 0 && i < __childFns.length) ? __childFns[i]() : Manifold.union([]))` +
-    `), __childFns.length, () => ${callExpr}, ${JSON.stringify(moduleName)}); ` +
+    `return __with_children((i) => ` +
+    `__union2d3d(__pick_children(__childFns, i).map(fn => fn()))` +
+    `, __childFns.length, () => ${callExpr}, ${JSON.stringify(moduleName)}); ` +
     `})()`;
 }
 
@@ -2400,14 +2718,16 @@ function compileIRModuleCall(node: IRModuleCallNode): string {
 
     case "echo": {
       const args = node.args.map(a =>
-        a.name ? `"${a.name} = ", ${compileExpr(a.value)}` : compileExpr(a.value)
+        a.name
+          ? `(${JSON.stringify(a.name + " = ")} + __oecho(${compileExpr(a.value)}))`
+          : `__oecho(${compileExpr(a.value)})`
       ).join(", ");
       const child = node.children.length === 0
         ? "Manifold.union([])"
         : node.children.length === 1
           ? compileIRNode(node.children[0]!)
           : `__union2d3d([\n  ${node.children.map(compileIRNode).join(",\n  ")}\n])`;
-      return `(console.log(${args}), ${child})`;
+      return `(__echo(${args}), ${child})`;
     }
 
     case "assert": {
@@ -2586,13 +2906,15 @@ function compileModuleCall(stmt: ModuleCallStmt): string {
 // Builtin module helpers
 function compileEchoModule(stmt: ModuleCallStmt): string {
   const args = stmt.args.map(a =>
-    a.name ? `"${a.name} =", ${compileExpr(a.value)}` : compileExpr(a.value)
+    a.name
+      ? `(${JSON.stringify(a.name + " = ")} + __oecho(${compileExpr(a.value)}))`
+      : `__oecho(${compileExpr(a.value)})`
   ).join(", ");
   if (stmt.child && stmt.child.kind !== "empty") {
     const child = compileGeometry(stmt.child);
-    return `(console.log(${args}), ${child || "Manifold.union([])"})`;
+    return `(__echo(${args}), ${child || "Manifold.union([])"})`;
   }
-  return `(console.log(${args}), Manifold.union([]))`;
+  return `(__echo(${args}), Manifold.union([]))`;
 }
 
 function compileAssertModule(stmt: ModuleCallStmt): string {
@@ -2639,7 +2961,7 @@ function compileCube(args: Argument[]): string {
   const centerStr = center ? compileExpr(center.value) : "false";
 
   // `size` can be a scalar or a runtime vector expression
-  return `((__s: any) => Manifold.cube((is_list_fn(__s) ? __s : [__s, __s, __s]), ${centerStr}))(${sizeStr})`;
+  return `__cube(${sizeStr}, ${centerStr})`;
 }
 
 function compileSphere(args: Argument[]): string {
@@ -2712,7 +3034,7 @@ function compileSquare(args: Argument[]): string {
   const centerStr = center ? compileExpr(center.value) : "false";
 
   // `size` can be a scalar or a runtime vector expression
-  return `((__s: any) => CrossSection.square((is_list_fn(__s) ? __s : [__s, __s]), ${centerStr}))(${sizeStr})`;
+  return `__square(${sizeStr}, ${centerStr})`;
 }
 
 function compilePolygon(args: Argument[]): string {
@@ -2854,25 +3176,27 @@ function collectChildrenWithDecls(stmt: ModuleCallStmt, sideEffectsAsChildren = 
 }
 
 function compileBlockStatementsWithDecls(stmts: Statement[], sideEffectsAsChildren = false): { decls: string[]; geos: string[] } {
-  const declItems: { name?: string; code: string }[] = [];
+  const varDecls = new Map<string, { code: string; order: number }>();
+  const otherDecls: string[] = [];
   const geos: string[] = [];
+  let order = 0;
 
   const collect = (list: Statement[]) => {
     for (const s of list) {
       if (s.kind === "empty") continue;
       if (hasBackgroundModifier(s)) continue;
       if (s.kind === "variableDecl") {
-        declItems.push({
-          name: escapeName(s.name),
-          code: `${leadingCommentLines(s).join("\n")}${s.leadingComments?.length ? "\n" : ""}let ${escapeName(s.name)}: any = ${compileExpr(s.value)};${trailingCommentText(s)}`,
-        });
+        const name = escapeName(s.name);
+        const code = `${leadingCommentLines(s).join("\n")}${s.leadingComments?.length ? "\n" : ""}let ${name}: any = ${compileExpr(s.value)};${trailingCommentText(s)}`;
+        const existing = varDecls.get(name);
+        varDecls.set(name, { code, order: existing ? existing.order : order++ });
       } else if (s.kind === "functionDecl" || s.kind === "moduleDecl") {
-        declItems.push({ code: compileDeclaration(s) });
+        otherDecls.push(compileDeclaration(s));
       } else if (s.kind === "block") {
         collect(s.statements);
       } else if (isSideEffectOnlyModule(s) && !sideEffectsAsChildren) {
         // Run echo()/assert() for their side effects, but keep them out of geos
-        declItems.push({ code: `${compileGeometry(s)};` });
+        otherDecls.push(`${compileGeometry(s)};`);
       } else {
         const g = compileGeometry(s);
         if (g) {
@@ -2884,19 +3208,24 @@ function compileBlockStatementsWithDecls(stmts: Statement[], sideEffectsAsChildr
   };
   collect(stmts);
 
-  // Keep only the last decl per variable name (named decls only; function/module declarations have no name key and are all kept)
-  const lastIdx = new Map<string, number>();
-  declItems.forEach((it, i) => { if (it.name) lastIdx.set(it.name, i); });
-  const decls = declItems
-    .filter((it, i) => it.name === undefined || lastIdx.get(it.name) === i)
-    .map(it => it.code);
+  const orderedVars = [...varDecls.values()].sort((a, b) => a.order - b.order).map(v => v.code);
+  const decls = [...orderedVars, ...otherDecls];
 
   return { decls, geos };
 }
 
+function emptyGeometryWithDecls(decls: string[]): string {
+  if (decls.length === 0) return "Manifold.union([])";
+  const body = `${decls.join("\n  ")}\n  return Manifold.union([]);`;
+  if (decls.some(d => d.includes("await "))) {
+    return `await (async () => {\n  ${body}\n})()`;
+  }
+  return `(() => {\n  ${body}\n})()`;
+}
+
 function compileBoolOp(stmt: ModuleCallStmt, op: string): string {
   const { decls, geos } = collectChildrenWithDecls(stmt);
-  if (geos.length === 0) return "Manifold.union([])";
+  if (geos.length === 0) return emptyGeometryWithDecls(decls);
 
   let result: string;
   if (geos.length === 1) {
@@ -2922,7 +3251,7 @@ function compileBoolOp(stmt: ModuleCallStmt, op: string): string {
 
 function compileDifference(stmt: ModuleCallStmt): string {
   const { decls, geos } = collectChildrenWithDecls(stmt);
-  if (geos.length === 0) return "Manifold.union([])";
+  if (geos.length === 0) return emptyGeometryWithDecls(decls);
 
   let result: string;
   if (geos.length === 1) {
@@ -2943,7 +3272,7 @@ function compileDifference(stmt: ModuleCallStmt): string {
 
 function compileMinkowski(stmt: ModuleCallStmt): string {
   const { decls, geos } = collectChildrenWithDecls(stmt);
-  if (geos.length === 0) return "Manifold.union([])";
+  if (geos.length === 0) return emptyGeometryWithDecls(decls);
 
   let result: string;
   if (geos.length === 1) {
@@ -3469,9 +3798,11 @@ function compileExpr(expr: Expr): string {
     }
     case "echo": {
       const eArgs = expr.args.map(a =>
-        a.name ? `"${a.name} =", ${compileExpr(a.value)}` : compileExpr(a.value)
+        a.name
+          ? `(${JSON.stringify(a.name + " = ")} + __oecho(${compileExpr(a.value)}))`
+          : `__oecho(${compileExpr(a.value)})`
       ).join(", ");
-      return `(console.log(${eArgs}), ${compileExpr(expr.expr)})`;
+      return `(__echo(${eArgs}), ${compileExpr(expr.expr)})`;
     }
     case "assert": {
       const condition = expr.args[0] ? compileExpr(expr.args[0].value) : "true";
@@ -3501,31 +3832,168 @@ function compileExpr(expr: Expr): string {
     case "each": {
       const inner = compileExpr(expr.expr);
       if (inner.startsWith("...")) return inner;
-      return `...${inner}`;
+      return `...__each(${inner})`;
     }
     case "lambda": {
       const params = expr.params.map(p => p.defaultValue ? `${escapeName(p.name)} = ${compileExpr(p.defaultValue)}` : escapeName(p.name)).join(", ");
       const localParams = expr.params.map(p => escapeName(p.name));
-      const bodyExpr = withLocalScope(localParams, () => compileExpr(expr.body));
-      return `(${params}) => ${bodyExpr}`;
+      // Compile the body in tail position so tail calls through function values become `__tc` thunks the trampoline can drive iteratively
+      const bodyExpr = withLocalScope(localParams, () => compileExprTail(expr.body));
+      
+      return `__fnlit((${params}) => ${bodyExpr}, ${JSON.stringify(oscadSource(expr))})`;
     }
     case "listComp": {
       return `...(${compileListComp(expr.generator)})`;
     }
     case "dynCall": {
+      const staticType = staticNonFunctionType(expr.callee);
+      if (staticType) {
+        const line = expr.loc?.start.line;
+        const where = line ? ` at line ${line}` : "";
+        console.warn(`Warning: Can't call function on ${staticType}${where}`);
+        return "undef";
+      }
       const callee = compileExpr(expr.callee);
       const args = expr.args.map(a => a.name ? `/* ${a.name} = */ ${compileExpr(a.value)}` : compileExpr(a.value)).join(", ");
-      return `(${callee})(${args})`;
+      // Invoking a function value goes through the trampoline driver
+      return `__call(${callee}${args ? `, ${args}` : ""})`;
     }
     default:
       return `/* unsupported expr: ${(expr as Expr).kind}${locTag(expr as ASTNode)} */`;
   }
 }
 
-function compileCallExpr(expr: { kind: "call"; name: string; args: Argument[] }): string {
+// Reconstruct the OpenSCAD source form of an expression, mirroring OpenSCAD's own Expression serialization
+function oscadSource(expr: Expr): string {
+  switch (expr.kind) {
+    case "number": return String(expr.value);
+    case "string": return '"' + expr.value.replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"';
+    case "boolean": return expr.value ? "true" : "false";
+    case "undef": return "undef";
+    case "identifier": return expr.name;
+    case "vector": return "[" + expr.elements.map(oscadSource).join(", ") + "]";
+    case "range": return expr.step
+      ? `[${oscadSource(expr.start)} : ${oscadSource(expr.step)} : ${oscadSource(expr.end)}]`
+      : `[${oscadSource(expr.start)} : ${oscadSource(expr.end)}]`;
+    case "binary": return `(${oscadSource(expr.left)} ${expr.op} ${oscadSource(expr.right)})`;
+    case "unary": return `${expr.op}${oscadSource(expr.operand)}`;
+    case "ternary": return `(${oscadSource(expr.condition)} ? ${oscadSource(expr.ifTrue)} : ${oscadSource(expr.ifFalse)})`;
+    case "call": return `${expr.name}(${expr.args.map(oscadArgSource).join(", ")})`;
+    case "index": return `${oscadSource(expr.object)}[${oscadSource(expr.index)}]`;
+    case "member": return `${oscadSource(expr.object)}.${expr.property}`;
+    case "group": return oscadSource(expr.expr);
+    case "lambda": return `function(${expr.params.map(oscadParamSource).join(", ")}) ${oscadSource(expr.body)}`;
+    case "let": return `let(${expr.assignments.map(a => `${a.name} = ${oscadSource(a.value)}`).join(", ")}) ${oscadSource(expr.body)}`;
+    case "dynCall": return `${oscadSource(expr.callee)}(${expr.args.map(oscadArgSource).join(", ")})`;
+    default: return "";
+  }
+}
+function oscadArgSource(a: Argument): string {
+  return a.name ? `${a.name} = ${oscadSource(a.value)}` : oscadSource(a.value);
+}
+function oscadParamSource(p: import("./ast.js").Parameter): string {
+  return p.defaultValue ? `${p.name} = ${oscadSource(p.defaultValue)}` : p.name;
+}
+
+function staticNonFunctionType(e: Expr): string | undefined {
+  switch (e.kind) {
+    case "number": return "number";
+    case "string": return "string";
+    case "boolean": return "bool";
+    case "undef": return "undefined";
+    case "vector": return "vector";
+    case "range": return "range";
+    case "group": return staticNonFunctionType(e.expr);
+    default: return undefined;
+  }
+}
+
+// Compile an expression that is in tail position of a function-literal body
+function compileExprTail(expr: Expr): string {
+  switch (expr.kind) {
+    case "group":
+      return compileExprTail(expr.expr);
+    case "ternary": {
+      return `(__truthy(${compileExpr(expr.condition)}) ? ${compileExprTail(expr.ifTrue)} : ${compileExprTail(expr.ifFalse)})`;
+    }
+    case "echo": {
+      const eArgs = expr.args.map(a =>
+        a.name
+          ? `(${JSON.stringify(a.name + " = ")} + __oecho(${compileExpr(a.value)}))`
+          : `__oecho(${compileExpr(a.value)})`
+      ).join(", ");
+      return `(__echo(${eArgs}), ${compileExprTail(expr.expr)})`;
+    }
+    case "assert": {
+      const condition = expr.args[0] ? compileExpr(expr.args[0].value) : "true";
+      const message = expr.args[1] ? compileExpr(expr.args[1].value) : '"Assertion failed"';
+      return `(openscad_assert_fn(${condition}, ${message}), ${compileExprTail(expr.expr)})`;
+    }
+    case "let": {
+      const localAssignNames = expr.assignments
+        .filter(a => !a.name.startsWith("$"))
+        .map(a => escapeName(a.name));
+      return withLocalScope(localAssignNames, () => {
+        let result = compileExprTail(expr.body);
+        for (let i = expr.assignments.length - 1; i >= 0; i--) {
+          const a = expr.assignments[i]!;
+          const name = escapeName(a.name);
+          const val = compileExpr(a.value);
+          if (a.name.startsWith("$")) {
+            const t = svTarget(name);
+            result = `(() => { const __save_${name}: any = ${t}; ${t} = ${val}; try { return ${result}; } finally { ${t} = __save_${name}; } })()`;
+          } else {
+            result = `((${name}) => (${result}))(${val})`;
+          }
+        }
+        return result;
+      });
+    }
+    case "call":
+      return compileCallExpr(expr, true);
+    case "dynCall": {
+      const staticType = staticNonFunctionType(expr.callee);
+      if (staticType) return "undef";
+      const callee = compileExpr(expr.callee);
+      const args = expr.args.map(a => a.name ? `/* ${a.name} = */ ${compileExpr(a.value)}` : compileExpr(a.value)).join(", ");
+      return `__tc(${callee}${args ? `, ${args}` : ""})`;
+    }
+    default:
+      return compileExpr(expr);
+  }
+}
+
+function compileCallExpr(expr: { kind: "call"; name: string; args: Argument[]; loc?: ASTNode["loc"] }, tail = false): string {
   const escaped = escapeName(expr.name);
   const isKnownFunction = BUILTIN_FUNCTIONS.has(expr.name) || signatures.has(`${escaped}_fn`);
-  const name = (!isKnownFunction && isLocalName(escaped)) ? escaped : `${escaped}_fn`;
+
+  // A call to a name that is not a builtin, a user/external function, a local binding, or a variable that might hold a function literal is an unknown function.
+  const isSpecialVarCallee = expr.name.startsWith("$") && expr.name !== "$children";
+  const isCallableValue = isLocalName(escaped)
+    || globalVarNames.has(escaped)
+    || externalFunctionNames.has(expr.name)
+    || isSpecialVarCallee;
+  if (!isKnownFunction && !isCallableValue) {
+    const line = expr.loc?.start.line;
+    const where = line ? ` at line ${line}` : "";
+    // Experimental builtins are OpenSCAD functions that are disabled
+    if (EXPERIMENTAL_BUILTIN_FUNCTIONS.has(expr.name)) {
+      console.warn(`Warning: Experimental builtin function '${expr.name}' is not enabled${where}`);
+    }
+    console.warn(`Warning: Ignoring unknown function '${expr.name}'${where}`);
+    // Lower to a runtime no-op that evaluates to undef
+    return `__unknown_fn(${JSON.stringify(expr.name)})`;
+  }
+
+  // When the callee isn't a known function definition but resolves to a value
+  const name = isSpecialVarCallee
+    ? svTarget(escaped)
+    : isLocalName(escaped) ? escaped
+    : (!isKnownFunction && globalVarNames.has(escaped)) ? escaped
+    : `${escaped}_fn`;
+
+  // A call through a function VALUE goes through the tail-call trampoline: `__call` drives it from non-tail position, while a tail call returns a `__tc` thunk so self-recursion through function values runs iteratively
+  const isValueCall = name !== `${escaped}_fn`;
 
   const sig = signatures.get(name);
   const dollarArgs = expr.args.filter(a =>
@@ -3533,7 +4001,9 @@ function compileCallExpr(expr: { kind: "call"; name: string; args: Argument[] })
   const positionalArgs = dollarArgs.length === 0 ? expr.args : expr.args.filter(a => !dollarArgs.includes(a));
 
   const argList = compileArgList(name, positionalArgs);
-  const call = `${name}(${argList})`;
+  const call = isValueCall
+    ? `${tail ? "__tc" : "__call"}(${name}${argList ? `, ${argList}` : ""})`
+    : `${name}(${argList})`;
   if (dollarArgs.length === 0) {
     return call;
   }
@@ -3541,11 +4011,14 @@ function compileCallExpr(expr: { kind: "call"; name: string; args: Argument[] })
   const saves: string[] = [];
   const decls: string[] = [];
   const restores: string[] = [];
-  for (const arg of dollarArgs) {
-    const dn = escapeName(arg.name!);
+  // Duplicate special-var named args resolve last-wins
+  const lastValue = new Map<string, typeof dollarArgs[number]["value"]>();
+  for (const arg of dollarArgs) lastValue.set(arg.name!, arg.value);
+  for (const [argName, value] of lastValue) {
+    const dn = escapeName(argName);
     const t = svTarget(dn);
     saves.push(`let __save_${dn}: any = ${t};`);
-    decls.push(`${t} = ${compileExpr(arg.value)};`);
+    decls.push(`${t} = ${compileExpr(value)};`);
     restores.push(`${t} = __save_${dn};`);
   }
   return `(() => { ${saves.join(" ")} ${decls.join(" ")} try { return ${call}; } finally { ${restores.join(" ")} } })()`;
@@ -3597,7 +4070,11 @@ function compileListComp(gen: ListCompGenerator): string {
       const cond = compileExpr(gen.condition);
       const updates = gen.updates.map(a => `${escapeName(a.name)} = ${compileExpr(a.value)}`).join(", ");
       const inner = compileListComp(gen.body);
-      return `(() => { const __r = []; for (let ${inits}; __truthy(${cond}); ${updates}) __r.push(...(${inner})); return __r; })()`;
+      // Abort the loop once its counter exceeds the limit
+      const base = currentMainFilename ? path.basename(currentMainFilename) : "<unknown>";
+      const line = gen.loc?.start.line ?? 0;
+      const errMsg = JSON.stringify(`ERROR: For loop counter exceeded limit in file ${base}, line ${line}`);
+      return `(() => { const __r = []; let __fc = 0; for (let ${inits}; __truthy(${cond}); ${updates}) { if (__fc++ >= ${MAX_FOR_ITERATIONS}) throw new Error(${errMsg}); __r.push(...(${inner})); } return __r; })()`;
     }
   }
 }

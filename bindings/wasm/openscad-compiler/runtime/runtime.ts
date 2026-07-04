@@ -22,16 +22,128 @@ function is_num_fn(x: any) { return arguments.length === 1 ? (typeof x === "numb
 function is_string_fn(x: any) { return arguments.length === 1 ? (typeof x === "string") : undefined; }
 function is_list_fn(x: any) { return arguments.length === 1 ? Array.isArray(x) : undefined; }
 function is_function_fn(x: any) { return arguments.length === 1 ? (typeof x === "function") : undefined; }
-function is_object_fn(x: any) { return arguments.length === 1 ? (x !== null && typeof x === "object" && !Array.isArray(x)) : undefined; }
 
-// Trig (OpenSCAD uses degrees)
-function sin_fn(x: any) { return Math.sin(x * Math.PI / 180); }
-function cos_fn(x: any) { return Math.cos(x * Math.PI / 180); }
-function tan_fn(x: any) { return Math.tan(x * Math.PI / 180); }
-function asin_fn(x: any) { return Math.asin(x) * 180 / Math.PI; }
-function acos_fn(x: any) { return Math.acos(x) * 180 / Math.PI; }
-function atan_fn(x: any) { return Math.atan(x) * 180 / Math.PI; }
-function atan2_fn(y: any, x: any) { return Math.atan2(y, x) * 180 / Math.PI; }
+// unknown/undefined function or disabled experimental builting function calls
+function __unknown_fn(_name: string, ..._args: any[]): undefined { return undefined; }
+
+// Trig from OpenSCAD's degree_trig
+const M_DEG2RAD = 0.017453292519943295769; // PI/180
+const M_RAD2DEG = 57.2957795130823208767;  // 180/PI
+const M_SQRT3 = 1.73205080756887719318;    // sqrt(3)
+const M_SQRT3_4 = 0.86602540378443859659;  // sqrt(3)/2
+const M_SQRT1_3 = 0.57735026918962573106;  // sqrt(3)/3
+const M_SQRT1_2 = 0.70710678118654752440;  // sqrt(1/2)
+const TRIG_HUGE_VAL = (1 << 26) * 360.0 * (1 << 26);
+
+function deg2rad(x: number) { return x * M_DEG2RAD; }
+function rad2deg(x: number) { return x * M_RAD2DEG; }
+function cround(x: number) { return x < 0 ? -Math.round(-x) : Math.round(x); }
+
+function sin_fn(x: any) {
+  if (x < 360.0 && x >= 0.0) {
+    // already in range
+  } else if (x < TRIG_HUGE_VAL && x > -TRIG_HUGE_VAL) {
+    x -= 360.0 * Math.floor(x / 360.0);
+  } else {
+    return NaN;
+  }
+  const oppose = x >= 180.0;
+  if (oppose) x -= 180.0;
+  if (x > 90.0) x = 180.0 - x;
+  if (x < 45.0) {
+    if (x === 30.0) x = 0.5;
+    else x = Math.sin(deg2rad(x));
+  } else if (x === 45.0) {
+    x = M_SQRT1_2;
+  } else if (x === 60.0) {
+    x = M_SQRT3_4;
+  } else {
+    x = Math.cos(deg2rad(90.0 - x));
+  }
+  return oppose ? -x : x;
+}
+
+function cos_fn(x: any) {
+  if (x < 360.0 && x >= 0.0) {
+    // already in range
+  } else if (x < TRIG_HUGE_VAL && x > -TRIG_HUGE_VAL) {
+    x -= 360.0 * Math.floor(x / 360.0);
+  } else {
+    return NaN;
+  }
+  let oppose = x >= 180.0;
+  if (oppose) x -= 180.0;
+  if (x > 90.0) {
+    x = 180.0 - x;
+    oppose = !oppose;
+  }
+  if (x > 45.0) {
+    if (x === 60.0) x = 0.5;
+    else x = Math.sin(deg2rad(90.0 - x));
+  } else if (x === 45.0) {
+    x = M_SQRT1_2;
+  } else if (x === 30.0) {
+    x = M_SQRT3_4;
+  } else {
+    x = Math.cos(deg2rad(x));
+  }
+  return oppose ? -x : x;
+}
+
+function tan_fn(x: any) {
+  const cycles = Math.floor(x / 180.0);
+  if (x < 180.0 && x >= 0.0) {
+    // already in range
+  } else if (x < TRIG_HUGE_VAL && x > -TRIG_HUGE_VAL) {
+    x -= 180.0 * cycles;
+  } else {
+    return NaN;
+  }
+  const oppose = x > 90.0;
+  if (oppose) x = 180.0 - x;
+  if (x === 0.0) {
+    x = (cycles % 2) === 0 ? 0.0 : -0.0;
+  } else if (x === 30.0) {
+    x = M_SQRT1_3;
+  } else if (x === 45.0) {
+    x = 1.0;
+  } else if (x === 60.0) {
+    x = M_SQRT3;
+  } else if (x === 90.0) {
+    x = (cycles % 2) === 0 ? Infinity : -Infinity;
+  } else {
+    x = Math.tan(deg2rad(x));
+  }
+  return oppose ? -x : x;
+}
+
+function asin_fn(x: any) {
+  const degs = rad2deg(Math.asin(x));
+  const whole = cround(degs);
+  if (sin_fn(whole) === x) return whole;
+  return degs;
+}
+
+function acos_fn(x: any) {
+  const degs = rad2deg(Math.acos(x));
+  const whole = cround(degs);
+  if (cos_fn(whole) === x) return whole;
+  return degs;
+}
+
+function atan_fn(x: any) {
+  const degs = rad2deg(Math.atan(x));
+  const whole = cround(degs);
+  if (tan_fn(whole) === x) return whole;
+  return degs;
+}
+
+function atan2_fn(y: any, x: any) {
+  const degs = rad2deg(Math.atan2(y, x));
+  const whole = cround(degs);
+  if (Math.abs(degs - whole) < 3.0e-14) return whole;
+  return degs;
+}
 
 // Math (OpenSCAD built-ins)
 let abs_fn = Math.abs;
@@ -43,24 +155,55 @@ let sqrt_fn = Math.sqrt;
 let exp_fn = Math.exp;
 function ln_fn(x: any) { return Math.log(x); }
 function log_fn(x: any) { return Math.log(x); }
-function min_fn(...a: any[]) { return a.length === 1 && Array.isArray(a[0]) ? Math.min(...a[0]) : Math.min(...a); }
-function max_fn(...a: any[]) { return a.length === 1 && Array.isArray(a[0]) ? Math.max(...a[0]) : Math.max(...a); }
-function norm_fn(v: any) { return Math.sqrt(v.reduce((s: any, x: any) => s + x * x, 0)); }
+
+function __minmax(reduce: (a: number, b: number) => number, a: any[]) {
+  const vals = a.length === 1 && Array.isArray(a[0]) ? a[0] : a;
+  if (vals.length === 0) return undefined;
+  let acc: number | undefined = undefined;
+  for (const v of vals) {
+    if (typeof v !== "number") return undefined;
+    acc = acc === undefined ? v : reduce(acc, v);
+  }
+  return acc;
+}
+
+function min_fn(...a: any[]) { return __minmax(Math.min, a); }
+function max_fn(...a: any[]) { return __minmax(Math.max, a); }
+
+function norm_fn(...args: any[]) {
+  if (args.length !== 1 || !__isVec(args[0])) return undefined;
+  let sum = 0;
+  for (const x of args[0]) {
+    if (typeof x !== "number") return undefined;
+    sum += x * x;
+  }
+  return Math.sqrt(sum);
+}
+
 function cross_fn(a: any, b: any) {
   if (!Array.isArray(a) || !Array.isArray(b)) return undefined;
-  // 2D vector yeilds the scalar z-component and 3D vector yeilds the vector
-  if (a.length === 2 && b.length === 2) return a[0] * b[1] - a[1] * b[0];
-  if (a.length === 3 && b.length === 3) {
-    return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  if ((a.length !== 2 || b.length !== 2) && (a.length !== 3 || b.length !== 3)) {
+    console.warn("WARNING: Invalid arguments to cross()");
+    return undefined;
   }
-  console.warn("WARNING: Invalid arguments to cross()");
-  return undefined;
+  // rejects vectors whose elements aren't finite numbers (NaN, INF, strings, nested vectors) - returns undef
+  if (![...a, ...b].every((x) => typeof x === "number" && Number.isFinite(x))) {
+    console.warn("WARNING: Invalid value in parameter vector for cross()");
+    return undefined;
+  }
+  // 2D vector yields the scalar z-component and 3D vector yields the vector
+  if (a.length === 2) return a[0] * b[1] - a[1] * b[0];
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 // String & list (OpenSCAD built-ins)
 function len_fn(x: any) {
-  if (typeof x === "string" || Array.isArray(x)) return x.length;
-  // returns undef and emits a warning for non-string/non-list inputs.
+  // returns undef when called with the wrong number of arguments
+  if (arguments.length !== 1) return undefined;
+  if (typeof x === "string") return Array.from(x).length;
+  if (Array.isArray(x)) return x.length;
+
+  // returns undef and emits a warning for non-string/non-list inputs
   console.warn("WARNING: len() parameter could not be converted");
   return undefined;
 }
@@ -70,15 +213,196 @@ function __ostr(x: any): string {
   if (typeof x === "boolean") return x ? "true" : "false";
   if (typeof x === "string") return x;
   if (Array.isArray(x)) return "[" + x.map(__ostrInner).join(", ") + "]";
+  if (typeof x === "function") return x.__oscadSrc ?? String(x);
   return String(x);
+}
+
+// prints `function(args) body` like OpenSCAD
+function __fnlit(fn: any, src: string) { try { fn.__oscadSrc = src; } catch {} return fn; }
+
+// Trampolines tail calls made via function values by wrapping them in `__TC` thunks that `__call` iterates instead of recursing, keeping self-recursion through function values off the JS call stack
+class __TC { fn: any; args: any[]; constructor(fn: any, args: any[]) { this.fn = fn; this.args = args; } }
+function __tc(fn: any, ...args: any[]): any { return new __TC(fn, args); }
+function __call(fn: any, ...args: any[]): any {
+  // Calling a non-function evaluates to undef in OpenSCAD
+  if (typeof fn !== "function") return undefined;
+  let r: any = fn(...args);
+  while (r instanceof __TC) {
+    if (typeof r.fn !== "function") return undefined;
+    r = r.fn(...r.args);
+  }
+  return r;
 }
 function __ostrInner(x: any): string {
   return typeof x === "string" ? `"${x}"` : __ostr(x);
 }
 function str_fn(...a: any[]) { return a.map(__ostr).join(""); }
-function chr_fn(n: any) { return Array.isArray(n) ? n.map(c => String.fromCharCode(c)).join("") : String.fromCharCode(n); }
-function ord_fn(s: any) { return s == null || s.length === 0 ? undefined : s.charCodeAt(0); }
-function concat_fn(...a: any[]) { return [].concat(...a); }
+
+// OpenSCAD echo formatting
+function __echoEscape(s: string): string {
+  let r = "";
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (ch === "\\") r += "\\\\";
+    else if (ch === '"') r += '\\"';
+    else if (ch === "\t") r += "\\t";
+    else if (ch === "\n") r += "\\n";
+    else if (ch === "\r") r += "\\r";
+    else r += ch;
+  }
+  return r;
+}
+
+function __oecho(x: any): string {
+  if (typeof x === "string") return '"' + __echoEscape(x) + '"';
+  if (Array.isArray(x)) return "[" + x.map(__oecho).join(", ") + "]";
+  return __ostr(x);
+}
+
+function __echo(...parts: string[]) { console.log(parts.join(", ")); }
+
+function __chrOne(c: any): string {
+  const n = Math.trunc(c);
+  if (!Number.isFinite(n) || n < 1 || n > 0x10FFFF || (n >= 0xD800 && n <= 0xDFFF)) return "";
+  return String.fromCodePoint(n);
+}
+
+
+function __chrCollect(x: any, out: string[]) {
+  if (Array.isArray(x)) { for (const e of x) __chrCollect(e, out); return; }
+  if (typeof x === "number") { const c = __chrOne(x); if (c) out.push(c); }
+}
+
+// OpenSCAD chr()
+function chr_fn(...args: any[]) {
+  const out: string[] = [];
+  for (const a of args) __chrCollect(a, out);
+  return out.join("");
+}
+
+// OpenSCAD ord()
+function ord_fn(...args: any[]) {
+  if (args.length !== 1) return undefined;
+  const s = args[0];
+  if (typeof s !== "string" || s.length === 0) return undefined;
+  return s.codePointAt(0);
+}
+
+// OpenSCAD's concat
+function concat_fn(...a: any[]) {
+  const out: any[] = [];
+  for (const x of a) {
+    if (__isVec(x)) out.push(...x);
+    else out.push(x);
+  }
+  return out;
+}
+
+// OpenSCAD rands()
+class __MT19937 {
+  private mt = new Uint32Array(624);
+  private idx = 624;
+  constructor(seed: number) { this.seed(seed); }
+  seed(s: number) {
+    this.mt[0] = s >>> 0;
+    for (let i = 1; i < 624; i++) {
+      const p = this.mt[i - 1]! ^ (this.mt[i - 1]! >>> 30);
+      const lo = (p & 0xffff) * 1812433253;
+      const hi = ((p >>> 16) * 1812433253) & 0xffff;
+      this.mt[i] = (((hi << 16) >>> 0) + lo + i) >>> 0;
+    }
+    this.idx = 624;
+  }
+  next(): number {
+    if (this.idx >= 624) {
+      for (let i = 0; i < 624; i++) {
+        const y = ((this.mt[i]! & 0x80000000) >>> 0) | (this.mt[(i + 1) % 624]! & 0x7fffffff);
+        let n = this.mt[(i + 397) % 624]! ^ (y >>> 1);
+        if (y & 1) n ^= 0x9908b0df;
+        this.mt[i] = n >>> 0;
+      }
+      this.idx = 0;
+    }
+    let y = this.mt[this.idx++]!;
+    y ^= y >>> 11;
+    y ^= (y << 7) & 0x9d2c5680;
+    y ^= (y << 15) & 0xefc60000;
+    y ^= y >>> 18;
+    return y >>> 0;
+  }
+}
+
+const __rng = new __MT19937((Date.now() ^ (Math.random() * 0x100000000)) >>> 0);
+
+function __hashFloatingPoint(v: number): number {
+  const PyHASH_BITS = 31n;
+  const MOD = (1n << 31n) - 1n;
+  if (!Number.isFinite(v)) {
+    if (v === Infinity) return 314159;
+    if (v === -Infinity) return -314159;
+    return 0; // NaN
+  }
+  if (v === 0) return 0;
+  let e = Math.floor(Math.log2(Math.abs(v))) + 1;
+  let m = v / 2 ** e;
+  while (Math.abs(m) >= 1) { m /= 2; e++; }
+  while (Math.abs(m) < 0.5) { m *= 2; e--; }
+  let sign = 1n;
+  if (m < 0) { sign = -1n; m = -m; }
+  let x = 0n;
+  let ee = BigInt(e);
+  while (m !== 0) {
+    x = ((x << 28n) & MOD) | (x >> (PyHASH_BITS - 28n));
+    m *= 268435456.0; // 2^28
+    ee -= 28n;
+    const y = BigInt(Math.trunc(m));
+    m -= Number(y);
+    x += y;
+    if (x >= MOD) x -= MOD;
+  }
+  const eMod = ee >= 0n
+    ? ee % PyHASH_BITS
+    : PyHASH_BITS - 1n - ((-1n - ee) % PyHASH_BITS);
+  x = ((x << eMod) & MOD) | (x >> (PyHASH_BITS - eMod));
+  x = x * sign;
+  return Number(BigInt.asIntN(32, x));
+}
+
+function __generateCanonical(): number {
+  const R = 2 ** 32;
+  const u0 = __rng.next();
+  const u1 = __rng.next();
+  let ret = (u0 + u1 * R) / (R * R);
+  if (ret >= 1) ret = 1 - Number.EPSILON / 2;
+  return ret;
+}
+
+function rands_fn(...args: any[]) {
+  // Requires 3 or 4 numeric arguments; any other shape warns and yields undef.
+  if (args.length < 3 || args.length > 4) return undefined;
+  for (const a of args) {
+    if (typeof a !== "number") return undefined;
+  }
+  const DBL_MAX = Number.MAX_VALUE;
+  let min = args[0];
+  if (!Number.isFinite(min)) min = -DBL_MAX / 2;
+  let max = args[1];
+  if (!Number.isFinite(max)) max = DBL_MAX / 2;
+  if (max < min) { const t = min; min = max; max = t; }
+  let numresultsd = Math.abs(args[2]);
+  if (!Number.isFinite(numresultsd)) numresultsd = 1;
+  const numresults = Math.trunc(numresultsd);
+  if (args.length > 3) {
+    __rng.seed(__hashFloatingPoint(args[3]) >>> 0);
+  }
+  const out: number[] = [];
+  if (min >= max) {
+    for (let i = 0; i < numresults; i++) out.push(min);
+  } else {
+    for (let i = 0; i < numresults; i++) out.push(__generateCanonical() * (max - min) + min);
+  }
+  return out;
+}
 
 function __search_match(needle: any, entry: any, idx_col: any) {
   const col = idx_col !== undefined ? idx_col : 0;
@@ -87,21 +411,25 @@ function __search_match(needle: any, entry: any, idx_col: any) {
 }
 
 function search_fn(needle: any, haystack: any, num_returns: any, idx_col: any) {
+  if (needle === undefined || haystack === undefined) {
+    console.warn(`WARNING: search() needs to be called with at least 2 arguments`);
+    return undefined;
+  }
   if (!is_list_fn(needle) && !is_string_fn(needle)) {
     const indices: any[] = [];
     for (let i = 0; i < haystack.length; i++) {
       if (__search_match(needle, haystack[i], idx_col)) indices.push(i);
     }
     if (num_returns === 0) return indices;
-    return indices.length > 0 ? [indices[0]] : [];
+    return indices.slice(0, num_returns === undefined ? 1 : num_returns);
   }
   if (is_string_fn(needle) && is_string_fn(haystack)) {
     let result: any[] = [];
+    const hs = [...haystack];
     for (let ch of needle) {
       let indices = [];
-      for (let i = 0; i < haystack.length; i++) { if (haystack[i] === ch) indices.push(i); }
+      for (let i = 0; i < hs.length; i++) { if (hs[i] === ch) indices.push(i); }
       if (num_returns === 1 || num_returns === undefined) {
-        // omits characters with no match from the result
         if (indices.length > 0) result.push(indices[0]);
       } else {
         result.push(num_returns === 0 ? indices : indices.slice(0, num_returns));
@@ -119,36 +447,66 @@ function search_fn(needle: any, haystack: any, num_returns: any, idx_col: any) {
     });
   }
   if (is_string_fn(needle) && is_list_fn(haystack)) {
-    return [...needle].map(function(n) {
+    const col = idx_col !== undefined ? idx_col : 0;
+    const result: any[] = [];
+    for (const n of needle) {
       let indices = [];
       for (let i = 0; i < haystack.length; i++) {
-        let item = idx_col !== undefined ? haystack[i][idx_col] : haystack[i];
-        if (__eq(item, n)) indices.push(i);
+        const entry = haystack[i];
+        if (!Array.isArray(entry) || col >= entry.length) {
+          console.warn(`WARNING: Invalid entry in search vector at index ${i}, required number of values in the entry: ${col + 1}. Invalid entry: ${entry}`);
+          return [];
+        }
+        if (__eq(entry[col], n)) indices.push(i);
       }
-      if (num_returns === 0) return indices;
-      if (indices.length === 0) return [];
-      return num_returns === 1 || num_returns === undefined
+      if (num_returns === 0) result.push(indices);
+      else if (indices.length === 0) result.push([]);
+      else result.push(num_returns === 1 || num_returns === undefined
         ? indices[0]
-        : indices.slice(0, num_returns);
-    });
-  }
-  return undefined;
-}
-function lookup_fn(key: any, table: any) {
-  if (key <= table[0][0]) return table[0][1];
-  if (key >= table[table.length - 1][0]) return table[table.length - 1][1];
-  for (let i = 0; i < table.length - 1; i++) {
-    if (table[i][0] <= key && key <= table[i + 1][0]) {
-      let t = (key - table[i][0]) / (table[i + 1][0] - table[i][0]);
-      return table[i][1] + t * (table[i+1][1] - table[i][1]);
+        : indices.slice(0, num_returns));
     }
+    return result;
   }
   return undefined;
 }
 
+function lookup_fn(key: any, table: any, ...rest: any[]) {
+  // OpenSCAD's lookup() takes exactly 2 parameters and a numeric key. Any other shape is warned about yields undef
+  if (rest.length > 0) {
+    console.warn(`WARNING: lookup() number of parameters does not match: expected 2, found ${2 + rest.length}`);
+    return undefined;
+  }
+  if (table === undefined) {
+    console.warn(`WARNING: lookup() number of parameters does not match: expected 2, found 1`);
+    return undefined;
+  }
+  if (typeof key !== "number") {
+    console.warn(`WARNING: lookup() parameter could not be converted: argument 0: expected number, found ${typeof key === "string" ? `string ("${key}")` : typeof key}`);
+    return undefined;
+  }
+  if (!Array.isArray(table)) return undefined;
+  let lowSet = false, highSet = false;
+  let low_p = 0, low_v: any, high_p = 0, high_v: any;
+  for (const entry of table) {
+    if (!Array.isArray(entry) || entry.length < 2) continue;
+    const this_p = entry[0], this_v = entry[1];
+    if (typeof this_p !== "number") continue;
+    if (this_p <= key && (!lowSet || this_p > low_p)) {
+      low_p = this_p; low_v = this_v; lowSet = true;
+    }
+    if (this_p >= key && (!highSet || this_p < high_p)) {
+      high_p = this_p; high_v = this_v; highSet = true;
+    }
+  }
+  if (!lowSet && !highSet) return undefined;
+  if (!lowSet) return high_v;
+  if (!highSet) return low_v;
+  if (high_p === low_p) return low_v;
+  return low_v + (high_v - low_v) * (key - low_p) / (high_p - low_p);
+}
+
 function __truthy(x: any) {
   if (x === undefined || x === null || x === false) return false;
-  // OpenSCAD treats every non-zero number as true, including nan and inf.
   if (typeof x === "number") return x !== 0;
   if (typeof x === "string" || Array.isArray(x)) return x.length > 0;
   return true;
@@ -230,32 +588,71 @@ function __mul(a: any, b: any): any {
   if (__isNum(a) && __isVec(b)) return b.map((x: any): any => __mul(a, x)); // scalar * vector
   if (__isVec(a) && __isNum(b)) return a.map((x: any): any => __mul(x, b)); // vector * scalar
   if (__isVec(a) && __isVec(b)) {
-    if (a.length > 0 && Array.isArray(a[0])) {
-      if (b.length > 0 && Array.isArray(b[0])) {
-        let res: any[] = [];                                               // matrix * matrix
-        for (let i = 0; i < a.length; i++) {
-          res[i] = [];
-          for (let j = 0; j < b[0].length; j++) {
-            let sum = 0;
-            for (let k = 0; k < a[0].length; k++) sum += a[i][k] * b[k][j];
-            res[i].push(sum);
-          }
+    const aMat = a.length > 0 && __isVec(a[0]);
+    const bMat = b.length > 0 && __isVec(b[0]);
+    if (aMat && bMat) {                                                    // matrix * matrix
+      const aCols = a[0].length, bRows = b.length;
+      if (aCols !== bRows) {
+        console.warn(`WARNING: matrix*matrix requires left operand column count to match right operand row count (${aCols} != ${bRows})`);
+        return undefined;
+      }
+      for (let i = 0; i < a.length; i++) {
+        const rowLen = __isVec(a[i]) ? a[i].length : 0;
+        if (rowLen !== bRows) {
+          console.warn(`WARNING: matrix*matrix left operand row length does not match right operand row count (${rowLen} != ${bRows}) at row ${i}`);
+          return undefined;
         }
-        return res;
       }
-      return a.map((row: any): any => __mul(row, b));                      // matrix * vector
-    }
-    if (b.length > 0 && Array.isArray(b[0])) {
-      let res2: any[] = [];                                                // vector * matrix
-      for (let j2 = 0; j2 < b[0].length; j2++) {
-        let sum2 = 0;
-        for (let k2 = 0; k2 < a.length; k2++) sum2 += a[k2] * b[k2][j2];
-        res2.push(sum2);
+      const res: any[] = [];
+      for (let i = 0; i < a.length; i++) {
+        res[i] = [];
+        for (let j = 0; j < b[0].length; j++) {
+          let sum = 0;
+          for (let k = 0; k < aCols; k++) sum += a[i][k] * b[k][j];
+          res[i].push(sum);
+        }
       }
-      return res2;
+      return res;
     }
-    let sum3 = 0;                                                          // vector . vector
-    for (let i3 = 0; i3 < Math.min(a.length, b.length); i3++) sum3 += a[i3] * b[i3];
+    if (aMat) {                                                           // matrix * vector
+      const aCols = a[0].length;
+      if (aCols !== b.length) {
+        console.warn(`WARNING: matrix*vector requires matrix column count to match vector length (${aCols} != ${b.length})`);
+        return undefined;
+      }
+      const res: any[] = [];
+      for (let i = 0; i < a.length; i++) {
+        const row = a[i];
+        const rowLen = __isVec(row) ? row.length : 0;
+        if (rowLen !== b.length) {
+          console.warn(`WARNING: matrix*vector left operand row length does not match vector length (${rowLen} != ${b.length}) at row ${i}`);
+          return undefined;
+        }
+        let sum = 0;
+        for (let k = 0; k < b.length; k++) sum += row[k] * b[k];
+        res.push(sum);
+      }
+      return res;
+    }
+    if (bMat) {                                                           // vector * matrix
+      if (a.length !== b.length) {
+        console.warn(`WARNING: vector*matrix requires vector length to match matrix row count (${a.length} != ${b.length})`);
+        return undefined;
+      }
+      const res: any[] = [];
+      for (let j = 0; j < b[0].length; j++) {
+        let sum = 0;
+        for (let k = 0; k < a.length; k++) sum += a[k] * b[k][j];
+        res.push(sum);
+      }
+      return res;
+    }
+    if (a.length !== b.length) {                                          // vector . vector
+      console.warn(`WARNING: vector*vector requires matching lengths (${a.length} != ${b.length})`);
+      return undefined;
+    }
+    let sum3 = 0;
+    for (let i3 = 0; i3 < a.length; i3++) sum3 += a[i3] * b[i3];
     return sum3;
   }
   return undefined;
@@ -322,7 +719,12 @@ function __pos(a: any): any {
 
 function __index(obj: any, idx: any): any {
   if (typeof idx !== "number" || obj == null) return undefined;
-  if (typeof obj === "string" || Array.isArray(obj)) return obj[idx];
+  if (typeof obj === "string") {
+    const cps = Array.from(obj);
+    const i = Math.floor(idx);
+    return i >= 0 && i < cps.length ? cps[i] : undefined;
+  }
+  if (Array.isArray(obj)) return obj[Math.floor(idx)];
   return undefined;
 }
 
@@ -362,6 +764,20 @@ function __with_children(fn: any, count: any, call: any, name?: string) {
   } finally {
     __children_stack.pop();
   }
+}
+
+// Resolve a children() selector into the ordered list of child fns to invoke
+function __pick_children(childFns: any[], i: any): any[] {
+  if (i === undefined) return childFns;
+  if (Array.isArray(i)) {
+    const out: any[] = [];
+    for (const v of i) {
+      if (Number.isInteger(v) && v >= 0 && v < childFns.length) out.push(childFns[v]);
+    }
+    return out;
+  }
+  if (Number.isInteger(i) && i >= 0 && i < childFns.length) return [childFns[i]];
+  return [];
 }
 
 function parent_module_fn(d: any = 1) {
@@ -602,7 +1018,13 @@ function __apply_color(shape: any, c: any, alpha: any) {
   }
 }
 
-// OpenSCAD iteration can target lists, strings, and occasionally scalars.
+function __each(v: any) {
+  if (v === undefined || v === null) return [];
+  if (Array.isArray(v)) return v;
+  if (typeof v === "string") return Array.from(v);
+  return [v];
+}
+
 function __flat_map_iter(v: any, fn: any) {
   if (v === undefined || v === null) return [];
   if (Array.isArray(v)) return v.flatMap((item, i) => fn(item, i));
@@ -1686,6 +2108,24 @@ function __mirror(shape: any, v: any) {
   }
 }
 
+function __cube(size: any, center = false) {
+  const v = is_list_fn(size) ? [Number(size[0]), Number(size[1]), Number(size[2])] : [Number(size), Number(size), Number(size)];
+  // A non-finite or non-positive dimension yields no geometry instead of crashing
+  if (v.some((x) => !Number.isFinite(x) || x <= 0)) {
+    return Manifold.union([]);
+  }
+  return Manifold.cube(v as [number, number, number], center);
+}
+
+function __square(size: any, center = false) {
+  const v = is_list_fn(size) ? [Number(size[0]), Number(size[1])] : [Number(size), Number(size)];
+  // A non-finite or non-positive dimension yields no geometry instead of crashing
+  if (v.some((x) => !Number.isFinite(x) || x <= 0)) {
+    return CrossSection.square(0);
+  }
+  return CrossSection.square(v as [number, number], center);
+}
+
 function __sphere(radius: number, fn = 0, fa = 12, fs = 2) {
   // A non-finite (or non-positive) size produces no geometry instead of crashing
   if (!Number.isFinite(radius) || radius <= 0) {
@@ -1823,7 +2263,7 @@ function __forceWinding(contour: [number, number][], ccw: boolean): [number, num
 
 function __polygon(points: any, paths?: any) {
   if (!points || !Array.isArray(points) || points.length === 0) {
-    return CrossSection.ofPolygons([]);
+    return CrossSection.square(0);
   }
 
   // A point with a non-finite coordinate yields no geometry
@@ -1889,7 +2329,13 @@ function __polyhedron(points: any, faces: any) {
   // OpenSCAD accepts "polyhedron soup" where coincident vertices are duplicated per-face (so edges aren't shared)
   // Manifold requires shared edges, so weld coincident vertices along open edges before constructing the solid
   mesh.merge();
-  return new Manifold(mesh);
+  try {
+    return new Manifold(mesh);
+  } catch (e: any) {
+    // OpenSCAD treats a non-manifold polyhedron as a soft error, produces empty geometry
+    console.warn("WARNING: Polyhedron is not manifold, object will be empty");
+    return Manifold.union([]);
+  }
 }
 
 function __parse_color_for_scope(c: any, alpha: any): any {
@@ -2035,21 +2481,22 @@ function pow_fn(base: any, exp: any) { return Math.pow(base, exp); }
 // Export all runtime symbols for compiled code
 export {
   Manifold, CrossSection, wasm,
-  __sphere, __cylinder, __circle, __radius, __rotate, __polygon, __polyhedron, __translate, __scale, __mirror,
-  is_undef_fn, is_bool_fn, is_num_fn, is_string_fn, is_list_fn, is_function_fn, is_object_fn,
+  __cube, __square, __sphere, __cylinder, __circle, __radius, __rotate, __polygon, __polyhedron, __translate, __scale, __mirror,
+  is_undef_fn, is_bool_fn, is_num_fn, is_string_fn, is_list_fn, is_function_fn, __unknown_fn,
   sin_fn, cos_fn, tan_fn, asin_fn, acos_fn, atan_fn, atan2_fn,
   abs_fn, sign_fn, floor_fn, ceil_fn, round_fn, sqrt_fn, exp_fn, ln_fn, log_fn, pow_fn,
   min_fn, max_fn, norm_fn, cross_fn,
-  len_fn, str_fn, chr_fn, ord_fn, concat_fn, search_fn, lookup_fn,
+  len_fn, str_fn, chr_fn, ord_fn, concat_fn, search_fn, lookup_fn, rands_fn,
   openscad_assert_fn, __truthy, __eq, __lt, __gt, __le, __ge, __add, __sub, __mul, __div, __mod, __band, __bor, __shl, __shr, __bnot, __neg, __pos, __index,
   version_fn, version_num_fn,
   PI, INF, NAN, undef, _EPSILON,
   __ctx, __withSpecials,
-  __children_stack, __with_children, parent_module_fn,
+  __children_stack, __with_children, __pick_children, parent_module_fn,
   __is_finite_matrix4, __to_manifold_mat4, __safe_transform, __identity4,
   __safe_offset2d, __safe_project3d,
   __apply_color,
-  __flat_map_iter, __range, __rangeCount, __is2D, __union2d3d, __difference2d3d, __intersection2d3d, __hull2d3d, __minkowski2d3d,
+  __each, __flat_map_iter, __range, __rangeCount, __is2D, __union2d3d, __difference2d3d, __intersection2d3d, __hull2d3d, __minkowski2d3d,
   __extrude, __revolve,
-  __text, __parse_color_for_scope, __surface
+  __text, __parse_color_for_scope, __surface,
+  __echo, __oecho, __fnlit, __tc, __call
 };

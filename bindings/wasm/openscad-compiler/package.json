@@ -9,8 +9,12 @@
   "scripts": {
     "build": "tsup index.ts --format cjs && tsup runtime/runtime.ts --format esm --target esnext --outDir runtime --external manifold-3d --external opentype.js --external fs --no-splitting",
     "serve": "npx serve .",
-    "test": "cd test && npx vitest run compiler.test.ts && npx vitest run source-location.test.ts && npx vitest run specials.test.ts && npx vitest run library-separation.test.ts",
-    "compute-parameters": "cd test && npx tsx parameter-calculator-bulk.ts"
+    "test": "cd test && npx vitest run geometry.test.ts && npx vitest run source-location.test.ts && npx vitest run semantic.test.ts",
+    "test:geometry": "cd test && npx vitest run geometry.test.ts",
+    "test:source-location": "cd test && npx vitest run source-location.test.ts",
+    "test:semantic": "cd test && npx vitest run semantic.test.ts",
+    "compute-parameters": "cd test && npx tsx parameter-calculator-bulk.ts",
+    "benchmark": "npx tsx test/benchmark.ts"
   },
   "keywords": [],
   "author": "",
