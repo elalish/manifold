@@ -52,8 +52,8 @@ int main(int argc, char** argv) {
   }
 
   if (argc != 1) {
-    std::cerr << "Usage: " << argv[0] << " [--size-index 0.."
-              << (kNumSizes - 1) << "]" << std::endl;
+    std::cerr << "Usage: " << argv[0] << " [--size-index 0.." << (kNumSizes - 1)
+              << "]" << std::endl;
     return 2;
   }
 
