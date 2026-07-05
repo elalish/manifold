@@ -17,10 +17,6 @@ TRI_TIME_PATTERN = re.compile(
 )
 
 
-def mean(values: list[float]) -> float:
-    return statistics.fmean(values)
-
-
 def stdev(values: list[float]) -> float:
     # keep stdev defined even for single-sample cases
     if len(values) <= 1:
@@ -87,7 +83,7 @@ def parse_suite(suite_dir: Path) -> dict:
         samples = benchmark_samples[benchmark]
         benchmarks[benchmark] = {
             "samples_sec": samples,
-            "mean_sec": mean(samples),
+            "mean_sec": statistics.fmean(samples),
             "median_sec": statistics.median(samples),
             "stdev_sec": stdev(samples),
             "min_sec": min(samples),
@@ -296,7 +292,6 @@ def resolve_metadata(args: argparse.Namespace) -> dict:
         "os": args.os_name or os.getenv("RUNNER_OS"),
         "compiler": args.compiler or detect_compiler(),
         "cpu_model": cpu["model"],
-        "cpu_count": cpu["logical_count"],
         "cpu_brand": cpu["brand"],
         "cpu_model_identifier": cpu["model_identifier"],
         "cpu_arch": cpu["arch"],
