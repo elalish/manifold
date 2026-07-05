@@ -634,7 +634,7 @@ jobs:
     name: perfTest base-vs-head guard
     if: github.event_name == 'pull_request'
     timeout-minutes: 45
-    runs-on: macos-latest
+    runs-on: macos-15
     env:
       PERF_REPEATS: 3
       REGRESSION_WARN_PCT: 20

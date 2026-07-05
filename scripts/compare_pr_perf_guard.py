@@ -121,10 +121,6 @@ def build_summary(
     per_benchmark = []
     regressed = False
     for benchmark in base["benchmark_order"]:
-        base_mean = base["benchmarks"][benchmark]["mean_sec"]
-        head_mean = head["benchmarks"][benchmark]["mean_sec"]
-        base_median = base["benchmarks"][benchmark]["median_sec"]
-        head_median = head["benchmarks"][benchmark]["median_sec"]
         base_min = base["benchmarks"][benchmark]["min_sec"]
         head_min = head["benchmarks"][benchmark]["min_sec"]
         base_stdev = base["benchmarks"][benchmark]["stdev_sec"]
@@ -144,10 +140,6 @@ def build_summary(
             {
                 "benchmark": benchmark,
                 "metric": "min_sec",
-                "base_mean_sec": base_mean,
-                "head_mean_sec": head_mean,
-                "base_median_sec": base_median,
-                "head_median_sec": head_median,
                 "base_min_sec": base_min,
                 "head_min_sec": head_min,
                 "base_stdev_sec": base_stdev,
