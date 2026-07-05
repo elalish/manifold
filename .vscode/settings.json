@@ -164,5 +164,4 @@
     "--header-insertion=never"
   ],
   "editor.defaultFormatter": "xaver.clang-format",
-  "claudeCode.allowDangerouslySkipPermissions": true,
 }
