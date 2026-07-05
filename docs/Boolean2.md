@@ -29,13 +29,15 @@ Boolean2 builds a planar arrangement and filters it by winding:
 4. With a narrow phase over those pairs (serial or TBB internally), find the
    vertices incident to each edge, then split every edge at its incident vertices
    into two-vertex sub-edges.
-5. Repeat the broad phase over the sub-edges, find proper crossings among them
-   with a second narrow phase, and insert them. A crossing reuses an existing
-   vertex id when one lies within epsilon. Because each edge is already split at
-   its incident vertices, a crossing near such a vertex lands on a sub-edge that
-   does not share it and is kept rather than collapsed onto it. Endpoint,
-   T-junction, and coincident-overlap degeneracies become ordinary sub-edge
-   endpoints. There is no separate post-hoc merge.
+5. Repeat the broad phase over the sub-edges and find proper crossings among the
+   incidence-split pieces, then insert them in lexicographic point order. Each
+   crossing is recomputed against the current pieces of its two edges before
+   insertion, and a constructed vertex is shared with an existing one only on
+   exact coordinate equality - never snapped onto a merely-nearby vertex. A new
+   vertex splits another edge only where a piece of it passes within the
+   intersection construction's own error bound. Endpoint, T-junction, and
+   coincident-overlap degeneracies become ordinary sub-edge endpoints. There is
+   no separate post-hoc merge.
 6. Canonicalize sub-edges and cancel opposing multiplicities.
 7. Filter by winding: for each canonical sub-edge, evaluate the winding of the
    face just left of vMin->vMax at the start vertex (a +x ray cast under a
@@ -71,10 +73,29 @@ Debug and performance tracing live in `boolean2_diagnostics.{h,cpp}`.
 
 This implementation follows the six-step 2D overlap-removal sketch from upstream
 issue #289: epsilon-based vertex merge, collapsed-edge removal, ordered edge
-vertex lists, snapped proper crossings, multiplicity-based sub-edge
-canonicalization, and positive-winding output. The current code generalizes the
-final filter only as far as the Boolean2 operations need: positive-winding
-add/subtract/fill and intersection.
+vertex lists, proper crossings, multiplicity-based sub-edge canonicalization, and
+positive-winding output. The current code generalizes the final filter only as
+far as the Boolean2 operations need: positive-winding add/subtract/fill and
+intersection.
+
+It departs from the sketch's step 4, which snaps a new crossing to a within-eps
+neighbor: constructed crossing vertices are kept exactly distinct instead,
+because snapping clustered crossings pairwise does not compose into a consistent
+collapse. This follows how Smith
+([RobustBoolean.pdf](RobustBoolean.pdf)) constructs intersection vertices. In the
+basic algorithm (chapter 4) a computed intersection is an exact construction, and
+even exactly-coincident vertices are kept distinct rather than merged (section
+4.6). Section 8.2 bounds that computed point within `alpha = sqrt(153)*u*L` of
+both source segments; section 8.4 makes the basic 2D Boolean algorithm
+epsilon-tolerant for epsilon = alpha (the successive-intersection build for
+`(kmax+1)*alpha`), with a retained edge lying at most alpha from its original.
+`EpsilonFromScale(L, k)` is that `(k+1)*alpha` budget, so a crossing vertex
+attaches to another edge only within `EpsilonFromScale(scale, 0)` (one alpha),
+while the input feature merge uses budget 1000. The alpha threshold is this
+implementation's rule; Smith's own vertex-on-edge predicate (section 6.5) is
+exact, with alpha as its error bound. Keeping constructed crossings exactly
+distinct is likewise this implementation's choice, consistent with Smith keeping
+exactly-coincident vertices distinct.
 
 The main implementation differences are:
 
@@ -85,13 +106,15 @@ The main implementation differences are:
 - Broad phases use the local boolean2 sweep and BVH helpers. This keeps the core
   independent from the 3D `Collider` surface while preserving the intended
   sub-quadratic candidate search.
-- Proper crossings are discovered from broad-phase pairs rather than a
-  Bentley-Ottmann sweep. Edges are split at their incident vertices first, so
-  endpoint-on-edge and collinear degeneracies become ordinary sub-edge endpoints
-  and a crossing near such a vertex is kept on its own sub-edge; crossings are
-  then inserted, snapped to a neighboring vertex when one is within epsilon.
-  Splitting first can make the sub-edge broad phase super-quadratic on dense
-  near-collinear input, which has not mattered in practice.
+- Proper crossings are discovered from broad-phase pairs, not Smith's
+  rounded-arithmetic sweep (his chapter 7): the engine borrows his alpha error
+  accounting and exact-vertex identity, not his Bentley-Ottmann algorithm. Edges
+  are split at their incident vertices first, so endpoint-on-edge and collinear
+  degeneracies become ordinary sub-edge endpoints, then crossings are inserted in
+  point order with exact-coordinate identity instead of an epsilon snap. Discovery
+  over the split pieces is super-quadratic on input whose real crossing count is
+  quadratic in the edges (dense everything-crosses-everything soups); ordinary
+  geometry is unaffected.
 
 ## Winding Rules
 
@@ -115,13 +138,19 @@ collapsed edges, and cancelled opposing sub-edges are dropped.
 
 Whether two segments cross is a sign decision: a crossing exists where each
 strictly straddles the other over a positive-width shared projection interval,
-with no epsilon band on nearness to an endpoint. A crossing that lands within
-epsilon of an endpoint is kept and snapped to that endpoint at insertion, not
-rejected. Orthogonal-coordinate ties within epsilon are treated as symbolic
-ties, not raw CCW fallbacks: the tie policy first uses canonical segment
+with no epsilon band on nearness to an endpoint. An exact endpoint hit resolves
+as no crossing; a near-endpoint crossing becomes a distinct vertex, not snapped
+onto the endpoint. Orthogonal-coordinate ties within epsilon are treated as
+symbolic ties, not raw CCW fallbacks: the tie policy first uses canonical segment
 geometry, then falls back to stable edge ID for geometrically identical ties.
-Splitting an edge at a vertex that lies on it stays an epsilon (bounded-distance)
-decision, distinct from this sign-based crossing test.
+Splitting an edge at an input vertex that lies on it stays an epsilon
+(bounded-distance) decision, distinct from this sign-based crossing test.
+
+Epsilon quantization therefore applies to input features - vertex merge, the
+incident-vertex split - but not to constructed crossing vertices, which keep
+exact identity. Output vertices around a resolved sub-epsilon tangle may
+consequently sit closer than epsilon to each other; a subsequent pass fuses them
+as input features on re-ingest.
 
 Callers may pass an explicit epsilon. A non-positive epsilon asks the core to
 infer an operation scale and apply the local floating-point budget used by the
