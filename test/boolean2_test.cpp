@@ -135,7 +135,10 @@ bool PointInSegmentInteriorBand(vec2 p, vec2 a, vec2 b, double eps) {
 
 // Independent oracle for the arrangement RemoveOverlaps2D retains - its
 // predicates are not reused from the engine, so it can't rubber-stamp a bug.
-// Checks: retained verts finite and >eps apart; edges valid and non-eps-zero;
+// Checks: retained verts finite; merged input verts >eps apart while
+// constructed intersection verts (id >= numMergedVerts) need only be exactly
+// distinct - eps quantization applies to input features, not constructed
+// points; edges valid and non-degenerate (non-eps-zero between input verts);
 // edge balance conserved (per-vertex signed multiplicity matches the input's,
 // zero for introduced verts); no two non-adjacent edges strictly cross.
 ::testing::AssertionResult CheckRetainedGraphValidity(
@@ -157,11 +160,17 @@ bool PointInSegmentInteriorBand(vec2 p, vec2 a, vec2 b, double eps) {
   const double eps2 = eps * eps;
   for (int a = 0; a < static_cast<int>(result.verts.size()); ++a) {
     for (int b = a + 1; b < static_cast<int>(result.verts.size()); ++b) {
-      if (dot(result.verts[b] - result.verts[a],
-              result.verts[b] - result.verts[a]) <= eps2) {
+      const vec2 d = result.verts[b] - result.verts[a];
+      if (b < numMergedVerts && dot(d, d) <= eps2) {
+        std::ostringstream out;
+        out << "retained input vertices " << a << " and " << b
+            << " remain within epsilon";
+        return fail(out.str());
+      }
+      if (result.verts[a] == result.verts[b]) {
         std::ostringstream out;
         out << "retained vertices " << a << " and " << b
-            << " remain within epsilon";
+            << " have identical coordinates";
         return fail(out.str());
       }
     }
@@ -176,10 +185,13 @@ bool PointInSegmentInteriorBand(vec2 p, vec2 a, vec2 b, double eps) {
           << edge.v1;
       return fail(out.str());
     }
-    if (dot(result.verts[edge.v1] - result.verts[edge.v0],
-            result.verts[edge.v1] - result.verts[edge.v0]) <= eps2) {
+    const vec2 edgeVec = result.verts[edge.v1] - result.verts[edge.v0];
+    const bool inputEdgeVerts =
+        edge.v0 < numMergedVerts && edge.v1 < numMergedVerts;
+    if (inputEdgeVerts ? dot(edgeVec, edgeVec) <= eps2
+                       : result.verts[edge.v0] == result.verts[edge.v1]) {
       std::ostringstream out;
-      out << "retained edge " << i << " is epsilon-zero: " << edge.v0 << " -> "
+      out << "retained edge " << i << " is degenerate: " << edge.v0 << " -> "
           << edge.v1;
       return fail(out.str());
     }
@@ -240,7 +252,23 @@ bool PointInSegmentInteriorBand(vec2 p, vec2 a, vec2 b, double eps) {
             << " still have a strict crossing";
         return fail(out.str());
       }
-      if (SegmentsHavePositiveCollinearOverlap(a0, a1, b0, b1, eps)) {
+      // Boundary chains involving constructed verts may legitimately run
+      // parallel within eps of each other (thin faces and winding
+      // staircases the eps snap used to fuse), so the eps-band collinearity
+      // check applies to input-vert edges only; for constructed-vert pairs
+      // flag construction-noise-scale coincidence - the double-cover
+      // signature - via the alpha bound.
+      const bool inputPair = a.v0 < numMergedVerts && a.v1 < numMergedVerts &&
+                             b.v0 < numMergedVerts && b.v1 < numMergedVerts;
+      const double collinearBand =
+          inputPair
+              ? eps
+              : EpsilonFromScale(
+                    std::max({std::fabs(a0.x), std::fabs(a0.y), std::fabs(a1.x),
+                              std::fabs(a1.y), std::fabs(b0.x), std::fabs(b0.y),
+                              std::fabs(b1.x), std::fabs(b1.y)}),
+                    0);
+      if (SegmentsHavePositiveCollinearOverlap(a0, a1, b0, b1, collinearBand)) {
         std::ostringstream out;
         out << "retained edges " << i << " and " << j
             << " still have positive collinear overlap";
@@ -249,16 +277,20 @@ bool PointInSegmentInteriorBand(vec2 p, vec2 a, vec2 b, double eps) {
     }
   }
 
+  // Constructed verts (id >= numMergedVerts) may sit within eps of an edge
+  // they don't constructionally lie on; only input verts are attached at eps.
   for (int e = 0; e < static_cast<int>(result.edges.size()); ++e) {
     const auto& edge = result.edges[e];
     const vec2 a = result.verts[edge.v0];
     const vec2 b = result.verts[edge.v1];
-    for (int v = 0; v < static_cast<int>(result.verts.size()); ++v) {
+    for (int v = 0;
+         v < numMergedVerts && v < static_cast<int>(result.verts.size()); ++v) {
       if (v == edge.v0 || v == edge.v1) continue;
       if (PointInSegmentInteriorBand(result.verts[v], a, b, eps)) {
         std::ostringstream out;
-        out << "retained vertex " << v << " lies in the interior band of edge "
-            << e << " (" << edge.v0 << " -> " << edge.v1 << ")";
+        out << "retained input vertex " << v
+            << " lies in the interior band of edge " << e << " (" << edge.v0
+            << " -> " << edge.v1 << ")";
         return fail(out.str());
       }
     }
@@ -363,6 +395,29 @@ TEST(Boolean2, PropagatesShallowIndependentIntersections) {
 
   ASSERT_EQ(inserted.verts.size(), 12);
   EXPECT_EQ(inserted.lists[4].size(), 2);
+}
+
+// Constructed verts may sit closer than eps only around a genuinely sub-eps
+// crossing tangle. Inputs whose features are all far above eps must not
+// silently acquire sub-eps output verts.
+TEST(Boolean2, CleanInputsKeepEpsSeparatedVerts) {
+  const Polygons a = {{{0., 0.}, {4., 0.}, {4., 4.}, {0., 4.}}};
+  const Polygons b = {{{2., 2.}, {6., 2.}, {6., 6.}, {2., 6.}}};
+  const double eps = InferEps(a, b);
+  const Polygons out = Boolean2D(a, b, OpType::Add);
+  const double eps2 = eps * eps;
+  std::vector<vec2> outVerts;
+  for (const auto& loop : out) {
+    for (const vec2& v : loop) outVerts.push_back(v);
+  }
+  ASSERT_GT(outVerts.size(), 0u);
+  for (size_t i = 0; i < outVerts.size(); ++i) {
+    for (size_t j = i + 1; j < outVerts.size(); ++j) {
+      const vec2 d = outVerts[j] - outVerts[i];
+      EXPECT_GT(dot(d, d), eps2) << "clean union produced verts " << i
+                                 << " and " << j << " within eps";
+    }
+  }
 }
 
 // Edge balance at a vertex is the signed sum of incident edge multiplicities
@@ -889,13 +944,13 @@ TEST(Boolean2, KeepsNearDistinctPresentationVertex) {
   EXPECT_NEAR(TotalSignedArea(polys), 1.0 + kDelta, 1e-12);
 }
 
-// The new-to-old snap is gated by perpendicular incidence (point-to-line
-// distance), not point-to-point proximity: a generated crossing fuses into a
-// nearby old corner only when one of its transversal source edges actually
-// passes through that corner within the bounded eps perpendicular band. Mere
-// proximity (within the 2*eps broad-phase band) is not enough - distinct
-// near-corner crossings whose source edges miss the corner stay separate.
-TEST(Boolean2, NewToOldMergeIsPerpIncidenceGated) {
+// A near-corner crossing stays a distinct vertex unless a source edge is
+// genuinely incident to the corner. When the transversal edge misses the
+// corner, the crossing is a constructed vertex kept exactly distinct from it.
+// When the edge passes through the corner, the incidence pre-split makes the
+// corner a shared vertex and the crossing resolves to it, so the two coincide.
+// Mere proximity within the broad-phase band does not merge them.
+TEST(Boolean2, NearCornerCrossingDistinctUnlessIncident) {
   constexpr double eps = 1e-6;
   const Polygons a = {{{0, 0}, {10, 0}, {10, 1}, {0, 1}}};
   auto countNear = [](const std::vector<vec2>& points, vec2 target, double r) {
@@ -908,9 +963,8 @@ TEST(Boolean2, NewToOldMergeIsPerpIncidenceGated) {
 
   // Not incident: b's vertical left edge crosses a's bottom edge at (xLeft, 0),
   // a perpendicular distance xLeft from corner (0, 0). At xLeft = 1.5*eps the
-  // crossing is inside the 2*eps proximity band but its only transversal source
-  // edge (b's vertical left edge) is 1.5*eps off the corner, so it must stay a
-  // distinct vertex rather than fuse.
+  // crossing is inside the proximity band but its only transversal source edge
+  // is 1.5*eps off the corner, so it stays a distinct vertex.
   {
     const Polygons b = {
         {{1.5 * eps, -0.5}, {0.5, -0.5}, {0.5, 0.5}, {1.5 * eps, 0.5}}};
@@ -918,23 +972,22 @@ TEST(Boolean2, NewToOldMergeIsPerpIncidenceGated) {
     auto result =
         RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::Add);
     EXPECT_EQ(countNear(result.verts, corner, 5 * eps), 2)
-        << "non-incident near-corner crossing was over-fused";
+        << "non-incident near-corner crossing collapsed onto the corner";
     EXPECT_TRUE(CheckRetainedGraphValidity(
         result, edges, result.inputVert2Merged, result.numMergedVerts, eps));
   }
 
-  // Incident: b's left edge is the sloped line through corner (0, 0), so the
-  // crossing of that edge with a's bottom edge IS the corner; the FP
-  // intersection lands within eps of (0, 0). Because the transversal source
-  // edge genuinely runs through the corner, the crossing fuses to one vertex.
-  // b's left edge runs from (-0.5, 0.5) down through (0, 0) to (0.5, -0.5).
+  // Incident: b's left edge is the sloped line through corner (0, 0), running
+  // from (-0.5, 0.5) down through (0, 0) to (0.5, -0.5). The incidence
+  // pre-split makes (0, 0) a shared vertex, so the crossing of that edge with
+  // a's bottom edge resolves to the corner and the two coincide.
   {
     const Polygons b = {{{0.5, -0.5}, {2.0, -0.5}, {2.0, 0.5}, {-0.5, 0.5}}};
     auto [verts, edges] = CombinedInput(a, b, /*bMult=*/1);
     auto result =
         RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::Add);
     EXPECT_EQ(countNear(result.verts, corner, 5 * eps), 1)
-        << "genuinely incident crossing failed to fuse onto the corner";
+        << "genuinely incident crossing did not resolve to the corner";
     EXPECT_TRUE(CheckRetainedGraphValidity(
         result, edges, result.inputVert2Merged, result.numMergedVerts, eps));
   }
@@ -1097,8 +1150,8 @@ const SegCase kIntersectSegmentsSeeds[] = {
      {5.0, 0.0},
      1e-12},
     // A genuine transversal crossing that lands within eps of an endpoint is
-    // kept, not dropped: the straddle is sign-confirmed and the near-endpoint
-    // resolution is left to insertion-time snapping.
+    // kept, not dropped: the straddle is sign-confirmed and the crossing
+    // becomes a distinct vertex at insertion.
     {"KeepsEpsNearEndpointCrossing",
      {{0.0, 0.0}, {10.0, 0.0}, 0},
      {{0.5, -1.0}, {0.5, 1.0}, 1},
