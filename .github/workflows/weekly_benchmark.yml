@@ -1,0 +1,79 @@
+name: Weekly Benchmarks
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * 0"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weekly-benchmark
+  cancel-in-progress: false
+
+jobs:
+  weekly_benchmark:
+    name: Weekly benchmarks
+    timeout-minutes: 60
+    runs-on: macos-15
+    env:
+      WEEKLY_BENCHMARK_REPEATS: 5
+      WEEKLY_BENCHMARK_THREADS: 1
+      CMAKE_OSX_ARCHITECTURES: arm64
+      DATA_BRANCH: benchmark-data
+    steps:
+    - uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+    - name: Verify macOS ARM runner
+      run: |
+        test "$(uname -s)" = "Darwin"
+        test "$(uname -m)" = "arm64"
+    - name: Install brew packages
+      run: brew install googletest assimp tbb cmake
+    - name: Run weekly benchmarks
+      shell: bash
+      run: python3 ./scripts/run_weekly_benchmarks.py . ./bench/weekly "${WEEKLY_BENCHMARK_REPEATS}"
+    - name: Report weekly benchmarks
+      run: python3 ./scripts/report_weekly_benchmarks.py . ./bench/weekly "${WEEKLY_BENCHMARK_REPEATS}"
+    - name: Upload weekly benchmark artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: weekly-benchmark
+        path: ./bench/weekly/
+        retention-days: 30
+    - name: Prepare benchmark data branch
+      if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      shell: bash
+      run: |
+        set -euo pipefail
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        if git ls-remote --exit-code --heads origin "${DATA_BRANCH}" >/dev/null 2>&1; then
+          git fetch origin "${DATA_BRANCH}"
+          git worktree add benchmark-data "origin/${DATA_BRANCH}"
+        else
+          git worktree add --detach benchmark-data
+          git -C benchmark-data checkout --orphan "${DATA_BRANCH}"
+          git -C benchmark-data rm -rf . >/dev/null 2>&1 || true
+          find benchmark-data -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+        fi
+    - name: Stage weekly benchmark data
+      if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      run: python3 ./scripts/publish_weekly_benchmark_results.py ./bench/weekly ./benchmark-data
+    - name: Push weekly benchmark data
+      if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      shell: bash
+      run: |
+        set -euo pipefail
+        git -C benchmark-data add weekly
+        if git -C benchmark-data diff --cached --quiet; then
+          echo "No benchmark data changes to publish."
+          exit 0
+        fi
+        git -C benchmark-data commit -m "add weekly benchmark result ${GITHUB_RUN_ID}"
+        git -C benchmark-data push origin "HEAD:${DATA_BRANCH}"
