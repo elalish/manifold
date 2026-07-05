@@ -45,6 +45,14 @@ struct PhaseAcc {
   std::atomic<int64_t> bvhBuildNs{0};
   std::atomic<int64_t> broadPairWorkNs{0};
   std::atomic<int64_t> narrowPhaseNs{0};
+  // Point-order insertion outcomes: how each queued crossing event resolved
+  // and how many attaches its new vertex triggered.
+  std::atomic<int64_t> insertSeeds{0};
+  std::atomic<int64_t> insertGone{0};
+  std::atomic<int64_t> insertRequeued{0};
+  std::atomic<int64_t> insertApplied{0};
+  std::atomic<int64_t> insertReused{0};
+  std::atomic<int64_t> insertAttached{0};
 
   void Reset() {
     mergeNs = 0;
@@ -57,6 +65,12 @@ struct PhaseAcc {
     bvhBuildNs = 0;
     broadPairWorkNs = 0;
     narrowPhaseNs = 0;
+    insertSeeds = 0;
+    insertGone = 0;
+    insertRequeued = 0;
+    insertApplied = 0;
+    insertReused = 0;
+    insertAttached = 0;
   }
 };
 

@@ -55,14 +55,17 @@ bool IsInside(WindRule rule, int w) {
 // at a vertex - an axis can leave d.y == 0 (horizontal edge) or cross(d, w) ==
 // 0 (an incident edge collinear with this one's direction).
 //
-// Edges incident to P (sharing it as a vertex, including this sub-edge itself)
+// Edges incident to P (sharing its vertex id, including this sub-edge itself)
 // pass through the ray origin, so the standard "is the crossing to the right of
 // P.x" test is degenerate. They are resolved instead by the Smith shadow of
-// their OTHER endpoint O: post-insertion no edges cross and coincidences are
-// one shared vertex, so an incident edge cannot cross the ray at P, and whether
-// the perturbed ray crosses it is fixed by which side of the classified edge O
-// sits on - an Interpolate+Shadows side test (O and the classified far vert
-// share a y-side of P), with no explicit cross product (see the branch below).
+// their OTHER endpoint O: incidence is exact vertex identity (insertion shares
+// constructed vertices only on exact coordinate equality, so any endpoint at
+// exactly P's coordinates carries P's index, while merely-near vertices stay
+// distinct and their edges take the ordinary ray test), so an index-incident
+// edge meets the ray line only at P, and whether the perturbed ray crosses it
+// is fixed by which side of the classified edge O sits on - an
+// Interpolate+Shadows side test (O and the classified far vert share a y-side
+// of P), with no explicit cross product (see the branch below).
 int LeftWindingAtVertex(int start, int end, const BVH& bvh,
                         const CanonicalSubEdges& canon,
                         const std::vector<vec2>& verts, double globalMaxX) {

@@ -262,9 +262,16 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
                               std::vector<std::pair<int, int>>& pairs);
 
 // Serially materialize precomputed proper intersections into caller-owned
-// containers. `verts` and `lists` are taken by value so callers can move in the
+// containers, in lexicographic point order: each crossing is recomputed
+// against the current pieces of its two edges before insertion, constructed
+// vertices are shared by exact coordinate equality (never aliased onto a
+// nearby vertex), and a new vertex splits other edges only where they pass
+// within the intersection construction's own error bound. Output vertices may
+// therefore be closer than eps to each other; eps quantization applies to
+// input features (MergeVerts, incidence pre-split), not constructed points.
+// `verts` and `lists` are taken by value so callers can move in the
 // post-narrow-phase state; the returned fields are those same containers after
-// appending/snapping intersection vertices and updating edge split lists.
+// appending intersection vertices and updating edge split lists.
 struct IntersectionInsertion {
   std::vector<vec2> verts;
   std::vector<std::vector<int>> lists;

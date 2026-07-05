@@ -271,9 +271,10 @@ bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
                           vec3(overlapL, bOL, 0.0), vec3(overlapR, bOR, 0.0));
   out = axis == 0 ? vec2(xyzz.x, xyzz.y) : vec2(xyzz.y, xyzz.x);
   // properCrossing already established a sign-confirmed straddle; do not reject
-  // a real crossing for landing within eps of an endpoint. A near-endpoint
-  // crossing snaps to that endpoint at insertion (FindAndInsertIntersections),
-  // which is the correct vertex-on-edge resolution.
+  // a real crossing for landing within eps of an endpoint. An exact endpoint
+  // hit resolves as no-crossing above; a near-endpoint crossing becomes a
+  // distinct vertex at insertion (FindAndInsertIntersections), attached to
+  // the edges it constructionally lies on.
   return std::isfinite(out.x) && std::isfinite(out.y);
 }
 
