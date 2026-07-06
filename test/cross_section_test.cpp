@@ -689,6 +689,47 @@ TEST(CrossSection, DenseNeedleClusterNonClosingWalk) {
   }
 }
 
+// A dense near-concurrent fan: seven thin triangles whose long edges all pass
+// within ~1 ulp of a common point. This is a regression against master, which
+// resolves it to one positive region (area ~1.01e29). Keeping constructed
+// crossings exactly distinct leaves two near-coincident crossings whose
+// sub-edges cross, so the retained graph is non-manifold: construction throws
+// the closed-walk assert with asserts on and silently drops the whole region
+// with asserts off. Reproduces at every scale (verified from ~1e3 up to 2^60);
+// irregular geometry is required, which is why the symmetric needle clusters
+// above do not trigger it.
+TEST(CrossSection, DenseNearConcurrentFanNonClosingWalk) {
+  const Polygons fan = {
+      {{59517310903986.016, 275227482880513.75},
+       {20649604556759.438, 251161349675909.44},
+       {579350395443240.88, -651161349675909.25}},
+      {{-246975444669931.22, -585938137005999.5},
+       {-219529778661818.47, -619896154117160},
+       {819529778661818.62, 219896154117159.78}},
+      {{147473383423457.41, -696078580400449.88},
+       {181663560574651.72, -704104581308617.12},
+       {418336439425347, 304104581308617.44}},
+      {{477120205194571.38, -549531644009214.44},
+       {501984621138576.69, -534518327170141.75},
+       {98015378861423.172, 134518327170141.72}},
+      {{546200240516309.75, -818792851748143.62},
+       {568072302752725.25, -809167762485802},
+       {31927697247276.043, 409167762485802.5}},
+      {{538266378181197.31, -930929118489626},
+       {545918584749244.25, -928345427098964.88},
+       {54081415250756.258, 528345427098965.06}},
+      {{392560430378768.94, -644468286981061},
+       {401641806989572.88, -642381746258070.88},
+       {198358193010426.28, 242381746258070.59}},
+  };
+  try {
+    const CrossSection u(fan);
+    EXPECT_GT(u.Area(), 0.0) << "dense near-concurrent fan dropped entirely";
+  } catch (const std::exception& e) {
+    ADD_FAILURE() << "construction threw: " << e.what();
+  }
+}
+
 // Offset consumes boolean output directly, before any re-quantization pass
 // can fuse it, so output around a resolved tangle (constructed verts closer
 // than eps) must not destabilize it: a degenerate edge's offset normal is
