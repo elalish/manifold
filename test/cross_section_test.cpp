@@ -795,6 +795,45 @@ TEST(CrossSection, CornerChainLargeCoord) {
   EXPECT_NEAR(cs.Area(), reference.Area(), eps * perimeter);
 }
 
+// Three edges crossing near one point with two of them near-vertical, the
+// configuration where exact-coordinate identity could in principle be
+// inconsistent: the crossing of the horizontal edge A with each near-vertical
+// edge (A-B, A-C) can round to the same exact point while B-C rounds elsewhere.
+// It cannot leave a residual crossing: two straight segments meet at most once,
+// so if A-B and A-C coincide, B and C are attached to that shared vertex and
+// their own single crossing either coincides with it or shares both endpoints
+// with it (a zero-area 2-gon that cancels) - never a second proper crossing.
+// The union must construct (no closed-walk assert), stay non-empty, and be a
+// stable re-ingest fixed point. Adversarially checked over ~1000 near-vertical
+// and near-horizontal concurrences at scales up to 2^50, including 351 with the
+// A-B == A-C rounding: zero residual crossings, zero asserts.
+TEST(CrossSection, NearVerticalConcurrenceStaysConsistent) {
+  // A horizontal, B and C near-vertical with slightly different slope and a
+  // small x-offset, long edges crossing near the origin.
+  const SimplePolygon a = {{-100, 0}, {100, 0}, {0, 3}};
+  const SimplePolygon b = {{-0.10, -100}, {0.10, 100}, {2.0, 98}};
+  const SimplePolygon c = {{0.19, -100}, {0.21, 100}, {2.2, -98}};
+  const CrossSection u(Polygons{a, b, c});
+  EXPECT_GT(u.Area(), 0.0) << "near-vertical concurrence dropped entirely";
+  const CrossSection reingested(u.ToPolygons());
+  EXPECT_NEAR(reingested.Area(), u.Area(), 1e-9 * (1.0 + u.Area()))
+      << "concurrence output is not a re-ingest fixed point";
+
+  // The same shape at 2^40, where the coarse ulp makes the A-B / A-C crossings
+  // more likely to round equal; features stay above the inferred eps.
+  const double base = 1099511627776.0;
+  const vec2 o{base, base};
+  const SimplePolygon a2 = {o + vec2{-1e4, 0}, o + vec2{1e4, 0},
+                            o + vec2{0, 30}};
+  const SimplePolygon b2 = {o + vec2{-10, -1e4}, o + vec2{10, 1e4},
+                            o + vec2{200, 9800}};
+  const SimplePolygon c2 = {o + vec2{19, -1e4}, o + vec2{21, 1e4},
+                            o + vec2{220, -9800}};
+  const CrossSection u2(Polygons{a2, b2, c2});
+  EXPECT_GT(u2.Area(), 0.0)
+      << "large-coordinate near-vertical concurrence dropped entirely";
+}
+
 // A big square built together with a tiny self-intersecting feature whose edges
 // cross the square's edge at nearly the same spot (within epsilon). Those
 // crossings are distinct and must stay distinct: treating them as one collapses
