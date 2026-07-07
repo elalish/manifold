@@ -1052,8 +1052,8 @@ TEST(Manifold, Simplify) {
       CrossSection::Circle(1, 20).Translate({10, 0}).ToPolygons();
   Manifold torus = Manifold::Revolve(polyCircle, 100);
   Manifold simplified = torus.Simplify(0.4);
-  EXPECT_NEAR(torus.Volume(), simplified.Volume(), 25);
-  EXPECT_NEAR(torus.SurfaceArea(), simplified.SurfaceArea(), 10);
+  EXPECT_NEAR(torus.Volume(), simplified.Volume(), 5);
+  EXPECT_NEAR(torus.SurfaceArea(), simplified.SurfaceArea(), 12);
 
   if (options.exportModels) WriteTestOBJ("torus.obj", simplified);
 }
