@@ -240,7 +240,8 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
     for_each(autoPolicy(end - edges.begin(), 1e4), edges.begin(), end,
              [&](int edge) {
                // Optimization
-               if (halfedge_.Valid(edge) && merger[edge].totalCost > maxCost &&
+               if (halfedge_.Valid(edge) && merger[edge].Valid() &&
+                   merger[edge].totalCost > maxCost &&
                    !vertsVisited[halfedge_.Start(edge)] &&
                    !vertsVisited[halfedge_.End(edge)])
                  return;
@@ -293,7 +294,7 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
         ++numCollapsed;
       } else {
         // std::cout << "failed to collapse edge " << edge << " with cost "
-        //           << merger[edge].cost << std::endl;
+        //           << merger[edge].addedCost << std::endl;
       }
     }
     end = std::partition(edges.begin(), end,
