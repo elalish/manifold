@@ -204,17 +204,22 @@ function attachSplitterDrag(splitterElement, handleDragMove) {
     pointerDownEvent.preventDefault();
     splitterElement.setPointerCapture(pointerDownEvent.pointerId);
 
+    const dragAbortController = new AbortController();
     const onPointerMove = moveEvent => handleDragMove(moveEvent);
     const onPointerEnd = endEvent => {
       splitterElement.releasePointerCapture(endEvent.pointerId);
-      splitterElement.removeEventListener('pointermove', onPointerMove);
-      splitterElement.removeEventListener('pointerup', onPointerEnd);
-      splitterElement.removeEventListener('pointercancel', onPointerEnd);
+      dragAbortController.abort();
     };
 
-    splitterElement.addEventListener('pointermove', onPointerMove);
-    splitterElement.addEventListener('pointerup', onPointerEnd);
-    splitterElement.addEventListener('pointercancel', onPointerEnd);
+    splitterElement.addEventListener('pointermove', onPointerMove, {
+      signal: dragAbortController.signal,
+    });
+    splitterElement.addEventListener('pointerup', onPointerEnd, {
+      signal: dragAbortController.signal,
+    });
+    splitterElement.addEventListener('pointercancel', onPointerEnd, {
+      signal: dragAbortController.signal,
+    });
   });
 }
 
@@ -256,10 +261,6 @@ function setupPaneSplitters() {
         leftPanePercent, LEFT_PANE_MIN_PERCENT, LEFT_PANE_MAX_PERCENT);
     pageElement.style.setProperty('--left-pane', `${clampedLeftPanePercent}%`);
     window.localStorage.setItem(leftPaneStorageKey, clampedLeftPanePercent);
-
-    // Monaco reacts to container size changes, but an explicit layout keeps
-    // drag updates immediate and smooth.
-    editor?.layout({});
   });
 
   attachSplitterDrag(verticalSplitterElement, moveEvent => {
