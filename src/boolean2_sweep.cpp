@@ -79,7 +79,7 @@ enum class Side : uint8_t { UNDER, OVER, ON, ENDS };
 
 // Positive fill (Add: w > 0), intersection (Intersect: w > 1). Subtract feeds
 // the second operand with negative multiplicity, so it uses the Add rule.
-bool IsInside(WindRule rule, long long w) {
+bool IsInside(WindRule rule, int64_t w) {
   switch (rule) {
     case WindRule::Add:
       return w > 0;
@@ -100,11 +100,11 @@ struct PairLexLess {
     return kLexLess(a.second, b.second);
   }
 };
-using PolySet2 = std::map<std::pair<vec2, vec2>, long long, PairLexLess>;
+using PolySet2 = std::map<std::pair<vec2, vec2>, int64_t, PairLexLess>;
 
 // Add the directed edge a->b with multiplicity m: normalize the key to lex
 // order (negating m on reversal) and erase zero-length or zero-sum entries.
-void PolySetAdd(PolySet2& ps, vec2 a, vec2 b, long long m) {
+void PolySetAdd(PolySet2& ps, vec2 a, vec2 b, int64_t m) {
   if (a == b || m == 0) return;  // zero-length / zero-mult discarded (6.5)
   if (kLexLess(b, a)) {
     std::swap(a, b);
@@ -123,7 +123,7 @@ void PolySetAdd(PolySet2& ps, vec2 a, vec2 b, long long m) {
 // construction uses eps only and does not decimate collinear verts; Simplify
 // owns that.
 void MergeVerticals1D(PolySet2& ps) {
-  std::map<double, std::vector<std::pair<std::pair<double, double>, long long>>>
+  std::map<double, std::vector<std::pair<std::pair<double, double>, int64_t>>>
       groups;
   std::vector<std::pair<vec2, vec2>> toErase;
   for (const auto& kv : ps) {
@@ -135,14 +135,14 @@ void MergeVerticals1D(PolySet2& ps) {
   }
   for (const auto& k : toErase) ps.erase(k);
   for (const auto& g : groups) {
-    std::map<double, long long> delta;  // coverage change at y
+    std::map<double, int64_t> delta;  // coverage change at y
     for (const auto& seg : g.second) {
       delta[seg.first.first] += seg.second;
       delta[seg.first.second] -= seg.second;
     }
     // Emit a segment for each consecutive breakpoint gap with the running
     // coverage, preserving every input vertex on the vertical.
-    long long cover = 0;
+    int64_t cover = 0;
     double prevY = 0;
     bool have = false;
     for (const auto& d : delta) {
@@ -160,7 +160,7 @@ void MergeVerticals1D(PolySet2& ps) {
 // direction.
 struct SweepEdge {
   vec2 l, r;
-  long long m;
+  int64_t m;
   uint64_t seq;
 };
 
@@ -175,7 +175,7 @@ class SweepPass {
  public:
   SweepPass(WindRule rule, SweepMode mode) : rule_(rule), mode_(mode) {}
 
-  void Seed(vec2 a, vec2 b, long long m) { PendingAdd(a, b, m); }
+  void Seed(vec2 a, vec2 b, int64_t m) { PendingAdd(a, b, m); }
 
   // `mergeVerticalOutput` runs the footnote-9 vertical resolve on the result:
   // coincident and overlapping vertical edges are summed into signed-coverage
@@ -196,11 +196,11 @@ class SweepPass {
   PolySet2& Out() { return out_; }
 
  private:
-  long long LexMultiplicity(const SweepEdge& e) const {
+  int64_t LexMultiplicity(const SweepEdge& e) const {
     return kLexLess(e.l, e.r) ? e.m : -e.m;
   }
 
-  void PendingAdd(vec2 a, vec2 b, long long m) {
+  void PendingAdd(vec2 a, vec2 b, int64_t m) {
     if (a == b || m == 0) return;
     if (kLexLess(b, a)) {
       std::swap(a, b);
@@ -252,8 +252,8 @@ class SweepPass {
   // 7.4.3 (+collect override): in collect mode the piece goes to `out` with its
   // role multiplicity (building the arrangement). In measure mode emit iff the
   // fill below/above differs, oriented interior-on-left.
-  void EmitBoundary(const vec2& from, const vec2& to, long long m,
-                    long long below, long long above) {
+  void EmitBoundary(const vec2& from, const vec2& to, int64_t m, int64_t below,
+                    int64_t above) {
     if (from == to) return;
     if (mode_ == SweepMode::Arrangement) {
       PolySetAdd(out_, from, to, m);
@@ -337,12 +337,12 @@ class SweepPass {
     size_t hi = n;
     while (hi > lo && cls[hi - 1] == Side::OVER) hi--;
     std::vector<SweepEdge> reinsert;
-    long long w = 0;
+    int64_t w = 0;
     for (size_t i = 0; i < lo; ++i) w += LexMultiplicity(status_[i]);
     for (size_t i = lo; i < hi; ++i) {
       SweepEdge& e = status_[i];
-      const long long lm = LexMultiplicity(e);
-      const long long below = w, above = w + lm;
+      const int64_t lm = LexMultiplicity(e);
+      const int64_t below = w, above = w + lm;
       w = above;
       if (cls[i] == Side::ENDS) {
         EmitBoundary(e.l, e.r, e.m, below, above);
@@ -377,7 +377,7 @@ class SweepPass {
   WindRule rule_;
   SweepMode mode_;
   std::set<vec2, LexLess> events_;
-  std::map<vec2, std::map<vec2, long long, LexLess>, LexLess> pending_;
+  std::map<vec2, std::map<vec2, int64_t, LexLess>, LexLess> pending_;
   std::vector<SweepEdge> status_;
   PolySet2 out_;
   uint64_t seqCounter_ = 0;
@@ -444,13 +444,13 @@ std::vector<OutEdge> SweepWinding(const std::vector<EdgeM>& edges,
   // lex-min/lex-max endpoints with signed multiplicity: positive runs lo->hi.
   std::vector<OutEdge> result;
   for (const auto& kv : out) {
-    const long long m = kv.second;
+    const int64_t m = kv.second;
     if (m == 0) continue;
     const int loId = getId(kv.first.first);
     const int hiId = getId(kv.first.second);
     const int from = m > 0 ? loId : hiId;
     const int to = m > 0 ? hiId : loId;
-    for (long long c = 0; c < std::abs(m); ++c) result.push_back({from, to, 1});
+    for (int64_t c = 0; c < std::abs(m); ++c) result.push_back({from, to, 1});
   }
   return result;
 }

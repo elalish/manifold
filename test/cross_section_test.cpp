@@ -679,13 +679,8 @@ const DenseNeedleCase kDenseNeedleClusterCases[] = {
 TEST(CrossSection, DenseNeedleClusterNonClosingWalk) {
   for (const auto& c : kDenseNeedleClusterCases) {
     SCOPED_TRACE(c.name);
-    // Per-row try/catch so each row reports independently.
-    try {
-      const CrossSection cs(c.polys);
-      EXPECT_GT(cs.Area(), 0.0) << "needle cluster dropped entirely";
-    } catch (const std::exception& e) {
-      ADD_FAILURE() << "construction threw: " << e.what();
-    }
+    const CrossSection cs(c.polys);
+    EXPECT_GT(cs.Area(), 0.0) << "needle cluster dropped entirely";
   }
 }
 
@@ -722,12 +717,8 @@ TEST(CrossSection, DenseNearConcurrentFanNonClosingWalk) {
        {401641806989572.88, -642381746258070.88},
        {198358193010426.28, 242381746258070.59}},
   };
-  try {
-    const CrossSection u(fan);
-    EXPECT_GT(u.Area(), 0.0) << "dense near-concurrent fan dropped entirely";
-  } catch (const std::exception& e) {
-    ADD_FAILURE() << "construction threw: " << e.what();
-  }
+  const CrossSection u(fan);
+  EXPECT_GT(u.Area(), 0.0) << "dense near-concurrent fan dropped entirely";
 }
 
 // Offset consumes boolean output directly, before any re-quantization pass
