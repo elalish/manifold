@@ -157,9 +157,9 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge,
   if (pair < 0) {
     return {};
   }
-  if (halfedge_.IsForward(edge)) {
-    return {MaxCost()};
-  }
+  // if (halfedge_.IsForward(edge)) {
+  //   return {MaxCost()};
+  // }
   const int start = halfedge_.Start(edge);
   const int end = halfedge_.End(edge);
   if (start < firstNewVert && end < firstNewVert) {
@@ -169,7 +169,7 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge,
   const double lenSq = la::dot(delta, delta);
   const vec3 mid = vertPos_[start] + delta / 2;
   if (lenSq < epsilon_ * epsilon_) {
-    return {-1, 0.5, mid};
+    return {-1, 0, 0.5, mid};
   }
   mat3 A(0.);
   vec3 b(0.);
@@ -207,14 +207,14 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge,
   const mat2 A2 = transpose(P) * A * P;
   const vec2 b2 = transpose(P) * b;
   vec2 u = inverse(A2) * b2;
-  if (!std::isfinite(u[0])) return {0, 0.5, mid};
+  if (!std::isfinite(u[0])) return {0, 0, 0.5, mid};
   // u[0] is the interpolation along the collapsed edge, which is used to
   // interpolate the properties. It is clamped to avoid extrapolation.
   u[0] = la::clamp(u[0], -0.5, 0.5);
   // Cost has units of length^2.
   const double cost =
       std::max(0.0, la::dot(u, A2 * u) - 2 * la::dot(b2, u) + c);
-  return {cost, u[0] + 0.5, mid + P * u};
+  return {cost, cost, u[0] + 0.5, mid + P * u};
 }
 
 void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
@@ -239,28 +239,36 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
   while (edges.begin() != end) {
     for_each(autoPolicy(end - edges.begin(), 1e4), edges.begin(), end,
              [&](int edge) {
-               const auto edgeCost = CheckEdge(edge, firstNewVert);
-               if (edgeCost.Valid() &&
-                   totalCost[halfedge_.Start(edge)] + edgeCost.cost < maxCost &&
-                   totalCost[halfedge_.End(edge)] + edgeCost.cost < maxCost) {
-                 merger[edge] = edgeCost;
-               } else {
-                 merger[edge] = Merger();
-               }
+               // Optimization
+               if (halfedge_.Valid(edge) && merger[edge].totalCost > maxCost &&
+                   !vertsVisited[halfedge_.Start(edge)] &&
+                   !vertsVisited[halfedge_.End(edge)])
+                 return;
+
+               Merger edgeCost = CheckEdge(edge, firstNewVert);
+
+               if (edgeCost.Valid())
+                 edgeCost.totalCost +=
+                     std::max(totalCost[halfedge_.Start(edge)],
+                              totalCost[halfedge_.End(edge)]);
+               merger[edge] = edgeCost;
              });
-    stable_sort(edges.begin(), end,
-                [&](int a, int b) { return merger[a].cost < merger[b].cost; });
+    stable_sort(edges.begin(), end, [&](int a, int b) {
+      return merger[a].totalCost < merger[b].totalCost;
+    });
     std::fill(vertsVisited.begin(), vertsVisited.end(), false);
     auto itr = edges.begin();
     size_t numCollapsed = 0;
-    const bool shortCollapse = merger[*itr].cost < 0;
-    for (; itr != end && merger[*itr].Valid(); ++itr) {
+    const bool shortCollapse = merger[*itr].Short();
+    for (;
+         itr != end && merger[*itr].Valid() && merger[*itr].totalCost < maxCost;
+         ++itr) {
       const int edge = *itr;
       if (halfedge_.Pair(edge) < 0) {
         merger[edge] = Merger();  // mark visited
         continue;
       }
-      if (shortCollapse && merger[edge].cost >= 0) {
+      if (shortCollapse && !merger[edge].Short()) {
         break;  // force recalculation of cost after short edges collapse.
       }
       const int startV = halfedge_.Start(edge);
@@ -273,14 +281,19 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
       totalCost.resize(vertPos_.size(), 0);
       if (didCollapse) {
         // only mark long edges as visited, allowing short merges to stack.
-        if (merger[edge].cost >= 0) {
-          totalCost[startV] += merger[edge].cost;
-          totalCost[endV] += merger[edge].cost;
+        // std::cout << "collapsed edge " << edge << " with cost "
+        //           << merger[edge].cost << std::endl;
+        if (!merger[edge].Short()) {
+          totalCost[startV] += merger[edge].addedCost;
+          totalCost[endV] += merger[edge].addedCost;
           vertsVisited[startV] = true;
           vertsVisited[endV] = true;
         }
         merger[edge] = Merger();  // mark visited
         ++numCollapsed;
+      } else {
+        // std::cout << "failed to collapse edge " << edge << " with cost "
+        //           << merger[edge].cost << std::endl;
       }
     }
     end = std::partition(edges.begin(), end,
@@ -362,14 +375,14 @@ void Manifold::Impl::CollapseColinearEdges(int firstNewVert) {
     // Collapse colinear edges, but only remove new verts, i.e. verts with
     // index
     // >= firstNewVert. This is used to keep the Boolean from changing the
-    // non-intersecting parts of the input meshes. Colinear is defined not by a
-    // local check, but by the global MarkCoplanar function, which keeps this
-    // from being vulnerable to error stacking.
+    // non-intersecting parts of the input meshes. Colinear is defined not by
+    // a local check, but by the global MarkCoplanar function, which keeps
+    // this from being vulnerable to error stacking.
     auto colinearEdge = [&](int edge) {
       const int pair = halfedge_.Pair(edge);
       if (pair < 0 || halfedge_.Start(edge) < firstNewVert) return false;
-      // Flag redundant edges - those where the startVert is surrounded by only
-      // two original triangles.
+      // Flag redundant edges - those where the startVert is surrounded by
+      // only two original triangles.
       const TriRef ref0 = meshRelation_.triRef[edge / 3];
       int current = NextHalfedge(pair);
       TriRef ref1 = meshRelation_.triRef[current / 3];
@@ -669,8 +682,8 @@ bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges, double tol,
       const int tri = current / 3;
       const TriRef ref = triRef[tri];
       const mat2x3 projection = GetAxisAlignedProjection(faceNormal_[tri]);
-      // Don't collapse if the edge is not redundant (this may have changed due
-      // to the collapse of neighbors).
+      // Don't collapse if the edge is not redundant (this may have changed
+      // due to the collapse of neighbors).
       if (!ref.SameFace(refCheck)) {
         const TriRef oldRef = refCheck;
         refCheck = triRef[edge / 3];
@@ -804,7 +817,7 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges,
   // degrees to allow more edges to collapse.
 
   // relax threshold for short edges
-  if (merger.cost > epsilon_ * epsilon_ && newWorst > 0.5 &&
+  if (merger.addedCost > epsilon_ * epsilon_ && newWorst > 0.5 &&
       newWorst > oldWorst)
     return false;
 

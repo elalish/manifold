@@ -196,11 +196,13 @@ struct Manifold::Impl {
 
   // edge_op.cpp
   struct Merger {
-    double cost = std::numeric_limits<double>::infinity();
+    double addedCost = std::numeric_limits<double>::infinity();
+    double totalCost = std::numeric_limits<double>::infinity();
     double a = std::numeric_limits<double>::quiet_NaN();
     vec3 newPos = vec3(a);
 
-    bool Valid() const { return std::isfinite(cost); }
+    bool Valid() const { return std::isfinite(addedCost); }
+    bool Short() const { return addedCost < 0; }
   };
   double MaxCost() const { return tolerance_ * tolerance_; }
   void CleanupTopology();

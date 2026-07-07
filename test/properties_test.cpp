@@ -99,7 +99,7 @@ TEST(Properties, ToleranceCylinder) {
 TEST(Properties, ToleranceCube) {
   Manifold cube = Manifold::Cube().Refine(5);
   EXPECT_EQ(cube.NumTri(), 300);
-  Manifold cube2 = cube.Simplify();  //.Simplify();
+  Manifold cube2 = cube.Simplify();
   EXPECT_EQ(cube2.NumTri(), 12);
   EXPECT_EQ(cube2.Genus(), 0);
   EXPECT_DOUBLE_EQ(cube.Volume(), cube2.Volume());

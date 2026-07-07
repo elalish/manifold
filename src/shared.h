@@ -218,12 +218,19 @@ class Halfedges {
   size_t size() const { return start_.size(); }
   bool empty() const { return start_.empty(); }
 
+  bool Valid(int idx) const { return Pair(idx) >= 0; }
   int Start(int idx) const { return start_[idx]; }
   int End(int idx) const { return start_[NextHalfedge(idx)]; }
   int Pair(int idx) const { return paired_[idx]; }
   int Prop(int idx) const { return propVert_[idx]; }
   int PropEnd(int idx) const { return propVert_[NextHalfedge(idx)]; }
 
+  void MakeInvalid(int idx) {
+    paired_[idx] = -1;
+    start_[idx] = -1;
+    start_[NextHalfedge(idx)] = -1;
+    propVert_[idx] = -1;
+  }
   void SetStart(int idx, int vert) { start_[idx] = vert; }
   void SetEnd(int idx, int vert) { start_[NextHalfedge(idx)] = vert; }
   void SetPair(int idx, int pair) { paired_[idx] = pair; }

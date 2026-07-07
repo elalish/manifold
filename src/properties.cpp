@@ -221,7 +221,7 @@ bool Manifold::Impl::MatchesTriNormals() const {
  * Returns the number of triangles that are colinear within tolerance_.
  */
 int Manifold::Impl::NumDegenerateTris() const {
-  if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
+  if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return 0;
   return count_if(countAt(0_uz), countAt(NumTri()), [this](size_t face) {
     if (halfedge_.Pair(3 * face) < 0) return true;
 

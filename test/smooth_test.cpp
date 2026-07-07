@@ -238,7 +238,7 @@ TEST(Smooth, Fillet) {
   // EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);
   // EXPECT_NEAR(fillet.Volume(), 7745, 1);
   // EXPECT_NEAR(fillet.SurfaceArea(), 2622, 1);
-  if (options.exportModels) WriteTestOBJ("fillet.obj", chamfered);
+  if (options.exportModels) WriteTestOBJ("fillet.obj", chamfer);
 }
 
 TEST(Smooth, Manual) {
