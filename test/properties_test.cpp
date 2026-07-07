@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "../src/utils.h"
+#include "gtest/gtest.h"
 #include "manifold/manifold.h"
 #include "test.h"
 

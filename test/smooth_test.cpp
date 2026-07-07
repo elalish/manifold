@@ -14,6 +14,7 @@
 
 #include <algorithm>
 
+#include "gtest/gtest.h"
 #include "manifold/cross_section.h"
 #include "manifold/manifold.h"
 #include "test.h"

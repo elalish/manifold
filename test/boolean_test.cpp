@@ -17,6 +17,7 @@
 #include <thread>
 
 #include "../src/utils.h"
+#include "gtest/gtest.h"
 #include "manifold/common.h"
 #include "manifold/manifold.h"
 #include "test.h"

@@ -16,9 +16,10 @@
 #include <filesystem>
 #include <fstream>
 #endif
-
+  
 #include "manifold/manifold.h"
 #include "test.h"
+#include "gtest/gtest.h"
 
 #if (MANIFOLD_PAR == 1)
 #include <oneapi/tbb/parallel_for.h>

@@ -16,6 +16,7 @@
 
 #include "manifold/cross_section.h"
 #include "test.h"
+#include "gtest/gtest.h"
 
 using namespace manifold;
 
