@@ -42,42 +42,10 @@ struct EdgeM {
 };
 using OutEdge = EdgeM;
 
-enum class GraphOrderKind {
-  ALessOrtho,
-  AGreaterOrtho,
-  EndpointTouch,
-  NoProjectionOverlap
-};
-
-struct GraphSegment2D {
-  vec2 p0;
-  vec2 p1;
-  // Stable fallback for geometrically identical ties (e.g. two input loops
-  // sharing an edge). Must come from a deterministic source, not BVH pair
-  // order.
-  int stableEdgeId = -1;
-};
-
-struct GraphOrder2D {
-  GraphOrderKind atMinProjection = GraphOrderKind::NoProjectionOverlap;
-  GraphOrderKind atMaxProjection = GraphOrderKind::NoProjectionOverlap;
-  bool coincidentOverlap = false;
-  bool properCrossing = false;
-};
-
 double SignedArea(const SimplePolygon& loop);
 double TotalSignedArea(const Polygons& polys);
 double EpsilonFromScale(double L, int k_budget = 1000);
 double Coord(vec2 p, int axis);
-// Projection-frame graph order over a positive-width shared projection
-// interval. `ALessOrtho`/`AGreaterOrtho` compare the coordinate orthogonal to
-// `axis`, so for axis==1 they compare x over a y interval.
-GraphOrder2D CompareProjectedOrder(const GraphSegment2D& a,
-                                   const GraphSegment2D& b, int axis,
-                                   double overlapL, double overlapR,
-                                   double eps = 0.0);
-bool IntersectSegments(const GraphSegment2D& a, const GraphSegment2D& b,
-                       double eps, vec2& out);
 
 inline constexpr int kEdgePairBvhThreshold = 1024;
 // The radix-tree BVH is binary and has at most 32 Morton-code bits plus
@@ -106,7 +74,6 @@ struct Box2 {
   }
 };
 
-Box2 BoxOf2DPoint(vec2 p, double eps);
 Box2 BoxOf2DEdge(vec2 p0, vec2 p1, double eps);
 uint32_t MortonCode2(vec2 position, Box2 bBox);
 
@@ -174,114 +141,27 @@ inline void CollidePairs(const BVH& bvh, const std::vector<Box2>& queries,
                 /*parallel=*/false);
 }
 
-struct CanonEdge {
-  int vMin, vMax;
-  int mult;
-};
-
-struct CanonicalSubEdges {
-  std::vector<CanonEdge> edges;
-
-  inline void Add(int v0, int v1, int mult) {
-    if (v0 == v1) return;
-    int vMin = std::min(v0, v1);
-    int vMax = std::max(v0, v1);
-    int signedMult = (v0 < v1) ? mult : -mult;
-    edges.push_back({vMin, vMax, signedMult});
-  }
-
-  inline void Finalize() {
-    manifold::stable_sort(edges.begin(), edges.end(),
-                          [](const CanonEdge& a, const CanonEdge& b) {
-                            if (a.vMin != b.vMin) return a.vMin < b.vMin;
-                            return a.vMax < b.vMax;
-                          });
-    size_t w = 0;
-    for (size_t r = 0; r < edges.size();) {
-      size_t k = r;
-      int sumMult = 0;
-      while (k < edges.size() && edges[k].vMin == edges[r].vMin &&
-             edges[k].vMax == edges[r].vMax) {
-        sumMult += edges[k].mult;
-        ++k;
-      }
-      if (sumMult != 0) {
-        edges[w] = {edges[r].vMin, edges[r].vMax, sumMult};
-        ++w;
-      }
-      r = k;
-    }
-    edges.resize(w);
-  }
-};
-
-// Split each directed input edge at the vertices in `lists[e]`, then merge
-// matching undirected sub-edges by summing signed multiplicities.
-//
-// `edges` are the collapsed input edges. `lists[e]` is the sorted list of
-// interior vertices that split edge `e`. The returned `edges` vector is sorted
-// by `(vMin, vMax)` and omits sub-edges whose summed multiplicity is zero.
-CanonicalSubEdges Canonicalize(const std::vector<EdgeM>& edges,
-                               const std::vector<std::vector<int>>& lists);
-
-struct IntersectionPoint {
-  int i;
-  int j;
-  vec2 p;
-};
-
 struct VertexMerge {
   std::vector<int> inputVert2Merged;
   std::vector<vec2> verts;
 };
 
 VertexMerge MergeVerts(const std::vector<vec2>& in, double eps);
-bool VESetContains(const std::vector<int>& vec, int x);
-void VESetInsert(std::vector<int>& vec, int x);
 std::vector<EdgeM> RemapAndCollapse(const std::vector<EdgeM>& edges,
                                     const std::vector<int>& inputVert2Merged);
 
-struct NarrowPhaseResult {
-  std::vector<std::vector<int>> lists;
-  std::vector<IntersectionPoint> intersections;
-};
-
-// Combined narrow phase over broad-phase edge pairs. Produces sorted
-// edge-vertex split lists and independent proper edge-edge intersection
-// candidates without mutating `verts` or `edges`; serial vs TBB execution is
-// an internal thresholded implementation detail. With `findCrossings` false,
-// only the split lists are produced and `intersections` is left empty.
-NarrowPhaseResult BuildListsAndFindIntersections(
+// Incidence narrow phase over broad-phase edge pairs: for each edge, the sorted
+// list of other-edge endpoints lying within eps of its interior. Splitting each
+// edge at these vertices yields the two-vertex sub-edges the sweep operates on.
+std::vector<std::vector<int>> BuildIncidenceLists(
     const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
-    const std::vector<std::pair<int, int>>& pairs, bool findCrossings = true);
+    const std::vector<std::pair<int, int>>& pairs);
 
 void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
                               const std::vector<vec2>& verts, double eps,
                               const std::vector<Box2>& edgeBoxes,
                               const BVH& bvh,
                               std::vector<std::pair<int, int>>& pairs);
-
-// Serially materialize precomputed proper intersections into caller-owned
-// containers, in lexicographic point order: each crossing is recomputed
-// against the current pieces of its two edges before insertion, constructed
-// vertices are shared by exact coordinate equality (never aliased onto a
-// nearby vertex), and a new vertex splits other edges only where they pass
-// within the intersection construction's own error bound. Output vertices may
-// therefore be closer than eps to each other; eps quantization applies to
-// input features (MergeVerts, incidence pre-split), not constructed points.
-// `verts` and `lists` are taken by value so callers can move in the
-// post-narrow-phase state; the returned fields are those same containers after
-// appending intersection vertices and updating edge split lists.
-struct IntersectionInsertion {
-  std::vector<vec2> verts;
-  std::vector<std::vector<int>> lists;
-};
-
-IntersectionInsertion FindAndInsertIntersections(
-    const std::vector<EdgeM>& edges, std::vector<vec2> verts,
-    std::vector<std::vector<int>> lists, double eps,
-    const std::vector<Box2>& edgeBoxes, const BVH& bvh,
-    const std::vector<IntersectionPoint>& precomputedIntersections);
 
 struct Trace;
 
@@ -290,15 +170,15 @@ enum class WindRule {
   Intersect,
 };
 
-// Per-edge winding filter: for each canonical sub-edge, evaluate the winding of
-// the face just left of vMin->vMax at the start vertex (a +x ray-cast under a
-// symbolic perturbation into that face), take the right winding as leftW-mult,
-// and keep the edge iff the rule disagrees across it. Correct only on a true
-// arrangement. The ray-cast reuses boolean2's BVH over the canonical sub-edges,
-// so the pass is ~O(E log E) amortized rather than O(E^2).
-std::vector<OutEdge> FilterByWinding(const CanonicalSubEdges& canon,
-                                     const std::vector<vec2>& verts,
-                                     WindRule rule = WindRule::Add);
+// Smith sweep-line arrangement + winding over the collapsed input edges: a
+// maintained-status Bentley-Ottmann sweep discovers all crossings and
+// vertex-on-edge incidences and applies the 7.6.2 block rule (a dense
+// near-concurrence collapses to one shared vertex), then a second,
+// forced-through winding sweep emits the retained boundary under `rule`.
+// `verts` is extended with the constructed crossing vertices the emitted edges
+// reference.
+std::vector<OutEdge> SweepWinding(const std::vector<EdgeM>& edges,
+                                  std::vector<vec2>& verts, WindRule rule);
 
 struct OverlapResult {
   std::vector<vec2> verts;

@@ -18,7 +18,7 @@ set(
   boolean2_diagnostics.cpp
   boolean2_offset.cpp
   boolean2_predicates.cpp
-  boolean2_winding.cpp
+  boolean2_sweep.cpp
   boolean3.cpp
   boolean_result.cpp
   constructors.cpp

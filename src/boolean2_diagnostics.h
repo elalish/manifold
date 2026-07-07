@@ -37,40 +37,22 @@ struct Trace;
 struct PhaseAcc {
   std::atomic<int64_t> mergeNs{0};
   std::atomic<int64_t> remapNs{0};
-  std::atomic<int64_t> findIxNs{0};
-  std::atomic<int64_t> canonNs{0};
   std::atomic<int64_t> filterWindingNs{0};
   std::atomic<int64_t> totalNs{0};
   std::atomic<int64_t> cases{0};
   std::atomic<int64_t> bvhBuildNs{0};
   std::atomic<int64_t> broadPairWorkNs{0};
   std::atomic<int64_t> narrowPhaseNs{0};
-  // Point-order insertion outcomes: how each queued crossing event resolved
-  // and how many attaches its new vertex triggered.
-  std::atomic<int64_t> insertSeeds{0};
-  std::atomic<int64_t> insertGone{0};
-  std::atomic<int64_t> insertRequeued{0};
-  std::atomic<int64_t> insertApplied{0};
-  std::atomic<int64_t> insertReused{0};
-  std::atomic<int64_t> insertAttached{0};
 
   void Reset() {
     mergeNs = 0;
     remapNs = 0;
-    findIxNs = 0;
-    canonNs = 0;
     filterWindingNs = 0;
     totalNs = 0;
     cases = 0;
     bvhBuildNs = 0;
     broadPairWorkNs = 0;
     narrowPhaseNs = 0;
-    insertSeeds = 0;
-    insertGone = 0;
-    insertRequeued = 0;
-    insertApplied = 0;
-    insertReused = 0;
-    insertAttached = 0;
   }
 };
 
@@ -202,17 +184,6 @@ class TraceRecorder {
                             const std::vector<int>& inputVert2Merged);
   void RecordCollapsedEdges(const std::vector<vec2>& verts,
                             const std::vector<EdgeM>& edges);
-  void RecordBroadPhasePairs(const std::vector<vec2>& verts,
-                             const std::vector<EdgeM>& edges,
-                             const std::vector<std::pair<int, int>>& pairs);
-  void RecordEdgeVertLists(const std::vector<vec2>& verts,
-                           const std::vector<EdgeM>& edges,
-                           const std::vector<std::vector<int>>& lists);
-  void RecordInsertedIntersections(const std::vector<vec2>& verts,
-                                   const std::vector<EdgeM>& edges,
-                                   const std::vector<std::vector<int>>& lists);
-  void RecordCanonicalSubedges(const std::vector<vec2>& verts,
-                               const CanonicalSubEdges& canon);
   void RecordFilteredOutput(const std::vector<vec2>& verts,
                             const std::vector<OutEdge>& edges);
 
