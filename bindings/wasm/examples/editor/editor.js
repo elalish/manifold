@@ -204,17 +204,22 @@ function attachSplitterDrag(splitterElement, handleDragMove) {
     pointerDownEvent.preventDefault();
     splitterElement.setPointerCapture(pointerDownEvent.pointerId);
 
+    const dragAbortController = new AbortController();
     const onPointerMove = moveEvent => handleDragMove(moveEvent);
     const onPointerEnd = endEvent => {
       splitterElement.releasePointerCapture(endEvent.pointerId);
-      splitterElement.removeEventListener('pointermove', onPointerMove);
-      splitterElement.removeEventListener('pointerup', onPointerEnd);
-      splitterElement.removeEventListener('pointercancel', onPointerEnd);
+      dragAbortController.abort();
     };
 
-    splitterElement.addEventListener('pointermove', onPointerMove);
-    splitterElement.addEventListener('pointerup', onPointerEnd);
-    splitterElement.addEventListener('pointercancel', onPointerEnd);
+    splitterElement.addEventListener('pointermove', onPointerMove, {
+      signal: dragAbortController.signal,
+    });
+    splitterElement.addEventListener('pointerup', onPointerEnd, {
+      signal: dragAbortController.signal,
+    });
+    splitterElement.addEventListener('pointercancel', onPointerEnd, {
+      signal: dragAbortController.signal,
+    });
   });
 }
 
