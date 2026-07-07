@@ -169,7 +169,7 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge,
   const double lenSq = la::dot(delta, delta);
   const vec3 mid = vertPos_[start] + delta / 2;
   if (lenSq < epsilon_ * epsilon_) {
-    return {-1, 0, 0.5, mid};
+    return {-1, -1, 0.5, mid};
   }
   mat3 A(0.);
   vec3 b(0.);
@@ -283,7 +283,7 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
       if (didCollapse) {
         // only mark long edges as visited, allowing short merges to stack.
         // std::cout << "collapsed edge " << edge << " with cost "
-        //           << merger[edge].cost << std::endl;
+        //           << merger[edge].addedCost << std::endl;
         if (!merger[edge].Short()) {
           totalCost[startV] += merger[edge].addedCost;
           totalCost[endV] += merger[edge].addedCost;
