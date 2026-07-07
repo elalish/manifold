@@ -230,7 +230,7 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
   Vec<bool> vertsVisited(vertPos_.size(), false);
   Vec<double> totalCost(vertPos_.size(), 0);
   size_t totalCollapsed = 0;
-  Vec<Merger> merger(edges.size());
+  Vec<Merger> merger(edges.size(), {});
   const double maxCost = MaxCost();
   Vec<int> scratchBuffer;
   scratchBuffer.reserve(10);

@@ -197,7 +197,7 @@ struct Manifold::Impl {
   // edge_op.cpp
   struct Merger {
     double addedCost = std::numeric_limits<double>::infinity();
-    double totalCost = std::numeric_limits<double>::infinity();
+    double totalCost = 0;
     double a = std::numeric_limits<double>::quiet_NaN();
     vec3 newPos = vec3(a);
 
