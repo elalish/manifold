@@ -254,11 +254,6 @@ constexpr int kRadixTreeBuildGrainSize = 10000;
 
 }  // namespace
 
-Box2 BoxOf2DPoint(vec2 p, double eps) {
-  const vec2 pad(eps, eps);
-  return Box2(p - pad, p + pad);
-}
-
 Box2 BoxOf2DEdge(vec2 p0, vec2 p1, double eps) {
   const vec2 pad(eps, eps);
   Box2 b(p0, p1);
@@ -321,34 +316,11 @@ BVH BVHBuildFromBoxes(const std::vector<Box2>& boxes) {
   return out;
 }
 
-// ===== Canonicalize =====
-
-CanonicalSubEdges Canonicalize(const std::vector<EdgeM>& edges,
-                               const std::vector<std::vector<int>>& lists) {
-  CanonicalSubEdges out;
-  // Pre-reserve. Each input edge contributes (1 + lists[e].size()) sub-edges.
-  size_t total = edges.size();
-  for (const auto& l : lists) total += l.size();
-  out.edges.reserve(total);
-  for (size_t e = 0; e < edges.size(); ++e) {
-    int prev = edges[e].v0;
-    for (int v : lists[e]) {
-      out.Add(prev, v, edges[e].mult);
-      prev = v;
-    }
-    out.Add(prev, edges[e].v1, edges[e].mult);
-  }
-  out.Finalize();
-  return out;
-}
-
 // ===== Vertex merge =====
 // Vertex-merge and edge-collapse passes. MergeVerts buckets verts within eps
-// of each other onto an existing representative vertex;
-// CollapseDegenerateEdges drops any input edge whose endpoints merged to the
-// same vert. Both run before the BVH-broad intersection discovery. Also hosts
-// the tiny "sorted-vector as set" helpers (VESetContains, VESetInsert) used by
-// the per-edge / per-vert adjacency tracking below.
+// of each other onto an existing representative vertex; RemapAndCollapse drops
+// any input edge whose endpoints merged to the same vert. Both run before the
+// edge-pair broad phase.
 
 VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
   const int n = static_cast<int>(in.size());
@@ -504,20 +476,6 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
   return {std::move(inputVert2Merged), std::move(verts)};
 }
 
-// Per-edge split lists and per-vertex edge-incidence lists both hold small sets
-// of int ids. Almost always 2-4 elements; occasionally larger at concurrent
-// intersection points. A sorted std::vector<int> beats a std::set<int> by 5-10x
-// on per-op cost for sets this small (no node allocation, no tree rebalancing,
-// contiguous memory). Helpers keep the "set" semantics: idempotent insert, fast
-// contains, ordered iteration.
-bool VESetContains(const std::vector<int>& vec, int x) {
-  return std::binary_search(vec.begin(), vec.end(), x);
-}
-void VESetInsert(std::vector<int>& vec, int x) {
-  auto it = std::lower_bound(vec.begin(), vec.end(), x);
-  if (it == vec.end() || *it != x) vec.insert(it, x);
-}
-
 // Drop edges whose endpoints map to the same vertex after MergeVerts.
 std::vector<EdgeM> RemapAndCollapse(const std::vector<EdgeM>& edges,
                                     const std::vector<int>& inputVert2Merged) {
@@ -583,17 +541,11 @@ void RecordEdgeVertHit(const std::vector<EdgeM>& edges,
   hits.push_back({e, dotAB / g.abLen2, v});
 }
 
-bool SharesEndpoint(const EdgeM& a, const EdgeM& b) {
-  return a.v0 == b.v0 || a.v0 == b.v1 || a.v1 == b.v0 || a.v1 == b.v1;
-}
-
 void ProcessEdgePair(const std::vector<EdgeM>& edges,
                      const std::vector<vec2>& verts,
                      const std::vector<EdgeGeom>& edgeG, double eps,
                      const std::pair<int, int>& pr,
-                     std::vector<EdgeVertHit>& hits,
-                     std::vector<IntersectionPoint>& intersections,
-                     bool findCrossings) {
+                     std::vector<EdgeVertHit>& hits) {
   const int i = pr.first;
   const int j = pr.second;
   const auto& ei = edges[i];
@@ -603,12 +555,6 @@ void ProcessEdgePair(const std::vector<EdgeM>& edges,
   RecordEdgeVertHit(edges, verts, edgeG, eps2, ei.v1, j, hits);
   RecordEdgeVertHit(edges, verts, edgeG, eps2, ej.v0, i, hits);
   RecordEdgeVertHit(edges, verts, edgeG, eps2, ej.v1, i, hits);
-  if (!findCrossings || SharesEndpoint(ei, ej)) return;
-  vec2 p;
-  if (IntersectSegments({verts[ei.v0], verts[ei.v1], i},
-                        {verts[ej.v0], verts[ej.v1], j}, eps, p)) {
-    intersections.push_back({i, j, p});
-  }
 }
 
 void MaterializeEdgeVertLists(int nE, std::vector<EdgeVertHit>& flatHits,
@@ -636,22 +582,13 @@ void MaterializeEdgeVertLists(int nE, std::vector<EdgeVertHit>& flatHits,
   }
 }
 
-void SortIntersections(std::vector<IntersectionPoint>& intersections) {
-  manifold::stable_sort(
-      intersections.begin(), intersections.end(),
-      [](const IntersectionPoint& a, const IntersectionPoint& b) {
-        if (a.i != b.i) return a.i < b.i;
-        return a.j < b.j;
-      });
-}
-
 }  // namespace
 
-NarrowPhaseResult BuildListsAndFindIntersections(
+std::vector<std::vector<int>> BuildIncidenceLists(
     const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
-    const std::vector<std::pair<int, int>>& pairs, bool findCrossings) {
+    const std::vector<std::pair<int, int>>& pairs) {
   const int nE = static_cast<int>(edges.size());
-  NarrowPhaseResult result;
+  std::vector<std::vector<int>> lists;
 
   // Per-calling-thread scratch; workers read these only through const refs.
   thread_local static std::vector<EdgeGeom> edgeG;
@@ -662,42 +599,30 @@ NarrowPhaseResult BuildListsAndFindIntersections(
 
 #if (MANIFOLD_PAR == 1)
   if (pairs.size() >= kFusedNarrowParallelMin) {
-    struct Local {
-      std::vector<EdgeVertHit> hits;
-      std::vector<IntersectionPoint> ix;
-    };
-    tbb::combinable<Local> tls;
+    tbb::combinable<std::vector<EdgeVertHit>> tls;
     manifold::for_each_n(autoPolicy(pairs.size(), kFineParallelGrainSize),
                          countAt(size_t{0}), pairs.size(), [&](size_t idx) {
-                           auto& l = tls.local();
                            ProcessEdgePair(edges, verts, edgeGRef, eps,
-                                           pairs[idx], l.hits, l.ix,
-                                           findCrossings);
+                                           pairs[idx], tls.local());
                          });
-    tls.combine_each([&](const Local& l) {
-      flatHits.insert(flatHits.end(), l.hits.begin(), l.hits.end());
-      result.intersections.insert(result.intersections.end(), l.ix.begin(),
-                                  l.ix.end());
+    tls.combine_each([&](const std::vector<EdgeVertHit>& l) {
+      flatHits.insert(flatHits.end(), l.begin(), l.end());
     });
   } else
 #endif
   {
     for (const auto& pr : pairs) {
-      ProcessEdgePair(edges, verts, edgeGRef, eps, pr, flatHits,
-                      result.intersections, findCrossings);
+      ProcessEdgePair(edges, verts, edgeGRef, eps, pr, flatHits);
     }
   }
-  MaterializeEdgeVertLists(nE, flatHits, result.lists);
-  SortIntersections(result.intersections);
-  return result;
+  MaterializeEdgeVertLists(nE, flatHits, lists);
+  return lists;
 }
 
-// ===== Intersections =====
-// Edge-edge intersection discovery: broad phase collects candidate edge
-// pairs; the edge-vertex narrow phase precomputes proper intersections;
-// FindAndInsertIntersections then snaps/inserts them into both edges'
-// parameter lists. Eager-propagation re-sweeps any vert that snapped onto
-// its k-th edge to detect k+1 incidences in one pass.
+// ===== Broad phase =====
+// Edge-pair broad phase: collect the candidate edge pairs whose eps-padded
+// boxes overlap. The pairs drive the incidence narrow phase (vertex-on-edge
+// split lists); the sweep does its own crossing discovery.
 
 namespace {
 
@@ -867,149 +792,11 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
 #endif
 }
 
-IntersectionInsertion FindAndInsertIntersections(
-    const std::vector<EdgeM>& edges, std::vector<vec2> verts,
-    std::vector<std::vector<int>> lists, double eps,
-    const std::vector<Box2>& edgeBoxes, const BVH& bvh,
-    const std::vector<IntersectionPoint>& precomputedIntersections) {
-  const int nE = static_cast<int>(edges.size());
-  const double eps2 = eps * eps;
-  std::vector<std::vector<int>> vertEdges;
-  vertEdges.resize(verts.size());
-  const size_t origNumVerts = verts.size();
-  const int firstNewVert = static_cast<int>(origNumVerts);
-
-  // Serial snap+insert pass. Each iteration may push to `verts` and
-  // mutate `lists[*]`, so subsequent iterations see the latest state.
-  // Avoid structured-binding capture (C++20-only) by naming locals.
-  for (const IntersectionPoint& ix : precomputedIntersections) {
-    const int i = ix.i;
-    const int j = ix.j;
-    const vec2 p = ix.p;
-    // Snap: is p within eps of any existing vert? Search the union of
-    // (i,j)'s endpoints and existing list members of i and j.
-    auto nearVert = [&](int candidate) -> bool {
-      vec2 d = p - verts[candidate];
-      return dot(d, d) <= eps2;
-    };
-    int snapTo = -1;
-    for (int v : {edges[i].v0, edges[i].v1, edges[j].v0, edges[j].v1}) {
-      if (nearVert(v)) {
-        snapTo = v;
-        break;
-      }
-    }
-    if (snapTo < 0) {
-      for (int v : lists[i]) {
-        if (nearVert(v)) {
-          snapTo = v;
-          break;
-        }
-      }
-    }
-    if (snapTo < 0) {
-      for (int v : lists[j]) {
-        if (nearVert(v)) {
-          snapTo = v;
-          break;
-        }
-      }
-    }
-    int vNew;
-    if (snapTo >= 0) {
-      vNew = snapTo;
-    } else {
-      vNew = static_cast<int>(verts.size());
-      verts.push_back(p);
-      vertEdges.emplace_back();
-    }
-    VESetInsert(vertEdges[vNew], i);
-    VESetInsert(vertEdges[vNew], j);
-    auto insertSorted = [&](int eIdx) {
-      if (vNew == edges[eIdx].v0 || vNew == edges[eIdx].v1) return;
-      auto& lst = lists[eIdx];
-      if (VESetContains(lst, vNew)) return;
-      vec2 a = verts[edges[eIdx].v0];
-      vec2 b = verts[edges[eIdx].v1];
-      vec2 ab = b - a;
-      double abLen2 = dot(ab, ab);
-      if (abLen2 == 0) return;
-      double tNew = dot(p - a, ab) / abLen2;
-      auto pos =
-          std::lower_bound(lst.begin(), lst.end(), tNew, [&](int v, double t) {
-            double tv = dot(verts[v] - a, ab) / abLen2;
-            return tv < t;
-          });
-      if (pos == lst.end() || *pos != vNew) lst.insert(pos, vNew);
-    };
-    insertSorted(i);
-    insertSorted(j);
-  }
-
-  // Eager propagation: after all independent edge-pair intersections are
-  // inserted, add each new intersection vertex to every other edge it
-  // geometrically splits. Otherwise a later canonical sub-edge can pass through
-  // a new vertex without being split there, leaving the loop tracing
-  // dependent on tiny angular-sort differences.
-  if (verts.size() == origNumVerts) return {std::move(verts), std::move(lists)};
-  const int numNewVerts = static_cast<int>(verts.size() - origNumVerts);
-
-  // Per-(qi, eIdx) propagation step. Same logic for BVH and brute-force
-  // broad phases.
-  auto propagateNarrow = [&](int qi, int eIdx) {
-    const int v = firstNewVert + qi;
-    if (v == edges[eIdx].v0 || v == edges[eIdx].v1) return;
-    if (VESetContains(vertEdges[v], eIdx)) return;  // already incident
-    const vec2 a = verts[edges[eIdx].v0];
-    const vec2 b = verts[edges[eIdx].v1];
-    const vec2 ab = b - a;
-    const double abLen2 = dot(ab, ab);
-    if (abLen2 == 0) return;
-    const vec2 p = verts[v];
-    const double t = dot(p - a, ab) / abLen2;
-    if (t <= 0 || t >= 1) return;
-    const vec2 closest = a + ab * t;
-    const vec2 d = p - closest;
-    if (dot(d, d) > eps2) return;
-    auto& lst = lists[eIdx];
-    auto pos =
-        std::lower_bound(lst.begin(), lst.end(), t, [&](int vv, double tQ) {
-          double tv = dot(verts[vv] - a, ab) / abLen2;
-          return tv < tQ;
-        });
-    if (pos == lst.end() || *pos != v) lst.insert(pos, v);
-    VESetInsert(vertEdges[v], eIdx);
-  };
-  if (bvh.leafToOrig.empty()) {
-    for (int qi = 0; qi < numNewVerts; ++qi) {
-      const Box2 queryBox = BoxOf2DPoint(verts[firstNewVert + qi], eps);
-      for (int e = 0; e < nE; ++e) {
-        if (queryBox.DoesOverlap(edgeBoxes[e])) propagateNarrow(qi, e);
-      }
-    }
-  } else {
-    auto adapter = [&](int qi, int leafIdx) {
-      propagateNarrow(qi, bvh.leafToOrig[leafIdx]);
-    };
-    auto recorder = MakeSimpleRecorder(adapter);
-    auto qf = [&](int qi) {
-      return BoxOf2DPoint(verts[firstNewVert + qi], eps);
-    };
-    BVHCollisions(bvh, recorder, qf, numNewVerts, /*parallel=*/false);
-  }
-  return {std::move(verts), std::move(lists)};
-}
-
 // ===== Driver =====
-// End-to-end Boolean2 driver. Stitches together vertex merging, edge
-// collapse, near-vertex indexing, proper edge-edge crossing insertion,
-// sub-edge canonicalization, and winding-rule filtering. Returns an
-// OverlapResult holding the merged-vert list, the retained directed sub-edges,
-// the inputVert2Merged remap, and the merged-vert count.
-//
-// Crossings are found among two-vertex sub-edges (edges pre-split at their
-// incident vertices); FindAndInsertIntersections snaps each onto a within-eps
-// neighbor, so coincident crossings merge and distinct ones stay distinct.
+// End-to-end Boolean2 driver: vertex merge, edge collapse, incidence pre-split,
+// then the Smith sweep-line (arrangement + winding). Returns an OverlapResult
+// holding the merged-vert list, the retained directed sub-edges, the
+// inputVert2Merged remap, and the merged-vert count.
 
 OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
                                const std::vector<EdgeM>& edgesIn, double eps,
@@ -1035,9 +822,7 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
     edges = RemapAndCollapse(edgesIn, merge.inputVert2Merged);
   }
   traceRecorder.RecordCollapsedEdges(merge.verts, edges);
-  // Build a shared edge-box array for edge-edge broad phase and near-vertex
-  // derivation. Medium cases use a sweep over these boxes; very large cases
-  // build a BVH when tree construction amortizes over enough queries.
+  // Broad phase: candidate edge pairs whose eps-padded boxes overlap.
   thread_local static std::vector<Box2> edgeBoxes;
   edgeBoxes.resize(edges.size());
   for (size_t e = 0; e < edges.size(); ++e) {
@@ -1051,37 +836,26 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
       bvh = BVHBuildFromBoxes(edgeBoxes);
   }
   thread_local static std::vector<std::pair<int, int>> intersectionPairs;
-  // Collect edge pairs once, then derive both intersection candidates and
-  // near-vertex lists from that pair set. In polygon arrangements, a vertex
-  // that can split a non-incident edge must have an eps-padded vertex box
-  // overlapping that edge's eps-padded box, so it appears as one endpoint of
-  // an overlapping edge pair.
   {
     ScopedTiming timing(P.broadPairWorkNs);
     CollectIntersectionPairs(edges, merge.verts, eps, edgeBoxes, bvh,
                              intersectionPairs);
   }
-  traceRecorder.RecordBroadPhasePairs(merge.verts, edges, intersectionPairs);
-  // Build the arrangement on two-vertex sub-edges: split each edge at its
-  // incident vertices, then find crossings among the sub-edges. Splitting first
-  // keeps a crossing that lies near an incidence distinct from it.
-
-  // Incidence-only narrow over the whole-edge pairs.
-  NarrowPhaseResult incidence;
+  // Incidence pre-split: split each edge at the input vertices lying within eps
+  // of its interior. The sweep's own crossing tests are exact, so this
+  // eps-scale vertex-on-edge quantization is what the sweep cannot reproduce.
+  std::vector<std::vector<int>> incidenceLists;
   {
     ScopedTiming timing(P.narrowPhaseNs);
-    incidence = BuildListsAndFindIntersections(
-        edges, merge.verts, eps, intersectionPairs, /*findCrossings=*/false);
+    incidenceLists =
+        BuildIncidenceLists(edges, merge.verts, eps, intersectionPairs);
   }
-  // Split each edge at its incident vertices; the sub-edges become the edge
-  // set. Lists are sorted and exclude the endpoints, so the guards only skip a
-  // zero-length sub-edge.
   {
     std::vector<EdgeM> subEdges;
     subEdges.reserve(edges.size());
     for (size_t e = 0; e < edges.size(); ++e) {
       int prev = edges[e].v0;
-      for (int v : incidence.lists[e]) {
+      for (int v : incidenceLists[e]) {
         if (v != prev) subEdges.push_back({prev, v, edges[e].mult});
         prev = v;
       }
@@ -1090,55 +864,11 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
     }
     edges = std::move(subEdges);
   }
-  edgeBoxes.resize(edges.size());
-  for (size_t e = 0; e < edges.size(); ++e)
-    edgeBoxes[e] =
-        BoxOf2DEdge(merge.verts[edges[e].v0], merge.verts[edges[e].v1], eps);
-  // Broad phase and crossing narrow over the sub-edges. Cost scales with
-  // sub-edge box overlaps, so a dense near-collinear bundle (one edge split
-  // into many pieces) is super-quadratic.
-  BVH subBvh;
-  {
-    ScopedTiming timing(P.bvhBuildNs);
-    if (edges.size() >= kEdgePairBvhThreshold)
-      subBvh = BVHBuildFromBoxes(edgeBoxes);
-  }
-  thread_local static std::vector<std::pair<int, int>> subPairs;
-  {
-    ScopedTiming timing(P.broadPairWorkNs);
-    CollectIntersectionPairs(edges, merge.verts, eps, edgeBoxes, subBvh,
-                             subPairs);
-  }
-  NarrowPhaseResult narrow;
-  {
-    ScopedTiming timing(P.narrowPhaseNs);
-    narrow = BuildListsAndFindIntersections(edges, merge.verts, eps, subPairs);
-  }
-  traceRecorder.RecordEdgeVertLists(merge.verts, edges, narrow.lists);
-  // Insert the crossings; the sub-edge BVH accelerates eager propagation.
-  IntersectionInsertion inserted;
-  {
-    ScopedTiming timing(P.findIxNs);
-    inserted = FindAndInsertIntersections(
-        edges, std::move(merge.verts), std::move(narrow.lists), eps, edgeBoxes,
-        subBvh, narrow.intersections);
-  }
-  merge.verts = std::move(inserted.verts);
-  std::vector<std::vector<int>> lists = std::move(inserted.lists);
-  traceRecorder.RecordInsertedIntersections(merge.verts, edges, lists);
-
-  // Sub-edge canonicalization.
-  CanonicalSubEdges canon;
-  {
-    ScopedTiming timing(P.canonNs);
-    canon = Canonicalize(edges, lists);
-  }
-  traceRecorder.RecordCanonicalSubedges(merge.verts, canon);
-  // Per-edge ray-cast winding filter.
+  // Smith sweep-line arrangement + winding over the incidence-split sub-edges.
   std::vector<OutEdge> out;
   {
     ScopedTiming timing(P.filterWindingNs);
-    out = FilterByWinding(canon, merge.verts, pred);
+    out = SweepWinding(edges, merge.verts, pred);
   }
   traceRecorder.RecordFilteredOutput(merge.verts, out);
   CountTimingCase();

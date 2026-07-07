@@ -515,18 +515,12 @@ TEST(CrossSection, NearCoincidentLargeCoordIsValid) {
   }
 }
 
-// DISABLED: a centered near-degenerate corner touch whose two un-merged
-// crossings sit ~2.8x eps apart - just outside the merge band - so the
-// arrangement is non-manifold (a retained vertex with in != out degree) and
-// OutEdgesToPolygons correctly hits the closed-walk assert. The assert is not
-// in question: a non-closing walk is a real defect. Position-inclusive eps is a
-// no-op at the origin, so it does not address this (it fixed HostDrop/Lane B
-// only by inflating eps at their large coords until the tangle merges). In
-// Release the macro area is incidentally correct (only a sub-eps sliver drops),
-// but the arrangement is still non-manifold - the fix belongs in the
-// arrangement, not the assert. Below-resolution floor, StressB/StressD class.
-// Re-enable when the arrangement is made manifold here.
-TEST(CrossSection, DISABLED_CenteredSubEpsNonClosingWalk) {
+// A centered near-degenerate corner touch whose two crossings sit ~2.8x eps
+// apart - just outside the merge band. Snapping the constructed crossings
+// used to collapse them inconsistently, leaving a retained vertex with
+// in != out degree and a non-closing boundary walk; point-order insertion
+// keeps them exactly distinct and the walk closes.
+TEST(CrossSection, CenteredSubEpsNonClosingWalk) {
   const SimplePolygon big = {{16.326654361604518, -168.72132050147599},
                              {126.43622068872992, 170.16107906902442},
                              {-126.4362206896044, -64.998020356457175},
@@ -537,22 +531,18 @@ TEST(CrossSection, DISABLED_CenteredSubEpsNonClosingWalk) {
                               {125.43554197004028, 170.16166685379164},
                               {124.77049882701533, 169.67730915692113},
                               {125.51465251505573, 169.92009174481331}};
-  // Release-correct result (only a ~6e-8 sub-eps sliver is dropped).
   const auto u = CrossSection(big) + CrossSection(tiny);
   EXPECT_NEAR(u.Area(), 30107.44255, 1e-3);
   EXPECT_EQ(u.NumContour(), 1);
 }
 
-// Companion to DISABLED_CenteredSubEpsNonClosingWalk: three triangles share a
-// nearly-common corner on y = 0 (corners within eps but distinct), and two of
-// their sides cross just below it. That crossing lands within eps of a
-// neighbor's corner, so insertion's on-edge-incidence rule treats the corner as
-// the meeting point and drops the crossing - leaving the two sides crossing
-// with no shared vertex, a non-planar arrangement whose boundary walk cannot
-// close. The retained in/out imbalance is macro-separated (the corner and the
-// true crossing are far apart). Re-enable once insertion keeps that crossing
-// (reaches general position) - not by relaxing the closed-walk assert.
-TEST(CrossSection, NearCoincidentCornersNonClosingWalk) {
+// Companion to CenteredSubEpsNonClosingWalk, in the same class but a guard
+// rather than a fixed repro (it already resolves on master): three triangles
+// share a nearly-common corner on y = 0 (corners within eps but distinct) and
+// two of their sides cross just below it. The joint arrangement must keep that
+// crossing distinct and agree with the sequential union, which exact-identity
+// insertion must preserve.
+TEST(CrossSection, NearCoincidentCornersMatchSequentialUnion) {
   const double eps = 3.519281e-10;  // EpsilonFromScale(160)
   const SimplePolygon t0 = {{100, 0}, {70, -20}, {120, 0}};
   const SimplePolygon t1 = {{100 - 1.5 * eps, 0}, {40, -50}, {150, 0}};
@@ -566,6 +556,314 @@ TEST(CrossSection, NearCoincidentCornersNonClosingWalk) {
   EXPECT_NEAR(joint.Area(), sequential.Area(),
               1e-6 * (1.0 + sequential.Area()));
   EXPECT_EQ(joint.NumContour(), sequential.NumContour());
+}
+
+// An ordinary Extrude -> Project/Slice round-trip that used to fail the
+// closed-walk assert. The 4-ring input mixes ~1000-scale edges with 1e-6-scale
+// near-origin verts; slicing the extruded prism feeds the 2D overlap removal a
+// near-coincident tangle. The anchors are self-consistency, not recorded
+// output: a prism's projection and any slice must reproduce the base
+// section's area, and the slice must reproduce the regularized base's own
+// contour count. Two raw rings meet in a sub-eps tangle whose
+// separate-or-pinched resolution is a decision-band call, so cross-pipeline
+// counts may differ (Project resolves it through the 3D mesh); area may not.
+// Same class as CenteredSubEpsNonClosingWalk, reached from a 3D round-trip
+// instead of a 2D construct.
+TEST(CrossSection, ExtrudeProjectSliceNonClosingWalk) {
+  const Polygons inputPolys = {
+      {{0., 9.9999999999999995e-07},
+       {1024., 1000.},
+       {-1., 0.},
+       {0., -1000.},
+       {-364.96862275285457, -1024.}},
+      {{1000., 3.385490849236616},
+       {368.52866094522233, -9.9999999999999995e-07},
+       {-1., 9.9999999999999995e-07},
+       {-0., -1.},
+       {1024., 9.9999999999999995e-07},
+       {-9.9999999999999995e-07, -9.9999999999999995e-07}},
+      {{-0., -1.},
+       {-9.9999999999999995e-07, 0.},
+       {0., 9.9999999999999995e-07},
+       {1024., -998.2714902694496}},
+      {{0., -9.9999999999999995e-07},
+       {0., -1024.},
+       {996.36854414150923, 1024.},
+       {-9.9999999999999995e-07, 1000.}}};
+  const double height = 3.4451635980796125;
+
+  const CrossSection input(inputPolys);
+  const double baseArea = input.Area();  // 1007807.5149243348
+  const auto solid = Manifold::Extrude(input.ToPolygons(), height, 4);
+  ASSERT_EQ(solid.Status(), Manifold::Error::NoError);
+
+  const CrossSection projected(solid.Project());
+  EXPECT_NEAR(projected.Area(), baseArea, 1e-6 * baseArea);
+
+  const CrossSection middle(solid.Slice(height * 0.5));
+  EXPECT_NEAR(middle.Area(), baseArea, 1e-6 * baseArea);
+  EXPECT_EQ(middle.NumContour(), input.NumContour());
+
+  const CrossSection reingested(middle.ToPolygons());
+  EXPECT_EQ(reingested.NumContour(), middle.NumContour())
+      << "sliced output is not a fixed point on re-ingest";
+}
+
+// Rows for DenseNeedleClusterNonClosingWalk: clusters of 3-vertex
+// needles (~256 long) whose long edges all cross near one point. ClusterA and
+// ClusterB are ~8 eps wide; ClusterAWide is ClusterA with each needle fattened
+// to width 160 (only the third vertex moves, so the long edges - and their
+// crossings - are identical).
+struct DenseNeedleCase {
+  const char* name;
+  Polygons polys;
+};
+const DenseNeedleCase kDenseNeedleClusterCases[] = {
+    {"ClusterA",
+     {{{-52.844785200907552, 11.738195865789642},
+       {180.84478520105384, 116.26180413371509},
+       {-52.844785201225143, 11.7381958664997}},
+      {{184.21607975286577, 20.044406852645196},
+       {-56.216079752192982, 107.95559314730275},
+       {184.21607975228173, 20.044406851047878}},
+      {{183.78007103303065, 18.869804085086884},
+       {-55.780071032939389, 109.1301959152371},
+       {183.78007103275826, 18.869804084363938}},
+      {{-59.508159390888785, 30.388475727204394},
+       {187.50815939057648, 97.611524271982049},
+       {-59.508159391287123, 30.388475728668116}},
+      {{-63.918266323361621, 59.426473917584424},
+       {191.91826632337171, 68.573526081913101},
+       {-63.918266323478399, 59.426473920850682}}}},
+    {"ClusterB",
+     {{{104.04456739522388, -57.574802579199783},
+       {23.955432604325701, 185.57480257870571},
+       {104.04456739252515, -57.574802580088694}},
+      {{73.112160047524867, -63.675246383911869},
+       {54.887839952808484, 191.67524638452852},
+       {73.112160045423437, -63.67524638406185}},
+      {{68.972209083850558, -63.903389856805731},
+       {59.027790916471098, 191.90338985654023},
+       {68.972209082544964, -63.903389856856485}},
+      {{3.8527157899330007, -48.988071061439712},
+       {124.14728421024159, 176.98807106106776},
+       {3.8527157875442106, -48.988071060168082}},
+      {{154.85567166460123, -26.162336518078007},
+       {-26.855671664628098, 154.16233651777404},
+       {154.85567166184316, -26.162336520857281}}}},
+    {"ClusterAWide",
+     {{{-52.844785200907552, 11.738195865789642},
+       {180.84478520105384, 116.26180413371509},
+       {-118.17204036836097, 157.79417736701549}},
+      {{184.21607975286577, 20.044406852645196},
+       {-56.216079752192982, 107.95559314730275},
+       {129.2715883187048, -130.22569283801653}},
+      {{183.78007103303065, 18.869804085086884},
+       {-55.780071032939389, 109.1301959152371},
+       {127.36732613918676, -130.8552847061444}},
+      {{-59.508159390888785, 30.388475727204394},
+       {187.50815939057648, 97.611524271982049},
+       {-101.52256473137481, 184.77367496562019}},
+      {{-63.918266323361621, 59.426473917584424},
+       {191.91826632337171, 68.573526081913101},
+       {-69.63517392606704, 219.32430682179276}}}},
+};
+
+// Dense needle clusters whose pairwise crossings land within eps of each
+// other. Snapping used to collapse the near-coincident crossings
+// inconsistently and either fail the closed-walk assert or silently drop the
+// cluster (ClusterB came back empty). ClusterAWide guards feature-size
+// independence: the needles are fattened to 160 x 256 wedges but the long
+// edges - and their crossings - are identical, so it exercises the same
+// tangle.
+TEST(CrossSection, DenseNeedleClusterNonClosingWalk) {
+  for (const auto& c : kDenseNeedleClusterCases) {
+    SCOPED_TRACE(c.name);
+    const CrossSection cs(c.polys);
+    EXPECT_GT(cs.Area(), 0.0) << "needle cluster dropped entirely";
+  }
+}
+
+// A dense near-concurrent fan: seven thin triangles whose long edges all pass
+// within ~1 ulp of a common point. This is a regression against master, which
+// resolves it to one positive region (area ~1.01e29). Keeping constructed
+// crossings exactly distinct leaves two near-coincident crossings whose
+// sub-edges cross, so the retained graph is non-manifold: construction throws
+// the closed-walk assert with asserts on and silently drops the whole region
+// with asserts off. Reproduces at every scale (verified from ~1e3 up to 2^60);
+// irregular geometry is required, which is why the symmetric needle clusters
+// above do not trigger it.
+TEST(CrossSection, DenseNearConcurrentFanNonClosingWalk) {
+  const Polygons fan = {
+      {{59517310903986.016, 275227482880513.75},
+       {20649604556759.438, 251161349675909.44},
+       {579350395443240.88, -651161349675909.25}},
+      {{-246975444669931.22, -585938137005999.5},
+       {-219529778661818.47, -619896154117160},
+       {819529778661818.62, 219896154117159.78}},
+      {{147473383423457.41, -696078580400449.88},
+       {181663560574651.72, -704104581308617.12},
+       {418336439425347, 304104581308617.44}},
+      {{477120205194571.38, -549531644009214.44},
+       {501984621138576.69, -534518327170141.75},
+       {98015378861423.172, 134518327170141.72}},
+      {{546200240516309.75, -818792851748143.62},
+       {568072302752725.25, -809167762485802},
+       {31927697247276.043, 409167762485802.5}},
+      {{538266378181197.31, -930929118489626},
+       {545918584749244.25, -928345427098964.88},
+       {54081415250756.258, 528345427098965.06}},
+      {{392560430378768.94, -644468286981061},
+       {401641806989572.88, -642381746258070.88},
+       {198358193010426.28, 242381746258070.59}},
+  };
+  const CrossSection u(fan);
+  EXPECT_GT(u.Area(), 0.0) << "dense near-concurrent fan dropped entirely";
+}
+
+// Offset consumes boolean output directly, before any re-quantization pass
+// can fuse it, so output around a resolved tangle (constructed verts closer
+// than eps) must not destabilize it: a degenerate edge's offset normal is
+// noise-directed and a wrong join lands a full |delta| away. The anchors are
+// containment-style: outward offset grows the area, inward shrinks it.
+TEST(CrossSection, OffsetOverBooleanOutput) {
+  const CrossSection cs(kDenseNeedleClusterCases[0].polys);
+  ASSERT_GT(cs.Area(), 0.0);
+  const CrossSection grown = cs.Offset(2.0, CrossSection::JoinType::Miter);
+  EXPECT_GT(grown.Area(), cs.Area());
+  const CrossSection shrunk = cs.Offset(-0.5, CrossSection::JoinType::Miter);
+  EXPECT_LT(shrunk.Area(), cs.Area());
+  EXPECT_GE(shrunk.Area(), 0.0);
+}
+
+// A pencil of eps-wide needles through a nearly common center (each member is
+// offset from the shared point by a fraction of eps along its normal). Same
+// class as DenseNeedleClusterNonClosingWalk: the crossings inside one eps
+// neighborhood used to collapse inconsistently and the output came back
+// silently empty without the assert.
+TEST(CrossSection, NearParallelPencilNonClosingWalk) {
+  const Polygons pencil = {{{-63.979717401988935, 61.721418487951532},
+                            {191.97971740203434, 66.2785815094974},
+                            {-63.979717402039057, 61.72141849076651}},
+                           {{79.643622392174876, -63.040454495609566},
+                            {48.356377607563161, 191.04045449557731},
+                            {79.643622389380553, -63.040454495953654}},
+                           {{168.87708292123006, -9.3811793168618607},
+                            {-40.877082922188407, 137.3811793154922},
+                            {168.87708291961599, -9.3811793191686856}},
+                           {{186.42006459837165, 26.619152180153641},
+                            {-58.420064599014012, 101.3808478177427},
+                            {186.42006459754944, 26.619152177460951}},
+                           {{191.51680774298507, 52.888576012113219},
+                            {-63.516807743206556, 75.111423985344928},
+                            {191.51680774274067, 52.888576009308423}}};
+  const CrossSection cs(pencil);
+  EXPECT_GT(cs.Area(), 0.0) << "needle pencil dropped entirely";
+}
+
+// Unlike the two classes above, this one reproduces only at large
+// coordinates. A chain of overlapping triangles whose apexes step along
+// y = 2^40 at 0.5 * eps spacing; at this magnitude eps is ~3.0 absolute, so
+// the apex spacing is sub-eps while the triangles are only ~10..60 eps across.
+// Construction used to fail the closed-walk assert ("retained directed edges
+// must form closed walks"). The reference below is the same chain translated
+// to the origin: every coordinate offset from 2^40 is exactly representable,
+// so the subtraction is exact and the reference is the same geometry at a
+// magnitude where it resolves at full precision into one contour. At 2^40 the
+// arrangement is valid but eps-quantized: near-coincident chain edges bent
+// through the same within-eps vertices cancel, so sliver pockets narrower
+// than eps are collapsed. The area deviation from the full-precision
+// reference is bounded by eps times the input perimeter, and the quantized
+// tangle may resolve with a different contour count, so the anchors are the
+// quantization envelope and re-ingest stability, not exact topology.
+TEST(CrossSection, CornerChainLargeCoord) {
+  const Polygons chain = {{{1099511627871.4653, 1099511627776},
+                           {1099511627843.8198, 1099511627749},
+                           {1099511627898.7, 1099511627775.85}},
+                          {{1099511627869.9539, 1099511627776},
+                           {1099511627843.2, 1099511627746},
+                           {1099511627899.6001, 1099511627776}},
+                          {{1099511627863.908, 1099511627776},
+                           {1099511627840.5, 1099511627749},
+                           {1099511627903.2, 1099511627776.1499}},
+                          {{1099511627862.3962, 1099511627776},
+                           {1099511627839.6599, 1099511627746},
+                           {1099511627904.1001, 1099511627775.85}}};
+  const double base = 1099511627776.0;  // 2^40
+  Polygons originChain = chain;
+  for (auto& poly : originChain)
+    for (auto& v : poly) v -= vec2(base, base);
+  // The translation round-trips exactly.
+  ASSERT_EQ(originChain[0][0].x + base, chain[0][0].x);
+  ASSERT_EQ(originChain[0][0].y + base, chain[0][0].y);
+  const CrossSection reference(originChain);
+  ASSERT_EQ(reference.NumContour(), 1);
+  double perimeter = 0.0;
+  for (const auto& poly : chain) {
+    for (size_t i = 0; i < poly.size(); ++i) {
+      perimeter += la::length(poly[(i + 1) % poly.size()] - poly[i]);
+    }
+  }
+  // Upper bound on the inferred eps: EpsilonFromScale rounds the scale up to
+  // a power of two, so eps <= (1000 + 1) * 12.37 * 2^-53 * 2 * scale.
+  const double eps = 1001 * 12.37 * std::ldexp(2.0, -53) * base;
+  CrossSection cs(chain);
+  EXPECT_NEAR(cs.Area(), reference.Area(), eps * perimeter)
+      << "large-coordinate corner chain lost more than the eps envelope";
+  EXPECT_GT(cs.Area(), 0.0);
+  // Construction is not a one-pass fixed point here: the next pass's input
+  // merge fuses micro features the first pass kept distinct. It must reach a
+  // bit-stable fixed point within a few passes, and the converged result has
+  // the reference's topology.
+  double prev = cs.Area();
+  bool fixed = false;
+  for (int it = 0; it < 4 && !fixed; ++it) {
+    cs = CrossSection(cs.ToPolygons());
+    fixed = cs.Area() == prev;
+    prev = cs.Area();
+  }
+  EXPECT_TRUE(fixed) << "re-ingest did not reach a fixed point";
+  EXPECT_EQ(cs.NumContour(), reference.NumContour());
+  EXPECT_NEAR(cs.Area(), reference.Area(), eps * perimeter);
+}
+
+// Three edges crossing near one point with two of them near-vertical, the
+// configuration where exact-coordinate identity could in principle be
+// inconsistent: the crossing of the horizontal edge A with each near-vertical
+// edge (A-B, A-C) can round to the same exact point while B-C rounds elsewhere.
+// It cannot leave a residual crossing: two straight segments meet at most once,
+// so if A-B and A-C coincide, B and C are attached to that shared vertex and
+// their own single crossing either coincides with it or shares both endpoints
+// with it (a zero-area 2-gon that cancels) - never a second proper crossing.
+// The union must construct (no closed-walk assert), stay non-empty, and be a
+// stable re-ingest fixed point. Adversarially checked over ~1000 near-vertical
+// and near-horizontal concurrences at scales up to 2^50, including 351 with the
+// A-B == A-C rounding: zero residual crossings, zero asserts.
+TEST(CrossSection, NearVerticalConcurrenceStaysConsistent) {
+  // A horizontal, B and C near-vertical with slightly different slope and a
+  // small x-offset, long edges crossing near the origin.
+  const SimplePolygon a = {{-100, 0}, {100, 0}, {0, 3}};
+  const SimplePolygon b = {{-0.10, -100}, {0.10, 100}, {2.0, 98}};
+  const SimplePolygon c = {{0.19, -100}, {0.21, 100}, {2.2, -98}};
+  const CrossSection u(Polygons{a, b, c});
+  EXPECT_GT(u.Area(), 0.0) << "near-vertical concurrence dropped entirely";
+  const CrossSection reingested(u.ToPolygons());
+  EXPECT_NEAR(reingested.Area(), u.Area(), 1e-9 * (1.0 + u.Area()))
+      << "concurrence output is not a re-ingest fixed point";
+
+  // The same shape at 2^40, where the coarse ulp makes the A-B / A-C crossings
+  // more likely to round equal; features stay above the inferred eps.
+  const double base = 1099511627776.0;
+  const vec2 o{base, base};
+  const SimplePolygon a2 = {o + vec2{-1e4, 0}, o + vec2{1e4, 0},
+                            o + vec2{0, 30}};
+  const SimplePolygon b2 = {o + vec2{-10, -1e4}, o + vec2{10, 1e4},
+                            o + vec2{200, 9800}};
+  const SimplePolygon c2 = {o + vec2{19, -1e4}, o + vec2{21, 1e4},
+                            o + vec2{220, -9800}};
+  const CrossSection u2(Polygons{a2, b2, c2});
+  EXPECT_GT(u2.Area(), 0.0)
+      << "large-coordinate near-vertical concurrence dropped entirely";
 }
 
 // A big square built together with a tiny self-intersecting feature whose edges
@@ -1013,7 +1311,7 @@ const CommCase kBooleanCommutativitySeeds[] = {
     //   star both with extreme-magnitude radii ranging from O(1e-40)
     //   to O(55), translated by (-0.36, 2.83). A+B = 11.12 but B+A =
     //   72.75 - off by ~62. Different inputs from
-    //   DISABLED_BooleanCommutativityMixedScaleStars.
+    //   BooleanCommutativityMixedScaleStars.
     {"VeryMixedStars",
      {{5.5755616189085049e-09, 55.713117722084, 0.24425911685471227,
        12.355613962816753, 3.2696445771376686e-21, 7.7223346956456043e-27,
@@ -1566,7 +1864,7 @@ const DistribCase kDistributivitySeeds[] = {
       {-4.6033649212771799, -4.3357952411613461}},
      DistribKind::Monotonicity},
     // Companion to
-    //   DISABLED_BooleanDistributivityNonzeroUnionResidual above, but
+    //   BooleanDistributivityNonzeroUnionResidual above, but
     //   with the zeros in A and an intermediate-sized B - 28-radii A
     //   with leading 0., 0. plus repeated 85.93 values, 16-radii B
     //   dominated by 1000s with a few small/zero values, 4-radii simple

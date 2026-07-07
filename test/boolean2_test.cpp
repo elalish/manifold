@@ -135,7 +135,10 @@ bool PointInSegmentInteriorBand(vec2 p, vec2 a, vec2 b, double eps) {
 
 // Independent oracle for the arrangement RemoveOverlaps2D retains - its
 // predicates are not reused from the engine, so it can't rubber-stamp a bug.
-// Checks: retained verts finite and >eps apart; edges valid and non-eps-zero;
+// Checks: retained verts finite; merged input verts >eps apart while
+// constructed intersection verts (id >= numMergedVerts) need only be exactly
+// distinct - eps quantization applies to input features, not constructed
+// points; edges valid and non-degenerate (non-eps-zero between input verts);
 // edge balance conserved (per-vertex signed multiplicity matches the input's,
 // zero for introduced verts); no two non-adjacent edges strictly cross.
 ::testing::AssertionResult CheckRetainedGraphValidity(
@@ -157,11 +160,17 @@ bool PointInSegmentInteriorBand(vec2 p, vec2 a, vec2 b, double eps) {
   const double eps2 = eps * eps;
   for (int a = 0; a < static_cast<int>(result.verts.size()); ++a) {
     for (int b = a + 1; b < static_cast<int>(result.verts.size()); ++b) {
-      if (dot(result.verts[b] - result.verts[a],
-              result.verts[b] - result.verts[a]) <= eps2) {
+      const vec2 d = result.verts[b] - result.verts[a];
+      if (b < numMergedVerts && dot(d, d) <= eps2) {
+        std::ostringstream out;
+        out << "retained input vertices " << a << " and " << b
+            << " remain within epsilon";
+        return fail(out.str());
+      }
+      if (result.verts[a] == result.verts[b]) {
         std::ostringstream out;
         out << "retained vertices " << a << " and " << b
-            << " remain within epsilon";
+            << " have identical coordinates";
         return fail(out.str());
       }
     }
@@ -176,10 +185,13 @@ bool PointInSegmentInteriorBand(vec2 p, vec2 a, vec2 b, double eps) {
           << edge.v1;
       return fail(out.str());
     }
-    if (dot(result.verts[edge.v1] - result.verts[edge.v0],
-            result.verts[edge.v1] - result.verts[edge.v0]) <= eps2) {
+    const vec2 edgeVec = result.verts[edge.v1] - result.verts[edge.v0];
+    const bool inputEdgeVerts =
+        edge.v0 < numMergedVerts && edge.v1 < numMergedVerts;
+    if (inputEdgeVerts ? dot(edgeVec, edgeVec) <= eps2
+                       : result.verts[edge.v0] == result.verts[edge.v1]) {
       std::ostringstream out;
-      out << "retained edge " << i << " is epsilon-zero: " << edge.v0 << " -> "
+      out << "retained edge " << i << " is degenerate: " << edge.v0 << " -> "
           << edge.v1;
       return fail(out.str());
     }
@@ -240,7 +252,23 @@ bool PointInSegmentInteriorBand(vec2 p, vec2 a, vec2 b, double eps) {
             << " still have a strict crossing";
         return fail(out.str());
       }
-      if (SegmentsHavePositiveCollinearOverlap(a0, a1, b0, b1, eps)) {
+      // Boundary chains involving constructed verts may legitimately run
+      // parallel within eps of each other (thin faces and winding
+      // staircases the eps snap used to fuse), so the eps-band collinearity
+      // check applies to input-vert edges only; for constructed-vert pairs
+      // flag construction-noise-scale coincidence - the double-cover
+      // signature - via the alpha bound.
+      const bool inputPair = a.v0 < numMergedVerts && a.v1 < numMergedVerts &&
+                             b.v0 < numMergedVerts && b.v1 < numMergedVerts;
+      const double collinearBand =
+          inputPair
+              ? eps
+              : EpsilonFromScale(
+                    std::max({std::fabs(a0.x), std::fabs(a0.y), std::fabs(a1.x),
+                              std::fabs(a1.y), std::fabs(b0.x), std::fabs(b0.y),
+                              std::fabs(b1.x), std::fabs(b1.y)}),
+                    0);
+      if (SegmentsHavePositiveCollinearOverlap(a0, a1, b0, b1, collinearBand)) {
         std::ostringstream out;
         out << "retained edges " << i << " and " << j
             << " still have positive collinear overlap";
@@ -249,16 +277,20 @@ bool PointInSegmentInteriorBand(vec2 p, vec2 a, vec2 b, double eps) {
     }
   }
 
+  // Constructed verts (id >= numMergedVerts) may sit within eps of an edge
+  // they don't constructionally lie on; only input verts are attached at eps.
   for (int e = 0; e < static_cast<int>(result.edges.size()); ++e) {
     const auto& edge = result.edges[e];
     const vec2 a = result.verts[edge.v0];
     const vec2 b = result.verts[edge.v1];
-    for (int v = 0; v < static_cast<int>(result.verts.size()); ++v) {
+    for (int v = 0;
+         v < numMergedVerts && v < static_cast<int>(result.verts.size()); ++v) {
       if (v == edge.v0 || v == edge.v1) continue;
       if (PointInSegmentInteriorBand(result.verts[v], a, b, eps)) {
         std::ostringstream out;
-        out << "retained vertex " << v << " lies in the interior band of edge "
-            << e << " (" << edge.v0 << " -> " << edge.v1 << ")";
+        out << "retained input vertex " << v
+            << " lies in the interior band of edge " << e << " (" << edge.v0
+            << " -> " << edge.v1 << ")";
         return fail(out.str());
       }
     }
@@ -334,35 +366,27 @@ std::pair<std::vector<vec2>, std::vector<EdgeM>> CombinedInput(
 
 }  // namespace
 
-TEST(Boolean2, PropagatesShallowIndependentIntersections) {
-  constexpr double eps = 1e-3;
-  std::vector<vec2> verts = {{-1., 0.},
-                             {1., 0.},
-                             {0., -1.},
-                             {0., 1.},
-                             {-1., 5. * eps},
-                             {1., 5. * eps},
-                             {0., -1. + 5. * eps},
-                             {0., 1. + 5. * eps},
-                             {0., -1.},
-                             {0., 1.}};
-  std::vector<EdgeM> edges = {
-      {0, 1, 1}, {2, 3, 1}, {4, 5, 1}, {6, 7, 1}, {8, 9, 1}};
-  std::vector<Box2> edgeBoxes;
-  edgeBoxes.reserve(edges.size());
-  for (const EdgeM& edge : edges) {
-    edgeBoxes.push_back(BoxOf2DEdge(verts[edge.v0], verts[edge.v1], eps));
+// Constructed verts may sit closer than eps only around a genuinely sub-eps
+// crossing tangle. Inputs whose features are all far above eps must not
+// silently acquire sub-eps output verts.
+TEST(Boolean2, CleanInputsKeepEpsSeparatedVerts) {
+  const Polygons a = {{{0., 0.}, {4., 0.}, {4., 4.}, {0., 4.}}};
+  const Polygons b = {{{2., 2.}, {6., 2.}, {6., 6.}, {2., 6.}}};
+  const double eps = InferEps(a, b);
+  const Polygons out = Boolean2D(a, b, OpType::Add);
+  const double eps2 = eps * eps;
+  std::vector<vec2> outVerts;
+  for (const auto& loop : out) {
+    for (const vec2& v : loop) outVerts.push_back(v);
   }
-  const std::vector<std::pair<int, int>> pairs = {{0, 1}, {2, 3}};
-
-  NarrowPhaseResult narrow =
-      BuildListsAndFindIntersections(edges, verts, eps, pairs);
-  IntersectionInsertion inserted = FindAndInsertIntersections(
-      edges, std::move(verts), std::move(narrow.lists), eps, edgeBoxes, BVH{},
-      narrow.intersections);
-
-  ASSERT_EQ(inserted.verts.size(), 12);
-  EXPECT_EQ(inserted.lists[4].size(), 2);
+  ASSERT_GT(outVerts.size(), 0u);
+  for (size_t i = 0; i < outVerts.size(); ++i) {
+    for (size_t j = i + 1; j < outVerts.size(); ++j) {
+      const vec2 d = outVerts[j] - outVerts[i];
+      EXPECT_GT(dot(d, d), eps2) << "clean union produced verts " << i
+                                 << " and " << j << " within eps";
+    }
+  }
 }
 
 // Edge balance at a vertex is the signed sum of incident edge multiplicities
@@ -889,13 +913,13 @@ TEST(Boolean2, KeepsNearDistinctPresentationVertex) {
   EXPECT_NEAR(TotalSignedArea(polys), 1.0 + kDelta, 1e-12);
 }
 
-// The new-to-old snap is gated by perpendicular incidence (point-to-line
-// distance), not point-to-point proximity: a generated crossing fuses into a
-// nearby old corner only when one of its transversal source edges actually
-// passes through that corner within the bounded eps perpendicular band. Mere
-// proximity (within the 2*eps broad-phase band) is not enough - distinct
-// near-corner crossings whose source edges miss the corner stay separate.
-TEST(Boolean2, NewToOldMergeIsPerpIncidenceGated) {
+// A near-corner crossing stays a distinct vertex unless a source edge is
+// genuinely incident to the corner. When the transversal edge misses the
+// corner, the crossing is a constructed vertex kept exactly distinct from it.
+// When the edge passes through the corner, the incidence pre-split makes the
+// corner a shared vertex and the crossing resolves to it, so the two coincide.
+// Mere proximity within the broad-phase band does not merge them.
+TEST(Boolean2, NearCornerCrossingDistinctUnlessIncident) {
   constexpr double eps = 1e-6;
   const Polygons a = {{{0, 0}, {10, 0}, {10, 1}, {0, 1}}};
   auto countNear = [](const std::vector<vec2>& points, vec2 target, double r) {
@@ -908,9 +932,8 @@ TEST(Boolean2, NewToOldMergeIsPerpIncidenceGated) {
 
   // Not incident: b's vertical left edge crosses a's bottom edge at (xLeft, 0),
   // a perpendicular distance xLeft from corner (0, 0). At xLeft = 1.5*eps the
-  // crossing is inside the 2*eps proximity band but its only transversal source
-  // edge (b's vertical left edge) is 1.5*eps off the corner, so it must stay a
-  // distinct vertex rather than fuse.
+  // crossing is inside the proximity band but its only transversal source edge
+  // is 1.5*eps off the corner, so it stays a distinct vertex.
   {
     const Polygons b = {
         {{1.5 * eps, -0.5}, {0.5, -0.5}, {0.5, 0.5}, {1.5 * eps, 0.5}}};
@@ -918,23 +941,22 @@ TEST(Boolean2, NewToOldMergeIsPerpIncidenceGated) {
     auto result =
         RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::Add);
     EXPECT_EQ(countNear(result.verts, corner, 5 * eps), 2)
-        << "non-incident near-corner crossing was over-fused";
+        << "non-incident near-corner crossing collapsed onto the corner";
     EXPECT_TRUE(CheckRetainedGraphValidity(
         result, edges, result.inputVert2Merged, result.numMergedVerts, eps));
   }
 
-  // Incident: b's left edge is the sloped line through corner (0, 0), so the
-  // crossing of that edge with a's bottom edge IS the corner; the FP
-  // intersection lands within eps of (0, 0). Because the transversal source
-  // edge genuinely runs through the corner, the crossing fuses to one vertex.
-  // b's left edge runs from (-0.5, 0.5) down through (0, 0) to (0.5, -0.5).
+  // Incident: b's left edge is the sloped line through corner (0, 0), running
+  // from (-0.5, 0.5) down through (0, 0) to (0.5, -0.5). The incidence
+  // pre-split makes (0, 0) a shared vertex, so the crossing of that edge with
+  // a's bottom edge resolves to the corner and the two coincide.
   {
     const Polygons b = {{{0.5, -0.5}, {2.0, -0.5}, {2.0, 0.5}, {-0.5, 0.5}}};
     auto [verts, edges] = CombinedInput(a, b, /*bMult=*/1);
     auto result =
         RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::Add);
     EXPECT_EQ(countNear(result.verts, corner, 5 * eps), 1)
-        << "genuinely incident crossing failed to fuse onto the corner";
+        << "genuinely incident crossing did not resolve to the corner";
     EXPECT_TRUE(CheckRetainedGraphValidity(
         result, edges, result.inputVert2Merged, result.numMergedVerts, eps));
   }
@@ -953,239 +975,6 @@ TEST(Boolean2, RemoveOverlapsMergesExactDuplicateCoordinates) {
   ASSERT_GE(overlap.inputVert2Merged[3], 0);
   ASSERT_LT(overlap.inputVert2Merged[3], overlap.numMergedVerts);
   EXPECT_EQ(overlap.inputVert2Merged[0], overlap.inputVert2Merged[3]);
-}
-
-TEST(Boolean2, GraphOrderDetectsProperCrossing) {
-  GraphSegment2D a{{0.0, 0.0}, {10.0, 10.0}, 0};
-  GraphSegment2D b{{0.0, 10.0}, {10.0, 0.0}, 1};
-
-  const auto order = CompareProjectedOrder(a, b, /*axis=*/0, 0.0, 10.0);
-  EXPECT_EQ(order.atMinProjection, GraphOrderKind::ALessOrtho);
-  EXPECT_EQ(order.atMaxProjection, GraphOrderKind::AGreaterOrtho);
-  EXPECT_FALSE(order.coincidentOverlap);
-  EXPECT_TRUE(order.properCrossing);
-}
-
-TEST(Boolean2, GraphOrderIsEndpointReversalStable) {
-  GraphSegment2D a{{0.0, 0.0}, {10.0, 10.0}, 0};
-  GraphSegment2D b{{0.0, 10.0}, {10.0, 0.0}, 1};
-  GraphSegment2D aReversed{{10.0, 10.0}, {0.0, 0.0}, 0};
-  GraphSegment2D bReversed{{10.0, 0.0}, {0.0, 10.0}, 1};
-
-  const auto order = CompareProjectedOrder(a, b, /*axis=*/0, 0.0, 10.0);
-  const auto reversed =
-      CompareProjectedOrder(aReversed, bReversed, /*axis=*/0, 0.0, 10.0);
-  EXPECT_EQ(order.atMinProjection, reversed.atMinProjection);
-  EXPECT_EQ(order.atMaxProjection, reversed.atMaxProjection);
-  EXPECT_EQ(order.coincidentOverlap, reversed.coincidentOverlap);
-  EXPECT_EQ(order.properCrossing, reversed.properCrossing);
-  EXPECT_EQ(order.atMinProjection, GraphOrderKind::ALessOrtho);
-  EXPECT_EQ(order.atMaxProjection, GraphOrderKind::AGreaterOrtho);
-
-  const auto aOnlyReversed =
-      CompareProjectedOrder(aReversed, b, /*axis=*/0, 0.0, 10.0);
-  const auto bOnlyReversed =
-      CompareProjectedOrder(a, bReversed, /*axis=*/0, 0.0, 10.0);
-  EXPECT_EQ(order.atMinProjection, aOnlyReversed.atMinProjection);
-  EXPECT_EQ(order.atMaxProjection, aOnlyReversed.atMaxProjection);
-  EXPECT_EQ(order.properCrossing, aOnlyReversed.properCrossing);
-  EXPECT_EQ(order.atMinProjection, bOnlyReversed.atMinProjection);
-  EXPECT_EQ(order.atMaxProjection, bOnlyReversed.atMaxProjection);
-  EXPECT_EQ(order.properCrossing, bOnlyReversed.properCrossing);
-}
-
-TEST(Boolean2, GraphOrderSupportsYAxisProjection) {
-  GraphSegment2D a{{0.0, 0.0}, {10.0, 10.0}, 0};
-  GraphSegment2D b{{10.0, 0.0}, {0.0, 10.0}, 1};
-
-  const auto order = CompareProjectedOrder(a, b, /*axis=*/1, 0.0, 10.0);
-  EXPECT_EQ(order.atMinProjection, GraphOrderKind::ALessOrtho);
-  EXPECT_EQ(order.atMaxProjection, GraphOrderKind::AGreaterOrtho);
-  EXPECT_TRUE(order.properCrossing);
-}
-
-TEST(Boolean2, GraphOrderResolvesCoincidentOverlap) {
-  GraphSegment2D a{{0.0, 0.0}, {10.0, 0.0}, 0};
-  GraphSegment2D b{{0.0, 0.0}, {10.0, 0.0}, 1};
-
-  const auto order = CompareProjectedOrder(a, b, /*axis=*/0, 0.0, 10.0);
-  EXPECT_EQ(order.atMinProjection, GraphOrderKind::ALessOrtho);
-  EXPECT_EQ(order.atMaxProjection, GraphOrderKind::ALessOrtho);
-  EXPECT_TRUE(order.coincidentOverlap);
-  EXPECT_FALSE(order.properCrossing);
-
-  const auto swapped = CompareProjectedOrder(b, a, /*axis=*/0, 0.0, 10.0);
-  EXPECT_EQ(swapped.atMinProjection, GraphOrderKind::AGreaterOrtho);
-  EXPECT_EQ(swapped.atMaxProjection, GraphOrderKind::AGreaterOrtho);
-  EXPECT_TRUE(swapped.coincidentOverlap);
-  EXPECT_FALSE(swapped.properCrossing);
-}
-
-TEST(Boolean2, GraphOrderCanonicalGeometryTieBeforeEdgeId) {
-  GraphSegment2D lower{{0.0, 0.0}, {10.0, 0.0}, 100};
-  GraphSegment2D upper{{0.0, 0.5}, {10.0, 0.5}, 1};
-
-  const auto order =
-      CompareProjectedOrder(lower, upper, /*axis=*/0, 0.0, 10.0, 1.0);
-  EXPECT_TRUE(order.coincidentOverlap);
-  EXPECT_EQ(order.atMinProjection, GraphOrderKind::ALessOrtho);
-  EXPECT_EQ(order.atMaxProjection, GraphOrderKind::ALessOrtho);
-  EXPECT_FALSE(order.properCrossing);
-
-  const auto swapped =
-      CompareProjectedOrder(upper, lower, /*axis=*/0, 0.0, 10.0, 1.0);
-  EXPECT_TRUE(swapped.coincidentOverlap);
-  EXPECT_EQ(swapped.atMinProjection, GraphOrderKind::AGreaterOrtho);
-  EXPECT_EQ(swapped.atMaxProjection, GraphOrderKind::AGreaterOrtho);
-  EXPECT_FALSE(swapped.properCrossing);
-}
-
-TEST(Boolean2, GraphOrderKeepsEndpointTouchDegenerate) {
-  GraphSegment2D a{{0.0, 0.0}, {10.0, 0.0}, 0};
-  GraphSegment2D b{{5.0, 0.0}, {15.0, 1.0}, 1};
-
-  const auto order = CompareProjectedOrder(a, b, /*axis=*/0, 5.0, 10.0);
-  EXPECT_EQ(order.atMinProjection, GraphOrderKind::EndpointTouch);
-  EXPECT_EQ(order.atMaxProjection, GraphOrderKind::ALessOrtho);
-  EXPECT_FALSE(order.coincidentOverlap);
-  EXPECT_FALSE(order.properCrossing);
-}
-
-// Consolidated Boolean2 IntersectSegments predicate cases, one row per case.
-// Each row carries the two segments, eps, expected crossing, and (when it
-// crosses) the expected point verbatim. atTol is that case's point tolerance:
-// 1e-12 for the fixed-geometry cases, and the scale-derived eps for the
-// shallow long-edge case (whose crossing is only resolved to within eps).
-// IntersectSegments is a boolean2-internal predicate.
-namespace {
-struct SegCase {
-  const char* name;
-  GraphSegment2D a, b;
-  double eps;
-  bool crosses;
-  vec2 at;       // expected intersection point, unused when !crosses
-  double atTol;  // point tolerance, unused when !crosses
-};
-
-const SegCase kIntersectSegmentsSeeds[] = {
-    {"FindsStrictCrossing",
-     {{0.0, 0.0}, {10.0, 10.0}, 0},
-     {{0.0, 10.0}, {10.0, 0.0}, 1},
-     0.0,
-     true,
-     {5.0, 5.0},
-     1e-12},
-    {"KeepsOneSidedEpsBandCrossing",
-     {{0.0, 0.0}, {10.0, 0.0}, 0},
-     {{0.0, -0.5}, {10.0, 2.0}, 1},
-     1.0,
-     true,
-     {2.0, 0.0},
-     1e-12},
-    {"KeepsTwoSidedEpsBandCrossing",
-     {{0.0, 0.0}, {10.0, 0.0}, 0},
-     {{0.0, -0.75}, {10.0, 0.75}, 1},
-     1.0,
-     true,
-     {5.0, 0.0},
-     1e-12},
-    {"KeepsUnderflowingSignChange",
-     {{0.0, 0.0}, {10.0, 0.0}, 0},
-     {{0.0, -1e-200}, {10.0, 1e-200}, 1},
-     1.0,
-     true,
-     {5.0, 0.0},
-     1e-12},
-    // A genuine transversal crossing that lands within eps of an endpoint is
-    // kept, not dropped: the straddle is sign-confirmed and the near-endpoint
-    // resolution is left to insertion-time snapping.
-    {"KeepsEpsNearEndpointCrossing",
-     {{0.0, 0.0}, {10.0, 0.0}, 0},
-     {{0.5, -1.0}, {0.5, 1.0}, 1},
-     1.0,
-     true,
-     {0.5, 0.0},
-     1e-12},
-    {"KeepsSteepInteriorCrossing",
-     {{0.0, 0.0}, {0.0015, 1000.0}, 0},
-     {{-1.0, 500.0}, {1.0, 500.0}, 1},
-     0.001,
-     true,
-     {0.00075, 500.0},
-     1e-12},
-    {"DropsEndpointTouch",
-     {{0.0, 0.0}, {10.0, 0.0}, 0},
-     {{10.0, 0.0}, {20.0, 10.0}, 1},
-     0.0,
-     false,
-     {},
-     0.0},
-    {"DropsPositiveOverlapTJunction",
-     {{0.0, 0.0}, {10.0, 0.0}, 0},
-     {{5.0, 0.0}, {15.0, 1.0}, 1},
-     0.0,
-     false,
-     {},
-     0.0},
-    {"FindsAxisAlignedStrictCrossing",
-     {{0.0, 5.0}, {10.0, 5.0}, 0},
-     {{5.0, 0.0}, {5.0, 10.0}, 1},
-     0.0,
-     true,
-     {5.0, 5.0},
-     1e-12},
-    {"DropsAxisAlignedEndpointTouch",
-     {{0.0, 0.0}, {10.0, 0.0}, 0},
-     {{10.0, 0.0}, {10.0, 10.0}, 1},
-     0.0,
-     false,
-     {},
-     0.0},
-    {"DropsCoincidentOverlap",
-     {{0.0, 0.0}, {10.0, 0.0}, 0},
-     {{2.0, 0.0}, {8.0, 0.0}, 1},
-     0.0,
-     false,
-     {},
-     0.0},
-    // Formerly standalone, near the merge-verts tests. The shallow long edge
-    // crosses the short edge at the origin but only to within the scale eps,
-    // so its point tolerance is eps, not 1e-12.
-    {"ShallowLongEdgeIntersectionIsNotDropped",
-     {{-0.5, 0.0}, {0.5, 0.0}, 0},
-     {{-1e9, 0.01}, {1e9, -0.01}, 1},
-     EpsilonFromScale(1e9),
-     true,
-     {0.0, 0.0},
-     EpsilonFromScale(1e9)},
-    {"NearEndpointIntersectionOutsideSegmentIsDropped",
-     {{0.0, 0.0}, {10.0, 0.0}, 0},
-     {{8.0, 0.4}, {18.0, 1.4}, 1},
-     1.0,
-     false,
-     {},
-     0.0},
-    {"EndpointTJunctionIntersectionIsDropped",
-     {{0.0, 0.0}, {10.0, 0.0}, 0},
-     {{5.0, 0.0}, {5.0, 0.1}, 1},
-     1.0,
-     false,
-     {},
-     0.0},
-};
-}  // namespace
-
-TEST(Boolean2, IntersectSegmentsSeeds) {
-  for (const auto& c : kIntersectSegmentsSeeds) {
-    SCOPED_TRACE(c.name);
-    std::cerr << "[seed] " << c.name << std::endl;
-    vec2 out;
-    EXPECT_EQ(IntersectSegments(c.a, c.b, c.eps, out), c.crosses);
-    if (c.crosses) {
-      EXPECT_NEAR(out.x, c.at.x, c.atTol);
-      EXPECT_NEAR(out.y, c.at.y, c.atTol);
-    }
-  }
 }
 
 TEST(Boolean2, NonFiniteInputReturnsEmpty) {
