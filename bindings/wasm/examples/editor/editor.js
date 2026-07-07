@@ -256,10 +256,6 @@ function setupPaneSplitters() {
         leftPanePercent, LEFT_PANE_MIN_PERCENT, LEFT_PANE_MAX_PERCENT);
     pageElement.style.setProperty('--left-pane', `${clampedLeftPanePercent}%`);
     window.localStorage.setItem(leftPaneStorageKey, clampedLeftPanePercent);
-
-    // Monaco reacts to container size changes, but an explicit layout keeps
-    // drag updates immediate and smooth.
-    editor?.layout({});
   });
 
   attachSplitterDrag(verticalSplitterElement, moveEvent => {
