@@ -117,8 +117,11 @@ void PolySetAdd(PolySet2& ps, vec2 a, vec2 b, long long m) {
     ps.erase(it);
 }
 
-// 7.6.1 footnote 9: rewrite each x-group of coincident vertical output edges as
-// maximal constant-coverage intervals (a 1D simplification per x).
+// 7.6.1 footnote 9: resolve each x-group of coincident/overlapping vertical
+// edges into signed-coverage segments between consecutive breakpoints, summing
+// overlaps and cancelling opposing edges. Every input breakpoint is preserved -
+// construction uses eps only and does not decimate collinear verts; Simplify
+// owns that.
 void MergeVerticals1D(PolySet2& ps) {
   std::map<double, std::vector<std::pair<std::pair<double, double>, long long>>>
       groups;
@@ -137,22 +140,17 @@ void MergeVerticals1D(PolySet2& ps) {
       delta[seg.first.first] += seg.second;
       delta[seg.first.second] -= seg.second;
     }
-    long long cover = 0, runCover = 0;
-    double runStart = 0;
-    bool inRun = false;
+    // Emit a segment for each consecutive breakpoint gap with the running
+    // coverage, preserving every input vertex on the vertical.
+    long long cover = 0;
+    double prevY = 0;
+    bool have = false;
     for (const auto& d : delta) {
-      const long long next = cover + d.second;
-      if (inRun && next != runCover) {
-        if (runCover != 0)
-          PolySetAdd(ps, {g.first, runStart}, {g.first, d.first}, runCover);
-        inRun = false;
-      }
-      if (!inRun && next != 0) {
-        runStart = d.first;
-        runCover = next;
-        inRun = true;
-      }
-      cover = next;
+      if (have && cover != 0)
+        PolySetAdd(ps, {g.first, prevY}, {g.first, d.first}, cover);
+      cover += d.second;
+      prevY = d.first;
+      have = true;
     }
   }
 }
@@ -179,11 +177,11 @@ class SweepPass {
 
   void Seed(vec2 a, vec2 b, long long m) { PendingAdd(a, b, m); }
 
-  // `mergeVerticalOutput` applies Smith's footnote-9 coalesce of collinear
-  // vertical edges. Wanted on an arrangement pass (any dropped split is
-  // re-created at its event next pass), but NOT on the final winding output:
-  // coalescing across a T-junction vertex (a non-vertical edge ending on the
-  // vertical's interior) would leave a vertex-on-edge non-manifold output.
+  // `mergeVerticalOutput` runs the footnote-9 vertical resolve on the result:
+  // coincident and overlapping vertical edges are summed into signed-coverage
+  // segments (input breakpoints preserved). The arrangement pass needs it to
+  // order coincident verticals the sweep status cannot; the measure pass emits
+  // the already-resolved boundary and skips it.
   void Run(bool mergeVerticalOutput = true) {
     while (!events_.empty()) {
       const vec2 p = *events_.begin();
