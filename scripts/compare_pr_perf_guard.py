@@ -15,6 +15,10 @@ TIME_PATTERN = re.compile(r"time\s*=\s*([0-9]*\.?[0-9]+)\s*sec")
 TRI_TIME_PATTERN = re.compile(
     r"nTri\s*=\s*([0-9]+)\s*,\s*time\s*=\s*([0-9]*\.?[0-9]+)\s*sec"
 )
+PEAK_RSS_PATTERN = re.compile(
+    r"PEAK_RSS\s+nTri=([^\s]+)\s+size_index=([0-9]+)\s+"
+    r"peak_rss_mb=([0-9]*\.?[0-9]+)\s+peak_rss_bytes=([0-9]+)"
+)
 
 
 def stdev(values: list[float]) -> float:
@@ -27,6 +31,7 @@ def stdev(values: list[float]) -> float:
 def parse_run(run_path: Path, run_index: int) -> dict:
     # parse one run*.txt into ordered benchmark samples
     benchmarks = []
+    peak_rss_by_benchmark = {}
     for line in run_path.read_text(encoding="utf-8").splitlines():
         tri_match = TRI_TIME_PATTERN.search(line)
         if tri_match:
@@ -42,6 +47,18 @@ def parse_run(run_path: Path, run_index: int) -> dict:
             benchmarks.append(
                 {"benchmark": benchmark_key, "time_sec": float(time_match.group(1))}
             )
+            continue
+
+        peak_rss_match = PEAK_RSS_PATTERN.search(line)
+        if peak_rss_match:
+            ntri, size_index, peak_rss_mb, peak_rss_bytes = peak_rss_match.groups()
+            benchmark_key = (
+                f"nTri={ntri}" if ntri != "unknown" else f"size_index={size_index}"
+            )
+            peak_rss_by_benchmark[benchmark_key] = {
+                "peak_rss_mb": float(peak_rss_mb),
+                "peak_rss_bytes": int(peak_rss_bytes),
+            }
 
     if not benchmarks:
         raise RuntimeError(f"No perf timing lines found in {run_path}")
@@ -49,6 +66,11 @@ def parse_run(run_path: Path, run_index: int) -> dict:
     benchmark_names = [entry["benchmark"] for entry in benchmarks]
     if len(set(benchmark_names)) != len(benchmark_names):
         raise RuntimeError(f"Duplicate benchmark keys found in {run_path}")
+
+    for entry in benchmarks:
+        peak_rss = peak_rss_by_benchmark.get(entry["benchmark"])
+        if peak_rss is not None:
+            entry.update(peak_rss)
 
     return {
         "path": str(run_path),
@@ -74,14 +96,17 @@ def parse_suite(suite_dir: Path) -> dict:
             )
 
     benchmark_samples = {benchmark: [] for benchmark in benchmark_order}
+    peak_rss_samples = {benchmark: [] for benchmark in benchmark_order}
     for run in runs:
         for entry in run["benchmarks"]:
             benchmark_samples[entry["benchmark"]].append(entry["time_sec"])
+            if "peak_rss_mb" in entry:
+                peak_rss_samples[entry["benchmark"]].append(entry["peak_rss_mb"])
 
     benchmarks = {}
     for benchmark in benchmark_order:
         samples = benchmark_samples[benchmark]
-        benchmarks[benchmark] = {
+        benchmark_stats = {
             "samples_sec": samples,
             "mean_sec": statistics.fmean(samples),
             "median_sec": statistics.median(samples),
@@ -90,6 +115,23 @@ def parse_suite(suite_dir: Path) -> dict:
             "max_sec": max(samples),
             "n_runs": len(samples),
         }
+        rss_samples = peak_rss_samples[benchmark]
+        if rss_samples:
+            benchmark_stats.update(
+                {
+                    "peak_rss_samples_mb": rss_samples,
+                    "peak_rss_mean_mb": statistics.fmean(rss_samples),
+                    "peak_rss_median_mb": statistics.median(rss_samples),
+                    "peak_rss_stdev_mb": stdev(rss_samples),
+                    "peak_rss_min_mb": min(rss_samples),
+                    "peak_rss_max_mb": max(rss_samples),
+                    "peak_rss_n_runs": len(rss_samples),
+                    "peak_rss_complete": len(rss_samples) == len(samples),
+                }
+            )
+        else:
+            benchmark_stats["peak_rss_complete"] = False
+        benchmarks[benchmark] = benchmark_stats
 
     return {
         "runs": runs,
@@ -99,9 +141,15 @@ def parse_suite(suite_dir: Path) -> dict:
 
 
 def build_summary(
-    base: dict, head: dict, warn_pct: float, warn_abs_ms: float
+    base: dict,
+    head: dict,
+    warn_pct: float,
+    warn_abs_ms: float,
+    memory_warn_pct: float,
+    memory_warn_abs_mb: float,
 ) -> tuple[str, bool, dict]:
-    # Compare benchmark minimums between base and head with dual-threshold warnings.
+    # Compare benchmark minimum time and minimum peak RSS with dual thresholds.
+    # Memory uses the same min-min comparison as time
     if base["benchmark_order"] != head["benchmark_order"]:
         raise RuntimeError(
             "Benchmark set/order mismatch between base and head: "
@@ -111,11 +159,16 @@ def build_summary(
     lines = []
     lines.append("### PR Benchmark Guard (perfTest)")
     lines.append("")
-    lines.append("| Benchmark | Base min (sec) | Head min (sec) | Delta | Base ±stdev | Head ±stdev | Status |")
-    lines.append("|---|---:|---:|---:|---:|---:|---|")
+    lines.append(
+        "| Benchmark | Base min (sec) | Head min (sec) | Time delta | "
+        "Base +/-stdev | Head +/-stdev | Base peak RSS (MB) | "
+        "Head peak RSS (MB) | RSS delta | Status |"
+    )
+    lines.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---|")
 
     per_benchmark = []
-    regressed = False
+    time_regressed = False
+    memory_regressed = False
     for benchmark in base["benchmark_order"]:
         base_min = base["benchmarks"][benchmark]["min_sec"]
         head_min = head["benchmarks"][benchmark]["min_sec"]
@@ -124,47 +177,157 @@ def build_summary(
         delta_sec = head_min - base_min
         delta_ms = delta_sec * 1000.0
         pct = delta_sec / base_min * 100.0
-        this_regressed = (pct >= warn_pct) and (delta_ms >= warn_abs_ms)
-        regressed = regressed or this_regressed
-        status = "WARNING" if this_regressed else "OK"
+        time_this_regressed = (pct >= warn_pct) and (delta_ms >= warn_abs_ms)
+        time_regressed = time_regressed or time_this_regressed
+
+        base_rss = base["benchmarks"][benchmark].get("peak_rss_min_mb")
+        head_rss = head["benchmarks"][benchmark].get("peak_rss_min_mb")
+        rss_delta_mb = None
+        rss_delta_pct = None
+        memory_this_regressed = False
+        if base_rss is not None and head_rss is not None:
+            rss_delta_mb = head_rss - base_rss
+            rss_delta_pct = rss_delta_mb / base_rss * 100.0 if base_rss else 0.0
+            memory_this_regressed = (
+                rss_delta_pct >= memory_warn_pct
+                and rss_delta_mb >= memory_warn_abs_mb
+            )
+            memory_regressed = memory_regressed or memory_this_regressed
+
+        # peak_rss_complete is False when a benchmark is missing an RSS sample
+        # for one or more repeats on either side; surface that instead of
+        # letting the memory guard silently go inactive for this benchmark.
+        base_rss_complete = base["benchmarks"][benchmark].get(
+            "peak_rss_complete", False
+        )
+        head_rss_complete = head["benchmarks"][benchmark].get(
+            "peak_rss_complete", False
+        )
+        memory_data_incomplete = not (base_rss_complete and head_rss_complete)
+
+        status_parts = []
+        if time_this_regressed:
+            status_parts.append("TIME WARNING")
+        if memory_this_regressed:
+            status_parts.append("MEMORY WARNING")
+        if memory_data_incomplete:
+            if base_rss is None or head_rss is None:
+                status_parts.append("MEMORY DATA MISSING")
+            else:
+                status_parts.append("MEMORY DATA PARTIAL")
+        status = ", ".join(status_parts) if status_parts else "OK"
+
+        base_rss_display = f"{base_rss:.2f}" if base_rss is not None else "N/A"
+        head_rss_display = f"{head_rss:.2f}" if head_rss is not None else "N/A"
+        rss_delta_display = "N/A"
+        if rss_delta_mb is not None and rss_delta_pct is not None:
+            rss_delta_display = f"{rss_delta_mb:+.2f} ({rss_delta_pct:+.2f}%)"
 
         lines.append(
-            f"| {benchmark} | {base_min:.6f} | {head_min:.6f} | {delta_sec:+.6f} ({pct:+.2f}%) | ±{base_stdev:.6f} | ±{head_stdev:.6f} | {status} |"
+            f"| {benchmark} | {base_min:.6f} | {head_min:.6f} | "
+            f"{delta_sec:+.6f} ({pct:+.2f}%) | +/-{base_stdev:.6f} | "
+            f"+/-{head_stdev:.6f} | {base_rss_display} | {head_rss_display} | "
+            f"{rss_delta_display} | {status} |"
         )
 
         per_benchmark.append(
             {
                 "benchmark": benchmark,
                 "metric": "min_sec",
+                "memory_metric": "peak_rss_min_mb",
                 "base_min_sec": base_min,
                 "head_min_sec": head_min,
                 "base_stdev_sec": base_stdev,
                 "head_stdev_sec": head_stdev,
                 "delta_min_sec": delta_sec,
                 "delta_min_pct": pct,
-                "regressed": this_regressed,
+                "time_regressed": time_this_regressed,
+                "base_peak_rss_mb": base_rss,
+                "head_peak_rss_mb": head_rss,
+                "delta_peak_rss_mb": rss_delta_mb,
+                "delta_peak_rss_pct": rss_delta_pct,
+                "memory_regressed": memory_this_regressed,
+                "memory_data_incomplete": memory_data_incomplete,
+                "regressed": time_this_regressed or memory_this_regressed,
             }
         )
 
     lines.append("")
-    lines.append(f"Thresholds: warn if regression >= {warn_pct:.1f}% and >= {warn_abs_ms:.1f} ms.")
+    lines.append(
+        f"Thresholds: warn if regression >= {warn_pct:.1f}% "
+        f"and >= {warn_abs_ms:.1f} ms."
+    )
+    lines.append(
+        f"Memory thresholds: warn if peak RSS regression >= {memory_warn_pct:.1f}% "
+        f"and >= {memory_warn_abs_mb:.1f} MB."
+    )
+    regressed = time_regressed or memory_regressed
     lines.append(
         f"Result: {'WARNING (one or more benchmark regressions detected)' if regressed else 'OK (no threshold breach)'}"
     )
-    lines.append("")
 
     regressed_rows = [row for row in per_benchmark if row["regressed"]]
-    worst_regression = max(regressed_rows, key=lambda row: row["delta_min_sec"]) if regressed_rows else None
+    time_regressed_rows = [row for row in per_benchmark if row["time_regressed"]]
+    memory_regressed_rows = [row for row in per_benchmark if row["memory_regressed"]]
+    memory_incomplete_rows = [
+        row for row in per_benchmark if row["memory_data_incomplete"]
+    ]
+    worst_regression = (
+        max(time_regressed_rows, key=lambda row: row["delta_min_sec"])
+        if time_regressed_rows
+        else None
+    )
+    worst_memory_regression = (
+        max(memory_regressed_rows, key=lambda row: row["delta_peak_rss_mb"])
+        if memory_regressed_rows
+        else None
+    )
+
+    if memory_incomplete_rows:
+        lines.append("")
+        missing_names = ", ".join(
+            row["benchmark"]
+            for row in memory_incomplete_rows
+            if row["base_peak_rss_mb"] is None or row["head_peak_rss_mb"] is None
+        )
+        partial_names = ", ".join(
+            row["benchmark"]
+            for row in memory_incomplete_rows
+            if row["base_peak_rss_mb"] is not None
+            and row["head_peak_rss_mb"] is not None
+        )
+        if missing_names:
+            lines.append(
+                f"Note: peak RSS data missing entirely (all repeats) for base "
+                f"or head, memory guard skipped for: {missing_names}."
+            )
+        if partial_names:
+            lines.append(
+                "Note: peak RSS data has fewer samples than time samples "
+                "(some repeats missing RSS) for: "
+                f"{partial_names}. Memory comparison for these ran on the "
+                "available samples but may be less reliable."
+            )
+    lines.append("")
 
     payload = {
         "primary_metric": "min_sec",
+        "memory_metric": "peak_rss_min_mb",
         "base": base,
         "head": head,
         "per_benchmark": per_benchmark,
         "regressed_count": len(regressed_rows),
+        "time_regressed_count": len(time_regressed_rows),
+        "memory_regressed_count": len(memory_regressed_rows),
+        "memory_incomplete_count": len(memory_incomplete_rows),
         "worst_regression": worst_regression,
+        "worst_memory_regression": worst_memory_regression,
         "warn_pct": warn_pct,
         "warn_abs_ms": warn_abs_ms,
+        "memory_warn_pct": memory_warn_pct,
+        "memory_warn_abs_mb": memory_warn_abs_mb,
+        "time_regressed": time_regressed,
+        "memory_regressed": memory_regressed,
         "regressed": regressed,
     }
     return "\n".join(lines), regressed, payload
@@ -185,9 +348,17 @@ def build_invalid_summary(reason: str) -> tuple[str, dict]:
         "head": None,
         "per_benchmark": [],
         "regressed_count": 0,
+        "time_regressed_count": 0,
+        "memory_regressed_count": 0,
+        "memory_incomplete_count": 0,
         "worst_regression": None,
+        "worst_memory_regression": None,
         "warn_pct": None,
         "warn_abs_ms": None,
+        "memory_warn_pct": None,
+        "memory_warn_abs_mb": None,
+        "time_regressed": False,
+        "memory_regressed": False,
         "regressed": False,
         "data_valid": False,
         "reason": reason,
@@ -307,8 +478,10 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Compare perfTest runs for PR benchmark guard.")
     parser.add_argument("--base-dir", required=True, type=Path)
     parser.add_argument("--head-dir", required=True, type=Path)
-    parser.add_argument("--warn-pct", type=float, default=20.0)
-    parser.add_argument("--warn-abs-ms", type=float, default=10.0)
+    parser.add_argument("--warn-pct", type=float, required=True)
+    parser.add_argument("--warn-abs-ms", type=float, required=True)
+    parser.add_argument("--memory-warn-pct", type=float, required=True)
+    parser.add_argument("--memory-warn-abs-mb", type=float, required=True)
     parser.add_argument("--markdown-out", required=True, type=Path)
     parser.add_argument("--json-out", required=True, type=Path)
     parser.add_argument("--commit-sha")
@@ -327,7 +500,12 @@ def main() -> int:
                 f"Run count mismatch: base has {len(base['runs'])}, head has {len(head['runs'])}."
             )
         markdown, regressed, payload = build_summary(
-            base, head, args.warn_pct, args.warn_abs_ms
+            base,
+            head,
+            args.warn_pct,
+            args.warn_abs_ms,
+            args.memory_warn_pct,
+            args.memory_warn_abs_mb,
         )
         payload["data_valid"] = True
     except Exception as exc:
@@ -343,11 +521,19 @@ def main() -> int:
         worst = payload.get("worst_regression")
         if worst:
             print(
-                "::warning::PR benchmark regression detected: "
-                f"{payload['regressed_count']} benchmark(s) exceeded thresholds. "
+                "::warning::PR benchmark time regression detected: "
+                f"{payload['time_regressed_count']} benchmark(s) exceeded thresholds. "
                 f"Worst: {worst['benchmark']} {worst['delta_min_pct']:.2f}% ({worst['delta_min_sec'] * 1000:.2f} ms) slower."
             )
-        else:
+        worst_memory = payload.get("worst_memory_regression")
+        if worst_memory:
+            print(
+                "::warning::PR benchmark memory regression detected: "
+                f"{payload['memory_regressed_count']} benchmark(s) exceeded thresholds. "
+                f"Worst: {worst_memory['benchmark']} {worst_memory['delta_peak_rss_pct']:.2f}% "
+                f"({worst_memory['delta_peak_rss_mb']:.2f} MB) higher peak RSS."
+            )
+        if not worst and not worst_memory:
             print("::warning::PR benchmark regression detected.")
     elif payload.get("data_valid", False):
         print("No benchmark regression above warning thresholds.")

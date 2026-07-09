@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [ "$#" -ne 4 ]; then
-  echo "Usage: $0 <base-dir> <head-dir> <warn-pct> <warn-abs-ms>"
+if [ "$#" -ne 6 ]; then
+  echo "Usage: $0 <base-dir> <head-dir> <warn-pct> <warn-abs-ms> <memory-warn-pct> <memory-warn-abs-mb>"
   exit 2
 fi
 
@@ -10,6 +10,8 @@ BASE_DIR="$1"
 HEAD_DIR="$2"
 WARN_PCT="$3"
 WARN_ABS_MS="$4"
+MEMORY_WARN_PCT="$5"
+MEMORY_WARN_ABS_MB="$6"
 
 mkdir -p ./bench
 
@@ -18,6 +20,8 @@ python3 ./scripts/compare_pr_perf_guard.py \
   --head-dir "$HEAD_DIR" \
   --warn-pct "$WARN_PCT" \
   --warn-abs-ms "$WARN_ABS_MS" \
+  --memory-warn-pct "$MEMORY_WARN_PCT" \
+  --memory-warn-abs-mb "$MEMORY_WARN_ABS_MB" \
   --markdown-out ./bench/summary.md \
   --json-out ./bench/result.json
 

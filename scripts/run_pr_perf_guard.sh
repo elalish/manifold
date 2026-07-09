@@ -10,6 +10,7 @@ SRC_DIR="$1"
 OUT_DIR="$2"
 REPEATS="$3"
 BUILD_DIR="${OUT_DIR}/build"
+OS_TYPE="$(uname -s)"
 
 cmake_args=(
   -S "$SRC_DIR"
@@ -22,7 +23,7 @@ cmake_args=(
   -DMANIFOLD_PAR=OFF
 )
 
-if [ "$(uname -s)" = "Darwin" ]; then
+if [ "$OS_TYPE" = "Darwin" ]; then
   cmake_args+=(-DCMAKE_OSX_ARCHITECTURES="${CMAKE_OSX_ARCHITECTURES:-arm64}")
 fi
 
@@ -47,7 +48,7 @@ run_measured_perf_size() {
   local output status ntri peak_rss_mb peak_rss_bytes peak_rss_kb
 
   set +e
-  if [ "$(uname -s)" = "Darwin" ]; then
+  if [ "$OS_TYPE" = "Darwin" ]; then
     output="$(/usr/bin/time -l "$BIN" --size-index "$size_index" 2>&1)"
     status="$?"
     peak_rss_bytes="$(printf "%s\n" "$output" | awk '/maximum resident set size/ {print $1; exit}')"

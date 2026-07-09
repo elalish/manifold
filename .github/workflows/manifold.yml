@@ -639,6 +639,8 @@ jobs:
       PERF_REPEATS: 3
       REGRESSION_WARN_PCT: 20
       REGRESSION_WARN_ABS_MS: 10
+      MEMORY_WARN_PCT: 20
+      MEMORY_WARN_ABS_MB: 50
       CMAKE_OSX_ARCHITECTURES: arm64
     steps:
     - uses: actions/checkout@v6
@@ -658,4 +660,4 @@ jobs:
       run: bash ./scripts/benchmark_pr_perf_guard.sh "${PERF_REPEATS}"
     - name: Compare benchmark results
       shell: bash
-      run: bash ./scripts/report_pr_perf_guard.sh ./bench/base ./bench/head "${REGRESSION_WARN_PCT}" "${REGRESSION_WARN_ABS_MS}"
+      run: bash ./scripts/report_pr_perf_guard.sh ./bench/base ./bench/head "${REGRESSION_WARN_PCT}" "${REGRESSION_WARN_ABS_MS}" "${MEMORY_WARN_PCT}" "${MEMORY_WARN_ABS_MB}"
