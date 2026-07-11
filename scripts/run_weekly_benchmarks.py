@@ -3,11 +3,13 @@ import argparse
 import csv
 import json
 import os
-import re
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+
+from benchmark_pr_perf_guard import NUM_SIZES as PERF_SIZE_COUNT
+from benchmark_pr_perf_guard import run_measured_perf_size
 
 DEFAULT_EMBER_CASES = "16 84 667 695 260 406 551 582"
 DEFAULT_GTEST_FILTER = ":".join(
@@ -21,13 +23,7 @@ DEFAULT_GTEST_FILTER = ":".join(
         "ExecutionContextFromMeshGL.CancelConcurrent",
     ]
 )
-#perf test is added seperately 
-PERF_SIZE_COUNT = 8
-NTRI_PATTERN = re.compile(r"^nTri = ([0-9]+),", re.MULTILINE)
-MACOS_RSS_PATTERN = re.compile(r"^\s*([0-9]+)\s+maximum resident set size$", re.MULTILINE)
-LINUX_RSS_PATTERN = re.compile(
-    r"^Maximum resident set size \(kbytes\):\s*([0-9]+)$", re.MULTILINE
-)
+
 
 @dataclass(frozen=True)
 class BuildContext:
@@ -88,40 +84,6 @@ def run_command(
             result.returncode, args, output=result.stdout
         )
     return result
-
-
-def measured_command(args: list[str]) -> list[str]:
-    time_binary = Path("/usr/bin/time")
-    if not time_binary.exists():
-        return args
-    if sys.platform == "darwin":
-        return [str(time_binary), "-l", *args]
-    return [str(time_binary), "-v", *args]
-
-
-def peak_rss_bytes(time_output: str) -> int | None:
-    match = MACOS_RSS_PATTERN.search(time_output)
-    if match:
-        return int(match.group(1))
-    match = LINUX_RSS_PATTERN.search(time_output)
-    if match:
-        return int(match.group(1)) * 1024
-    return None
-
-
-def peak_rss_line(size_index: int, command_output: str, time_output: str) -> str:
-    ntri_match = NTRI_PATTERN.search(command_output)
-    ntri = ntri_match.group(1) if ntri_match else "unknown"
-    rss_bytes = peak_rss_bytes(time_output)
-    if rss_bytes is None:
-        return (
-            f"PEAK_RSS nTri={ntri} size_index={size_index} "
-            "peak_rss_mb=unknown peak_rss_bytes=unknown"
-        )
-    return (
-        f"PEAK_RSS nTri={ntri} size_index={size_index} "
-        f"peak_rss_mb={rss_bytes / 1024 / 1024:.2f} peak_rss_bytes={rss_bytes}"
-    )
 
 
 def configure_build(ctx: BuildContext) -> None:
@@ -276,24 +238,17 @@ def run_perf_size_sweep_suite(ctx: BuildContext, binary: Path) -> None:
     out_dir = ctx.out_dir / "perf_size_sweep"
     out_dir.mkdir(parents=True, exist_ok=True)
     for run_index in range(1, ctx.repeats + 1):
-        output = ""
-        for size_index in range(PERF_SIZE_COUNT):
-            result = subprocess.run(
-                measured_command([str(binary), "--size-index", str(size_index)]),
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            output += f"### perfTest size_index={size_index}\n"
-            output += result.stdout
-            if result.stderr:
-                output += result.stderr
-            output += peak_rss_line(size_index, result.stdout, result.stderr)
-            output += "\n"
-            if not output.endswith("\n"):
-                output += "\n"
-            output += "\n"
-        (out_dir / f"run{run_index}.txt").write_text(output, encoding="utf-8")
+        run_file = out_dir / f"run{run_index}.txt"
+        with run_file.open("w", encoding="utf-8") as handle:
+            for size_index in range(PERF_SIZE_COUNT):
+                block, status = run_measured_perf_size(binary, size_index)
+                handle.write(f"### perfTest size_index={size_index}\n{block}\n\n")
+                handle.flush()
+                if status != 0:
+                    raise RuntimeError(
+                        f"perfTest exited with status {status} "
+                        f"(run {run_index}, size_index={size_index}, dir={out_dir})"
+                    )
         print(f"completed perfTest run {run_index}/{ctx.repeats}")
         sys.stdout.flush()
 

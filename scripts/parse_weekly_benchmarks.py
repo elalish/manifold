@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 import argparse
-import datetime
 import json
-import os
-import platform
 import re
-import statistics
-import subprocess
 from pathlib import Path
+
+from compare_pr_perf_guard import compute_stats
+from compare_pr_perf_guard import parse_suite as parse_perf_run_suite
+from system_metadata import resolve_metadata as resolve_system_metadata
 
 SCHEMA_VERSION = "1.0.0"
 EMBER_SUITE = "weekly_ember_phase"
@@ -17,9 +16,7 @@ GTEST_SUITE = "existing_gtests"
 EMBER_CASE_PATTERN = re.compile(r"^### case\s+([0-9]+)(?:\s+\([0-9]+\s+vs\s+[0-9]+\))?")
 PHASE_PATTERN = re.compile(r"^-+\s+([0-9]+)\s+ms for\s+(.*)$")
 VERTS_PATTERN = re.compile(r"^[0-9]+\s+verts and\s+[0-9]+\s+tris$")
-PERF_PATTERN = re.compile(r"^nTri\s*=\s*([0-9]+),\s*time\s*=\s*([0-9.eE+-]+)\s+sec$")
 GTEST_OK_PATTERN = re.compile(r"^\[\s+OK\s+\]\s+([^\s]+)\s+\(([0-9]+) ms\)")
-CMAKE_SUMMARY_PATTERN = re.compile(r"^--\s+([A-Z0-9_]+):\s*(.*)$")
 
 INDEPENDENT_PHASES = [
     "Assembly",
@@ -33,36 +30,25 @@ INDEPENDENT_PHASES = [
 ]
 
 
-def mean(values: list[float]) -> float:
-    return statistics.fmean(values)
-
-
-def stdev(values: list[float]) -> float:
-    if len(values) <= 1:
-        return 0.0
-    return statistics.stdev(values)
-
-
 def summarize(values: list[float], suffix: str = "") -> dict:
+    stats = compute_stats(values)
     fields = {
-        "samples": values,
-        "mean": mean(values),
-        "median": statistics.median(values),
-        "stdev": stdev(values),
-        "min": min(values),
-        "max": max(values),
+        name: stats[name]
+        for name in ("samples", "mean", "median", "sd", "min", "max")
     }
     return {
         **{f"{name}{suffix}": value for name, value in fields.items()},
-        "n_runs": len(values),
+        "n_runs": stats["n_runs"],
     }
 
 
 def summarize_ms(values: list[float]) -> dict:
     return summarize(values, "_ms")
 
+
 def summarize_ratio(values: list[float]) -> dict:
     return summarize(values)
+
 
 def run_files(suite_dir: Path) -> list[Path]:
     files = sorted(suite_dir.glob("run*.txt"))
@@ -190,44 +176,41 @@ def parse_ember_suite(suite_dir: Path, source_dir: Path) -> dict:
     }
 
 
-def parse_perf_run(run_path: Path, run_index: int) -> dict:
-    workloads = []
-    for line in run_path.read_text(encoding="utf-8").splitlines():
-        match = PERF_PATTERN.match(line.strip())
-        if not match:
-            continue
-        workloads.append(
-            {
-                "n_tri": int(match.group(1)),
-                "time_ms": float(match.group(2)) * 1000.0,
-            }
-        )
-    if not workloads:
-        raise RuntimeError(f"No perfTest rows found in {run_path}")
-    return {"path": str(run_path), "run_index": run_index, "workloads": workloads}
+def ntri_from_benchmark_key(benchmark: str) -> int | str:
+    prefix = "nTri="
+    if benchmark.startswith(prefix):
+        value = benchmark[len(prefix) :]
+        if value.isdigit():
+            return int(value)
+    return benchmark
 
 
 def parse_perf_suite(suite_dir: Path) -> dict:
-    runs = [parse_perf_run(path, i + 1) for i, path in enumerate(run_files(suite_dir))]
-    workload_order = [item["n_tri"] for item in runs[0]["workloads"]]
-    for run in runs[1:]:
-        run_order = [item["n_tri"] for item in run["workloads"]]
-        if run_order != workload_order:
-            raise RuntimeError(
-                f"perfTest layout mismatch in {run['path']}: expected {workload_order}, got {run_order}"
-            )
-
+    parsed = parse_perf_run_suite(suite_dir)
+    workload_order = [
+        ntri_from_benchmark_key(benchmark) for benchmark in parsed["benchmark_order"]
+    ]
     workloads = []
-    for position, n_tri in enumerate(workload_order):
-        samples = [run["workloads"][position]["time_ms"] for run in runs]
-        workloads.append({"n_tri": n_tri, "time_ms": summarize_ms(samples)})
+    for benchmark, n_tri in zip(parsed["benchmark_order"], workload_order):
+        metrics = parsed["benchmarks"][benchmark]
+        time_ms_samples = [
+            sample * 1000.0 for sample in metrics["timing_sec"]["samples"]
+        ]
+        workloads.append(
+            {
+                "benchmark": benchmark,
+                "n_tri": n_tri,
+                "time_ms": summarize_ms(time_ms_samples),
+                "peak_rss_mb": metrics["peak_rss_mb"],
+            }
+        )
 
     return {
         "type": "perf_size_sweep",
         "description": "perfTest sphere boolean size sweep",
         "workload_order": workload_order,
         "workloads": workloads,
-        "runs": runs,
+        "runs": parsed["runs"],
     }
 
 
@@ -267,124 +250,9 @@ def parse_gtest_suite(suite_dir: Path) -> dict:
     }
 
 
-def parse_cmake_configure_log(log_path: Path) -> dict:
-    if not log_path.exists():
-        return {}
-
-    values = {}
-    for line in log_path.read_text(encoding="utf-8", errors="ignore").splitlines():
-        match = CMAKE_SUMMARY_PATTERN.match(line.strip())
-        if match:
-            values[match.group(1)] = match.group(2).strip()
-
-    return {
-        "version": values.get("CMAKE_VERSION"),
-        "generator": values.get("CMAKE_GENERATOR"),
-        "build_type": values.get("CMAKE_BUILD_TYPE"),
-        "cxx_compiler_id": values.get("CMAKE_CXX_COMPILER_ID"),
-        "cxx_compiler_version": values.get("CMAKE_CXX_COMPILER_VERSION"),
-    }
-
-
-def cmake_compiler(cmake: dict) -> str | None:
-    compiler_id = cmake.get("cxx_compiler_id")
-    compiler_version = cmake.get("cxx_compiler_version")
-    if compiler_id and compiler_version:
-        return f"{compiler_id} {compiler_version}"
-    return compiler_id or compiler_version
-
-
-def sysctl_value(name: str) -> str | None:
-    try:
-        result = subprocess.run(
-            ["sysctl", "-n", name],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except (subprocess.CalledProcessError, OSError):
-        return None
-
-    value = result.stdout.strip()
-    return value or None
-
-
-def int_or_none(value: str | None) -> int | None:
-    if value is None:
-        return None
-    try:
-        return int(value)
-    except ValueError:
-        return None
-
-
-def default_cpu_model() -> str | None:
-    #/proc/cpuinfo on Linux because it gives a much better CPU name
-    # than platform.processor() on GitHub-hosted Ubuntu runners.
-    cpuinfo = Path("/proc/cpuinfo")
-    if not cpuinfo.exists():
-        return platform.processor() or None
-    for line in cpuinfo.read_text(encoding="utf-8", errors="ignore").splitlines():
-        if line.startswith("model name"):
-            return line.split(":", 1)[1].strip()
-    return None
-
-
-def cpu_details() -> dict:
-    if platform.system() == "Darwin":
-        brand = sysctl_value("machdep.cpu.brand_string")
-        model = sysctl_value("hw.model")
-        return {
-            "model": brand or model or platform.processor() or None,
-            "brand": brand,
-            "model_identifier": model,
-            "arch": platform.machine() or None,
-            "logical_count": int_or_none(sysctl_value("hw.logicalcpu"))
-            or os.cpu_count(),
-            "physical_count": int_or_none(sysctl_value("hw.physicalcpu")),
-            "performance_core_count": int_or_none(
-                sysctl_value("hw.perflevel0.physicalcpu")
-            ),
-            "efficiency_core_count": int_or_none(
-                sysctl_value("hw.perflevel1.physicalcpu")
-            ),
-        }
-
-    return {
-        "model": default_cpu_model(),
-        "brand": None,
-        "model_identifier": None,
-        "arch": platform.machine() or None,
-        "logical_count": os.cpu_count(),
-        "physical_count": None,
-        "performance_core_count": None,
-        "efficiency_core_count": None,
-    }
-
-
 def resolve_metadata(args: argparse.Namespace) -> dict:
-    timestamp = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
-    cmake = parse_cmake_configure_log(args.suite_dir / "cmake_configure.log")
-    cpu = cpu_details()
-    return {
-        "schema_version": SCHEMA_VERSION,
-        "commit_sha": args.commit_sha or os.getenv("GITHUB_SHA"),
-        "workflow": args.workflow or os.getenv("GITHUB_WORKFLOW"),
-        "runner": args.runner or os.getenv("RUNNER_NAME"),
-        "os": args.os_name or os.getenv("RUNNER_OS"),
-        "compiler": args.compiler or cmake_compiler(cmake),
-        "cmake": cmake,
-        "cpu_model": args.cpu_model or cpu["model"],
-        "cpu_count": args.cpu_count or cpu["logical_count"],
-        "cpu_brand": cpu["brand"],
-        "cpu_model_identifier": cpu["model_identifier"],
-        "cpu_arch": cpu["arch"],
-        "cpu_logical_count": cpu["logical_count"],
-        "cpu_physical_count": cpu["physical_count"],
-        "cpu_performance_core_count": cpu["performance_core_count"],
-        "cpu_efficiency_core_count": cpu["efficiency_core_count"],
-        "timestamp": timestamp.isoformat().replace("+00:00", "Z"),
-    }
+    metadata = resolve_system_metadata(args)
+    return {"schema_version": SCHEMA_VERSION, **metadata}
 
 
 def build_ember_summary(suite: dict) -> list[str]:
@@ -435,17 +303,25 @@ def build_perf_summary(suite: dict) -> list[str]:
     lines = []
     lines.append("#### perfTest Size Sweep")
     lines.append("")
-    lines.append("| nTri | Mean (ms) | Median (ms) | Min (ms) | Max (ms) | Runs |")
-    lines.append("|---:|---:|---:|---:|---:|---:|")
+    lines.append(
+        "| nTri | Mean (ms) | Median (ms) | Min (ms) | Max (ms) | "
+        "Peak RSS mean (MB) | Peak RSS min (MB) | Peak RSS max (MB) | Runs |"
+    )
+    lines.append("|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
     for workload in suite["workloads"]:
         timing = workload["time_ms"]
+        peak_rss = workload["peak_rss_mb"]
         lines.append(
-            "| {n_tri} | {mean:.2f} | {median:.2f} | {min_:.2f} | {max_:.2f} | {runs} |".format(
+            "| {n_tri} | {mean:.2f} | {median:.2f} | {min_:.2f} | {max_:.2f} | "
+            "{rss_mean:.2f} | {rss_min:.2f} | {rss_max:.2f} | {runs} |".format(
                 n_tri=workload["n_tri"],
                 mean=timing["mean_ms"],
                 median=timing["median_ms"],
                 min_=timing["min_ms"],
                 max_=timing["max_ms"],
+                rss_mean=peak_rss["mean"],
+                rss_min=peak_rss["min"],
+                rss_max=peak_rss["max"],
                 runs=timing["n_runs"],
             )
         )
