@@ -830,6 +830,8 @@ TEST(Boolean, SimpleCubeRegression) {
       Manifold::Cube() -
       Manifold::Cube().Rotate(-0.10000000000000001, -0.10000000000066571, -1.);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(result.NumDegenerateTris(), 0);
+  if (options.exportModels) WriteTestOBJ("simple_cube_regression.obj", result);
 }
 
 // Regression: Compose() in csg_tree.cpp used to read the global atomic
