@@ -113,17 +113,19 @@ def parse_suite(suite_dir: Path) -> dict:
             if "peak_rss_mb" in entry:
                 peak_rss_samples[entry["benchmark"]].append(entry["peak_rss_mb"])
 
-    benchmarks = {}
     for benchmark in benchmark_order:
-        samples = benchmark_samples[benchmark]
-        benchmark_stats: dict = {"timing_sec": compute_stats(samples)}
+        if not peak_rss_samples[benchmark]:
+            raise RuntimeError(
+                f"No peak RSS samples for benchmark {benchmark!r} in {suite_dir}"
+            )
 
-        rss_samples = peak_rss_samples[benchmark]
-        if rss_samples:
-            benchmark_stats["peak_rss_mb"] = compute_stats(rss_samples)
-        else:
-            benchmark_stats["peak_rss_mb"] = None
-        benchmarks[benchmark] = benchmark_stats
+    benchmarks = {
+        benchmark: {
+            "timing_sec": compute_stats(benchmark_samples[benchmark]),
+            "peak_rss_mb": compute_stats(peak_rss_samples[benchmark]),
+        }
+        for benchmark in benchmark_order
+    }
 
     return {
         "runs": runs,
@@ -174,44 +176,28 @@ def build_summary(
         time_this_regressed = (percent >= warn_percent) and (delta_ms >= warn_abs_ms)
         time_regressed = time_regressed or time_this_regressed
 
-        base_peak_rss = base["benchmarks"][benchmark]["peak_rss_mb"]
-        head_peak_rss = head["benchmarks"][benchmark]["peak_rss_mb"]
-        base_rss = base_peak_rss["min"] if base_peak_rss else None
-        head_rss = head_peak_rss["min"] if head_peak_rss else None
-        rss_delta_mb = None
-        rss_delta_percent = None
-        memory_this_regressed = False
-        if base_rss is not None and head_rss is not None:
-            rss_delta_mb = head_rss - base_rss
-            rss_delta_percent = rss_delta_mb / base_rss * 100.0 if base_rss else 0.0
-            memory_this_regressed = (
-                rss_delta_percent >= memory_warn_percent
-                and rss_delta_mb >= memory_warn_abs_mb
-            )
-            memory_regressed = memory_regressed or memory_this_regressed
-
-        memory_data_missing = base_rss is None or head_rss is None
+        base_rss = base["benchmarks"][benchmark]["peak_rss_mb"]["min"]
+        head_rss = head["benchmarks"][benchmark]["peak_rss_mb"]["min"]
+        rss_delta_mb = head_rss - base_rss
+        rss_delta_percent = rss_delta_mb / base_rss * 100.0 if base_rss else 0.0
+        memory_this_regressed = (
+            rss_delta_percent >= memory_warn_percent
+            and rss_delta_mb >= memory_warn_abs_mb
+        )
+        memory_regressed = memory_regressed or memory_this_regressed
 
         status_parts = []
         if time_this_regressed:
             status_parts.append("TIME WARNING")
         if memory_this_regressed:
             status_parts.append("MEMORY WARNING")
-        if memory_data_missing:
-            status_parts.append("MEMORY DATA MISSING")
         status = ", ".join(status_parts) if status_parts else "OK"
-
-        base_rss_display = f"{base_rss:.2f}" if base_rss is not None else "N/A"
-        head_rss_display = f"{head_rss:.2f}" if head_rss is not None else "N/A"
-        rss_delta_display = "N/A"
-        if rss_delta_mb is not None and rss_delta_percent is not None:
-            rss_delta_display = f"{rss_delta_mb:+.2f} ({rss_delta_percent:+.2f}%)"
 
         lines.append(
             f"| {benchmark} | {base_min:.6f} | {head_min:.6f} | "
             f"{delta_sec:+.6f} ({percent:+.2f}%) | +/-{base_sd:.6f} | "
-            f"+/-{head_sd:.6f} | {base_rss_display} | {head_rss_display} | "
-            f"{rss_delta_display} | {status} |"
+            f"+/-{head_sd:.6f} | {base_rss:.2f} | {head_rss:.2f} | "
+            f"{rss_delta_mb:+.2f} ({rss_delta_percent:+.2f}%) | {status} |"
         )
 
         per_benchmark.append(
@@ -231,7 +217,6 @@ def build_summary(
                 "delta_peak_rss_mb": rss_delta_mb,
                 "delta_peak_rss_percent": rss_delta_percent,
                 "memory_regressed": memory_this_regressed,
-                "memory_data_missing": memory_data_missing,
                 "regressed": time_this_regressed or memory_this_regressed,
             }
         )
@@ -253,7 +238,6 @@ def build_summary(
     regressed_rows = [row for row in per_benchmark if row["regressed"]]
     time_regressed_rows = [row for row in per_benchmark if row["time_regressed"]]
     memory_regressed_rows = [row for row in per_benchmark if row["memory_regressed"]]
-    memory_missing_rows = [row for row in per_benchmark if row["memory_data_missing"]]
     worst_regression = (
         max(time_regressed_rows, key=lambda row: row["delta_min_sec"])
         if time_regressed_rows
@@ -265,13 +249,6 @@ def build_summary(
         else None
     )
 
-    if memory_missing_rows:
-        lines.append("")
-        missing_names = ", ".join(row["benchmark"] for row in memory_missing_rows)
-        lines.append(
-            f"Note: peak RSS data missing entirely (all repeats) for base "
-            f"or head, memory guard skipped for: {missing_names}."
-        )
     lines.append("")
 
     payload = {
@@ -283,7 +260,6 @@ def build_summary(
         "regressed_count": len(regressed_rows),
         "time_regressed_count": len(time_regressed_rows),
         "memory_regressed_count": len(memory_regressed_rows),
-        "memory_missing_count": len(memory_missing_rows),
         "worst_regression": worst_regression,
         "worst_memory_regression": worst_memory_regression,
         "warn_percent": warn_percent,
@@ -314,7 +290,6 @@ def build_invalid_summary(reason: str) -> tuple[str, dict]:
         "regressed_count": 0,
         "time_regressed_count": 0,
         "memory_regressed_count": 0,
-        "memory_missing_count": 0,
         "worst_regression": None,
         "worst_memory_regression": None,
         "warn_percent": None,
