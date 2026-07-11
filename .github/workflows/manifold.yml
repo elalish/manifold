@@ -634,28 +634,33 @@ jobs:
     name: perfTest base-vs-head guard
     if: github.event_name == 'pull_request'
     timeout-minutes: 45
-    runs-on: ubuntu-24.04
+    runs-on: macos-15
     env:
       PERF_REPEATS: 3
-      REGRESSION_WARN_PCT: 20
+      REGRESSION_WARN_PERCENT: 20
       REGRESSION_WARN_ABS_MS: 10
+      MEMORY_WARN_PERCENT: 20
+      MEMORY_WARN_ABS_MB: 50
     steps:
     - uses: actions/checkout@v6
       with:
         fetch-depth: 0
-    - name: Install apt packages
-      uses: awalsh128/cache-apt-pkgs-action@v1.6.0
-      with:
-        packages: libgtest-dev libtbb-dev cmake
-        version: 1
-    - name: Prepare base and head worktrees
-      continue-on-error: true
-      shell: bash
-      run: bash ./scripts/prepare_pr_perf_guard_worktrees.sh "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
+    - name: Install brew packages
+      run: brew install googletest cmake
     - name: Benchmark base and head
-      continue-on-error: true
-      shell: bash
-      run: bash ./scripts/benchmark_pr_perf_guard.sh "${PERF_REPEATS}"
+      run: >
+        python3 ./scripts/benchmark_pr_perf_guard.py
+        --base-sha "${{ github.event.pull_request.base.sha }}"
+        --head-sha "${{ github.event.pull_request.head.sha }}"
+        --repeats "${PERF_REPEATS}"
     - name: Compare benchmark results
-      shell: bash
-      run: bash ./scripts/report_pr_perf_guard.sh ./bench/base ./bench/head "${REGRESSION_WARN_PCT}" "${REGRESSION_WARN_ABS_MS}"
+      run: >
+        python3 ./scripts/compare_pr_perf_guard.py
+        --base-dir ./bench/base
+        --head-dir ./bench/head
+        --warn-percent "${REGRESSION_WARN_PERCENT}"
+        --warn-abs-ms "${REGRESSION_WARN_ABS_MS}"
+        --memory-warn-percent "${MEMORY_WARN_PERCENT}"
+        --memory-warn-abs-mb "${MEMORY_WARN_ABS_MB}"
+        --markdown-out ./bench/summary.md
+        --json-out ./bench/result.json
