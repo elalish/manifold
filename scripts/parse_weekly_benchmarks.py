@@ -20,10 +20,6 @@ VERTS_PATTERN = re.compile(r"^[0-9]+\s+verts and\s+[0-9]+\s+tris$")
 GTEST_OK_PATTERN = re.compile(r"^\[\s+OK\s+\]\s+([^\s]+)\s+\(([0-9]+) ms\)")
 
 INDEPENDENT_PHASES = [
-    "Assembly",
-    "Triangulation",
-    "Simplification",
-    "Sorting",
     "Intersect12 P->Q",
     "Intersect12 Q->P",
     "Winding03 P",
@@ -233,9 +229,9 @@ def build_ember_summary(suite: dict) -> list[str]:
     lines.append("#### Ember Phase Timings")
     lines.append("")
     lines.append(
-        "| Case | Dominant phase | Full mean (ms) | Intersect12 share | Assembly | Triangulation | Simplification | Sorting | P->Q | Q->P | Winding P | Winding Q | Runs |"
+        "| Case | Dominant phase | Full mean (ms) | Intersect12 share | P->Q | Q->P | Winding P | Winding Q | Runs |"
     )
-    lines.append("|---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+    lines.append("|---:|---|---:|---:|---:|---:|---:|---:|---:|")
 
     for case in sorted(
         suite["cases"],
@@ -245,17 +241,12 @@ def build_ember_summary(suite: dict) -> list[str]:
         phases = case["phases"]
         lines.append(
             "| {case_index} | {dominant_phase} | {full:.2f} | {share:.3f} | "
-            "{assembly:.2f} | {triangulation:.2f} | {simplification:.2f} | "
-            "{sorting:.2f} | {p_to_q:.2f} | {q_to_p:.2f} | {winding_p:.2f} | "
+            "{p_to_q:.2f} | {q_to_p:.2f} | {winding_p:.2f} | "
             "{winding_q:.2f} | {runs} |".format(
                 case_index=case["case_index"],
                 dominant_phase=case["dominant_phase"],
                 full=case["full_phase_sum_ms"]["mean_ms"],
                 share=case["intersect12_share"]["mean"],
-                assembly=phases["Assembly"]["mean_ms"],
-                triangulation=phases["Triangulation"]["mean_ms"],
-                simplification=phases["Simplification"]["mean_ms"],
-                sorting=phases["Sorting"]["mean_ms"],
                 p_to_q=phases["Intersect12 P->Q"]["mean_ms"],
                 q_to_p=phases["Intersect12 Q->P"]["mean_ms"],
                 winding_p=phases["Winding03 P"]["mean_ms"],
@@ -266,7 +257,7 @@ def build_ember_summary(suite: dict) -> list[str]:
 
     lines.append("")
     lines.append(
-        "Note: phase timings use independent phases only; `Intersections (total)` is not added to the denominator."
+        "Note: phase timings cover `Intersect12` and `Winding03` only; `Intersections (total)` is excluded from the denominator."
     )
     lines.append("")
     return lines

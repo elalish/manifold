@@ -182,7 +182,11 @@ def run_ember_case(
         "--verbose",
         str(verbose),
     ]
-    result = subprocess.run(args, check=True, capture_output=True, text=True, cwd=cwd)
+    result = subprocess.run(
+        args, check=True,
+        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+        text=True, cwd=cwd,
+    )
     return result.stdout
 
 
