@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 import argparse
+import json
 import os
-import subprocess
 import sys
 from pathlib import Path
+
+import parse_weekly_benchmarks as pwb
 
 
 def print_file(path: Path) -> None:
@@ -31,23 +33,28 @@ def main() -> int:
     summary_path = args.suite_dir / "summary.md"
     result_path = args.suite_dir / "result.json"
 
-    subprocess.run(
-        [
-            sys.executable,
-            "./scripts/parse_weekly_benchmarks.py",
-            "--source-dir",
-            str(args.source_dir),
-            "--suite-dir",
-            str(args.suite_dir),
-            "--repeats",
-            str(args.repeats),
-            "--markdown-out",
-            str(summary_path),
-            "--json-out",
-            str(result_path),
-        ],
-        check=True,
+    import argparse as _argparse
+    parse_ns = _argparse.Namespace(
+        suite_dir=args.suite_dir,
+        source_dir=args.source_dir,
+        commit_sha=None,
+        workflow=None,
+        runner=None,
+        os_name=None,
+        compiler=None,
+        cpu_model=None,
+        cpu_count=None,
     )
+    metadata = pwb.resolve_metadata(parse_ns)
+    suites = pwb.parse_suites(args.suite_dir, args.source_dir)
+    markdown = pwb.build_summary(suites, metadata, args.repeats)
+    payload = {
+        "metadata": metadata,
+        "config": {"repeats": args.repeats, "suites": list(suites.keys())},
+        "suites": suites,
+    }
+    summary_path.write_text(markdown + "\n", encoding="utf-8")
+    result_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
     print("::group::Weekly benchmark summary")
     print_file(summary_path)

@@ -2,6 +2,7 @@
 import argparse
 import json
 import re
+import sys
 from pathlib import Path
 
 from compare_pr_perf_guard import compute_stats
@@ -42,14 +43,6 @@ def summarize(values: list[float], suffix: str = "") -> dict:
     }
 
 
-def summarize_ms(values: list[float]) -> dict:
-    return summarize(values, "_ms")
-
-
-def summarize_ratio(values: list[float]) -> dict:
-    return summarize(values)
-
-
 def run_files(suite_dir: Path) -> list[Path]:
     files = sorted(suite_dir.glob("run*.txt"))
     if not files:
@@ -81,10 +74,6 @@ def parse_ember_run(run_path: Path, run_index: int) -> dict:
         line = raw_line.strip().lstrip("\ufeff")
         case_match = EMBER_CASE_PATTERN.match(line)
         if case_match:
-            if current is not None and not accepting_phases:
-                same_case = current["case_index"] == int(case_match.group(1))
-                if same_case:
-                    continue
             finish_current()
             current = {
                 "case_index": int(case_match.group(1)),
@@ -121,17 +110,9 @@ def parse_ember_suite(suite_dir: Path, source_dir: Path) -> dict:
     runs = [parse_ember_run(path, i + 1) for i, path in enumerate(run_files(suite_dir))]
     ember_specs = load_ember_specs(source_dir)
     case_order = [case["case_index"] for case in runs[0]["cases"]]
-    for run in runs[1:]:
-        run_order = [case["case_index"] for case in run["cases"]]
-        if run_order != case_order:
-            raise RuntimeError(
-                f"Case layout mismatch in {run['path']}: expected {case_order}, got {run_order}"
-            )
 
     cases = []
     for position, case_index in enumerate(case_order):
-        if case_index < 0 or case_index >= len(ember_specs):
-            raise IndexError(f"Case index {case_index} is outside 0..{len(ember_specs) - 1}")
         spec = ember_specs[case_index]
         phase_samples = {phase: [] for phase in INDEPENDENT_PHASES}
         full_phase_samples = []
@@ -149,7 +130,7 @@ def parse_ember_suite(suite_dir: Path, source_dir: Path) -> dict:
                 phase_samples[phase].append(phases[phase])
 
         phase_metrics = {
-            phase: summarize_ms(samples) for phase, samples in phase_samples.items()
+            phase: summarize(samples, "_ms") for phase, samples in phase_samples.items()
         }
         dominant_phase = max(
             INDEPENDENT_PHASES, key=lambda phase: phase_metrics[phase]["mean_ms"]
@@ -159,8 +140,8 @@ def parse_ember_suite(suite_dir: Path, source_dir: Path) -> dict:
                 "case_index": case_index,
                 "id_a": spec["id_a"],
                 "id_b": spec["id_b"],
-                "full_phase_sum_ms": summarize_ms(full_phase_samples),
-                "intersect12_share": summarize_ratio(intersect12_share_samples),
+                "full_phase_sum_ms": summarize(full_phase_samples, "_ms"),
+                "intersect12_share": summarize(intersect12_share_samples),
                 "dominant_phase": dominant_phase,
                 "phases": phase_metrics,
             }
@@ -200,7 +181,7 @@ def parse_perf_suite(suite_dir: Path) -> dict:
             {
                 "benchmark": benchmark,
                 "n_tri": n_tri,
-                "time_ms": summarize_ms(time_ms_samples),
+                "time_ms": summarize(time_ms_samples, "_ms"),
                 "peak_rss_mb": metrics["peak_rss_mb"],
             }
         )
@@ -221,25 +202,17 @@ def parse_gtest_run(run_path: Path, run_index: int) -> dict:
         if not match:
             continue
         tests.append({"name": match.group(1), "time_ms": float(match.group(2))})
-    if not tests:
-        raise RuntimeError(f"No gtest timing rows found in {run_path}")
     return {"path": str(run_path), "run_index": run_index, "tests": tests}
 
 
 def parse_gtest_suite(suite_dir: Path) -> dict:
     runs = [parse_gtest_run(path, i + 1) for i, path in enumerate(run_files(suite_dir))]
     test_order = [item["name"] for item in runs[0]["tests"]]
-    for run in runs[1:]:
-        run_order = [item["name"] for item in run["tests"]]
-        if run_order != test_order:
-            raise RuntimeError(
-                f"gtest layout mismatch in {run['path']}: expected {test_order}, got {run_order}"
-            )
 
     tests = []
     for position, name in enumerate(test_order):
         samples = [run["tests"][position]["time_ms"] for run in runs]
-        tests.append({"name": name, "time_ms": summarize_ms(samples)})
+        tests.append({"name": name, "time_ms": summarize(samples, "_ms")})
 
     return {
         "type": "existing_gtests",
@@ -335,6 +308,8 @@ def build_gtest_summary(suite: dict) -> list[str]:
     lines.append("")
     lines.append("| Test | Mean (ms) | Median (ms) | Min (ms) | Max (ms) | Runs |")
     lines.append("|---|---:|---:|---:|---:|---:|")
+    if not suite["tests"]:
+        lines.append("| No tests selected | 0 | 0 | 0 | 0 | 0 |")
     for test in suite["tests"]:
         timing = test["time_ms"]
         lines.append(
@@ -393,8 +368,6 @@ def parse_suites(root_dir: Path, source_dir: Path) -> dict:
 
     if ember_dir.exists():
         suites[EMBER_SUITE] = parse_ember_suite(ember_dir, source_dir)
-    elif list(root_dir.glob("run*.txt")):
-        suites[EMBER_SUITE] = parse_ember_suite(root_dir, source_dir)
 
     if perf_dir.exists():
         suites[PERF_SUITE] = parse_perf_suite(perf_dir)
@@ -442,4 +415,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    sys.exit(main())

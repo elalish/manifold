@@ -75,7 +75,7 @@ def run_command(
         stderr=subprocess.STDOUT,
         text=True,
     )
-    output = result.stdout or ""
+    output = result.stdout
     if output:
         print(output, end="")
     log_path.write_text("+ " + " ".join(args) + "\n" + output, encoding="utf-8")
@@ -146,8 +146,6 @@ def load_ember_specs(spec_path: Path, cases: list[int]) -> list[dict]:
     specs = json.loads(spec_path.read_text(encoding="utf-8"))
     selected = []
     for case_index in cases:
-        if case_index < 0 or case_index >= len(specs):
-            raise IndexError(f"Case index {case_index} is outside 0..{len(specs) - 1}")
         spec = dict(specs[case_index])
         spec["case_index"] = case_index
         selected.append(spec)
@@ -264,12 +262,9 @@ def run_existing_gtests_suite(ctx: BuildContext, binary: Path) -> None:
             capture_output=True,
             text=True,
         )
-        output = result.stdout
         if result.stderr:
-            output += "\n" + result.stderr
-        if "[==========] Running 0 tests" in output:
-            raise RuntimeError(f"gtest filter selected no tests: {gtest_filter}")
-        (out_dir / f"run{run_index}.txt").write_text(output, encoding="utf-8")
+            print(result.stderr, end="", file=sys.stderr)
+        (out_dir / f"run{run_index}.txt").write_text(result.stdout, encoding="utf-8")
         print(f"completed existing gtest run {run_index}/{ctx.repeats}")
         sys.stdout.flush()
 

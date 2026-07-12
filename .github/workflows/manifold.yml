@@ -462,7 +462,7 @@ jobs:
       run: bash ./scripts/ci/sanitizer_test.sh
 
   weekly_benchmark:
-    name: Weekly benchmarks
+    name: weeklybenchmark-test
     if: github.event_name == 'pull_request' && (github.head_ref == 'weekly-benchmark' || contains(github.event.pull_request.labels.*.name, 'weekly-benchmark'))
     timeout-minutes: 60
     runs-on: macos-15

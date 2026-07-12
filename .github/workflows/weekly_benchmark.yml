@@ -16,7 +16,7 @@ jobs:
   weekly_benchmark:
     name: Weekly benchmarks
     timeout-minutes: 60
-    runs-on: macos-15
+    runs-on: macos-15-arm64
     env:
       WEEKLY_BENCHMARK_REPEATS: 5
       WEEKLY_BENCHMARK_THREADS: 1
