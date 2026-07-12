@@ -57,7 +57,7 @@ TEST(BooleanComplex, MeshRelation) {
   if (options.exportModels) WriteTestOBJ("gyroidUnion.obj", result);
 
   EXPECT_TRUE(result.MatchesTriNormals());
-  EXPECT_LE(result.NumDegenerateTris(), 12);
+  EXPECT_LE(result.NumDegenerateTris(), 0);
   EXPECT_EQ(result.Decompose().size(), 1);
   EXPECT_NEAR(result.Volume(), 226, 1);
   EXPECT_NEAR(result.SurfaceArea(), 387, 1);

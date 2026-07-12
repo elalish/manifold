@@ -157,9 +157,6 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge,
   if (pair < 0) {
     return {};
   }
-  // if (halfedge_.IsForward(edge)) {
-  //   return {MaxCost()};
-  // }
   const int start = halfedge_.Start(edge);
   const int end = halfedge_.End(edge);
   if (start < firstNewVert && end < firstNewVert) {
@@ -235,10 +232,11 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
   Vec<int> scratchBuffer;
   scratchBuffer.reserve(10);
 
-  int i = 0;
   while (edges.begin() != end) {
     for_each(autoPolicy(end - edges.begin(), 1e4), edges.begin(), end,
              [&](int edge) {
+               // TODO: why does changing the ! change behavior?
+               if (!halfedge_.IsForward(edge)) return;
                // Optimization
                if (halfedge_.Valid(edge) && merger[edge].Valid() &&
                    merger[edge].totalCost > maxCost &&
@@ -253,6 +251,8 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
                      std::max(totalCost[halfedge_.Start(edge)],
                               totalCost[halfedge_.End(edge)]);
                merger[edge] = edgeCost;
+               edgeCost.a = 1 - edgeCost.a;
+               merger[halfedge_.Pair(edge)] = edgeCost;
              });
     stable_sort(edges.begin(), end, [&](int a, int b) {
       return merger[a].totalCost < merger[b].totalCost;
@@ -261,13 +261,13 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
     auto itr = edges.begin();
     size_t numCollapsed = 0;
     const bool shortCollapse = merger[*itr].Short();
-    for (;
-         itr != end && merger[*itr].Valid() && merger[*itr].totalCost < maxCost;
-         ++itr) {
+    for (; itr != end; ++itr) {
       const int edge = *itr;
-      if (halfedge_.Pair(edge) < 0) {
-        merger[edge] = Merger();  // mark visited
+      if (!halfedge_.Valid(edge)) {
         continue;
+      }
+      if (merger[edge].totalCost > maxCost) {
+        break;  // Sorting means no further edges can be collapsed this round.
       }
       if (shortCollapse && !merger[edge].Short()) {
         break;  // force recalculation of cost after short edges collapse.
@@ -290,23 +290,21 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
           vertsVisited[startV] = true;
           vertsVisited[endV] = true;
         }
-        merger[edge] = Merger();  // mark visited
         ++numCollapsed;
       } else {
         // std::cout << "failed to collapse edge " << edge << " with cost "
         //           << merger[edge].addedCost << std::endl;
       }
     }
-    end = std::partition(edges.begin(), end,
-                         [&](int edge) { return merger[edge].Valid(); });
+    end = std::partition(edges.begin(), end, [&](int edge) {
+      return halfedge_.Valid(edge) && merger[edge].Valid();
+    });
     // std::cout << "short? " << shortCollapse << ", collapsed: " <<
     // numCollapsed
-    //           << ", edges left: " << (end - edges.begin()) << ", " << itr -
-    //           end
-    //           << std::endl;
+    //           << ", edges left: " << (end - edges.begin()) << ", "
+    //           << itr - edges.begin() << std::endl;
     totalCollapsed += numCollapsed;
     if (numCollapsed == 0) break;
-    // if (++i > 0) break;
   }
   // Merging verts causes their normals to change
   CalculateVertNormals();
