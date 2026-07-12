@@ -11,7 +11,7 @@ from pathlib import Path
 from benchmark_pr_perf_guard import NUM_SIZES as PERF_SIZE_COUNT
 from benchmark_pr_perf_guard import run_measured_perf_size
 
-DEFAULT_EMBER_CASES = "16 84 667 695 260 406 551 582"
+DEFAULT_EMBER_CASES = "16 84 667 695 260 406 551 582"#valid cases 1 to 1000
 DEFAULT_GTEST_FILTER = ":".join(
     [
         "Manifold.DeepChainDoesNotOverflowNumLeaves",

@@ -33,10 +33,8 @@ def main() -> int:
     summary_path = args.suite_dir / "summary.md"
     result_path = args.suite_dir / "result.json"
 
-    import argparse as _argparse
-    parse_ns = _argparse.Namespace(
+    metadata_args = argparse.Namespace(
         suite_dir=args.suite_dir,
-        source_dir=args.source_dir,
         commit_sha=None,
         workflow=None,
         runner=None,
@@ -45,7 +43,7 @@ def main() -> int:
         cpu_model=None,
         cpu_count=None,
     )
-    metadata = pwb.resolve_metadata(parse_ns)
+    metadata = pwb.resolve_metadata(metadata_args)
     suites = pwb.parse_suites(args.suite_dir, args.source_dir)
     markdown = pwb.build_summary(suites, metadata, args.repeats)
     payload = {
