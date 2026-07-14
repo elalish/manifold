@@ -233,6 +233,8 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
   scratchBuffer.reserve(10);
 
   while (edges.begin() != end) {
+    // std::cout << NumDegenerateTris() << " degenerate triangles remain"
+    //           << std::endl;
     for_each(autoPolicy(end - edges.begin(), 1e4), edges.begin(), end,
              [&](int edge) {
                if (halfedge_.IsForward(edge)) return;
@@ -808,12 +810,11 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges,
   // Reject a collapse that would worsen the Delaunay condition too much, which
   // is equivalent to having no obtuse angles. This would be a threshold of zero
   // on this dot product, but 0.5 is used to allow obtuse angles up to 120
-  // degrees to allow more edges to collapse.
-
-  // relax threshold for short edges
-  if (merger.addedCost > epsilon_ * epsilon_ && newWorst > 0.5 &&
-      newWorst > oldWorst)
-    return false;
+  // degrees to allow more edges to collapse. Planar cases (small cost) relax
+  // this threshold to allow generic polygon triangulation, but not so much as
+  // to create new degenerate triangles.
+  const double threshold = merger.addedCost > epsilon_ * epsilon_ ? 0.5 : 0.99;
+  if (newWorst > threshold && newWorst > oldWorst) return false;
 
   // Orbit endVert
   {

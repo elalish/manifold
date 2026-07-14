@@ -223,7 +223,7 @@ bool Manifold::Impl::MatchesTriNormals() const {
 int Manifold::Impl::NumDegenerateTris() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return 0;
   return count_if(countAt(0_uz), countAt(NumTri()), [this](size_t face) {
-    if (halfedge_.Pair(3 * face) < 0) return true;
+    if (halfedge_.Pair(3 * face) < 0) return false;
 
     const mat2x3 projection = GetAxisAlignedProjection(faceNormal_[face]);
     vec2 v[3];
