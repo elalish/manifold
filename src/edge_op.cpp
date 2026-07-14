@@ -235,21 +235,17 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
   while (edges.begin() != end) {
     for_each(autoPolicy(end - edges.begin(), 1e4), edges.begin(), end,
              [&](int edge) {
-               // TODO: why does changing the ! change behavior?
-               if (!halfedge_.IsForward(edge)) return;
+               if (halfedge_.IsForward(edge)) return;
                // Optimization
                if (halfedge_.Valid(edge) && merger[edge].Valid() &&
-                   merger[edge].totalCost > maxCost &&
                    !vertsVisited[halfedge_.Start(edge)] &&
                    !vertsVisited[halfedge_.End(edge)])
                  return;
 
                Merger edgeCost = CheckEdge(edge, firstNewVert);
 
-               if (edgeCost.Valid())
-                 edgeCost.totalCost +=
-                     std::max(totalCost[halfedge_.Start(edge)],
-                              totalCost[halfedge_.End(edge)]);
+               edgeCost.totalCost += std::max(totalCost[halfedge_.Start(edge)],
+                                              totalCost[halfedge_.End(edge)]);
                merger[edge] = edgeCost;
                edgeCost.a = 1 - edgeCost.a;
                merger[halfedge_.Pair(edge)] = edgeCost;
@@ -287,9 +283,9 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
         if (!merger[edge].Short()) {
           totalCost[startV] += merger[edge].addedCost;
           totalCost[endV] += merger[edge].addedCost;
-          vertsVisited[startV] = true;
-          vertsVisited[endV] = true;
         }
+        vertsVisited[startV] = true;
+        vertsVisited[endV] = true;
         ++numCollapsed;
       } else {
         // std::cout << "failed to collapse edge " << edge << " with cost "
