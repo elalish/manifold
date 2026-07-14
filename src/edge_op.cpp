@@ -278,7 +278,7 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
         continue;
       }
       const bool didCollapse = CollapseEdge2(edge, scratchBuffer, merger[edge]);
-      vertsVisited.resize(vertPos_.size(), false);
+      vertsVisited.resize(vertPos_.size(), true);
       totalCost.resize(vertPos_.size(), 0);
       if (didCollapse) {
         // std::cout << "collapsed edge " << edge << " with cost "
