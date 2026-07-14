@@ -166,7 +166,7 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge,
   const double lenSq = la::dot(delta, delta);
   const vec3 mid = vertPos_[start] + delta / 2;
   if (lenSq < epsilon_ * epsilon_) {
-    return {-1, -1, 0.5, mid};
+    return {0, -1, 0.5, mid};
   }
   mat3 A(0.);
   vec3 b(0.);
@@ -256,6 +256,7 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
     std::fill(vertsVisited.begin(), vertsVisited.end(), false);
     auto itr = edges.begin();
     size_t numCollapsed = 0;
+    // Collapse short edges first so that long edges calculate correct cost.
     const bool shortCollapse = merger[*itr].Short();
     for (; itr != end; ++itr) {
       const int edge = *itr;
@@ -270,20 +271,18 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
       }
       const int startV = halfedge_.Start(edge);
       const int endV = halfedge_.End(edge);
-      if (vertsVisited[startV] || vertsVisited[endV]) {
+      // Allow short merges to stack to ensure all are collapsed.
+      if (!shortCollapse && (vertsVisited[startV] || vertsVisited[endV])) {
         continue;
       }
       const bool didCollapse = CollapseEdge2(edge, scratchBuffer, merger[edge]);
       vertsVisited.resize(vertPos_.size(), false);
       totalCost.resize(vertPos_.size(), 0);
       if (didCollapse) {
-        // only mark long edges as visited, allowing short merges to stack.
         // std::cout << "collapsed edge " << edge << " with cost "
         //           << merger[edge].addedCost << std::endl;
-        if (!merger[edge].Short()) {
-          totalCost[startV] += merger[edge].addedCost;
-          totalCost[endV] += merger[edge].addedCost;
-        }
+        totalCost[startV] += merger[edge].addedCost;
+        totalCost[endV] += merger[edge].addedCost;
         vertsVisited[startV] = true;
         vertsVisited[endV] = true;
         ++numCollapsed;

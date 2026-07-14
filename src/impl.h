@@ -202,7 +202,7 @@ struct Manifold::Impl {
     vec3 newPos = vec3(a);
 
     bool Valid() const { return std::isfinite(addedCost); }
-    bool Short() const { return addedCost < 0; }
+    bool Short() const { return totalCost < 0; }
   };
   double MaxCost() const { return tolerance_ * tolerance_; }
   void CleanupTopology();
