@@ -796,21 +796,47 @@ function __is_finite_matrix4(m: any) {
       row.every((v: any) => typeof v === "number" && Number.isFinite(v)));
 }
 
+// Pad smaller matrices to 4×4 with identity, then normalize by the bottom-right value before applying the affine transform
+function __normalize_matrix4(m: any) {
+  if (!Array.isArray(m) || m.length < 3) return undefined;
+  const out = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
+  for (let row = 0; row < 3; row++) {
+    const r = m[row];
+    if (!Array.isArray(r) || r.length < 3) return undefined;
+    for (let col = 0; col < Math.min(r.length, 4); col++) {
+      const v = r[col];
+      if (typeof v !== "number" || !Number.isFinite(v)) return undefined;
+      out[row]![col] = v;
+    }
+  }
+  const w = Array.isArray(m[3]) ? m[3][3] : undefined;
+  if (typeof w === "number" && Number.isFinite(w) && w !== 0 && w !== 1) {
+    for (let row = 0; row < 3; row++) {
+      for (let col = 0; col < 4; col++) {
+        out[row]![col]! /= w;
+      }
+    }
+  }
+  return out;
+}
+
 // Manifold expects a flat 4x4 matrix in column-major order.
 function __to_manifold_mat4(m: any) {
-  if (!__is_finite_matrix4(m)) return undefined;
+  const n = __normalize_matrix4(m);
+  if (!n) return undefined;
   const out = new Array(16);
   for (let row = 0; row < 4; row++) {
     for (let col = 0; col < 4; col++) {
-      out[col * 4 + row] = m[row][col];
+      out[col * 4 + row] = n[row]![col];
     }
   }
   return out;
 }
 
 function __to_manifold_mat3(m: any) {
-  if (!__is_finite_matrix4(m)) return undefined;
-  return [m[0][0], m[1][0], 0, m[0][1], m[1][1], 0, m[0][3], m[1][3], 1];
+  const n = __normalize_matrix4(m);
+  if (!n) return undefined;
+  return [n[0]![0], n[1]![0], 0, n[0]![1], n[1]![1], 0, n[0]![3], n[1]![3], 1];
 }
 
 function __safe_transform(shape: any, m: any) {
@@ -1032,17 +1058,46 @@ function __flat_map_iter(v: any, fn: any) {
   return [v].flatMap(fn);
 }
 
+const __UINT32_MAX = 4294967295;
+const __rc_f64 = new Float64Array(1);
+const __rc_u64 = new BigUint64Array(__rc_f64.buffer);
+function __nextUp(x: number): number {
+  __rc_f64[0] = x;
+  __rc_u64[0] = __rc_u64[0]! + 1n;
+  return __rc_f64[0]!;
+}
+
+// max uint32_t if step is 0 or range is infinite
+function __rangeNumValues(start: number, step: number, end: number): number {
+  if (Number.isNaN(start) || Number.isNaN(step) || Number.isNaN(end)) return 0;
+  if (step < 0) {
+    if (start < end) return 0;
+  } else {
+    if (start > end) return 0;
+  }
+  if (start === end || !Number.isFinite(step)) return 1;
+  if (!Number.isFinite(start) || !Number.isFinite(end) || step === 0) return __UINT32_MAX;
+  const numSteps = Math.floor(__nextUp((end - start) / step));
+  return numSteps >= __UINT32_MAX ? __UINT32_MAX : numSteps + 1;
+}
+
 function __rangeCount(start: any, step: any, end: any): number {
-  if (step === 0 || Number.isNaN(start) || Number.isNaN(step) || Number.isNaN(end)) return 0;
-  let n = (end - start) / step;
-  if (!Number.isFinite(n) || n < 0) return 0;
-  return Math.floor(n + 1e-10) + 1;
+  if (typeof start !== "number" || typeof step !== "number" || typeof end !== "number") return 0;
+  const n = __rangeNumValues(start, step, end);
+  if (n >= 1000000) {
+    console.warn(`WARNING: Bad range parameter in for statement: too many elements (${n}).`);
+    return 0;
+  }
+  // Starts at the end when step is 0, so [0:0:0] yields nothing
+  if (step === 0) return 0;
+  return n;
 }
 
 function __range(start: any, step: any, end: any) {
   let result: any[] = [];
   let n = __rangeCount(start, step, end);
-  for (let i = 0; i < n; i++) result.push(start + i * step);
+  // Yield begin_val itself first, so an infinite step still yields start
+  for (let i = 0; i < n; i++) result.push(i === 0 ? start : start + i * step);
   Object.defineProperty(result, "__isRange", {
     value: true, enumerable: false, writable: true, configurable: true,
   });
@@ -1097,6 +1152,17 @@ function __withTol3d(items: any[]): any[] {
 // OpenSCAD cannot mix 2D and 3D in a boolean op - it keeps the dimension of the first child and ignores (with a warning) any children of the other dimension.
 function __sameDim(items: any[], ref2D: boolean): any[] {
   return items.filter(x => __is2D(x) === ref2D);
+}
+
+// Root modifier (!): the first geometry evaluated under a `!` statement becomes the design root - OpenSCAD renders only that subtree and ignores the rest of the design
+let __root_item: any = null;
+function __rootMod(g: any): any {
+  if (__root_item === null && g !== null && g !== undefined) __root_item = g;
+  return g;
+}
+function __applyRoot(items: any[], isBackground = false): any[] {
+  if (__root_item === null) return items;
+  return isBackground ? [] : [__root_item];
 }
 
 // Boolean ops: use CrossSection for 2D, Manifold for 3D
@@ -1238,40 +1304,27 @@ function __finiteOr(x: any, dflt: number): number {
 
 function __normalizeScale(scale: number | number[] | undefined): [number, number] | undefined {
   if (scale === undefined || scale === null) return undefined;
-  // A range (e.g. [1:3]) is not a valid scale - OpenSCAD falls back to no scaling
-  if (Array.isArray(scale) && (scale as any).__isRange) return undefined;
-  // Each component defaults to 1 (no scaling) when it isn't a finite number
-  const num = (v: any) => __finiteOr(v, 1);
-  const [sx, sy] = Array.isArray(scale)
-    ? [num(scale[0]), num(scale[1])]
-    : [num(scale), num(scale)];
+  // OpenSCAD accepts only a finite scalar or a 2-element finite vector for scaling; anything else is treated as no scaling
+  let sx: number, sy: number;
+  if (Array.isArray(scale)) {
+    if ((scale as any).__isRange || scale.length !== 2) return undefined;
+    if (!Number.isFinite(scale[0]) || !Number.isFinite(scale[1])) return undefined;
+    sx = scale[0] as number;
+    sy = scale[1] as number;
+  } else {
+    if (typeof scale !== "number" || !Number.isFinite(scale)) return undefined;
+    sx = sy = scale;
+  }
   return [Math.max(0, sx), Math.max(0, sy)];
 }
 
-function __getHelixLength(rMax: number, height: number, twist: number, scaleX: number, scaleY: number): number {
-  const steps = 100;
-  let len = 0;
-  const twistRad = (twist * Math.PI) / 180;
-  const dt = 1 / steps;
-  for (let i = 0; i < steps; i++) {
-    const t = (i + 0.5) * dt;
-    const sx = 1 + (scaleX - 1) * t;
-    const sy = 1 + (scaleY - 1) * t;
-    const sin = Math.sin(t * twistRad);
-    const cos = Math.cos(t * twistRad);
-    
-    const vx = -rMax * sx * twistRad * sin;
-    const vy = rMax * sy * twistRad * cos;
-    const vz = height;
-    
-    const speed = Math.sqrt(vx * vx + vy * vy + vz * vz);
-    len += speed * dt;
-  }
-  return len;
+// Arc length of an Archimedes spiral r = a*theta
+function __archimedesLength(a: number, theta: number): number {
+  return 0.5 * a * (theta * Math.sqrt(1 + theta * theta) + Math.asinh(theta));
 }
 
+// Slice calculation logic for curves, helices, and conical helices
 function __computeExtrudeDivisions(shape: any, height: number, options: { twist?: number; scale?: number | number[] | undefined; fn?: number; fa?: number; fs?: number; fe?: number; slices?: number; }): number {
-  // Explicit, finite slices count - an invalid value (undef, inf, nan, string, bool, range) is ignored and the count is auto-computed
   if (typeof options.slices === "number" && Number.isFinite(options.slices)) {
     return Math.max(1, options.slices);
   }
@@ -1280,49 +1333,82 @@ function __computeExtrudeDivisions(shape: any, height: number, options: { twist?
   const fn = options.fn ?? 0;
   const fa = options.fa ?? 12;
   const fs = options.fs ?? 2;
-  const fe = options.fe ?? 0;
+  const fe = (typeof options.fe === "number" && Number.isFinite(options.fe) && options.fe > 0) ? options.fe : 0;
+  const GRID_FINE = 0.00000095367431640625;
 
   const normScale = __normalizeScale(options.scale);
   const sx = normScale?.[0] ?? 1;
   const sy = normScale?.[1] ?? 1;
 
-  let rMax = 0;
+  // Tracks the maximum squared distance from the axis and the largest squared displacement caused by scaling
+  let rSqr = 0;
+  let maxDeltaSqr = 0;
   try {
     const polys = shape.toPolygons();
     for (const poly of polys) {
       for (const p of poly) {
-        const dist = Math.sqrt(p[0] * p[0] + p[1] * p[1]);
-        if (dist > rMax) rMax = dist;
+        const dSqr0 = p[0] * p[0] + p[1] * p[1];
+        if (dSqr0 > rSqr) rSqr = dSqr0;
+        const dx = p[0] - p[0] * sx;
+        const dy = p[1] - p[1] * sy;
+        const dSqr = dx * dx + dy * dy;
+        if (dSqr > maxDeltaSqr) maxDeltaSqr = dSqr;
       }
     }
   } catch {
-    rMax = 10;
+    rSqr = 100;
+    maxDeltaSqr = (10 * Math.max(Math.abs(sx - 1), Math.abs(sy - 1))) ** 2;
   }
 
+  const diagonalSlices = () => {
+    if (Math.sqrt(maxDeltaSqr) < GRID_FINE) return 1;
+    if (fn > 0) return Math.max(1, Math.trunc(fn));
+    return Math.max(1, Math.ceil(Math.sqrt(maxDeltaSqr + height * height) / fs));
+  };
+
   if (twist === 0) {
-    if (sx !== sy) {
-      const maxDeltaSqr = rMax * rMax * Math.max(Math.abs(sx - 1), Math.abs(sy - 1)) ** 2;
-      const diagSlices = Math.ceil(Math.sqrt(maxDeltaSqr + height * height) / fs);
-      return fn > 0 ? fn : diagSlices;
-    }
-    return 1;
+    return sx !== sy ? diagonalSlices() : 1;
   }
 
   const minSlices = Math.max(Math.ceil(twist / 120), 1);
-  if (fn > 0) {
-    return Math.max(Math.ceil((twist / 360) * fn), minSlices);
+  const twistRad = (twist * Math.PI) / 180;
+
+  const helixSlices = () => {
+    const r = Math.sqrt(rSqr);
+    if (r < GRID_FINE) return minSlices;
+    if (fn > 0) return Math.max(Math.ceil((twist / 360) * fn), minSlices);
+    if (fe > 0) {
+      // helix_slices_given_fe: max sagitta of a chord across the helix arc <= fe
+      if (fe >= r) return minSlices;
+      const theta = 2 * (Math.PI - Math.acos(fe / r - 1));
+      return Math.max(Math.ceil(twistRad / theta), minSlices);
+    }
+    const faSlices = Math.ceil(twist / fa);
+    const helixLen = Math.sqrt(rSqr * twistRad * twistRad + height * height);
+    const fsSlices = Math.ceil(helixLen / fs);
+    return Math.max(Math.min(faSlices, fsSlices), minSlices);
+  };
+
+  if (sx === 1 && sy === 1) {
+    return helixSlices();
   }
 
-  if (fe > 0) {
-    const twistRad = (twist * Math.PI) / 180;
-    const circumference = rMax * twistRad;
-    return Math.max(Math.ceil(circumference / fe), minSlices);
+  if (sx !== sy) {
+    // Twist with non-uniform scale: the larger of the diagonal and helix counts
+    return Math.max(diagonalSlices(), helixSlices());
   }
 
-  const helixLen = __getHelixLength(rMax, height, twist, sx, sy);
-  const fsSlices = Math.ceil(helixLen / fs);
+  // Twist with uniform scale
+  const r = Math.sqrt(rSqr);
+  if (r < GRID_FINE) return minSlices;
+  if (fn > 0) return Math.max(Math.ceil(twist * fn / 360), minSlices);
+  const angleEnd = sx > 1 ? twistRad * sx / (sx - 1) : twistRad / (1 - sx);
+  const angleStart = angleEnd - twistRad;
+  const a = r / angleEnd;
+  const spiralLength = __archimedesLength(a, angleEnd) - __archimedesLength(a, angleStart);
+  const totalLength = Math.sqrt(spiralLength * spiralLength + height * height);
+  const fsSlices = Math.ceil(totalLength / fs);
   const faSlices = Math.ceil(twist / fa);
-
   return Math.max(Math.min(faSlices, fsSlices), minSlices);
 }
 
@@ -1404,15 +1490,35 @@ function __splitOutline(o: [number, number][], twist: number, sx: number, sy: nu
     : fsOutline;
 }
 
-function __extrudeTwisted(shape: any, height: number, twistDeg: number, slices: number, scaleVec: [number, number] | undefined, center: boolean | undefined, fn: number, fa: number, fs: number): any {
-  const rawPolys: [number, number][][] = shape.toPolygons();
+// OpenSCAD removes duplicate and collinear outline vertices before extrusion, so do the same to match its mesh output
+function __dropCollinear(poly: [number, number][]): [number, number][] {
+  const n = poly.length;
+  if (n < 4) return poly;
+  const out: [number, number][] = [];
+  for (let i = 0; i < n; i++) {
+    const p = poly[(i + n - 1) % n]!;
+    const c = poly[i]!;
+    const q = poly[(i + 1) % n]!;
+    const ax = c[0] - p[0], ay = c[1] - p[1];
+    const bx = q[0] - c[0], by = q[1] - c[1];
+    const cross = ax * by - ay * bx;
+    const scale = Math.hypot(ax, ay) * Math.hypot(bx, by);
+    if (Math.abs(cross) > 1e-12 * Math.max(scale, 1e-30)) out.push(c);
+  }
+  return out.length >= 3 ? out : poly;
+}
+
+function __extrudeTwisted(shape: any, height: number, twistDeg: number, slices: number, scaleVec: [number, number] | undefined, center: boolean | undefined, fn: number, fa: number, fs: number, segments?: number): any {
+  const rawPolys: [number, number][][] = shape.toPolygons().map(__dropCollinear);
   if (!rawPolys.length) return Manifold.union([]);
 
   const sx = scaleVec ? scaleVec[0] : 1;
   const sy = scaleVec ? scaleVec[1] : 1;
 
-  // Refine each outline exactly as OpenSCAD does, so the cross-section vertex count matches OpenSCAD's twisted mesh.
-  const polys = rawPolys.map(c => __splitOutline(c, twistDeg, sx, sy, slices, fn, fa, fs, 0));
+  // Refine outlines the same way as OpenSCAD to match its twisted mesh; `segments=0` disables refinement
+  const polys = segments === 0
+    ? rawPolys
+    : rawPolys.map(c => __splitOutline(c, twistDeg, sx, sy, slices, fn, fa, fs, segments ?? 0));
 
   // Flatten all contours, keeping per-contour boundary order for the walls and a position -> flat-index map for recovering the cap triangulation
   const flat: [number, number][] = [];
@@ -1475,13 +1581,21 @@ function __extrudeTwisted(shape: any, height: number, twistDeg: number, slices: 
 
   const tris: number[] = [];
   const idx = (i: number, k: number) => i * M + k;
-  const dist2 = (p: number, q: number) => {
+  // OpenSCAD's add_slice_indices compares the XY-projected diagonal lengths only
+  const dist2d = (p: number, q: number) => {
     const pb = p * 3, qb = q * 3;
     const dx = verts[pb]! - verts[qb]!;
     const dy = verts[pb + 1]! - verts[qb + 1]!;
-    const dz = verts[pb + 2]! - verts[qb + 2]!;
-    return dx * dx + dy * dy + dz * dz;
+    return Math.hypot(dx, dy);
   };
+  // OpenSCAD sgn_vdiff: lengths within 5 orders of magnitude count as equal
+  const sgnVdiff = (l1: number, l2: number) => {
+    const scale = l1 + l2;
+    const diff = 2 * Math.abs(l1 - l2) * 1e5;
+    return diff > scale ? (l1 < l2 ? -1 : 1) : 0;
+  };
+  // back_twist: rotation at slice top <= rotation at slice bottom
+  const backTwist = twistDeg <= 0;
 
   // Bottom cap (slice 0) keeps the plain-extrude winding (faces -z); top cap (slice S) is reversed to face +z. Skip the top cap if it collapses to a point.
   for (const [a, b, c] of capTris) tris.push(idx(0, a), idx(0, b), idx(0, c));
@@ -1489,8 +1603,17 @@ function __extrudeTwisted(shape: any, height: number, twistDeg: number, slices: 
     for (const [a, b, c] of capTris) tris.push(idx(S, a), idx(S, c), idx(S, b));
   }
 
-  // Walls: triangulate each quad p1->c1->c2->p2 along its shorter diagonal
+  // Triangulate each wall quad using the shorter diagonal; if both are equal, choose the diagonal the same way OpenSCAD does based on twist direction and outline orientation
   for (const { off, len } of contours) {
+    // Outline orientation via signed area: CCW outer outlines are positive, CW holes negative
+    let area2 = 0;
+    for (let e = 0; e < len; e++) {
+      const v0 = flat[off + e]!;
+      const v1 = flat[off + ((e + 1) % len)]!;
+      area2 += v0[0] * v1[1] - v1[0] * v0[1];
+    }
+    const flip = (area2 < 0) !== backTwist;
+
     for (let e = 0; e < len; e++) {
       const a = off + e;
       const b = off + ((e + 1) % len);
@@ -1500,7 +1623,14 @@ function __extrudeTwisted(shape: any, height: number, twistDeg: number, slices: 
         if (topZero && i === S - 1) {
           // Top collapsed to a point: fan to a single shared apex vertex (all slice-S vertices coincide at the origin, so pick one canonical index)
           tris.push(p1, c1, idx(S, 0));
-        } else if (dist2(p1, c2) <= dist2(c1, p2)) {
+          continue;
+        }
+        const diffSign = sgnVdiff(dist2d(p1, c2), dist2d(c1, p2));
+        const splitFirst = diffSign === -1 || (diffSign === 0 && !flip);
+        // A zero component in the slice-top scale flips the split to avoid 0-thickness ears
+        const t1 = (i + 1) / S;
+        const anyZero = 1 + (sx - 1) * t1 === 0 || 1 + (sy - 1) * t1 === 0;
+        if (splitFirst !== anyZero) {
           tris.push(p1, c1, c2, p1, c2, p2);
         } else {
           tris.push(p1, c1, p2, c1, c2, p2);
@@ -1512,37 +1642,77 @@ function __extrudeTwisted(shape: any, height: number, twistDeg: number, slices: 
   return new Manifold({ vertProperties: verts, triVerts: new Uint32Array(tris), numProp: 3 } as any);
 }
 
-function __extrude(shape: any, height = 100, options: {twist?: number; scale?: number | number[] | undefined; center?: boolean; fn?: number; fa?: number; fs?: number; fe?: number; slices?: number;} = {}) {
+function __extrude(shape: any, height?: number, options: {twist?: number; scale?: number | number[] | undefined; center?: boolean; v?: any; fn?: number; fa?: number; fs?: number; fe?: number; slices?: number; segments?: number;} = {}) {
   if (__isEmpty(shape)) {
     return Manifold.union([]);
   }
 
+  // OpenSCAD ignores 3D children of 2D operations
   if (!__is2D(shape)) {
-    return shape;
+    return Manifold.union([]);
   }
 
-  // An invalid height defaults to OpenSCAD's linear_extrude default of 100
-  height = __finiteOr(height, 100);
+  // Match OpenSCAD's extrusion vector rules: use `v` as-is, combine `v` with `height` when both are given, default to `[0,0,1] * height`, and treat an invalid `v` as `[0,0,1]`
+  let vec: [number, number, number] | undefined;
+  if (options.v !== undefined && options.v !== null) {
+    const v = options.v;
+    if (Array.isArray(v) && v.length === 3 && v.every(c => Number.isFinite(c))) {
+      vec = [v[0], v[1], v[2]];
+    } else {
+      vec = [0, 0, 1];
+    }
+    if (typeof height === "number" && Number.isFinite(height)) {
+      const len = Math.hypot(vec[0], vec[1], vec[2]);
+      if (len > 0) vec = [vec[0] / len * height, vec[1] / len * height, vec[2] / len * height];
+    }
+    height = vec[2];
+  } else {
+    // An invalid height defaults to OpenSCAD's linear_extrude default of 100
+    height = __finiteOr(height, 100);
+  }
+  // OpenSCAD clamps a non-positive z extent to 0, which yields no geometry
+  if (height <= 0) {
+    return Manifold.union([]);
+  }
+
   // An invalid twist means "no twist"
   const twist = __finiteOr(options.twist, 0);
   const normScale = __normalizeScale(options.scale);
 
   const nDivisions = __computeExtrudeDivisions(shape, height, { ...options, scale: normScale });
 
-  if (twist !== 0) {
-    return __extrudeTwisted(
+  // OpenSCAD validates segments as a non-negative integer, ignoring anything else
+  const segments = (typeof options.segments === "number" && Number.isInteger(options.segments) && options.segments >= 0)
+    ? options.segments
+    : undefined;
+
+  let result: any;
+  if (twist !== 0 || (normScale !== undefined && normScale[0] !== normScale[1])) {
+    // Even without twist, non-uniform scaling uses the manual mesh builder to match OpenSCAD's sliced walls and consistent quad triangulation
+    result = __extrudeTwisted(
       shape, height, twist, nDivisions, normScale, options.center,
-      options.fn ?? 0, options.fa ?? 12, options.fs ?? 2,
+      options.fn ?? 0, options.fa ?? 12, options.fs ?? 2, segments,
+    );
+  } else {
+    result = shape.extrude(
+      height,
+      Math.max(0, nDivisions - 1),
+      undefined,
+      normScale,
+      options.center
     );
   }
 
-  return shape.extrude(
-    height,
-    Math.max(0, nDivisions - 1),
-    undefined,
-    normScale,
-    options.center
-  );
+  // A non-vertical extrusion vector shears the straight extrusion sideways
+  if (vec && (vec[0] !== 0 || vec[1] !== 0)) {
+    const kx = vec[0] / vec[2];
+    const ky = vec[1] / vec[2];
+    result = result.warp((p: number[]) => {
+      p[0]! += kx * p[2]!;
+      p[1]! += ky * p[2]!;
+    });
+  }
+  return result;
 }
 
 function __revolve(shape: any, fn = 0, fa = 12, fs = 2, angle = 360) {
@@ -1550,23 +1720,54 @@ function __revolve(shape: any, fn = 0, fa = 12, fs = 2, angle = 360) {
     return Manifold.union([]);
   }
   if (__is2D(shape)) {
-    let num_sections: number;
-    const absAngle = Math.abs(angle);
+    // NaN, ±Infinity and anything beyond ±360 all mean a full revolution
+    if (typeof angle !== "number" || !isFinite(angle) || Math.abs(angle) > 360) {
+      angle = 360;
+    }
+    if (angle === 0) {
+      return Manifold.union([]);
+    }
 
+    const bounds = shape.bounds();
+    // OpenSCAD supports profiles entirely on the negative X side; mirror them to +X for Manifold's revolve, then rotate the result back by 180° to match
+    const onNegativeSide = bounds.max[0] <= 0;
+    if (onNegativeSide) {
+      shape = shape.mirror([1, 0]);
+    }
+
+    const absAngle = Math.abs(angle);
+    // Fragments for the full circle first, then scaled by the swept angle and truncated
+    let full_fragments: number;
     if (fn > 0) {
-      num_sections = Math.max(1, Math.ceil(Math.max(fn, 3) * absAngle / 360));
+      full_fragments = Math.floor(fn >= 3 ? fn : 3);
     } else {
-      const bounds = shape.bounds();
       const r = Math.max(Math.abs(bounds.max[0]), Math.abs(bounds.min[0]));
       const N_fa = 360 / fa;
       const N_fs = 2 * Math.PI * r / fs;
-      num_sections = Math.max(1, Math.ceil(Math.max(Math.min(N_fa, N_fs), 5) * absAngle / 360));
+      full_fragments = Math.ceil(Math.max(Math.min(N_fa, N_fs), 5));
     }
+    const num_sections = Math.max(1, Math.floor(full_fragments * absAngle / 360));
 
-    const revolved = shape.revolve(num_sections, absAngle);
-    return angle < 0 ? revolved.mirror([0, 1, 0]) : revolved;
+    let revolved: any;
+    if (num_sections < 3) {
+      const arc = absAngle * Math.PI / 180;
+      revolved = shape.extrude(1, num_sections - 1).warp((v: number[]) => {
+        const phi = (1 - v[2]!) * arc;
+        const x = v[0];
+        const y = v[1];
+        v[0] = x * Math.cos(phi);
+        v[1] = x * Math.sin(phi);
+        v[2] = y;
+      });
+    } else {
+      revolved = shape.revolve(num_sections, absAngle);
+    }
+    if (angle < 0) revolved = revolved.mirror([0, 1, 0]);
+    if (onNegativeSide) revolved = revolved.rotate([0, 0, 180]);
+    return revolved;
   }
-  return shape;
+  // OpenSCAD ignores 3D children of 2D operations
+  return Manifold.union([]);
 }
 
 function __sampleQuadratic(x0: number, y0: number, x1: number, y1: number, x2: number, y2: number, steps: number): [number, number][] {
@@ -1954,65 +2155,70 @@ function __sync_quality(fa: any, fs: any) {
   }
 }
 
+// Only accepts actual finite numbers here; strings like "45", undef, bools, etc. silently become 0
+function __rot_angle(x: any): number {
+  return (typeof x === 'number' && isFinite(x)) ? x : 0;
+}
+
 function __rotate(shape: any, a: any, v?: any) {
   if (!shape) return shape;
 
+  // Vector angle: XYZ euler rotation. OpenSCAD ignores 'v' entirely, uses only the first three elements, and treats invalid ones as 0
+  if (Array.isArray(a)) {
+    const ex = __rot_angle(a[0]);
+    const ey = __rot_angle(a[1]);
+    const ez = __rot_angle(a[2]);
+    if (__is2D(shape)) {
+      return shape.rotate(ez);
+    }
+    return shape.rotate([ex, ey, ez]);
+  }
+
+  // Scalar angle: rotate about axis 'v'. Defaults to Z and keeps that default when 'v' is not a valid 2/3-element numeric vector
+  const angle = __rot_angle(a);
+  let vx = 0, vy = 0, vz = 1;
+  if (Array.isArray(v) && (v.length === 2 || v.length === 3) &&
+      v.every((c: any) => typeof c === 'number' && isFinite(c))) {
+    vx = v[0];
+    vy = v[1];
+    vz = v.length === 3 ? v[2] : 0;
+  } else if (v !== undefined && v !== null && !Array.isArray(v) && typeof v === 'object') {
+    vx = Number(v.x) || 0;
+    vy = Number(v.y) || 0;
+    vz = Number(v.z) || 0;
+  }
+
+  const len = Math.sqrt(vx * vx + vy * vy + vz * vz);
+  if (len < 1e-9) return shape;
+
   if (__is2D(shape)) {
-    if (v !== undefined) {
-      const vz = Array.isArray(v) ? v[2] : (v && typeof v === 'object' ? (v.z || v[2]) : 0);
-      const vzNum = Number(vz) || 0;
-      if (Math.abs(vzNum) > 1e-9) {
-        return shape.rotate(Number(a) * Math.sign(vzNum));
-      }
-      return shape;
+    if (Math.abs(vz) > 1e-9) {
+      return shape.rotate(angle * Math.sign(vz));
     }
-    if (Array.isArray(a)) {
-      return shape.rotate(Number(a[2]) || 0);
-    }
-    return shape.rotate(Number(a) || 0);
+    return shape;
   }
 
-  // 3D shape
-  if (v !== undefined) {
-    const theta = (Number(a) || 0) * Math.PI / 180;
-    const cosT = Math.cos(theta);
-    const sinT = Math.sin(theta);
-    const oneMinusCosT = 1 - cosT;
-
-    let vx = 0, vy = 0, vz = 0;
-    if (Array.isArray(v)) {
-      vx = Number(v[0]) || 0;
-      vy = Number(v[1]) || 0;
-      vz = Number(v[2]) || 0;
-    } else if (v && typeof v === 'object') {
-      vx = Number(v.x || v[0]) || 0;
-      vy = Number(v.y || v[1]) || 0;
-      vz = Number(v.z || v[2]) || 0;
-    } else {
-      vx = Number(v) || 0;
-    }
-
-    const len = Math.sqrt(vx * vx + vy * vy + vz * vz);
-    if (len < 1e-9) return shape;
-
-    const ux = vx / len;
-    const uy = vy / len;
-    const uz = vz / len;
-
-    const R = [
-      [oneMinusCosT * ux * ux + cosT, oneMinusCosT * ux * uy - sinT * uz, oneMinusCosT * ux * uz + sinT * uy, 0],
-      [oneMinusCosT * ux * uy + sinT * uz, oneMinusCosT * uy * uy + cosT, oneMinusCosT * uy * uz - sinT * ux, 0],
-      [oneMinusCosT * ux * uz - sinT * uy, oneMinusCosT * uy * uz + sinT * ux, oneMinusCosT * uz * uz + cosT, 0],
-      [0, 0, 0, 1]
-    ];
-
-    return __safe_transform(shape, R);
-  } else {
-    if (Array.isArray(a)) {
-      return shape.rotate(a);
-    }
-    return shape.rotate([0, 0, Number(a) || 0]);
+  if (vx === 0 && vy === 0) {
+    return shape.rotate([0, 0, angle * Math.sign(vz)]);
   }
+
+  const theta = angle * Math.PI / 180;
+  const cosT = Math.cos(theta);
+  const sinT = Math.sin(theta);
+  const oneMinusCosT = 1 - cosT;
+
+  const ux = vx / len;
+  const uy = vy / len;
+  const uz = vz / len;
+
+  const R = [
+    [oneMinusCosT * ux * ux + cosT, oneMinusCosT * ux * uy - sinT * uz, oneMinusCosT * ux * uz + sinT * uy, 0],
+    [oneMinusCosT * ux * uy + sinT * uz, oneMinusCosT * uy * uy + cosT, oneMinusCosT * uy * uz - sinT * ux, 0],
+    [oneMinusCosT * ux * uz - sinT * uy, oneMinusCosT * uy * uz + sinT * ux, oneMinusCosT * uz * uz + cosT, 0],
+    [0, 0, 0, 1]
+  ];
+
+  return __safe_transform(shape, R);
 }
 
 function __translate(shape: any, v: any) {
@@ -2077,6 +2283,55 @@ function __scale(shape: any, v: any) {
   }
 }
 
+// Scale about the origin to fit `newsize`, preserving zero-sized axes unless `auto` is enabled, with the auto scale taken from the largest requested dimension
+function __resize(shape: any, newsizeRaw: any, autoRaw: any) {
+  if (!shape || __isEmpty(shape)) return shape;
+
+  const newsize = [0, 0, 0];
+  if (is_list_fn(newsizeRaw)) {
+    for (let i = 0; i < 3 && i < newsizeRaw.length; i++) {
+      const n = Number(newsizeRaw[i]);
+      if (Number.isFinite(n)) newsize[i] = n;
+    }
+  }
+
+  const autosize = [false, false, false];
+  if (is_list_fn(autoRaw)) {
+    for (let i = 0; i < 3 && i < autoRaw.length; i++) autosize[i] = __truthy(autoRaw[i]);
+  } else if (typeof autoRaw === "boolean") {
+    autosize[0] = autosize[1] = autosize[2] = autoRaw;
+  }
+
+  const is2D = __is2D(shape);
+  const dim = is2D ? 2 : 3;
+  const bb = is2D ? shape.bounds() : shape.boundingBox();
+  const bboxSize = [0, 0, 0];
+  for (let i = 0; i < dim; i++) bboxSize[i] = bb.max[i] - bb.min[i];
+
+  // Non-positive `newsize` components are treated as unspecified, and `auto` uses the scale of the largest requested dimension
+  let maxIdx = 0;
+  for (let i = 1; i < 3; i++) {
+    if (newsize[i]! > newsize[maxIdx]!) maxIdx = i;
+  }
+  const scale = [1, 1, 1];
+  for (let i = 0; i < dim; i++) {
+    if (newsize[i]! > 0) {
+      if (bboxSize[i] === 0) {
+        console.warn("WARNING: Resize in direction normal to flat object is not implemented");
+        return shape;
+      }
+      scale[i] = newsize[i]! / bboxSize[i]!;
+    }
+  }
+  const autoscale = scale[maxIdx]!;
+  for (let i = 0; i < dim; i++) {
+    if (autosize[i] && !(newsize[i]! > 0)) scale[i] = autoscale;
+  }
+
+  return is2D ? shape.scale([scale[0], scale[1]]) : shape.scale(scale);
+}
+
+// Build the reflection matrix to avoid rounding artifacts, and treat a zero-length normal as an identity transform
 function __mirror(shape: any, v: any) {
   if (!shape) return shape;
   if (__is2D(shape)) {
@@ -2090,7 +2345,14 @@ function __mirror(shape: any, v: any) {
     } else {
       x = Number(v) || 0;
     }
-    return shape.mirror([x, y]);
+    const normSq = x * x + y * y;
+    if (normSq === 0) return shape;
+    const d = 2 / normSq;
+    return __safe_transform(shape, [
+      [1 - d * x * x, -d * x * y, 0, 0],
+      [-d * x * y, 1 - d * y * y, 0, 0],
+      [0, 0, 1, 0],
+    ]);
   } else {
     let x = 0, y = 0, z = 0;
     if (Array.isArray(v)) {
@@ -2104,12 +2366,27 @@ function __mirror(shape: any, v: any) {
     } else {
       x = Number(v) || 0;
     }
-    return shape.mirror([x, y, z]);
+    const normSq = x * x + y * y + z * z;
+    if (normSq === 0) return shape;
+    const d = 2 / normSq;
+    return __safe_transform(shape, [
+      [1 - d * x * x, -d * x * y, -d * x * z, 0],
+      [-d * x * y, 1 - d * y * y, -d * y * z, 0],
+      [-d * x * z, -d * y * z, 1 - d * z * z, 0],
+    ]);
   }
 }
 
 function __cube(size: any, center = false) {
-  const v = is_list_fn(size) ? [Number(size[0]), Number(size[1]), Number(size[2])] : [Number(size), Number(size), Number(size)];
+  // Invalid or `undef` `size` uses the default (1,1,1), while only valid but degenerate sizes produce empty geometry
+  let v: number[] = [1, 1, 1];
+  if (size !== undefined && size !== null) {
+    if (typeof size === "number") {
+      v = [size, size, size];
+    } else if (is_list_fn(size) && size.length === 3 && size.every((x: any) => typeof x === "number")) {
+      v = [size[0], size[1], size[2]];
+    }
+  }
   // A non-finite or non-positive dimension yields no geometry instead of crashing
   if (v.some((x) => !Number.isFinite(x) || x <= 0)) {
     return Manifold.union([]);
@@ -2118,7 +2395,15 @@ function __cube(size: any, center = false) {
 }
 
 function __square(size: any, center = false) {
-  const v = is_list_fn(size) ? [Number(size[0]), Number(size[1])] : [Number(size), Number(size)];
+  // Invalid or `undef` `size` uses the default (1,1), while only valid but degenerate sizes produce empty geometry
+  let v: number[] = [1, 1];
+  if (size !== undefined && size !== null) {
+    if (typeof size === "number") {
+      v = [size, size];
+    } else if (is_list_fn(size) && size.length === 2 && size.every((x: any) => typeof x === "number")) {
+      v = [size[0], size[1]];
+    }
+  }
   // A non-finite or non-positive dimension yields no geometry instead of crashing
   if (v.some((x) => !Number.isFinite(x) || x <= 0)) {
     return CrossSection.square(0);
@@ -2133,7 +2418,7 @@ function __sphere(radius: number, fn = 0, fa = 12, fs = 2) {
   }
   let N: number;
   if (fn > 0) {
-    // OpenSCAD takes the explicit-$fn path whenever $fn > 0, clamping to a minimum of 3 - a non-finite $fn is clamped to that minimum
+    // Takes the explicit-$fn path whenever $fn > 0, clamping to a minimum of 3 - a non-finite $fn is clamped to that minimum
     N = Number.isFinite(fn) ? Math.max(3, Math.ceil(fn)) : 3;
   } else {
     const N_fa = 360 / fa;
@@ -2212,8 +2497,8 @@ function __cylinder(height: number, radiusLow: number, radiusHigh = -1.0, fn = 0
   }
   let segs = fn;
   if (segs > 0) {
-    // OpenSCAD clamps a non-finite $fn to the minimum of 3 fragments.
-    if (!Number.isFinite(segs)) segs = 3;
+    // OpenSCAD clamps $fn (including non-finite) to a minimum of 3 fragments and truncates
+    segs = Number.isFinite(segs) && segs >= 3 ? Math.floor(segs) : 3;
   } else {
     const r = Math.max(radiusLow, radiusHigh < 0 ? radiusLow : radiusHigh);
     const N_fa = 360 / fa;
@@ -2316,8 +2601,47 @@ function __polyhedron(points: any, faces: any) {
   if (Array.isArray(faces)) {
     for (const face of faces) {
       if (!Array.isArray(face) || face.length < 3) continue;
-      for (let i = 1; i + 1 < face.length; i++) {
-        tris.push(Number(face[i + 1]), Number(face[i]), Number(face[0]));
+      const idx = face.map((i: any) => Number(i));
+      if (idx.length === 3) {
+        tris.push(idx[2]!, idx[1]!, idx[0]!);
+        continue;
+      }
+      
+      // Properly triangulate concave faces to avoid overlapping triangles, falling back to a simple fan only for degenerate faces
+      let done = false;
+      const pts = idx.map((i) => [verts[i * 3] ?? 0, verts[i * 3 + 1] ?? 0, verts[i * 3 + 2] ?? 0]);
+      // Newell normal follows the face's winding order
+      let nx = 0, ny = 0, nz = 0;
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i]!, q = pts[(i + 1) % pts.length]!;
+        nx += (p[1]! - q[1]!) * (p[2]! + q[2]!);
+        ny += (p[2]! - q[2]!) * (p[0]! + q[0]!);
+        nz += (p[0]! - q[0]!) * (p[1]! + q[1]!);
+      }
+      const nLen = Math.hypot(nx, ny, nz);
+      if (nLen > 1e-12) {
+        nx /= nLen; ny /= nLen; nz /= nLen;
+        let ux: number, uy: number, uz: number;
+        if (Math.abs(nx) > Math.abs(nz)) { ux = -ny; uy = nx; uz = 0; }
+        else { ux = 0; uy = -nz; uz = ny; }
+        const uLen = Math.hypot(ux, uy, uz);
+        ux /= uLen; uy /= uLen; uz /= uLen;
+        const vx = ny * uz - nz * uy, vy = nz * ux - nx * uz, vz = nx * uy - ny * ux;
+        const poly2d = pts.map((p) => [
+          p[0]! * ux + p[1]! * uy + p[2]! * uz,
+          p[0]! * vx + p[1]! * vy + p[2]! * vz,
+        ]);
+        try {
+          for (const t of wasm.triangulate([poly2d])) {
+            tris.push(idx[t[2]!]!, idx[t[1]!]!, idx[t[0]!]!);
+          }
+          done = true;
+        } catch { /* self-intersecting or otherwise invalid face: use the fan */ }
+      }
+      if (!done) {
+        for (let i = 1; i + 1 < idx.length; i++) {
+          tris.push(idx[i + 1]!, idx[i]!, idx[0]!);
+        }
       }
     }
   }
@@ -2326,8 +2650,7 @@ function __polyhedron(points: any, faces: any) {
     vertProperties: new Float32Array(verts),
     triVerts: new Uint32Array(tris),
   });
-  // OpenSCAD accepts "polyhedron soup" where coincident vertices are duplicated per-face (so edges aren't shared)
-  // Manifold requires shared edges, so weld coincident vertices along open edges before constructing the solid
+  // OpenSCAD allows duplicate per-face vertices, but Manifold requires shared edges, so weld coincident vertices before building the solid.
   mesh.merge();
   try {
     return new Manifold(mesh);
@@ -2347,49 +2670,56 @@ function __parse_color_for_scope(c: any, alpha: any): any {
 }
 
 
-async function gridFromImage(dataUrl: string): Promise<{ width: number; height: number; Z: (x: number, y: number) => number }> {
+async function gridFromImage(dataUrl: string, invert: boolean): Promise<{ width: number; height: number; Z: (x: number, y: number) => number; minVal: number }> {
   const { width, height, data } = await decodeImageToPixels(dataUrl);
+  // Flip the image vertically and apply `invert` as `1 - pixel`, even if it produces negative values
   const Z = (x: number, y: number): number => {
-    const i = (y * width + x) * 4;
+    const i = ((height - 1 - y) * width + x) * 4;
     const gray = 0.2126 * data![i]! + 0.7152 * data![i + 1]! + 0.0722 * data![i + 2]!;
-    return (gray / 255) * 100;
+    return (100 / 255) * (invert ? 1 - gray : gray);
   };
-  return { width, height, Z };
+  let minVal = 200;
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++)
+      minVal = Math.min(minVal, Z(x, y));
+  return { width, height, Z, minVal };
 }
 
-function gridFromText(text: string): { width: number; height: number; Z: (x: number, y: number) => number } {
+function gridFromText(text: string): { width: number; height: number; Z: (x: number, y: number) => number; minVal: number } {
   const rows: number[][] = [];
+  // Only parsed values affect the minimum height, so zero-filled gaps never raise the floor above z=0
+  let minVal = 1;
   for (const line of text.split(/\r?\n/)) {
     const t = line.trim();
-    // skip blanks, '#' (OpenSCAD/Octave) and '%' (Matlab) comment lines
+    // skip blanks, '#' and '%' comment lines
     if (t === "" || t.startsWith("#") || t.startsWith("%")) continue;
     const vals = t.split(/\s+/).map(Number).filter(v => Number.isFinite(v));
-    if (vals.length) rows.push(vals);
+    if (vals.length) {
+      rows.push(vals);
+      for (const v of vals) minVal = Math.min(minVal, v);
+    }
   }
   if (rows.length === 0) throw new Error("__surface: empty data file");
   const height = rows.length;
   const width = Math.max(...rows.map(r => r.length));
-  // OpenSCAD reads row 0 as the first data row; row index -> Y, column index -> X. Value used directly as Z (no normalization).
+  // Reads row 0 as the first data row; row index -> Y, column index -> X. Value used directly as Z (no normalization)
   const Z = (x: number, y: number): number => rows[y]?.[x] ?? 0;
-  return { width, height, Z };
+  return { width, height, Z, minVal };
 }
 
-async function __surface(source: string, opts: { center?: boolean; kind?: "image" | "text"; fn?: number; fa?: number; fs?: number } = {}
+async function __surface(source: string, opts: { center?: boolean; invert?: boolean; kind?: "image" | "text"; fn?: number; fa?: number; fs?: number } = {}
 ) {
-  const { center = false, kind = "image" } = opts;
-  const grid = kind === "text" ? gridFromText(source) : await gridFromImage(source);
+  const { center = false, invert = false, kind = "image" } = opts;
+  // OpenSCAD only honors a bool invert, and only for images
+  const grid = kind === "text" ? gridFromText(source) : await gridFromImage(source, invert === true);
   return buildSurfaceMesh(grid, center);
 }
 
-function buildSurfaceMesh({ width, height, Z }: { width: number; height: number; Z: (x: number, y: number) => number }, center: boolean) {
+function buildSurfaceMesh({ width, height, Z, minVal }: { width: number; height: number; Z: (x: number, y: number) => number; minVal: number }, center: boolean) {
   const ox = center ? -(width - 1) / 2 : 0;
   const oy = center ? -(height - 1) / 2 : 0;
 
-  let zmin = Infinity;
-  for (let y = 0; y < height; y++)
-    for (let x = 0; x < width; x++)
-      if (Z(x, y) < zmin) zmin = Z(x, y);
-  const zFloor = zmin - 1;
+  const zFloor = minVal - 1;
 
   const numTop = width * height;
   const numQuads = (width - 1) * (height - 1);
@@ -2481,7 +2811,7 @@ function pow_fn(base: any, exp: any) { return Math.pow(base, exp); }
 // Export all runtime symbols for compiled code
 export {
   Manifold, CrossSection, wasm,
-  __cube, __square, __sphere, __cylinder, __circle, __radius, __rotate, __polygon, __polyhedron, __translate, __scale, __mirror,
+  __cube, __square, __sphere, __cylinder, __circle, __radius, __rotate, __polygon, __polyhedron, __translate, __scale, __mirror, __resize,
   is_undef_fn, is_bool_fn, is_num_fn, is_string_fn, is_list_fn, is_function_fn, __unknown_fn,
   sin_fn, cos_fn, tan_fn, asin_fn, acos_fn, atan_fn, atan2_fn,
   abs_fn, sign_fn, floor_fn, ceil_fn, round_fn, sqrt_fn, exp_fn, ln_fn, log_fn, pow_fn,
@@ -2496,6 +2826,7 @@ export {
   __safe_offset2d, __safe_project3d,
   __apply_color,
   __each, __flat_map_iter, __range, __rangeCount, __is2D, __union2d3d, __difference2d3d, __intersection2d3d, __hull2d3d, __minkowski2d3d,
+  __rootMod, __applyRoot,
   __extrude, __revolve,
   __text, __parse_color_for_scope, __surface,
   __echo, __oecho, __fnlit, __tc, __call

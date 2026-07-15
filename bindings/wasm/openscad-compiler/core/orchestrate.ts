@@ -32,14 +32,27 @@ export function ensureLibraryCompiled(ref: ExternalLibraryRef, libraryPaths: str
   const libDir = libraryDir(cwd, ref.name);
   const manifestPath = path.join(libDir, ".manifest.json");
 
+  // Carry over files from the previous build so existing references keep working across the full set during recompilation
+  let priorFiles: string[] = [];
   if (fs.existsSync(libDir) && fs.existsSync(manifestPath)) {
     const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8")) as LibraryManifest;
-    log(`Library ${ref.name}: cache hit (${Object.keys(manifest.files).length} files)`);
-    return { manifest, libDir };
+    const relOf = (abs: string) => path.relative(ref.root, abs).replace(/\\/g, "/");
+    const missing = ref.entries.filter(e => !(relOf(e.file) in manifest.files));
+    if (missing.length === 0) {
+      log(`Library ${ref.name}: cache hit (${Object.keys(manifest.files).length} files)`);
+      return { manifest, libDir };
+    }
+    priorFiles = Object.keys(manifest.files).map(rel => path.join(ref.root, rel));
+    log(`Library ${ref.name}: cache is missing ${missing.map(e => relOf(e.file)).join(", ")}; recompiling...`);
+  } else {
+    log(`Library ${ref.name}: compiling...`);
   }
 
-  log(`Library ${ref.name}: compiling...`);
-  const closure = resolveLibraryClosure(ref.name, ref.root, ref.entries.map(e => e.file), libraryPaths);
+  const entryFiles = [...priorFiles];
+  for (const e of ref.entries) {
+    if (!entryFiles.includes(e.file)) entryFiles.push(e.file);
+  }
+  const closure = resolveLibraryClosure(ref.name, ref.root, entryFiles, libraryPaths);
   const runtimeJsAbs = path.join(cwd, "runtime", "runtime.js");
   const runtimePathFor = (outRel: string) =>
     toPosixSpecifier(path.relative(path.dirname(path.join(libDir, outRel)), runtimeJsAbs));

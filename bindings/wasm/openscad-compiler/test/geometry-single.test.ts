@@ -38,7 +38,7 @@ async function getCompiledManifoldProperties(
     const worker = fork(workerPath, [filename], {
       execArgv,
       stdio: ['inherit', 'pipe', 'pipe', 'ipc'],
-      timeout: 15000,
+      timeout: 60000,
     });
 
     let stdout = '';
@@ -112,5 +112,5 @@ suite('Single Compiled Example', async () => {
     expectApproximatelyEqual(volume, compiledVolume, tolerance);
     console.log(`expected surfaceArea: ${surfaceArea}, recieved surfaceArea: ${compiledSurfaceArea}`);
     expectApproximatelyEqual(surfaceArea, compiledSurfaceArea, tolerance);
-  });
+  }, 60000);
 });

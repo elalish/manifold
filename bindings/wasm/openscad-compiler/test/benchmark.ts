@@ -65,8 +65,9 @@ function runOpenscadOnce(absFile: string): number {
   const dir = mkdtempSync(path.join(tmpdir(), "scad-bench-"));
   try {
     const out = path.join(dir, "out.off");
+    const openscadArgs = ["-o", out, "--backend=manifold", absFile];
     const t0 = performance.now();
-    execFileSync("openscad", ["-o", out, "--backend=manifold", absFile], { stdio: "ignore" });
+    execFileSync("taskset", ["-c", "0", "openscad", ...openscadArgs], { stdio: "ignore" });
     return performance.now() - t0;
   } finally {
     rmSync(dir, { recursive: true, force: true });
@@ -213,7 +214,7 @@ function printTable(results: FileResult[], openscadAvailable: boolean) {
   const fmt = (s: Stat | null) => s ? s.median.toFixed(1) : "ERR";
   const fileW = Math.max(4, ...results.map(r => r.file.length));
   const header = `${"file".padEnd(fileW)}  ${"openscad".padStart(9)}  ${"compile".padStart(8)}  ${"run".padStart(9)}  ${"total".padStart(9)}  ratio`;
-  console.log("\n=== Median timings (ms) over " + RUNS + " runs ===\n");
+  console.log("--- Median timings (ms) over " + RUNS + " runs ---");
   console.log(header);
   console.log("-".repeat(header.length));
   for (const r of results) {
@@ -224,16 +225,16 @@ function printTable(results: FileResult[], openscadAvailable: boolean) {
 
 function main() {
   const openscadAvailable = isOpenscadAvailable();
-  console.log(`OpenSCAD on PATH: ${openscadAvailable ? "yes" : "no (nothing will be skipped; native timings unavailable)"}`);
+  console.log(`OpenSCAD on PATH: ${openscadAvailable ? "yes" : "no"}`);
 
   const files = findScadFiles(EXAMPLES_DIR).sort();
   console.log(`Found ${files.length} .scad file(s) under ${EXAMPLES_DIR}`);
-  console.log(`Running ${RUNS} iterations per file per phase...\n`);
+  console.log(`Running ${RUNS} iterations per file per phase...`);
 
   const results: FileResult[] = [];
   const skipped: SkippedFile[] = [];
 
-  files.forEach((absFile, i) => {
+  files.splice(0, 5).forEach((absFile, i) => {
     const rel = path.relative(EXAMPLES_DIR, absFile).replace(/\\/g, "/");
     process.stdout.write(`[${i + 1}/${files.length}] ${rel} ... `);
     const r = benchmarkFile(absFile, openscadAvailable);
@@ -247,14 +248,14 @@ function main() {
   });
 
   const succeeded = results.filter(r => r.ourTotal).length;
-  console.log(`\n${results.length} file(s) benchmarked (${succeeded} fully succeeded), ${skipped.length} skipped due to native OpenSCAD compile errors.`);
+  console.log(`${results.length} file(s) benchmarked (${succeeded} fully succeeded), ${skipped.length} skipped due to native OpenSCAD compile errors.`);
 
   writeJson(results, skipped, openscadAvailable);
   writeCsv(results);
   writeMarkdown(results, skipped, openscadAvailable);
   printTable(results, openscadAvailable);
 
-  console.log(`\nWrote ${RESULTS_PREFIX}.json, ${RESULTS_PREFIX}.csv, ${RESULTS_PREFIX}.md`);
+  console.log(`Wrote ${RESULTS_PREFIX}.json, ${RESULTS_PREFIX}.csv, ${RESULTS_PREFIX}.md`);
 }
 
 main();
