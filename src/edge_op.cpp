@@ -164,6 +164,14 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge) const {
   mat3 A(0.);
   vec3 b(0.);
   double c = 0;
+
+  auto addCost = [&](vec3 normal, vec3 pos) {
+    A += la::outerprod(normal, normal);
+    double d = la::dot(normal, pos - mid);
+    b += normal * d;
+    c += d * d;
+  };
+
   int firstEdge = edge;
 
   auto addTri = [&](int current) {
@@ -171,14 +179,18 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge) const {
       return;  // don't double-count the collapsing triangles.
     }
     const vec3 normal = faceNormal_[halfedge_.Tri(current)];
+    const vec3 pos = vertPos_[halfedge_.Start(current)];
 
     // Equal-weighted per triangle, keeps the cost in terms of distance.
     // Angle-weighting like pseudo-normals may be better, but it is more
     // expensive to compute and may be less stable on degenerates.
-    A += la::outerprod(normal, normal);
-    double d = la::dot(normal, vertPos_[halfedge_.Start(current)] - mid);
-    b += normal * d;
-    c += d * d;
+    addCost(normal, pos);
+
+    if (!Continuous(current)) {
+      addCost(SafeNormalize(
+                  la::cross(normal, vertPos_[halfedge_.End(current)] - pos)),
+              pos);
+    }
   };
   ForVert(firstEdge, addTri);
   firstEdge = halfedge_.Pair(edge);
@@ -198,6 +210,15 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge) const {
   const double cost =
       std::max(0.0, la::dot(u, A2 * u) - 2 * la::dot(b2, u) + c);
   return {cost, cost, u[0] + 0.5, mid + P * u};
+}
+
+bool Manifold::Impl::Continuous(int edge) const {
+  const int pair = halfedge_.Pair(edge);
+  const TriRef ref0 = meshRelation_.triRef[halfedge_.Tri(edge)];
+  const TriRef ref1 = meshRelation_.triRef[halfedge_.Tri(pair)];
+  return ref0.meshID == ref1.meshID && ref0.faceID == ref1.faceID &&
+         halfedge_.Prop(edge) == halfedge_.PropEnd(pair) &&
+         halfedge_.Prop(pair) == halfedge_.PropEnd(edge);
 }
 
 void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
@@ -867,7 +888,7 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges,
   int current = start;
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
-    if (numProp > 0 && halfedge_.Prop(current) == startProp) {
+    if (halfedge_.Prop(current) == startProp) {
       halfedge_.SetProp(current, endProp);
     }
     const int vert = halfedge_.End(current);
