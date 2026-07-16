@@ -316,8 +316,14 @@ TEST(Boolean, TreeTransforms) {
   auto a = (Manifold::Cube({1, 1, 1}) + Manifold::Cube({1, 1, 1}))
                .Translate({1, 0, 0});
   auto b = (Manifold::Cube({1, 1, 1}) + Manifold::Cube({1, 1, 1}));
+  auto c = a + b;
 
-  EXPECT_FLOAT_EQ((a + b).Volume(), 2);
+  EXPECT_FLOAT_EQ(c.Volume(), 2);
+  EXPECT_EQ(c.NumDegenerateTris(), 0);
+  EXPECT_FLOAT_EQ(a.Volume(), 1);
+  EXPECT_EQ(a.NumDegenerateTris(), 0);
+  EXPECT_FLOAT_EQ(b.Volume(), 1);
+  EXPECT_EQ(b.NumDegenerateTris(), 0);
 }
 
 TEST(Boolean, CreatePropertiesSlow) {

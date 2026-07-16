@@ -151,17 +151,10 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
   CalculateVertNormals();
 }
 
-Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge,
-                                                 int firstNewVert) const {
+Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge) const {
   const int pair = halfedge_.Pair(edge);
-  if (pair < 0) {
-    return {};
-  }
   const int start = halfedge_.Start(edge);
   const int end = halfedge_.End(edge);
-  if (start < firstNewVert && end < firstNewVert) {
-    return {};
-  }
   const vec3 delta = vertPos_[end] - vertPos_[start];
   const double lenSq = la::dot(delta, delta);
   const vec3 mid = vertPos_[start] + delta / 2;
@@ -237,20 +230,42 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
     //           << std::endl;
     for_each(autoPolicy(end - edges.begin(), 1e4), edges.begin(), end,
              [&](int edge) {
-               if (halfedge_.IsForward(edge)) return;
-               // Optimization
+               const int pair = halfedge_.Pair(edge);
+               if (!halfedge_.Valid(edge)) return;
+
+               // Optimization: When decimating a Boolean result, operate only
+               // on new verts by only collapsing edges where the end vert is
+               // new. StartVerts get updated to their EndVert, so retained
+               // verts can become new, but not vice-versa.
+               if (halfedge_.End(edge) < firstNewVert) return;
+
+               // Optimization: only calculate for forward halfedges, then copy
+               // result to the pair. However, this conflicts with the above
+               // optimization because forward halfedges with two retained verts
+               // get discarded, but can later become edges with new verts,
+               // which are then needed.
+               if (!halfedge_.IsForward(edge) && firstNewVert == 0) return;
+
+               // Optimization: only recalculate when an edge has collapsed into
+               // this one. Technically its cost can also change from a
+               // neighbor's collapse, but probably not enough to worry about,
+               // and this is a much cheaper check.
                if (halfedge_.Valid(edge) && merger[edge].Valid() &&
                    !vertsVisited[halfedge_.Start(edge)] &&
                    !vertsVisited[halfedge_.End(edge)])
                  return;
 
-               Merger edgeCost = CheckEdge(edge, firstNewVert);
+               Merger edgeCost = CheckEdge(edge);
 
                edgeCost.totalCost += std::max(totalCost[halfedge_.Start(edge)],
                                               totalCost[halfedge_.End(edge)]);
                merger[edge] = edgeCost;
-               edgeCost.a = 1 - edgeCost.a;
-               merger[halfedge_.Pair(edge)] = edgeCost;
+               if (firstNewVert == 0) {
+                 // Forward edge optimization is enabled, so copy the result to
+                 // the pair.
+                 edgeCost.a = 1 - edgeCost.a;
+                 merger[pair] = edgeCost;
+               }
              });
     stable_sort(edges.begin(), end, [&](int a, int b) {
       return merger[a].totalCost < merger[b].totalCost;
@@ -282,7 +297,7 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
       totalCost.resize(vertPos_.size(), 0);
       if (didCollapse) {
         // std::cout << "collapsed edge " << edge << " with cost "
-        //           << merger[edge].addedCost << std::endl;
+        // << merger[edge].addedCost << std::endl;
         totalCost[startV] += merger[edge].addedCost;
         totalCost[endV] += merger[edge].addedCost;
         vertsVisited[startV] = true;
@@ -296,6 +311,7 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
     end = std::partition(edges.begin(), end, [&](int edge) {
       return halfedge_.Valid(edge) && merger[edge].Valid();
     });
+    // edges.Dump();
     // std::cout << "short? " << shortCollapse << ", collapsed: " <<
     // numCollapsed
     //           << ", edges left: " << (end - edges.begin()) << ", "
