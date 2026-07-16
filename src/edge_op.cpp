@@ -170,22 +170,15 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge) const {
     if (current == firstEdge) {
       return;  // don't double-count the collapsing triangles.
     }
-    const vec3 center = vertPos_[halfedge_.Start(current)];
-    const vec3 triAreaNormal =
-        la::cross(vertPos_[halfedge_.End(current)] - center,
-                  vertPos_[halfedge_.End(NextHalfedge(current))] - center);
-
-    const double area2 = la::length2(triAreaNormal);
-    if (area2 == 0) return;
-    const double area2inv = 1 / area2;
+    const vec3 normal = faceNormal_[halfedge_.Tri(current)];
 
     // Equal-weighted per triangle, keeps the cost in terms of distance.
     // Angle-weighting like pseudo-normals may be better, but it is more
     // expensive to compute and may be less stable on degenerates.
-    A += area2inv * la::outerprod(triAreaNormal, triAreaNormal);
-    double d = la::dot(triAreaNormal, center - mid);
-    b += area2inv * triAreaNormal * d;
-    c += area2inv * d * d;
+    A += la::outerprod(normal, normal);
+    double d = la::dot(normal, vertPos_[halfedge_.Start(current)] - mid);
+    b += normal * d;
+    c += d * d;
   };
   ForVert(firstEdge, addTri);
   firstEdge = halfedge_.Pair(edge);
@@ -297,7 +290,7 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
       totalCost.resize(vertPos_.size(), 0);
       if (didCollapse) {
         // std::cout << "collapsed edge " << edge << " with cost "
-        // << merger[edge].addedCost << std::endl;
+        //           << merger[edge].addedCost << std::endl;
         totalCost[startV] += merger[edge].addedCost;
         totalCost[endV] += merger[edge].addedCost;
         vertsVisited[startV] = true;
@@ -318,6 +311,19 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
     //           << itr - edges.begin() << std::endl;
     totalCollapsed += numCollapsed;
     if (numCollapsed == 0) break;
+
+    for_each_n(autoPolicy(NumTri(), 1e4), countAt(0), NumTri(), [&](int tri) {
+      if (!halfedge_.Valid(3 * tri)) return;
+      bool update = false;
+      for (const int i : {0, 1, 2})
+        update |= vertsVisited[halfedge_.Start(3 * tri + i)];
+      if (!update) return;
+
+      const vec3 center = vertPos_[halfedge_.Start(3 * tri)];
+      faceNormal_[tri] = SafeNormalize(
+          la::cross(vertPos_[halfedge_.Start(3 * tri + 1)] - center,
+                    vertPos_[halfedge_.Start(3 * tri + 2)] - center));
+    });
   }
   // Merging verts causes their normals to change
   CalculateVertNormals();

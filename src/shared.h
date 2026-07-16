@@ -219,6 +219,7 @@ class Halfedges {
   bool empty() const { return start_.empty(); }
 
   bool Valid(int idx) const { return Pair(idx) >= 0; }
+  int Tri(int idx) const { return idx / 3; }
   int Start(int idx) const { return start_[idx]; }
   int End(int idx) const { return start_[NextHalfedge(idx)]; }
   int Pair(int idx) const { return paired_[idx]; }
