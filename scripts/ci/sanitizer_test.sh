@@ -40,9 +40,17 @@ if [ -z "${SANITIZER_TEST_BIN}" ]; then
 fi
 chmod +x "${SANITIZER_TEST_BIN}" || true
 
+TIMEOUT_CMD=()
+if command -v timeout >/dev/null 2>&1; then
+  TIMEOUT_CMD=(timeout "${SANITIZER_TEST_TIMEOUT_SEC}")
+elif command -v gtimeout >/dev/null 2>&1; then
+  TIMEOUT_CMD=(gtimeout "${SANITIZER_TEST_TIMEOUT_SEC}")
+else
+  echo "::warning::timeout command not found; relying on the workflow timeout."
+fi
+
 set +e
-timeout "${SANITIZER_TEST_TIMEOUT_SEC}" \
-  "${SANITIZER_TEST_BIN}" --gtest_filter="${SANITIZER_GTEST_FILTER}"
+"${TIMEOUT_CMD[@]}" "${SANITIZER_TEST_BIN}" --gtest_filter="${SANITIZER_GTEST_FILTER}"
 TEST_RC="$?"
 set -e
 if [ "${TEST_RC}" -eq 124 ]; then

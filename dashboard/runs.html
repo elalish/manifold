@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manifold weekly benchmarks</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body class="container" data-page="runs">
+  <div class="top-nav">&gt; <a href="graphs.html">graphs</a>, <a href="latest.html">latest</a>, <a href="runs.html">runs</a>, <a href="help.html">help</a>.</div>
+  <h1>Weekly benchmark runs</h1>
+
+  <div class="controls">
+    <label for="run-count">Runs</label>
+    <select id="run-count">
+      <option value="10">latest 10</option>
+      <option value="25">latest 25</option>
+      <option value="all">all</option>
+    </select>
+
+    <button id="load-button" type="button">Reload</button>
+  </div>
+
+  <div class="data-source"><strong>Data source:</strong> <code id="data-root-label">-</code></div>
+  <p id="status-line"><strong>Status:</strong> <span id="status-text">Loading data</span></p>
+  <pre id="error-box" hidden></pre>
+  <section id="runs">
+    <h2>Loaded runs</h2>
+    <div id="run-table"></div>
+  </section>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

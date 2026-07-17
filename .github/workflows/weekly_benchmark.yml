@@ -2,6 +2,8 @@ name: Weekly Benchmarks
 
 on:
   workflow_dispatch:
+  release:
+    types: [published]
   schedule:
     - cron: "0 2 * * 0"
 
@@ -13,8 +15,62 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  build_sanitizer:
+    name: Sanitizer build (ASan+UBSan)
+    timeout-minutes: 30
+    runs-on: macos-15
+    env:
+      CMAKE_OSX_ARCHITECTURES: arm64
+      SANITIZER_C_COMPILER: clang
+      SANITIZER_CXX_COMPILER: clang++
+    steps:
+    - uses: actions/checkout@v6
+    - name: Verify macOS ARM runner
+      run: |
+        test "$(uname -s)" = "Darwin"
+        test "$(uname -m)" = "arm64"
+    - name: Install brew packages
+      run: brew install googletest cmake
+    - name: Build (AppleClang + asan/ubsan)
+      run: bash ./scripts/ci/sanitizer_build.sh
+    - name: Upload sanitizer build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: sanitizer-build
+        path: build/
+        retention-days: 1
+
+  test_sanitizer:
+    name: Sanitizer extended subset (ASan+UBSan)
+    needs: build_sanitizer
+    timeout-minutes: 30
+    runs-on: macos-15
+    env:
+      ASAN_OPTIONS: detect_container_overflow=0
+      UBSAN_OPTIONS: print_stacktrace=1
+      SANITIZER_TEST_TIMEOUT_SEC: 1200
+      SANITIZER_SUBSET: extended
+    steps:
+    - uses: actions/checkout@v6
+    - name: Verify macOS ARM runner
+      run: |
+        test "$(uname -s)" = "Darwin"
+        test "$(uname -m)" = "arm64"
+    - name: Install brew packages
+      run: brew install coreutils
+    - name: Download sanitizer build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: sanitizer-build
+        path: .
+    - name: Test extended sanitizer subset
+      shell: bash
+      run: bash ./scripts/ci/sanitizer_test.sh
+
   weekly_benchmark:
     name: Weekly benchmarks
+    needs: [build_sanitizer, test_sanitizer]
+    if: ${{ always() && !cancelled() }}
     timeout-minutes: 60
     runs-on: macos-15
     env:
@@ -22,6 +78,13 @@ jobs:
       WEEKLY_BENCHMARK_THREADS: 1
       CMAKE_OSX_ARCHITECTURES: arm64
       DATA_BRANCH: benchmark-data
+      RELEASE_TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
+      SANITIZER_SUMMARY_SUBSET: extended
+      SANITIZER_SUMMARY_RUNNER: macos-15
+      SANITIZER_SUMMARY_OS: macOS
+      SANITIZER_SUMMARY_COMPILER: AppleClang
+      SANITIZER_BUILD_RESULT: ${{ needs.build_sanitizer.result }}
+      SANITIZER_TEST_RESULT: ${{ needs.test_sanitizer.result }}
     steps:
     - uses: actions/checkout@v6
       with:
@@ -47,7 +110,7 @@ jobs:
         path: ./bench/weekly/
         retention-days: 30
     - name: Prepare benchmark data branch
-      if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      if: github.event_name == 'release' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
       shell: bash
       run: |
         set -euo pipefail
@@ -63,10 +126,19 @@ jobs:
           find benchmark-data -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
         fi
     - name: Stage weekly benchmark data
-      if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-      run: python3 ./scripts/publish_weekly_benchmark_results.py ./bench/weekly ./benchmark-data
+      if: github.event_name == 'release' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      run: >
+        python3 ./scripts/publish_weekly_benchmark_results.py
+        ./bench/weekly ./benchmark-data
+        --release-tag "${RELEASE_TAG}"
+        --sanitizer-subset "${SANITIZER_SUMMARY_SUBSET}"
+        --sanitizer-build-result "${SANITIZER_BUILD_RESULT}"
+        --sanitizer-test-result "${SANITIZER_TEST_RESULT}"
+        --sanitizer-runner "${SANITIZER_SUMMARY_RUNNER}"
+        --sanitizer-os "${SANITIZER_SUMMARY_OS}"
+        --sanitizer-compiler "${SANITIZER_SUMMARY_COMPILER}"
     - name: Push weekly benchmark data
-      if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      if: github.event_name == 'release' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
       shell: bash
       run: |
         set -euo pipefail

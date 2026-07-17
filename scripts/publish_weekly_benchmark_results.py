@@ -44,10 +44,33 @@ def load_index(index_path: Path) -> dict:
     return json.loads(index_path.read_text(encoding="utf-8-sig"))
 
 
+def optional_field(payload: dict, key: str, value: str | int | None) -> None:
+    if value not in (None, ""):
+        payload[key] = value
+
+
+def sanitizer_summary(args: argparse.Namespace) -> dict | None:
+    summary = {}
+    optional_field(summary, "subset", args.sanitizer_subset)
+    optional_field(summary, "build_result", args.sanitizer_build_result)
+    optional_field(summary, "test_result", args.sanitizer_test_result)
+    optional_field(summary, "runner", args.sanitizer_runner)
+    optional_field(summary, "os", args.sanitizer_os)
+    optional_field(summary, "compiler", args.sanitizer_compiler)
+    return summary or None
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Publish weekly benchmark result files.")
     parser.add_argument("suite_dir", type=Path)
     parser.add_argument("data_dir", type=Path)
+    parser.add_argument("--release-tag")
+    parser.add_argument("--sanitizer-subset")
+    parser.add_argument("--sanitizer-build-result")
+    parser.add_argument("--sanitizer-test-result")
+    parser.add_argument("--sanitizer-runner")
+    parser.add_argument("--sanitizer-os")
+    parser.add_argument("--sanitizer-compiler")
     args = parser.parse_args()
 
     result_path = args.suite_dir / "result.json"
@@ -73,11 +96,6 @@ def main() -> int:
     dated_dir = args.data_dir / dated_rel
     dated_dir.mkdir(parents=True, exist_ok=True)
 
-    result_dest = dated_dir / "result.json"
-    summary_dest = dated_dir / "summary.md"
-    shutil.copy2(result_path, result_dest)
-    shutil.copy2(summary_path, summary_dest)
-
     entry = {
         "run_id": run_id,
         "timestamp": timestamp_iso,
@@ -93,10 +111,21 @@ def main() -> int:
         "summary_path": str(dated_rel / "summary.md").replace("\\", "/"),
         "github_run_url": github_run_url(run_id),
     }
+    if args.release_tag:
+        entry["release_tag"] = args.release_tag
+    sanitizer = sanitizer_summary(args)
+    if sanitizer:
+        entry["sanitizer"] = sanitizer
+    entry["trigger"] = "release" if args.release_tag else "weekly"
 
-    latest_payload = dict(result)
-    latest_payload["storage"] = entry
-    json_dump(args.data_dir / "weekly" / "latest.json", latest_payload)
+    result_dest = dated_dir / "result.json"
+    summary_dest = dated_dir / "summary.md"
+    stored_result = dict(result)
+    stored_result["storage"] = entry
+    json_dump(result_dest, stored_result)
+    shutil.copy2(summary_path, summary_dest)
+
+    json_dump(args.data_dir / "weekly" / "latest.json", stored_result)
 
     index_path = args.data_dir / "weekly" / "index.json"
     index = load_index(index_path)

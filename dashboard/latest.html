@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manifold weekly benchmarks</title>
+  <link rel="stylesheet" href="dashboard.css">
+</head>
+<body class="container" data-page="latest">
+  <div class="top-nav">&gt; <a href="graphs.html">graphs</a>, <a href="latest.html">latest</a>, <a href="runs.html">runs</a>, <a href="help.html">help</a>.</div>
+  <h1>Latest weekly benchmark run</h1>
+
+  <div class="data-source"><strong>Data source:</strong> <code id="data-root-label">-</code></div>
+  <p id="status-line"><strong>Status:</strong> <span id="status-text">Loading data</span></p>
+  <pre id="error-box" hidden></pre>
+  <section id="latest">
+    <h2>Latest run</h2>
+    <p>Run: <span id="latest-run">-</span></p>
+    <p>CPU: <span id="latest-cpu">-</span></p>
+    <p>Compiler: <span id="latest-compiler">-</span></p>
+    <p id="data-summary">Waiting for benchmark index...</p>
+    <div id="latest-metadata-table"></div>
+  </section>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>
