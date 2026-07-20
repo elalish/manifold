@@ -2,7 +2,17 @@ import fs from 'fs';
 import {strict as assert} from 'assert';
 import {afterEach, expect, suite, test} from 'vitest';
 import path from 'path';
-import { fork } from "child_process";
+import { fork, execSync } from "child_process";
+
+// Ensure test/out directory exists and contains compiled files before tests execute
+const outDir = path.resolve(__dirname, "out");
+if (!fs.existsSync(outDir) || fs.readdirSync(outDir).length === 0) {
+  console.log("`test/out` missing or empty. Compiling OpenSCAD examples...");
+  execSync("npx tsx index.ts compile-all", {
+    cwd: path.resolve(__dirname, ".."),
+    stdio: "inherit",
+  });
+}
 
 async function getOpenScadProperties(filename: string) {
   const firstLine = fs.readFileSync(filename).toString().split('\n')[0];

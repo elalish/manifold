@@ -1,9 +1,19 @@
 import { describe, test, expect } from "vitest";
-import { execFileSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { readFileSync, existsSync, mkdtempSync } from "node:fs";
 import fs from "fs";
 import path from "path";
 import { tmpdir } from "node:os";
+
+// Ensure test/out directory exists and contains compiled files before tests execute
+const outDir = path.resolve(__dirname, "out");
+if (!fs.existsSync(outDir) || fs.readdirSync(outDir).length === 0) {
+  console.log("`test/out` missing or empty. Compiling OpenSCAD examples...");
+  execSync("npx tsx index.ts compile-all", {
+    cwd: path.resolve(__dirname, ".."),
+    stdio: "inherit",
+  });
+}
 
 const matchFiles = getAllFiles(path.resolve(__dirname, "examples/echo")).filter(f => f.endsWith(".scad"));
 

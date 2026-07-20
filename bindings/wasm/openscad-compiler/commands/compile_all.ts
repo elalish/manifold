@@ -73,4 +73,9 @@ compileAllCommand.name("compile-all")
     });
 
 
-export default compileAllCommand
+if (process.argv[1]?.includes("compile_all")) {
+  compileAllCommand.parse(process.argv);
+}
+
+export default compileAllCommand;
+
