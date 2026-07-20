@@ -327,7 +327,7 @@ function getAllFiles(dir: string): string[] {
 }
 
 describe("AST source locations", () => {
-  const openscadFiles = getAllFiles("./examples");
+  const openscadFiles = getAllFiles(path.resolve(__dirname, "./examples"));
 
   for (const file of openscadFiles) {
     if (file.endsWith(".scad")) {

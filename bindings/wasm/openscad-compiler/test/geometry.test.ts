@@ -33,7 +33,7 @@ async function getCompiledManifoldProperties(
       }
     })();
 
-    const workerPath = path.resolve('./test-worker.ts');
+    const workerPath = path.resolve(__dirname, './test-worker.ts');
 
     const worker = fork(workerPath, [filename], {
       execArgv,
@@ -111,7 +111,7 @@ function getAllFiles(dir: string): string[] {
 }
 
 suite('Compiled Examples', async () => {
-  const openscadFiles = getAllFiles("./examples");
+  const openscadFiles = getAllFiles(path.resolve(__dirname, "./examples"));
 
   for (const file of openscadFiles) {
     if (file.endsWith(".scad")) {

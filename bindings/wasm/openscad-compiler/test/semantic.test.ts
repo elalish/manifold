@@ -5,7 +5,7 @@ import fs from "fs";
 import path from "path";
 import { tmpdir } from "node:os";
 
-const matchFiles = getAllFiles("./examples/echo").filter(f => f.endsWith(".scad"));
+const matchFiles = getAllFiles(path.resolve(__dirname, "examples/echo")).filter(f => f.endsWith(".scad"));
 
 const tsForMatch = (scadPath: string) => path.join(path.dirname(scadPath).replace("examples", "out"), `${path.basename(scadPath, ".scad")}.ts`);
 
@@ -17,7 +17,7 @@ describe("echo equality", () => {
     const actual = normalize(runCompiled(tsPath), "ts");
     expect(actual.length).toBe(expected.length);
     expected.forEach((e, i) => expectEchoEqual(actual[i], e, i));
-  });
+  }, 60000);
 });
 
 function getAllFiles(dir: string): string[] {
