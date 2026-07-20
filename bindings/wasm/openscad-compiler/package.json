@@ -9,6 +9,8 @@
   "scripts": {
     "build": "tsup index.ts --format cjs && tsup runtime/runtime.ts --format esm --target esnext --outDir runtime --external manifold-3d --external opentype.js --external fs --no-splitting",
     "serve": "npx serve .",
+    "compile-all": "npx tsx commands/compile_all.ts",
+    "pretest": "npm run compile-all",
     "test": "cd test && npx vitest run geometry.test.ts && npx vitest run source-location.test.ts && npx vitest run semantic.test.ts",
     "test:geometry": "cd test && npx vitest run geometry.test.ts",
     "test:source-location": "cd test && npx vitest run source-location.test.ts",
