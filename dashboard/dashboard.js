@@ -45,7 +45,6 @@ const CHARTS = [
 const state = {
   dataRoot: '',
   branchRoot: '',
-  weeklyRoot: '',
   index: null,
   records: [],
   scale: 'linear',
@@ -98,36 +97,22 @@ async function fetchJson(url) {
 }
 
 async function loadIndex(dataRoot) {
-  const root = normalizeRoot(dataRoot);
-  const rootIsWeeklyDir = root.endsWith('/weekly');
-  const candidate = rootIsWeeklyDir ? {
-    indexUrl: `${root}/index.json`,
-    branchRoot: root.slice(0, -'/weekly'.length),
-    weeklyRoot: root,
-  } :
-                                      {
-                                        indexUrl: `${root}/weekly/index.json`,
-                                        branchRoot: root,
-                                        weeklyRoot: `${root}/weekly`,
-                                      };
+  const branchRoot = normalizeRoot(dataRoot);
+  const weeklyRoot = `${branchRoot}/weekly`;
+  const indexUrl = `${weeklyRoot}/index.json`;
 
   try {
-    const index = await fetchJson(candidate.indexUrl);
-    return {...candidate, index};
+    const index = await fetchJson(indexUrl);
+    return {branchRoot, weeklyRoot, index};
   } catch (error) {
     throw new Error(`Unable to load benchmark index.\n${error.message}`);
   }
 }
 
 function resultUrl(entry) {
-  const path = entry.result_path || '';
-  if (/^https?:\/\//.test(path)) {
-    return path;
-  }
-  if (path.startsWith('weekly/')) {
-    return `${state.branchRoot}/${path}`;
-  }
-  return `${state.weeklyRoot}/${path}`;
+  // result_path is always a weekly/-prefixed path relative to branchRoot -
+  // see publish_weekly_benchmark_results.py's dated_rel construction.
+  return `${state.branchRoot}/${entry.result_path}`;
 }
 
 function shortSha(sha) {
@@ -151,7 +136,7 @@ function runLabel(entry) {
 }
 
 function sanitizerSummary(entry) {
-  const sanitizer = entry?.sanitizer;
+  const sanitizer = entry.sanitizer;
   if (!sanitizer) {
     return '-';
   }
@@ -323,13 +308,12 @@ function renderLatestMetadata() {
     return;
   }
 
-  const metadata = latest.result.metadata || {};
   const entry = latest.entry;
   setText(
       'latest-run',
       `${formatDate(entry.timestamp)} / ${shortSha(entry.commit_sha)}`);
-  setText('latest-cpu', metadata.cpu_model || entry.cpu_model || 'unknown');
-  setText('latest-compiler', metadata.compiler || entry.compiler || 'unknown');
+  setText('latest-cpu', entry.cpu_model || 'unknown');
+  setText('latest-compiler', entry.compiler || 'unknown');
   renderLatestTable(latest);
 }
 
@@ -340,48 +324,22 @@ function renderLatestTable(latest) {
   }
   container.replaceChildren();
 
-  const metadata = latest.result.metadata || {};
-  const storage = latest.result.storage || latest.entry || {};
-  const sanitizer = storage.sanitizer || latest.entry.sanitizer || {};
+  // latest.entry is the same run entry stored in both index.json and
+  // result.json's storage field - no need to cross-check both.
+  const entry = latest.entry;
+  const sanitizer = entry.sanitizer || {};
   const rows = [
-    ['Run ID', storage.run_id || latest.entry.run_id || 'unknown'],
-    ['Trigger', storage.trigger || latest.entry.trigger || 'weekly'],
-    ['Release tag', storage.release_tag || latest.entry.release_tag || '-'],
-    [
-      'Timestamp',
-      storage.timestamp || metadata.timestamp || latest.entry.timestamp ||
-          'unknown'
-    ],
-    [
-      'Commit',
-      storage.commit_sha || metadata.commit_sha || latest.entry.commit_sha ||
-          'unknown'
-    ],
-    [
-      'Workflow',
-      storage.workflow || metadata.workflow || latest.entry.workflow ||
-          'unknown'
-    ],
-    [
-      'Runner',
-      storage.runner || metadata.runner || latest.entry.runner || 'unknown'
-    ],
-    ['OS', storage.os || metadata.os || latest.entry.os || 'unknown'],
-    [
-      'Compiler',
-      metadata.compiler || storage.compiler || latest.entry.compiler ||
-          'unknown'
-    ],
-    [
-      'CPU',
-      metadata.cpu_model || storage.cpu_model || latest.entry.cpu_model ||
-          'unknown'
-    ],
-    [
-      'CPU count',
-      metadata.cpu_count || storage.cpu_count || latest.entry.cpu_count ||
-          'unknown'
-    ],
+    ['Run ID', entry.run_id],
+    ['Trigger', entry.trigger],
+    ['Release tag', entry.release_tag || '-'],
+    ['Timestamp', entry.timestamp],
+    ['Commit', entry.commit_sha || 'unknown'],
+    ['Workflow', entry.workflow || 'unknown'],
+    ['Runner', entry.runner || 'unknown'],
+    ['OS', entry.os || 'unknown'],
+    ['Compiler', entry.compiler || 'unknown'],
+    ['CPU', entry.cpu_model || 'unknown'],
+    ['CPU count', entry.cpu_count || 'unknown'],
     ['Sanitizer subset', sanitizer.subset || '-'],
     ['Sanitizer build', sanitizer.build_result || '-'],
     ['Sanitizer test', sanitizer.test_result || '-'],
@@ -488,11 +446,10 @@ async function loadDashboard() {
     const loaded = await loadIndex(root);
     state.dataRoot = root;
     state.branchRoot = loaded.branchRoot;
-    state.weeklyRoot = loaded.weeklyRoot;
     state.index = loaded.index;
 
-    const runs = [...(loaded.index.runs || [])].sort(
-        (a, b) => (a.timestamp || '').localeCompare(b.timestamp || ''),
+    const runs = [...loaded.index.runs].sort(
+        (a, b) => a.timestamp.localeCompare(b.timestamp),
     );
     const count = selectedRunCount(runs.length);
     const selected = runs.slice(-count);
@@ -539,15 +496,25 @@ function handleScaleChange(event) {
   }
 }
 
-function updateNavLinks() {
-  const data = new URLSearchParams(window.location.search).get('data');
-  if (!data) {
-    return;
+const TABS = ['graphs', 'latest', 'runs', 'help'];
+
+function currentTab() {
+  const hash = window.location.hash.replace(/^#/, '');
+  return TABS.includes(hash) ? hash : 'graphs';
+}
+
+function showTab(tab) {
+  for (const name of TABS) {
+    const page = qs(`page-${name}`);
+    if (page) {
+      page.hidden = name !== tab;
+    }
   }
-  for (const link of document.querySelectorAll('a[href$=".html"]')) {
-    const url = new URL(link.getAttribute('href'), window.location.href);
-    url.searchParams.set('data', data);
-    link.href = url.pathname.split('/').pop() + url.search;
+  for (const link of document.querySelectorAll('.top-nav a[data-tab]')) {
+    link.classList.toggle('active', link.dataset.tab === tab);
+  }
+  if (tab === 'graphs') {
+    renderCharts();
   }
 }
 
@@ -555,7 +522,9 @@ function init() {
   const params = new URLSearchParams(window.location.search);
   state.dataRoot = params.get('data') || DEFAULT_DATA_ROOT;
   setText('data-root-label', state.dataRoot);
-  updateNavLinks();
+
+  window.addEventListener('hashchange', () => showTab(currentTab()));
+  showTab(currentTab());
 
   qs('load-button')?.addEventListener('click', loadDashboard);
   qs('stat-select')?.addEventListener('change', renderDashboard);
@@ -563,9 +532,7 @@ function init() {
   qs('linear-scale-input')?.addEventListener('input', handleScaleChange);
   qs('log-scale-input')?.addEventListener('input', handleScaleChange);
 
-  if (document.body.dataset.page !== 'help') {
-    loadDashboard();
-  }
+  loadDashboard();
 }
 
 document.addEventListener('DOMContentLoaded', init);

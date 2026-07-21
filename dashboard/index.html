@@ -2,12 +2,117 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Manifold weekly benchmarks</title>
-  <script>
-    location.replace(`graphs.html${location.search}`);
-  </script>
+  <link rel="stylesheet" href="dashboard.css">
 </head>
-<body>
-  <p><a href="graphs.html">Open graphs</a></p>
+<body class="container">
+  <div class="top-nav">&gt; <a href="#graphs" data-tab="graphs">graphs</a>, <a href="#latest" data-tab="latest">latest</a>, <a href="#runs" data-tab="runs">runs</a>, <a href="#help" data-tab="help">help</a>.</div>
+
+  <div class="controls">
+    <label for="run-count">Runs</label>
+    <select id="run-count">
+      <option value="10">latest 10</option>
+      <option value="25">latest 25</option>
+      <option value="all">all</option>
+    </select>
+    <button id="load-button" type="button">Reload</button>
+  </div>
+
+  <div class="data-source"><strong>Data source:</strong> <code id="data-root-label">-</code></div>
+  <p id="status-line"><strong>Status:</strong> <span id="status-text">Loading data</span></p>
+  <pre id="error-box" hidden></pre>
+
+  <section id="page-graphs">
+    <h1>Manifold weekly benchmarks</h1>
+
+    <details open>
+      <summary>What data is in the dashboard?</summary>
+      <p>
+        The dashboard reads weekly benchmark JSON files from the <code>benchmark-data</code>
+        branch. It shows the <code>perfTest</code> size sweep, selected Ember phase
+        timings, and selected existing gtests. The charts use Highcharts line graphs,
+        matching the approach used by the rustc-perf dashboard.
+      </p>
+    </details>
+
+    <form id="scale-select-form">
+      <label for="linear-scale-input">
+        <input id="linear-scale-input" type="radio" name="scale-select" value="linear" checked>
+        Linear-scale
+      </label>
+      <label for="log-scale-input">
+        <input id="log-scale-input" type="radio" name="scale-select" value="log">
+        Log-scale
+      </label>
+    </form>
+
+    <div class="controls">
+      <label for="stat-select">Statistic</label>
+      <select id="stat-select">
+        <option value="median">median</option>
+        <option value="mean">mean</option>
+        <option value="min">min</option>
+        <option value="max">max</option>
+      </select>
+    </div>
+
+    <div class="graphs">
+      <div id="perf-time-chart" class="chart-box"></div>
+      <div id="perf-rss-chart" class="chart-box"></div>
+      <div id="ember-full-chart" class="chart-box"></div>
+      <div id="ember-phase-chart" class="chart-box"></div>
+      <div id="gtest-time-chart" class="chart-box"></div>
+    </div>
+  </section>
+
+  <section id="page-latest" hidden>
+    <h1>Latest weekly benchmark run</h1>
+    <p>Run: <span id="latest-run">-</span></p>
+    <p>CPU: <span id="latest-cpu">-</span></p>
+    <p>Compiler: <span id="latest-compiler">-</span></p>
+    <p id="data-summary">Waiting for benchmark index...</p>
+    <div id="latest-metadata-table"></div>
+  </section>
+
+  <section id="page-runs" hidden>
+    <h1>Weekly benchmark runs</h1>
+    <div id="run-table"></div>
+  </section>
+
+  <section id="page-help" hidden>
+    <h1>Manifold benchmark dashboard help</h1>
+
+    <details open>
+      <summary>What data is in the dashboard?</summary>
+      <p>
+        The dashboard reads weekly benchmark JSON files from the <code>benchmark-data</code>
+        branch. The default source is <code>https://raw.githubusercontent.com/elalish/manifold/benchmark-data</code>.
+        For local testing against a fork, append <code>?data=&lt;raw benchmark-data branch URL&gt;</code>
+        to the dashboard URL. The URL must point at the branch root (e.g.
+        <code>https://raw.githubusercontent.com/&lt;you&gt;/manifold/benchmark-data</code>),
+        not the <code>weekly/</code> subdirectory.
+        Release-triggered benchmark runs are stored in the same timeline and marked
+        with their release tag.
+      </p>
+    </details>
+
+    <h2>Tabs</h2>
+    <p><a href="#graphs">graphs</a> shows Highcharts line charts for weekly benchmark trends.</p>
+    <p><a href="#latest">latest</a> shows metadata for the latest loaded run.</p>
+    <p><a href="#runs">runs</a> lists loaded historical runs and links to raw JSON.</p>
+
+    <h2>Measured suites</h2>
+    <ul>
+      <li><code>perfTest</code> size sweep time and peak RSS.</li>
+      <li>Selected Ember phase timings.</li>
+      <li>Selected existing gtests.</li>
+      <li>Sanitizer subset summary status from the weekly workflow.</li>
+      <li>Release tags, when a run was triggered by a published release.</li>
+    </ul>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/highcharts@12.4.0/highcharts.js"></script>
+  <script src="dashboard.js"></script>
 </body>
 </html>

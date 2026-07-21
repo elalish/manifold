@@ -121,7 +121,7 @@ jobs:
         name: weekly-benchmark
         path: ./bench/weekly/
         retention-days: 30
-    - name: Prepare benchmark data branch
+    - name: Publish weekly benchmark data
       if: github.event_name == 'release' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
       shell: bash
       run: |
@@ -137,23 +137,17 @@ jobs:
           git -C benchmark-data rm -rf . >/dev/null 2>&1 || true
           find benchmark-data -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
         fi
-    - name: Stage weekly benchmark data
-      if: github.event_name == 'release' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-      run: >
-        python3 ./scripts/publish_weekly_benchmark_results.py
-        ./bench/weekly ./benchmark-data
-        --release-tag "${RELEASE_TAG}"
-        --sanitizer-subset "${SANITIZER_SUMMARY_SUBSET}"
-        --sanitizer-build-result "${SANITIZER_BUILD_RESULT}"
-        --sanitizer-test-result "${SANITIZER_TEST_RESULT}"
-        --sanitizer-runner "${SANITIZER_SUMMARY_RUNNER}"
-        --sanitizer-os "${SANITIZER_SUMMARY_OS}"
-        --sanitizer-compiler "${SANITIZER_SUMMARY_COMPILER}"
-    - name: Push weekly benchmark data
-      if: github.event_name == 'release' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
-      shell: bash
-      run: |
-        set -u
+
+        python3 ./scripts/publish_weekly_benchmark_results.py \
+          ./bench/weekly ./benchmark-data \
+          --release-tag "${RELEASE_TAG}" \
+          --sanitizer-subset "${SANITIZER_SUMMARY_SUBSET}" \
+          --sanitizer-build-result "${SANITIZER_BUILD_RESULT}" \
+          --sanitizer-test-result "${SANITIZER_TEST_RESULT}" \
+          --sanitizer-runner "${SANITIZER_SUMMARY_RUNNER}" \
+          --sanitizer-os "${SANITIZER_SUMMARY_OS}" \
+          --sanitizer-compiler "${SANITIZER_SUMMARY_COMPILER}"
+
         git -C benchmark-data add weekly
         if git -C benchmark-data diff --cached --quiet; then
           echo "No benchmark data changes to publish."

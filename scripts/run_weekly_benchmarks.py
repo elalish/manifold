@@ -260,8 +260,18 @@ def run_existing_gtests_suite(ctx: BuildContext, binary: Path) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     gtest_filter = os.getenv("WEEKLY_BENCHMARK_GTEST_FILTER", DEFAULT_GTEST_FILTER)
     for run_index in range(1, ctx.repeats + 1):
+        # gtest's --gtest_output=json emits structured per-test results
+        # directly, so parse_weekly_benchmarks.py doesn't need to regex the
+        # console text; relative path avoids Windows drive-letter colons
+        # being misread as the format:path separator.
+        json_name = f"run{run_index}.json"
         result = subprocess.run(
-            [str(binary), f"--gtest_filter={gtest_filter}"],
+            [
+                str(binary),
+                f"--gtest_filter={gtest_filter}",
+                f"--gtest_output=json:{json_name}",
+            ],
+            cwd=out_dir,
             check=True,
             capture_output=True,
             text=True,

@@ -17,7 +17,6 @@ GTEST_SUITE = "existing_gtests"
 EMBER_CASE_PATTERN = re.compile(r"^### case\s+([0-9]+)(?:\s+\([0-9]+\s+vs\s+[0-9]+\))?")
 PHASE_PATTERN = re.compile(r"^-+\s+([0-9]+)\s+ms for\s+(.*)$")
 VERTS_PATTERN = re.compile(r"^[0-9]+\s+verts and\s+[0-9]+\s+tris$")
-GTEST_OK_PATTERN = re.compile(r"^\[\s+OK\s+\]\s+([^\s]+)\s+\(([0-9]+) ms\)")
 
 INDEPENDENT_PHASES = [
     "Intersect12 P->Q",
@@ -192,17 +191,33 @@ def parse_perf_suite(suite_dir: Path) -> dict:
 
 
 def parse_gtest_run(run_path: Path, run_index: int) -> dict:
+    # run_path is a gtest --gtest_output=json report; a passing test has no
+    # "failures" key, matching the old parser's "only count [ OK ] lines"
+    # behavior. time is a string in seconds, e.g. "0.024s" or "0s".
+    report = json.loads(run_path.read_text(encoding="utf-8-sig"))
     tests = []
-    for line in run_path.read_text(encoding="utf-8").splitlines():
-        match = GTEST_OK_PATTERN.match(line.strip())
-        if not match:
-            continue
-        tests.append({"name": match.group(1), "time_ms": float(match.group(2))})
+    for testsuite in report.get("testsuites", []):
+        for test in testsuite.get("testsuite", []):
+            if "failures" in test:
+                continue
+            name = f"{test['classname']}.{test['name']}"
+            time_ms = float(test["time"].rstrip("s")) * 1000.0
+            tests.append({"name": name, "time_ms": time_ms})
     return {"path": str(run_path), "run_index": run_index, "tests": tests}
 
 
+def gtest_run_files(suite_dir: Path) -> list[Path]:
+    files = sorted(suite_dir.glob("run*.json"))
+    if not files:
+        raise RuntimeError(f"No run*.json files found in {suite_dir}")
+    return files
+
+
 def parse_gtest_suite(suite_dir: Path) -> dict:
-    runs = [parse_gtest_run(path, i + 1) for i, path in enumerate(run_files(suite_dir))]
+    runs = [
+        parse_gtest_run(path, i + 1)
+        for i, path in enumerate(gtest_run_files(suite_dir))
+    ]
     test_order = [item["name"] for item in runs[0]["tests"]]
 
     tests = []
@@ -275,18 +290,23 @@ def build_perf_summary(suite: dict) -> list[str]:
     for workload in suite["workloads"]:
         timing = workload["time_ms"]
         peak_rss = workload["peak_rss_mb"]
+        # peak_rss_mb can be None if RSS data was missing for every repeat
+        # (see compare_pr_perf_guard.py) - show N/A rather than crashing.
+        if peak_rss:
+            rss_mean = f"{peak_rss['mean']:.2f}"
+            rss_min = f"{peak_rss['min']:.2f}"
+            rss_max = f"{peak_rss['max']:.2f}"
+        else:
+            rss_mean = rss_min = rss_max = "N/A"
         lines.append(
-            "| {n_tri} | {mean:.2f} | {median:.2f} | {min_:.2f} | {max_:.2f} | "
-            "{rss_mean:.2f} | {rss_min:.2f} | {rss_max:.2f} | {runs} |".format(
+            "| {n_tri} | {mean_ms:.2f} | {median_ms:.2f} | {min_ms:.2f} | "
+            "{max_ms:.2f} | {rss_mean} | {rss_min} | {rss_max} | "
+            "{n_runs} |".format(
                 n_tri=workload["n_tri"],
-                mean=timing["mean_ms"],
-                median=timing["median_ms"],
-                min_=timing["min_ms"],
-                max_=timing["max_ms"],
-                rss_mean=peak_rss["mean"],
-                rss_min=peak_rss["min"],
-                rss_max=peak_rss["max"],
-                runs=timing["n_runs"],
+                rss_mean=rss_mean,
+                rss_min=rss_min,
+                rss_max=rss_max,
+                **timing,
             )
         )
     lines.append("")

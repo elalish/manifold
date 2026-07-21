@@ -52,13 +52,19 @@ summary {
 }
 
 .data-source,
-#latest,
+#page-latest,
 #status-line {
   margin: 8px 0;
 }
 
-#latest p {
+#page-latest p {
   margin: 3px 0;
+}
+
+.top-nav a.active {
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
 }
 
 .graphs {
