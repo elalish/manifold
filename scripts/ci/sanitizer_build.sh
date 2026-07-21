@@ -4,6 +4,7 @@ set -euo pipefail
 SANITIZER_C_COMPILER="${SANITIZER_C_COMPILER:-clang-18}"
 SANITIZER_CXX_COMPILER="${SANITIZER_CXX_COMPILER:-clang++-18}"
 
+mkdir -p build
 cmake \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DBUILD_SHARED_LIBS=ON \
@@ -19,6 +20,6 @@ cmake \
   -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
   -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined" \
   -DCMAKE_BUILD_RPATH_USE_ORIGIN=ON \
-  . -B build
+  . -B build | tee build/cmake_configure.log
 
 cmake --build build
