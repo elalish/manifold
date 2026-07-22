@@ -324,8 +324,6 @@ function renderLatestTable(latest) {
   }
   container.replaceChildren();
 
-  // latest.entry is the same run entry stored in both index.json and
-  // result.json's storage field - no need to cross-check both.
   const entry = latest.entry;
   const sanitizer = entry.sanitizer || {};
   const rows = [

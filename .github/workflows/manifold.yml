@@ -429,9 +429,9 @@ jobs:
     - name: Install apt packages
       uses: awalsh128/cache-apt-pkgs-action@v1.6.0
       with:
-        packages: libgtest-dev libtbb-dev clang-18 cmake
+        packages: libgtest-dev libtbb-dev cmake
         version: 1
-    - name: Build (clang-18 + asan/ubsan)
+    - name: Build (asan/ubsan)
       run: bash ./scripts/ci/sanitizer_build.sh
     - name: Upload sanitizer build artifacts
       uses: actions/upload-artifact@v4

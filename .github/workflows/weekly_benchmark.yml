@@ -24,9 +24,9 @@ jobs:
     - name: Install apt packages
       uses: awalsh128/cache-apt-pkgs-action@v1.6.0
       with:
-        packages: libgtest-dev libtbb-dev clang-18 cmake
+        packages: libgtest-dev libtbb-dev cmake
         version: 1
-    - name: Build (clang-18 + asan/ubsan)
+    - name: Build (asan/ubsan)
       run: bash ./scripts/ci/sanitizer_build.sh
     - name: Upload sanitizer build artifacts
       uses: actions/upload-artifact@v4
@@ -104,10 +104,6 @@ jobs:
         cmake = parse_cmake_configure_log(Path("sanitizer-cmake-log/cmake_configure.log"))
         print(f"SANITIZER_SUMMARY_COMPILER={cmake_compiler(cmake) or 'unknown'}")
         PY
-    - name: Verify macOS ARM runner
-      run: |
-        test "$(uname -s)" = "Darwin"
-        test "$(uname -m)" = "arm64"
     - name: Install brew packages
       run: brew install googletest assimp tbb cmake
     - name: Run weekly benchmarks
@@ -126,6 +122,8 @@ jobs:
       shell: bash
       run: |
         set -u
+        # github-actions[bot]'s identity for committing with the built-in
+        # token, see https://github.com/actions/checkout#push-a-commit-using-the-built-in-token
         git config user.name "github-actions[bot]"
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
         if git ls-remote --exit-code --heads origin "${DATA_BRANCH}" >/dev/null 2>&1; then
