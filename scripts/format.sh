@@ -16,8 +16,10 @@ $CLANG_FORMAT -i bindings/wasm/examples/*/*.{js,ts,html} &
 $CLANG_FORMAT -i bindings/wasm/test/*.ts &
 $CLANG_FORMAT -i bindings/wasm/test/fixtures/*.{ts,mjs} &
 $CLANG_FORMAT -i bindings/wasm/types/*.ts &
-$CLANG_FORMAT -i bindings/wasm/openscad-compiler/*.{js,ts} &
-$CLANG_FORMAT -i bindings/wasm/openscad-compiler/**/*.{js,ts,html} &
+find bindings/wasm/openscad-compiler \
+  -type f \( -name '*.js' -o -name '*.ts' -o -name '*.html' \) \
+  -not -path '*/node_modules/*' -not -path '*/dist/*' \
+  -print0 | xargs -0 $CLANG_FORMAT -i &
 $CLANG_FORMAT -i src/*.{h,cpp} &
 $CLANG_FORMAT -i src/*/*.cpp &
 $CLANG_FORMAT -i include/manifold/*.h &

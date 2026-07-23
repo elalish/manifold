@@ -315,7 +315,7 @@ let encounteredSurfaceData = new Map < string, {
   exportName: string;
   kind: 'image'|'text'
 }
-> ();
+>();
 
 let currentRuntimePath: string = './runtime/runtime.js';
 
@@ -1535,7 +1535,7 @@ export function compile(program: Program, options?: CompileOptions): string {
     stmt: Statement;
     code: string
   }
-  > ();
+  >();
   const declOrder: string[] = [];
   const geometryLines: string[] = [];
 
@@ -1869,7 +1869,7 @@ export function compileLibrary(
     functions: string[];
     variables: string[]
   }
-  > ();
+  >();
 
   for (const rel of sourceRels) {
     const program = closure.files.get(rel)!;
@@ -1977,7 +1977,7 @@ function emitLibraryFile(
     stmt: Statement;
     code: string
   }
-  > ();
+  >();
   const declOrder: string[] = [];
   const ownNames = {
     module: new Set<string>(),
@@ -4106,7 +4106,7 @@ function compileBlockStatementsWithDecls(
     code: string;
     order: number
   }
-  > ();
+  >();
   const otherDecls: string[] = [];
   const geos: string[] = [];
   let order = 0;

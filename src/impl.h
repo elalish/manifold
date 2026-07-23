@@ -90,7 +90,7 @@ struct Manifold::Impl {
   static std::atomic<uint32_t> meshIDCounter_;
   static uint32_t ReserveIDs(uint32_t);
 
-  Impl(){};
+  Impl() {};
   enum class Shape { Tetrahedron, Cube, Octahedron };
   Impl(Shape, const mat3x4 = la::identity);
 

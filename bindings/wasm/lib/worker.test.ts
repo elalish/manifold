@@ -52,9 +52,9 @@ async function runExample(name: string, firstMeshOnly: boolean = true) {
 
   const firstMesh =
       document.getRoot().listNodes().find(node => !!node.getMesh());
-  const manifold = await (
-      firstMeshOnly ? gltfDocToManifold(document, firstMesh) :
-                      gltfDocToManifold(document))
+  const manifold =
+      await (firstMeshOnly ? gltfDocToManifold(document, firstMesh) :
+                             gltfDocToManifold(document))
 
   if (manifold) {
     const volume = manifold.volume();
