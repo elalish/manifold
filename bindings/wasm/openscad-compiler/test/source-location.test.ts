@@ -24,16 +24,6 @@ interface Violation {
   sliced?: string;
 }
 
-// Ensure test/out directory exists and contains compiled files before tests execute
-const outDir = path.resolve(__dirname, "out");
-if (!fs.existsSync(outDir) || fs.readdirSync(outDir).length === 0) {
-  console.log("`test/out` missing or empty. Compiling OpenSCAD examples...");
-  execSync("npx tsx index.ts compile-all", {
-    cwd: path.resolve(__dirname, ".."),
-    stdio: "inherit",
-  });
-}
-
 function offsetToLineCol(source: string, offset: number): { line: number; column: number } {
   let line = 1;
   let column = 1;
