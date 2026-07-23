@@ -1,5 +1,5 @@
-import { pathToFileURL } from 'url';
 import path from 'path';
+import {pathToFileURL} from 'url';
 
 const filename = process.argv[2];
 

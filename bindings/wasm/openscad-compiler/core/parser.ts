@@ -1,10 +1,6 @@
-import { Lexer, TokenType, fmtLoc, tokenTypeToString } from "./lexer.js";
-import type { Token, SourceLocation, SourceRange } from "./lexer.js";
-import type {
-  Expr, Statement, Program, Argument, Parameter, ForVariable,
-  ModuleCallStmt, BlockStmt, ListCompGenerator, LetAssignment,
-  Comment, ASTNode,
-} from "./ast.js";
+import type {Argument, ASTNode, BlockStmt, Comment, Expr, ForVariable, LetAssignment, ListCompGenerator, ModuleCallStmt, Parameter, Program, Statement,} from './ast.js';
+import {fmtLoc, Lexer, TokenType, tokenTypeToString} from './lexer.js';
+import type {SourceLocation, SourceRange, Token} from './lexer.js';
 
 export class Parser {
   private tokens: Token[] = [];
@@ -22,10 +18,11 @@ export class Parser {
     let tok: Token;
     do {
       tok = lexer.nextToken();
-      if (tok.type === TokenType.LineComment || tok.type === TokenType.BlockComment) {
+      if (tok.type === TokenType.LineComment ||
+          tok.type === TokenType.BlockComment) {
         this.comments.push({
-          kind: tok.type === TokenType.LineComment ? "line" : "block",
-          value: tok.value ?? "",
+          kind: tok.type === TokenType.LineComment ? 'line' : 'block',
+          value: tok.value ?? '',
           loc: tok.range,
         });
       } else {
@@ -42,7 +39,7 @@ export class Parser {
   }
 
   private rangeSince(start: SourceLocation): SourceRange {
-    return { start, end: this.prev.range.end };
+    return {start, end: this.prev.range.end};
   }
 
   // Token helpers
@@ -50,15 +47,16 @@ export class Parser {
     const tok = this.current;
     this.prev = tok;
     this.pos++;
-    this.current = this.tokens[this.pos] ?? this.tokens[this.tokens.length - 1]!;
+    this.current =
+        this.tokens[this.pos] ?? this.tokens[this.tokens.length - 1]!;
     return tok;
   }
 
   private expect(type: TokenType): Token {
     if (this.current.type !== type) {
-      throw new Error(
-        `Expected ${tokenTypeToString(type)} but got ${tokenTypeToString(this.current.type)} at ${fmtLoc(this.current.range.start, this.filename)}`
-      );
+      throw new Error(`Expected ${tokenTypeToString(type)} but got ${
+          tokenTypeToString(this.current.type)} at ${
+          fmtLoc(this.current.range.start, this.filename)}`);
     }
     return this.advance();
   }
@@ -77,9 +75,8 @@ export class Parser {
 
   private isIdentifier(name?: string): boolean {
     return (
-      this.current.type === TokenType.Identifier &&
-      (name === undefined || this.current.value === name)
-    );
+        this.current.type === TokenType.Identifier &&
+        (name === undefined || this.current.value === name));
   }
 
   // Program
@@ -93,13 +90,15 @@ export class Parser {
         stmt.filename = this.filename;
         statements.push(stmt);
       } catch (err) {
-        // Recover instead of aborting the whole file: record the error, skip past the broken statement, and keep emitting the surrounding code.
+        // Recover instead of aborting the whole file: record the error, skip
+        // past the broken statement, and keep emitting the surrounding code.
         this.warnings.push((err as Error).message);
         this.synchronize();
         if (this.pos === posBefore) this.advance();
       }
     }
-    const program: Program = { kind: "program", statements, loc: this.rangeSince(start) };
+    const program:
+        Program = {kind: 'program', statements, loc: this.rangeSince(start)};
     program.filename = this.filename;
     attachComments(program, this.comments);
     return program;
@@ -109,7 +108,8 @@ export class Parser {
     let depth = 0;
     while (this.current.type !== TokenType.EOF) {
       const t = this.current.type;
-      if (t === TokenType.LBrace || t === TokenType.LParen || t === TokenType.LBracket) {
+      if (t === TokenType.LBrace || t === TokenType.LParen ||
+          t === TokenType.LBracket) {
         depth++;
         this.advance();
         continue;
@@ -135,29 +135,26 @@ export class Parser {
 
   // Statements
   private parseStatement(): Statement {
-    let modifier: string | undefined;
-    while (
-      this.current.type === TokenType.Hash ||
-      this.current.type === TokenType.Bang ||
-      this.current.type === TokenType.Star ||
-      this.current.type === TokenType.Percent
-    ) {
-      const ch =
-        this.current.type === TokenType.Hash ? "#"
-        : this.current.type === TokenType.Bang ? "!"
-        : this.current.type === TokenType.Star ? "*"
-        : "%";
-      modifier = (modifier ?? "") + ch;
+    let modifier: string|undefined;
+    while (this.current.type === TokenType.Hash ||
+           this.current.type === TokenType.Bang ||
+           this.current.type === TokenType.Star ||
+           this.current.type === TokenType.Percent) {
+      const ch = this.current.type === TokenType.Hash ? '#' :
+          this.current.type === TokenType.Bang        ? '!' :
+          this.current.type === TokenType.Star        ? '*' :
+                                                        '%';
+      modifier = (modifier ?? '') + ch;
       this.advance();
     }
 
     const stmt = this.parseStatementInner();
     if (modifier !== undefined) {
       switch (stmt.kind) {
-        case "moduleCall":
-        case "block":
-        case "for":
-        case "if":
+        case 'moduleCall':
+        case 'block':
+        case 'for':
+        case 'if':
           stmt.modifier = modifier;
           break;
         default:
@@ -168,24 +165,24 @@ export class Parser {
   }
 
   private parseStatementInner(): Statement {
-    if (this.isIdentifier("module")) return this.parseModuleDecl();
-    if (this.isIdentifier("function")) return this.parseFunctionDecl();
-    if (this.isIdentifier("use") || this.isIdentifier("include")) return this.parseUseInclude();
-    if (this.isIdentifier("for")) return this.parseForStmt();
-    if (this.isIdentifier("let") && this.peekNext().type === TokenType.LParen) return this.parseLetStmt();
-    if (this.isIdentifier("if")) return this.parseIfStmt();
+    if (this.isIdentifier('module')) return this.parseModuleDecl();
+    if (this.isIdentifier('function')) return this.parseFunctionDecl();
+    if (this.isIdentifier('use') || this.isIdentifier('include'))
+      return this.parseUseInclude();
+    if (this.isIdentifier('for')) return this.parseForStmt();
+    if (this.isIdentifier('let') && this.peekNext().type === TokenType.LParen)
+      return this.parseLetStmt();
+    if (this.isIdentifier('if')) return this.parseIfStmt();
     if (this.current.type === TokenType.LBrace) return this.parseBlock();
 
     if (this.current.type === TokenType.Semicolon) {
       const start = this.startLoc();
       this.advance();
-      return { kind: "empty", loc: this.rangeSince(start) };
+      return {kind: 'empty', loc: this.rangeSince(start)};
     }
 
-    if (
-      this.current.type === TokenType.Identifier &&
-      this.peekNext().type === TokenType.Equals
-    ) {
+    if (this.current.type === TokenType.Identifier &&
+        this.peekNext().type === TokenType.Equals) {
       return this.parseVariableDecl();
     }
 
@@ -194,18 +191,24 @@ export class Parser {
 
   private parseModuleDecl(): Statement {
     const start = this.startLoc();
-    this.advance(); // consume 'module'
+    this.advance();  // consume 'module'
     const name = this.expect(TokenType.Identifier).value!;
     this.expect(TokenType.LParen);
     const params = this.parseParameterList();
     this.expect(TokenType.RParen);
     const body = this.parseStatement();
-    return { kind: "moduleDecl", name, params, body, loc: this.rangeSince(start) };
+    return {
+      kind: 'moduleDecl',
+      name,
+      params,
+      body,
+      loc: this.rangeSince(start)
+    };
   }
 
   private parseFunctionDecl(): Statement {
     const start = this.startLoc();
-    this.advance(); // consume 'function'
+    this.advance();  // consume 'function'
     const name = this.expect(TokenType.Identifier).value!;
     this.expect(TokenType.LParen);
     const params = this.parseParameterList();
@@ -213,12 +216,18 @@ export class Parser {
     this.expect(TokenType.Equals);
     const body = this.parseExpr();
     this.expect(TokenType.Semicolon);
-    return { kind: "functionDecl", name, params, body, loc: this.rangeSince(start) };
+    return {
+      kind: 'functionDecl',
+      name,
+      params,
+      body,
+      loc: this.rangeSince(start)
+    };
   }
 
   private parseForStmt(): Statement {
     const start = this.startLoc();
-    this.advance(); // consume 'for'
+    this.advance();  // consume 'for'
     this.expect(TokenType.LParen);
 
     const variables: ForVariable[] = [];
@@ -228,12 +237,12 @@ export class Parser {
       const name = this.expect(TokenType.Identifier).value!;
       this.expect(TokenType.Equals);
       const range = this.parseExpr();
-      variables.push({ name, range, loc: this.rangeSince(vs) });
+      variables.push({name, range, loc: this.rangeSince(vs)});
     } while (this.match(TokenType.Comma));
 
     this.expect(TokenType.RParen);
     const body = this.parseStatement();
-    return { kind: "for", variables, body, loc: this.rangeSince(start) };
+    return {kind: 'for', variables, body, loc: this.rangeSince(start)};
   }
 
   private parseIfStmt(): Statement {
@@ -244,27 +253,31 @@ export class Parser {
     this.expect(TokenType.RParen);
     const thenBody = this.parseStatement();
 
-    let elseBody: Statement | undefined;
-    if (this.isIdentifier("else")) {
+    let elseBody: Statement|undefined;
+    if (this.isIdentifier('else')) {
       this.advance();
       elseBody = this.parseStatement();
     }
 
-    return { kind: "if", condition, thenBody, elseBody, loc: this.rangeSince(start) };
+    return {
+      kind: 'if',
+      condition,
+      thenBody,
+      elseBody,
+      loc: this.rangeSince(start)
+    };
   }
 
   private parseBlock(): BlockStmt {
     const start = this.startLoc();
     this.expect(TokenType.LBrace);
     const statements: Statement[] = [];
-    while (
-      this.current.type !== TokenType.RBrace &&
-      this.current.type !== TokenType.EOF
-    ) {
+    while (this.current.type !== TokenType.RBrace &&
+           this.current.type !== TokenType.EOF) {
       statements.push(this.parseStatement());
     }
     this.expect(TokenType.RBrace);
-    return { kind: "block", statements, loc: this.rangeSince(start) };
+    return {kind: 'block', statements, loc: this.rangeSince(start)};
   }
 
   private parseVariableDecl(): Statement {
@@ -273,7 +286,7 @@ export class Parser {
     this.expect(TokenType.Equals);
     const value = this.parseExpr();
     this.expect(TokenType.Semicolon);
-    return { kind: "variableDecl", name, value, loc: this.rangeSince(start) };
+    return {kind: 'variableDecl', name, value, loc: this.rangeSince(start)};
   }
 
   private parseModuleCallStmt(): ModuleCallStmt {
@@ -283,21 +296,19 @@ export class Parser {
     const args = this.parseArgumentList();
     this.expect(TokenType.RParen);
 
-    let child: Statement | undefined;
+    let child: Statement|undefined;
     if (this.current.type === TokenType.Semicolon) {
       this.advance();
     } else if (
-      this.current.type === TokenType.EOF ||
-      this.current.type === TokenType.RBrace
-    ) {
-      throw new Error(
-        `Expected ';' or child statement after module call '${name}' at ${fmtLoc(this.current.range.start, this.filename)}`
-      );
+        this.current.type === TokenType.EOF ||
+        this.current.type === TokenType.RBrace) {
+      throw new Error(`Expected ';' or child statement after module call '${
+          name}' at ${fmtLoc(this.current.range.start, this.filename)}`);
     } else {
       child = this.parseStatement();
     }
 
-    return { kind: "moduleCall", name, args, child, loc: this.rangeSince(start) };
+    return {kind: 'moduleCall', name, args, child, loc: this.rangeSince(start)};
   }
 
   // Argument / Parameter lists
@@ -308,17 +319,15 @@ export class Parser {
     do {
       if ((this.current as Token).type === TokenType.RParen) break;
       const as = this.startLoc();
-      if (
-        this.current.type === TokenType.Identifier &&
-        this.peekNext().type === TokenType.Equals
-      ) {
+      if (this.current.type === TokenType.Identifier &&
+          this.peekNext().type === TokenType.Equals) {
         const name = this.advance().value!;
-        this.advance(); // consume '='
+        this.advance();  // consume '='
         const value = this.parseExpr();
-        args.push({ name, value, loc: this.rangeSince(as) });
+        args.push({name, value, loc: this.rangeSince(as)});
       } else {
         const value = this.parseExpr();
-        args.push({ value, loc: this.rangeSince(as) });
+        args.push({value, loc: this.rangeSince(as)});
       }
     } while (this.match(TokenType.Comma));
 
@@ -333,17 +342,17 @@ export class Parser {
       if ((this.current as Token).type === TokenType.RParen) break;
       const ps = this.startLoc();
       const name = this.expect(TokenType.Identifier).value!;
-      let defaultValue: Expr | undefined;
+      let defaultValue: Expr|undefined;
       if (this.match(TokenType.Equals)) {
         defaultValue = this.parseExpr();
       }
-      params.push({ name, defaultValue, loc: this.rangeSince(ps) });
+      params.push({name, defaultValue, loc: this.rangeSince(ps)});
     } while (this.match(TokenType.Comma));
 
     return params;
   }
 
-  // Expressions 
+  // Expressions
   parseExpr(): Expr {
     return this.parseTernary();
   }
@@ -355,7 +364,13 @@ export class Parser {
       const ifTrue = this.parseExpr();
       this.expect(TokenType.Colon);
       const ifFalse = this.parseExpr();
-      return { kind: "ternary", condition: expr, ifTrue, ifFalse, loc: this.rangeSince(start) };
+      return {
+        kind: 'ternary',
+        condition: expr,
+        ifTrue,
+        ifFalse,
+        loc: this.rangeSince(start)
+      };
     }
     return expr;
   }
@@ -364,7 +379,13 @@ export class Parser {
     let left = this.parseAnd();
     while (this.match(TokenType.Or)) {
       const right = this.parseAnd();
-      left = { kind: "binary", op: "||", left, right, loc: { start: left.loc!.start, end: right.loc!.end } };
+      left = {
+        kind: 'binary',
+        op: '||',
+        left,
+        right,
+        loc: {start: left.loc!.start, end: right.loc!.end}
+      };
     }
     return left;
   }
@@ -373,18 +394,31 @@ export class Parser {
     let left = this.parseEquality();
     while (this.match(TokenType.And)) {
       const right = this.parseEquality();
-      left = { kind: "binary", op: "&&", left, right, loc: { start: left.loc!.start, end: right.loc!.end } };
+      left = {
+        kind: 'binary',
+        op: '&&',
+        left,
+        right,
+        loc: {start: left.loc!.start, end: right.loc!.end}
+      };
     }
     return left;
   }
 
   private parseEquality(): Expr {
     let left = this.parseRelational();
-    while (this.current.type === TokenType.EqEq || this.current.type === TokenType.BangEq) {
-      const op = this.current.type === TokenType.EqEq ? "==" : "!=";
+    while (this.current.type === TokenType.EqEq ||
+           this.current.type === TokenType.BangEq) {
+      const op = this.current.type === TokenType.EqEq ? '==' : '!=';
       this.advance();
       const right = this.parseRelational();
-      left = { kind: "binary", op, left, right, loc: { start: left.loc!.start, end: right.loc!.end } };
+      left = {
+        kind: 'binary',
+        op,
+        left,
+        right,
+        loc: {start: left.loc!.start, end: right.loc!.end}
+      };
     }
     return left;
   }
@@ -392,16 +426,22 @@ export class Parser {
   private parseRelational(): Expr {
     let left = this.parseBitOr();
     const opMap: Partial<Record<TokenType, string>> = {
-      [TokenType.Lt]: "<",
-      [TokenType.Gt]: ">",
-      [TokenType.LtEq]: "<=",
-      [TokenType.GtEq]: ">=",
+      [TokenType.Lt]: '<',
+      [TokenType.Gt]: '>',
+      [TokenType.LtEq]: '<=',
+      [TokenType.GtEq]: '>=',
     };
     let op = opMap[this.current.type];
     while (op) {
       this.advance();
       const right = this.parseBitOr();
-      left = { kind: "binary", op, left, right, loc: { start: left.loc!.start, end: right.loc!.end } };
+      left = {
+        kind: 'binary',
+        op,
+        left,
+        right,
+        loc: {start: left.loc!.start, end: right.loc!.end}
+      };
       op = opMap[this.current.type];
     }
     return left;
@@ -412,7 +452,13 @@ export class Parser {
     while (this.current.type === TokenType.Pipe) {
       this.advance();
       const right = this.parseBitAnd();
-      left = { kind: "binary", op: "|", left, right, loc: { start: left.loc!.start, end: right.loc!.end } };
+      left = {
+        kind: 'binary',
+        op: '|',
+        left,
+        right,
+        loc: {start: left.loc!.start, end: right.loc!.end}
+      };
     }
     return left;
   }
@@ -422,49 +468,70 @@ export class Parser {
     while (this.current.type === TokenType.Amp) {
       this.advance();
       const right = this.parseShift();
-      left = { kind: "binary", op: "&", left, right, loc: { start: left.loc!.start, end: right.loc!.end } };
+      left = {
+        kind: 'binary',
+        op: '&',
+        left,
+        right,
+        loc: {start: left.loc!.start, end: right.loc!.end}
+      };
     }
     return left;
   }
 
   private parseShift(): Expr {
     let left = this.parseAddition();
-    while (this.current.type === TokenType.Shl || this.current.type === TokenType.Shr) {
-      const op = this.current.type === TokenType.Shl ? "<<" : ">>";
+    while (this.current.type === TokenType.Shl ||
+           this.current.type === TokenType.Shr) {
+      const op = this.current.type === TokenType.Shl ? '<<' : '>>';
       this.advance();
       const right = this.parseAddition();
-      left = { kind: "binary", op, left, right, loc: { start: left.loc!.start, end: right.loc!.end } };
+      left = {
+        kind: 'binary',
+        op,
+        left,
+        right,
+        loc: {start: left.loc!.start, end: right.loc!.end}
+      };
     }
     return left;
   }
 
   private parseAddition(): Expr {
     let left = this.parseMultiplication();
-    while (
-      this.current.type === TokenType.Plus ||
-      this.current.type === TokenType.Minus
-    ) {
-      const op = this.current.type === TokenType.Plus ? "+" : "-";
+    while (this.current.type === TokenType.Plus ||
+           this.current.type === TokenType.Minus) {
+      const op = this.current.type === TokenType.Plus ? '+' : '-';
       this.advance();
       const right = this.parseMultiplication();
-      left = { kind: "binary", op, left, right, loc: { start: left.loc!.start, end: right.loc!.end } };
+      left = {
+        kind: 'binary',
+        op,
+        left,
+        right,
+        loc: {start: left.loc!.start, end: right.loc!.end}
+      };
     }
     return left;
   }
 
   private parseMultiplication(): Expr {
     let left = this.parseUnary();
-    while (
-      this.current.type === TokenType.Star ||
-      this.current.type === TokenType.Slash ||
-      this.current.type === TokenType.Percent
-    ) {
-      const op =
-        this.current.type === TokenType.Star ? "*" :
-          this.current.type === TokenType.Slash ? "/" : "%";
+    while (this.current.type === TokenType.Star ||
+           this.current.type === TokenType.Slash ||
+           this.current.type === TokenType.Percent) {
+      const op = this.current.type === TokenType.Star ? '*' :
+          this.current.type === TokenType.Slash       ? '/' :
+                                                        '%';
       this.advance();
       const right = this.parseUnary();
-      left = { kind: "binary", op, left, right, loc: { start: left.loc!.start, end: right.loc!.end } };
+      left = {
+        kind: 'binary',
+        op,
+        left,
+        right,
+        loc: {start: left.loc!.start, end: right.loc!.end}
+      };
     }
     return left;
   }
@@ -474,22 +541,22 @@ export class Parser {
     if (this.current.type === TokenType.Minus) {
       this.advance();
       const operand = this.parseUnary();
-      return { kind: "unary", op: "-", operand, loc: this.rangeSince(start) };
+      return {kind: 'unary', op: '-', operand, loc: this.rangeSince(start)};
     }
     if (this.current.type === TokenType.Plus) {
       this.advance();
       const operand = this.parseUnary();
-      return { kind: "unary", op: "+", operand, loc: this.rangeSince(start) };
+      return {kind: 'unary', op: '+', operand, loc: this.rangeSince(start)};
     }
     if (this.current.type === TokenType.Bang) {
       this.advance();
       const operand = this.parseUnary();
-      return { kind: "unary", op: "!", operand, loc: this.rangeSince(start) };
+      return {kind: 'unary', op: '!', operand, loc: this.rangeSince(start)};
     }
     if (this.current.type === TokenType.Tilde) {
       this.advance();
       const operand = this.parseUnary();
-      return { kind: "unary", op: "~", operand, loc: this.rangeSince(start) };
+      return {kind: 'unary', op: '~', operand, loc: this.rangeSince(start)};
     }
     return this.parseExponentiation();
   }
@@ -500,7 +567,13 @@ export class Parser {
     if (this.current.type === TokenType.Caret) {
       this.advance();
       const right = this.parseUnary();
-      return { kind: "binary", op: "^", left, right, loc: this.rangeSince(start) };
+      return {
+        kind: 'binary',
+        op: '^',
+        left,
+        right,
+        loc: this.rangeSince(start)
+      };
     }
     return left;
   }
@@ -513,19 +586,39 @@ export class Parser {
         this.advance();
         const index = this.parseExpr();
         this.expect(TokenType.RBracket);
-        expr = { kind: "index", object: expr, index, loc: { start: expr.loc!.start, end: this.prev.range.end } };
+        expr = {
+          kind: 'index',
+          object: expr,
+          index,
+          loc: {start: expr.loc!.start, end: this.prev.range.end}
+        };
       } else if (this.current.type === TokenType.Dot) {
         this.advance();
         const property = this.expect(TokenType.Identifier).value!;
-        expr = { kind: "member", object: expr, property, loc: { start: expr.loc!.start, end: this.prev.range.end } };
+        expr = {
+          kind: 'member',
+          object: expr,
+          property,
+          loc: {start: expr.loc!.start, end: this.prev.range.end}
+        };
       } else if (this.current.type === TokenType.LParen) {
         this.advance();
         const args = this.parseArgumentList();
         this.expect(TokenType.RParen);
-        if (expr.kind === "identifier") {
-          expr = { kind: "call", name: expr.name, args, loc: { start: expr.loc!.start, end: this.prev.range.end } };
+        if (expr.kind === 'identifier') {
+          expr = {
+            kind: 'call',
+            name: expr.name,
+            args,
+            loc: {start: expr.loc!.start, end: this.prev.range.end}
+          };
         } else {
-          expr = { kind: "dynCall", callee: expr, args, loc: { start: expr.loc!.start, end: this.prev.range.end } };
+          expr = {
+            kind: 'dynCall',
+            callee: expr,
+            args,
+            loc: {start: expr.loc!.start, end: this.prev.range.end}
+          };
         }
       } else {
         break;
@@ -542,65 +635,86 @@ export class Parser {
     // Number
     if (tok.type === TokenType.Number) {
       this.advance();
-      return { kind: "number", value: Number(tok.value), loc: this.rangeSince(start) };
+      return {
+        kind: 'number',
+        value: Number(tok.value),
+        loc: this.rangeSince(start)
+      };
     }
 
     // String
     if (tok.type === TokenType.String) {
       this.advance();
-      return { kind: "string", value: tok.value!, loc: this.rangeSince(start) };
+      return {kind: 'string', value: tok.value!, loc: this.rangeSince(start)};
     }
 
     // Booleans & undef
     if (tok.type === TokenType.Identifier) {
-      if (tok.value === "true") { this.advance(); return { kind: "boolean", value: true, loc: this.rangeSince(start) }; }
-      if (tok.value === "false") { this.advance(); return { kind: "boolean", value: false, loc: this.rangeSince(start) }; }
-      if (tok.value === "undef") { this.advance(); return { kind: "undef", loc: this.rangeSince(start) }; }
+      if (tok.value === 'true') {
+        this.advance();
+        return {kind: 'boolean', value: true, loc: this.rangeSince(start)};
+      }
+      if (tok.value === 'false') {
+        this.advance();
+        return {kind: 'boolean', value: false, loc: this.rangeSince(start)};
+      }
+      if (tok.value === 'undef') {
+        this.advance();
+        return {kind: 'undef', loc: this.rangeSince(start)};
+      }
 
       // Anonymous function: function(params) expr
-      if (tok.value === "function" && this.peekNext().type === TokenType.LParen) {
-        this.advance(); // consume 'function'
-        this.advance(); // consume '('
+      if (tok.value === 'function' &&
+          this.peekNext().type === TokenType.LParen) {
+        this.advance();  // consume 'function'
+        this.advance();  // consume '('
         const params = this.parseParameterList();
         this.expect(TokenType.RParen);
         const body = this.parseExpr();
-        return { kind: "lambda", params, body, loc: this.rangeSince(start) };
+        return {kind: 'lambda', params, body, loc: this.rangeSince(start)};
       }
 
       // Echo expression modifier: echo(args) [expr]
-      if (tok.value === "echo" && this.peekNext().type === TokenType.LParen) {
-        this.advance(); // consume 'echo'
-        this.advance(); // consume '('
+      if (tok.value === 'echo' && this.peekNext().type === TokenType.LParen) {
+        this.advance();  // consume 'echo'
+        this.advance();  // consume '('
         const args = this.parseArgumentList();
         this.expect(TokenType.RParen);
-        const expr = this.canStartExpr() ? this.parseExpr() : { kind: "undef" } as const;
-        return { kind: "echo", args, expr, loc: this.rangeSince(start) };
+        const expr =
+            this.canStartExpr() ? this.parseExpr() : {kind: 'undef'} as const;
+        return {kind: 'echo', args, expr, loc: this.rangeSince(start)};
       }
 
       // Let expression: let(assignments) expr
-      if (tok.value === "let" && this.peekNext().type === TokenType.LParen) {
-        this.advance(); // consume 'let'
-        this.advance(); // consume '('
+      if (tok.value === 'let' && this.peekNext().type === TokenType.LParen) {
+        this.advance();  // consume 'let'
+        this.advance();  // consume '('
         const assignments = this.parseLetAssignments();
         this.expect(TokenType.RParen);
-        const body = this.canStartExpr() ? this.parseExpr() : { kind: "undef" } as const;
-        return { kind: "let", assignments, body, loc: this.rangeSince(start) };
+        const body =
+            this.canStartExpr() ? this.parseExpr() : {kind: 'undef'} as const;
+        return {kind: 'let', assignments, body, loc: this.rangeSince(start)};
       }
 
       // Assert expression modifier: assert(args) [expr]
-      if (tok.value === "assert" && this.peekNext().type === TokenType.LParen) {
-        this.advance(); // consume 'assert'
-        this.advance(); // consume '('
+      if (tok.value === 'assert' && this.peekNext().type === TokenType.LParen) {
+        this.advance();  // consume 'assert'
+        this.advance();  // consume '('
         const args = this.parseArgumentList();
         this.expect(TokenType.RParen);
-        const expr = this.canStartExpr() ? this.parseExpr() : { kind: "undef" } as const;
-        return { kind: "assert", args, expr, loc: this.rangeSince(start) };
+        const expr =
+            this.canStartExpr() ? this.parseExpr() : {kind: 'undef'} as const;
+        return {kind: 'assert', args, expr, loc: this.rangeSince(start)};
       }
 
       // Each expression: each expr
-      if (tok.value === "each") {
-        this.advance(); // consume 'each'
-        return { kind: "each", expr: this.parseExpr(), loc: this.rangeSince(start) };
+      if (tok.value === 'each') {
+        this.advance();  // consume 'each'
+        return {
+          kind: 'each',
+          expr: this.parseExpr(),
+          loc: this.rangeSince(start)
+        };
       }
 
       if (this.peekNext().type === TokenType.LParen) {
@@ -608,12 +722,16 @@ export class Parser {
         this.advance();
         const args = this.parseArgumentList();
         this.expect(TokenType.RParen);
-        return { kind: "call", name, args, loc: this.rangeSince(start) };
+        return {kind: 'call', name, args, loc: this.rangeSince(start)};
       }
 
       // Plain identifier
       this.advance();
-      return { kind: "identifier", name: tok.value!, loc: this.rangeSince(start) };
+      return {
+        kind: 'identifier',
+        name: tok.value!,
+        loc: this.rangeSince(start)
+      };
     }
 
     // Vector or range
@@ -626,14 +744,13 @@ export class Parser {
       this.advance();
       const expr = this.parseExpr();
       this.expect(TokenType.RParen);
-      return { kind: "group", expr, loc: this.rangeSince(start) };
+      return {kind: 'group', expr, loc: this.rangeSince(start)};
     }
 
     throw new Error(
-      `Unexpected token ${tokenTypeToString(tok.type)}` +
-      (tok.value ? ` '${tok.value}'` : "") +
-      ` at ${fmtLoc(tok.range.start, this.filename)}`
-    );
+        `Unexpected token ${tokenTypeToString(tok.type)}` +
+        (tok.value ? ` '${tok.value}'` : '') +
+        ` at ${fmtLoc(tok.range.start, this.filename)}`);
   }
 
   // Vector / Range
@@ -644,23 +761,35 @@ export class Parser {
     // empty vector
     if (this.current.type === TokenType.RBracket) {
       this.advance();
-      return { kind: "vector", elements: [], loc: this.rangeSince(start) };
+      return {kind: 'vector', elements: [], loc: this.rangeSince(start)};
     }
 
     const first = this.parseVectorElement();
 
     // Range  [start : end] or [start : step : end]
-    if (first.kind !== "listComp" && first.kind !== "each" && this.current.type === TokenType.Colon) {
+    if (first.kind !== 'listComp' && first.kind !== 'each' &&
+        this.current.type === TokenType.Colon) {
       this.advance();
       const second = this.parseExpr();
       if (this.current.type === TokenType.Colon) {
         this.advance();
         const third = this.parseExpr();
         this.expect(TokenType.RBracket);
-        return { kind: "range", start: first, step: second, end: third, loc: this.rangeSince(start) };
+        return {
+          kind: 'range',
+          start: first,
+          step: second,
+          end: third,
+          loc: this.rangeSince(start)
+        };
       }
       this.expect(TokenType.RBracket);
-      return { kind: "range", start: first, end: second, loc: this.rangeSince(start) };
+      return {
+        kind: 'range',
+        start: first,
+        end: second,
+        loc: this.rangeSince(start)
+      };
     }
 
     // Vector
@@ -670,22 +799,32 @@ export class Parser {
       elements.push(this.parseVectorElement());
     }
     this.expect(TokenType.RBracket);
-    return { kind: "vector", elements, loc: this.rangeSince(start) };
+    return {kind: 'vector', elements, loc: this.rangeSince(start)};
   }
 
   private parseVectorElement(): Expr {
     const start = this.startLoc();
-    if (this.isIdentifier("each")) {
+    if (this.isIdentifier('each')) {
       this.advance();
-      if (this.isIdentifier("for") || this.isIdentifier("if") || this.isIdentifier("let")) {
+      if (this.isIdentifier('for') || this.isIdentifier('if') ||
+          this.isIdentifier('let')) {
         const generator = this.parseListCompGenerator();
-        return { kind: "each", expr: { kind: "listComp", generator, loc: this.rangeSince(start) }, loc: this.rangeSince(start) };
+        return {
+          kind: 'each',
+          expr: {kind: 'listComp', generator, loc: this.rangeSince(start)},
+          loc: this.rangeSince(start)
+        };
       }
-      return { kind: "each", expr: this.parseExpr(), loc: this.rangeSince(start) };
+      return {
+        kind: 'each',
+        expr: this.parseExpr(),
+        loc: this.rangeSince(start)
+      };
     }
-    if (this.isIdentifier("for") || this.isIdentifier("if") || this.isIdentifier("let")) {
+    if (this.isIdentifier('for') || this.isIdentifier('if') ||
+        this.isIdentifier('let')) {
       const generator = this.parseListCompGenerator();
-      return { kind: "listComp", generator, loc: this.rangeSince(start) };
+      return {kind: 'listComp', generator, loc: this.rangeSince(start)};
     }
     return this.parseExpr();
   }
@@ -696,36 +835,39 @@ export class Parser {
 
     if (this.current.type === TokenType.LParen) {
       const next = this.peekNext();
-      if (
-        next.type === TokenType.Identifier &&
-        (next.value === "for" || next.value === "if" || next.value === "let" || next.value === "each")
-      ) {
-        this.advance(); // consume '('
+      if (next.type === TokenType.Identifier &&
+          (next.value === 'for' || next.value === 'if' ||
+           next.value === 'let' || next.value === 'each')) {
+        this.advance();  // consume '('
         const inner = this.parseListCompGenerator();
         this.expect(TokenType.RParen);
         return inner;
       }
     }
 
-    if (this.isIdentifier("for")) {
+    if (this.isIdentifier('for')) {
       this.advance();
       this.expect(TokenType.LParen);
       const variables: ForVariable[] = [];
-      if ((this.current as Token).type !== TokenType.Semicolon && (this.current as Token).type !== TokenType.RParen) {
+      if ((this.current as Token).type !== TokenType.Semicolon &&
+          (this.current as Token).type !== TokenType.RParen) {
         do {
-          if ((this.current as Token).type === TokenType.Semicolon || (this.current as Token).type === TokenType.RParen) break;
+          if ((this.current as Token).type === TokenType.Semicolon ||
+              (this.current as Token).type === TokenType.RParen)
+            break;
           const vs = this.startLoc();
           const name = this.expect(TokenType.Identifier).value!;
           this.expect(TokenType.Equals);
           const range = this.parseExpr();
-          variables.push({ name, range, loc: this.rangeSince(vs) });
+          variables.push({name, range, loc: this.rangeSince(vs)});
         } while (this.match(TokenType.Comma));
       }
 
       // C-style for: for(init ; condition ; update)
       if (this.current.type === TokenType.Semicolon) {
         this.advance();
-        const inits = variables.map(v => ({ name: v.name, value: v.range, loc: v.loc }));
+        const inits =
+            variables.map(v => ({name: v.name, value: v.range, loc: v.loc}));
         const condition = this.parseExpr();
         this.expect(TokenType.Semicolon);
         const updates: LetAssignment[] = [];
@@ -736,53 +878,80 @@ export class Parser {
             const name = this.expect(TokenType.Identifier).value!;
             this.expect(TokenType.Equals);
             const value = this.parseExpr();
-            updates.push({ name, value, loc: this.rangeSince(us) });
+            updates.push({name, value, loc: this.rangeSince(us)});
           } while (this.match(TokenType.Comma));
         }
         this.expect(TokenType.RParen);
         const body = this.parseListCompGenerator();
-        return { kind: "lcCFor", inits, condition, updates, body, loc: this.rangeSince(start) };
+        return {
+          kind: 'lcCFor',
+          inits,
+          condition,
+          updates,
+          body,
+          loc: this.rangeSince(start)
+        };
       }
 
       this.expect(TokenType.RParen);
       const body = this.parseListCompGenerator();
-      return { kind: "lcFor", variables, body, loc: this.rangeSince(start) };
+      return {kind: 'lcFor', variables, body, loc: this.rangeSince(start)};
     }
 
-    if (this.isIdentifier("if")) {
+    if (this.isIdentifier('if')) {
       this.advance();
       this.expect(TokenType.LParen);
       const condition = this.parseExpr();
       this.expect(TokenType.RParen);
       const ifTrue = this.parseListCompGenerator();
-      let ifFalse: ListCompGenerator | undefined;
-      if (this.isIdentifier("else")) {
+      let ifFalse: ListCompGenerator|undefined;
+      if (this.isIdentifier('else')) {
         this.advance();
         ifFalse = this.parseListCompGenerator();
       }
-      return { kind: "lcIf", condition, ifTrue, ifFalse, loc: this.rangeSince(start) };
+      return {
+        kind: 'lcIf',
+        condition,
+        ifTrue,
+        ifFalse,
+        loc: this.rangeSince(start)
+      };
     }
 
-    if (this.isIdentifier("let")) {
+    if (this.isIdentifier('let')) {
       this.advance();
       this.expect(TokenType.LParen);
       const assignments = this.parseLetAssignments();
       this.expect(TokenType.RParen);
       const body = this.parseListCompGenerator();
-      return { kind: "lcLet", assignments, body, loc: this.rangeSince(start) };
+      return {kind: 'lcLet', assignments, body, loc: this.rangeSince(start)};
     }
 
-    if (this.isIdentifier("each")) {
+    if (this.isIdentifier('each')) {
       this.advance();
-      if (this.isIdentifier("for") || this.isIdentifier("if") || this.isIdentifier("let")) {
+      if (this.isIdentifier('for') || this.isIdentifier('if') ||
+          this.isIdentifier('let')) {
         const generator = this.parseListCompGenerator();
-        return { kind: "lcExpr", expr: { kind: "each", expr: { kind: "listComp", generator, loc: this.rangeSince(start) }, loc: this.rangeSince(start) }, loc: this.rangeSince(start) };
+        return {
+          kind: 'lcExpr',
+          expr: {
+            kind: 'each',
+            expr: {kind: 'listComp', generator, loc: this.rangeSince(start)},
+            loc: this.rangeSince(start)
+          },
+          loc: this.rangeSince(start)
+        };
       }
-      return { kind: "lcExpr", expr: { kind: "each", expr: this.parseExpr(), loc: this.rangeSince(start) }, loc: this.rangeSince(start) };
+      return {
+        kind: 'lcExpr',
+        expr:
+            {kind: 'each', expr: this.parseExpr(), loc: this.rangeSince(start)},
+        loc: this.rangeSince(start)
+      };
     }
 
     const expr = this.parseExpr();
-    return { kind: "lcExpr", expr, loc: this.rangeSince(start) };
+    return {kind: 'lcExpr', expr, loc: this.rangeSince(start)};
   }
 
   // Let assignments
@@ -796,9 +965,11 @@ export class Parser {
       const name = this.expect(TokenType.Identifier).value!;
       this.expect(TokenType.Equals);
       const value = this.parseExpr();
-      // OpenSCAD ignores a duplicate assignment to the same name within one `let` (the first binding wins) and warns; drop later occurrences so we don't apply last-wins reassignment.
+      // OpenSCAD ignores a duplicate assignment to the same name within one
+      // `let` (the first binding wins) and warns; drop later occurrences so we
+      // don't apply last-wins reassignment.
       if (!assignments.some(a => a.name === name)) {
-        assignments.push({ name, value, loc: this.rangeSince(as) });
+        assignments.push({name, value, loc: this.rangeSince(as)});
       }
     } while (this.match(TokenType.Comma));
 
@@ -808,17 +979,18 @@ export class Parser {
   // Use / Include
   private parseUseInclude(): Statement {
     const start = this.startLoc();
-    const keyword = this.advance().value! as "use" | "include";
+    const keyword = this.advance().value! as 'use' | 'include';
     this.expect(TokenType.Lt);
 
     let path = '';
-    while ((this.current as Token).type !== TokenType.Gt && (this.current as Token).type !== TokenType.EOF) {
+    while ((this.current as Token).type !== TokenType.Gt &&
+           (this.current as Token).type !== TokenType.EOF) {
       const tok = this.advance();
       path += this.tokenToString(tok);
     }
     this.expect(TokenType.Gt);
 
-    return { kind: keyword, path, loc: this.rangeSince(start) };
+    return {kind: keyword, path, loc: this.rangeSince(start)};
   }
 
   // Let statement
@@ -829,60 +1001,62 @@ export class Parser {
     const args = this.parseArgumentList();
     this.expect(TokenType.RParen);
 
-    let child: Statement | undefined;
+    let child: Statement|undefined;
     if (this.current.type === TokenType.Semicolon) {
       this.advance();
     } else {
       child = this.parseStatement();
     }
 
-    return { kind: "moduleCall", name, args, child, loc: this.rangeSince(start) };
+    return {kind: 'moduleCall', name, args, child, loc: this.rangeSince(start)};
   }
 
   // Utilities
   private tokenToString(tok: Token): string {
     if (tok.value !== undefined) return tok.value;
     switch (tok.type) {
-      case TokenType.Slash: return '/';
-      case TokenType.Dot: return '.';
-      case TokenType.Minus: return '-';
-      case TokenType.Plus: return '+';
-      case TokenType.Star: return '*';
-      case TokenType.Colon: return ':';
-      default: return '';
+      case TokenType.Slash:
+        return '/';
+      case TokenType.Dot:
+        return '.';
+      case TokenType.Minus:
+        return '-';
+      case TokenType.Plus:
+        return '+';
+      case TokenType.Star:
+        return '*';
+      case TokenType.Colon:
+        return ':';
+      default:
+        return '';
     }
   }
 
   private canStartExpr(): boolean {
     const t = this.current.type;
     return (
-      t === TokenType.Number ||
-      t === TokenType.String ||
-      t === TokenType.Identifier ||
-      t === TokenType.LBracket ||
-      t === TokenType.LParen ||
-      t === TokenType.Minus ||
-      t === TokenType.Bang ||
-      t === TokenType.Tilde ||
-      t === TokenType.Plus
-    );
+        t === TokenType.Number || t === TokenType.String ||
+        t === TokenType.Identifier || t === TokenType.LBracket ||
+        t === TokenType.LParen || t === TokenType.Minus ||
+        t === TokenType.Bang || t === TokenType.Tilde || t === TokenType.Plus);
   }
 }
 
 function attachComments(program: Program, comments: Comment[]): void {
   const targets = collectStatementTargets(program.statements)
-    .filter((node): node is Statement & { loc: NonNullable<ASTNode["loc"]> } => Boolean(node.loc))
-    .sort((a, b) => a.loc.start.offset - b.loc.start.offset);
+                      .filter((node): node is Statement&{
+                        loc: NonNullable<ASTNode['loc']>
+                      } => Boolean(node.loc))
+                      .sort((a, b) => a.loc.start.offset - b.loc.start.offset);
 
-  const byEnd = [...targets].sort((a, b) => a.loc.end.offset - b.loc.end.offset);
+  const byEnd =
+      [...targets].sort((a, b) => a.loc.end.offset - b.loc.end.offset);
 
-  for (const comment of [...comments].sort((a, b) => a.loc.start.offset - b.loc.start.offset)) {
-    const trailing = [...byEnd]
-      .reverse()
-      .find(node =>
-        node.loc.end.line === comment.loc.start.line &&
-        node.loc.end.offset <= comment.loc.start.offset
-      );
+  for (const comment of [...comments].sort(
+           (a, b) => a.loc.start.offset - b.loc.start.offset)) {
+    const trailing = [...byEnd].reverse().find(
+        node => node.loc.end.line === comment.loc.start.line &&
+            node.loc.end.offset <= comment.loc.start.offset);
 
     if (trailing) {
       trailing.trailingComments ??= [];
@@ -890,7 +1064,8 @@ function attachComments(program: Program, comments: Comment[]): void {
       continue;
     }
 
-    const leading = targets.find(node => node.loc.start.offset >= comment.loc.end.offset);
+    const leading =
+        targets.find(node => node.loc.start.offset >= comment.loc.end.offset);
     if (leading) {
       leading.leadingComments ??= [];
       leading.leadingComments.push(comment);
@@ -903,21 +1078,22 @@ function collectStatementTargets(statements: Statement[]): Statement[] {
   for (const stmt of statements) {
     out.push(stmt);
     switch (stmt.kind) {
-      case "block":
+      case 'block':
         out.push(...collectStatementTargets(stmt.statements));
         break;
-      case "moduleDecl":
+      case 'moduleDecl':
         out.push(...collectStatementTargets([stmt.body]));
         break;
-      case "moduleCall":
+      case 'moduleCall':
         if (stmt.child) out.push(...collectStatementTargets([stmt.child]));
         break;
-      case "for":
+      case 'for':
         out.push(...collectStatementTargets([stmt.body]));
         break;
-      case "if":
+      case 'if':
         out.push(...collectStatementTargets([stmt.thenBody]));
-        if (stmt.elseBody) out.push(...collectStatementTargets([stmt.elseBody]));
+        if (stmt.elseBody)
+          out.push(...collectStatementTargets([stmt.elseBody]));
         break;
     }
   }

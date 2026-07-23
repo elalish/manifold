@@ -1,14 +1,16 @@
-import fs from 'fs';
 import {strict as assert} from 'assert';
-import {afterEach, expect, suite, test} from 'vitest';
+import {fork} from 'child_process';
+import fs from 'fs';
 import path from 'path';
-import { fork } from "child_process";
+import {afterEach, expect, suite, test} from 'vitest';
 
 async function getOpenScadProperties(filename: string) {
   const firstLine = fs.readFileSync(filename).toString().split('\n')[0];
   if (!firstLine) {
     console.log(`File is empty: ${filename}`);
-    return {volume: undefined, surfaceArea: undefined}
+    return {
+      volume: undefined, surfaceArea: undefined
+    }
   }
 
   const volumeStr = firstLine.match(/Volume: ([\d\.]+)/)?.[1];
@@ -20,9 +22,8 @@ async function getOpenScadProperties(filename: string) {
   return {volume, surfaceArea};
 }
 
-async function getCompiledManifoldProperties(
-  filename: string
-): Promise<{ volume: number; surfaceArea: number }> {
+async function getCompiledManifoldProperties(filename: string):
+    Promise<{volume: number; surfaceArea: number}> {
   return new Promise((resolve, reject) => {
     const execArgv = (() => {
       try {
@@ -44,8 +45,12 @@ async function getCompiledManifoldProperties(
     let stdout = '';
     let stderr = '';
 
-    worker.stdout?.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
-    worker.stderr?.on('data', (chunk: Buffer) => { stderr += chunk.toString(); });
+    worker.stdout?.on('data', (chunk: Buffer) => {
+      stdout += chunk.toString();
+    });
+    worker.stderr?.on('data', (chunk: Buffer) => {
+      stderr += chunk.toString();
+    });
 
     worker.on('exit', (code, signal) => {
       if (code === 0) {
@@ -53,33 +58,31 @@ async function getCompiledManifoldProperties(
           const jsonMatch = stdout.match(/(\{.*\})/s);
           const jsonStr = jsonMatch?.[1];
           if (!jsonStr) throw new Error('No JSON found in output');
-          if (stderr) console.log("Worker stderr:", stderr);
+          if (stderr) console.log('Worker stderr:', stderr);
           resolve(JSON.parse(jsonStr));
         } catch {
-          reject(new Error(`Bad JSON from worker.\nstdout: ${stdout}\nstderr: ${stderr}`));
+          reject(new Error(
+              `Bad JSON from worker.\nstdout: ${stdout}\nstderr: ${stderr}`));
         }
       } else {
         reject(new Error(
-          `Worker failed (code=${code}, signal=${signal})\n` +
-          `file: ${filename}\n` +
-          `stderr: ${stderr}\n` +
-          `stdout: ${stdout}`
-        ));
+            `Worker failed (code=${code}, signal=${signal})\n` +
+            `file: ${filename}\n` +
+            `stderr: ${stderr}\n` +
+            `stdout: ${stdout}`));
       }
     });
 
     worker.on('error', (err) => {
-      reject(new Error(`Worker failed: ${err.message}\nworkerPath: ${workerPath}`));
+      reject(new Error(
+          `Worker failed: ${err.message}\nworkerPath: ${workerPath}`));
     });
   });
 }
 
 
 function expectApproximatelyEqual(
-  actual: number,
-  expected: number,
-  relativeTolerance: number
-) {
+    actual: number, expected: number, relativeTolerance: number) {
   assert(actual !== undefined);
   assert(expected !== undefined);
 
@@ -95,7 +98,7 @@ suite('Single Compiled Example', async () => {
   const fileName = process.env.TEST_FILE;
 
   if (!fileName) {
-    throw new Error("TEST_FILE not provided");
+    throw new Error('TEST_FILE not provided');
   }
 
   test(`Test for ${fileName}`, async () => {
@@ -103,14 +106,18 @@ suite('Single Compiled Example', async () => {
 
     if (volume == undefined || surfaceArea == undefined) return;
 
-    const compiledFile = fileName.replace(".scad", ".ts").replace("examples", "out");
-    const { volume: compiledVolume, surfaceArea: compiledSurfaceArea } = await getCompiledManifoldProperties(compiledFile);
+    const compiledFile =
+        fileName.replace('.scad', '.ts').replace('examples', 'out');
+    const {volume: compiledVolume, surfaceArea: compiledSurfaceArea} =
+        await getCompiledManifoldProperties(compiledFile);
 
     const tolerance = 0.001;
 
-    console.log(`expected volume: ${volume}, recieved volume: ${compiledVolume}`);
+    console.log(
+        `expected volume: ${volume}, recieved volume: ${compiledVolume}`);
     expectApproximatelyEqual(volume, compiledVolume, tolerance);
-    console.log(`expected surfaceArea: ${surfaceArea}, recieved surfaceArea: ${compiledSurfaceArea}`);
+    console.log(`expected surfaceArea: ${surfaceArea}, recieved surfaceArea: ${
+        compiledSurfaceArea}`);
     expectApproximatelyEqual(surfaceArea, compiledSurfaceArea, tolerance);
   }, 60000);
 });
