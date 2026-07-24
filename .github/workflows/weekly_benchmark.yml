@@ -27,7 +27,7 @@ jobs:
         packages: libgtest-dev libtbb-dev cmake
         version: 1
     - name: Build (asan/ubsan)
-      run: bash ./scripts/ci/sanitizer_build.sh
+      run: ./scripts/ci/sanitizer_build.sh
     - name: Upload sanitizer build artifacts
       uses: actions/upload-artifact@v4
       with:
@@ -121,7 +121,6 @@ jobs:
       if: github.event_name == 'release' || github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
       shell: bash
       run: |
-        set -u
         # github-actions[bot]'s identity for committing with the built-in
         # token, see https://github.com/actions/checkout#push-a-commit-using-the-built-in-token
         git config user.name "github-actions[bot]"

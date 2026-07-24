@@ -432,7 +432,7 @@ jobs:
         packages: libgtest-dev libtbb-dev cmake
         version: 1
     - name: Build (asan/ubsan)
-      run: bash ./scripts/ci/sanitizer_build.sh
+      run: ./scripts/ci/sanitizer_build.sh
     - name: Upload sanitizer build artifacts
       uses: actions/upload-artifact@v4
       with:

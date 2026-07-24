@@ -1,5 +1,4 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/usr/bin/env -S bash -euo pipefail
 
 # No compiler forced by default - GCC (the runner's default) supports
 # -fsanitize=address,undefined fine. Set SANITIZER_C_COMPILER/
