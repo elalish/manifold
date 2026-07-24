@@ -30,7 +30,7 @@ Here is an incomplete list of our users, whose integrations may be anywhere from
 
 ### Bindings & Packages
 
-Manifold has bindings to many other languages, some maintained in this repository, and others elsewhere. It can also be built in C++ via [vcpkg](https://github.com/microsoft/vcpkg.git).
+Manifold has bindings to many other languages, some maintained in this repository, and others elsewhere. It can also be built in C++ via [vcpkg](https://github.com/microsoft/vcpkg.git). There is also a native Rust port, [manifold-rust](https://github.com/larsbrubaker/manifold-rust), which passes Manifold's full test suite with identical results and has no C++ dependency — from a user's perspective it works like a binding.
 
 | Language | Packager | Name | Maintenance |
 | --- | --- | --- | --- |
@@ -44,6 +44,7 @@ Manifold has bindings to many other languages, some maintained in this repositor
 | Julia | Packages | [ManifoldBindings.jl](https://juliapackages.com/p/manifoldbindings) | external |
 | OCaml | N/A | [OManifold](https://ocadml.github.io/OManifold/OManifold/index.html) | external |
 | Rust | crates.io | [manifold-csg](https://github.com/zmerlynn/manifold-csg) | external |
+| Rust (native port) | crates.io | [manifold-rust](https://crates.io/crates/manifold-rust) | external |
 | Swift | SPM | [Manifold-Swift](https://github.com/tomasf/manifold-swift) | external |
 
 ## Frontend Sandboxes
