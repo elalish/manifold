@@ -15,10 +15,14 @@
 #include "manifold/polygon.h"
 
 #include <algorithm>
+#include <array>
+#include <atomic>
+#include <cmath>
 #ifndef MANIFOLD_NO_IOSTREAM
 #include <fstream>
 #endif
 #include <limits>
+#include <thread>
 
 #include "polygon_corpus.h"
 #include "test.h"
@@ -54,6 +58,17 @@ Polygons Duplicate(Polygons polys) {
       vert.x += shift;
     }
     polys.push_back(poly);
+  }
+  return polys;
+}
+
+Polygons StarPolygon(int numVert) {
+  Polygons polys(1);
+  polys[0].reserve(numVert);
+  for (int i = 0; i < numVert; ++i) {
+    const double angle = kTwoPi * i / numVert;
+    const double radius = i % 2 == 0 ? 2.0 : 1.0;
+    polys[0].push_back({radius * std::cos(angle), radius * std::sin(angle)});
   }
   return polys;
 }
@@ -99,6 +114,44 @@ void RegisterPolygonTestsFile(const std::string& filename) {
 }
 #endif
 }  // namespace
+
+TEST(TriangulatorReuse, ClearsState) {
+  const Polygons large = StarPolygon(64);
+  const Polygons withHole = SquareHole();
+
+  const auto largeTriangles = Triangulate(large, -1, false);
+  const auto holeTriangles = Triangulate(withHole, -1, false);
+
+  EXPECT_EQ(largeTriangles.size(), 62);
+  EXPECT_EQ(holeTriangles.size(), 8);
+  EXPECT_EQ(Triangulate(large, -1, false), largeTriangles);
+}
+
+#ifndef __EMSCRIPTEN__
+TEST(TriangulatorReuse, IsThreadLocal) {
+  const Polygons large = StarPolygon(64);
+  const Polygons withHole = SquareHole();
+  const auto largeTriangles = Triangulate(large, -1, false);
+  const auto holeTriangles = Triangulate(withHole, -1, false);
+
+  std::atomic<bool> success = true;
+  std::array<std::thread, 8> threads;
+  for (std::thread& thread : threads) {
+    thread = std::thread([&] {
+      for (int i = 0; i < 10; ++i) {
+        if (Triangulate(large, -1, false) != largeTriangles ||
+            Triangulate(withHole, -1, false) != holeTriangles) {
+          success = false;
+          return;
+        }
+      }
+    });
+  }
+  for (std::thread& thread : threads) thread.join();
+
+  EXPECT_TRUE(success);
+}
+#endif
 
 #ifndef MANIFOLD_NO_IOSTREAM
 void RegisterPolygonTests() {
