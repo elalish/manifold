@@ -14,11 +14,22 @@
 
 #include "manifold/polygon.h"
 
+#include <cstddef>
 #include <map>
 #include <memory>
+#if defined(__has_include)
+#if __has_include(<memory_resource>)
+#include <memory_resource>
+#endif
+#endif
 #include <optional>
 #include <set>
 #include <utility>
+
+// Apple libc++ defines this only for deployment targets with PMR support.
+#if defined(__cpp_lib_memory_resource) && __cpp_lib_memory_resource >= 201603L
+#define MANIFOLD_POLYGON_HAS_PMR
+#endif
 
 #include "manifold/manifold.h"
 #include "manifold/optional_assert.h"
@@ -233,8 +244,14 @@ HalfedgeTriangulation TriangulateConvex(const PolygonsIdx& polys) {
  * within epsilon.
  */
 
+template <typename NodeAllocator = std::allocator<std::byte>>
 class EarClip {
  public:
+  explicit EarClip(const NodeAllocator& allocator = NodeAllocator())
+      : holes_(MaxX(), NodeListAllocator(allocator)),
+        hole2BBox_(std::less<VertItr>(), HoleBoxAllocator(allocator)),
+        earsQueue_(MinCost(), NodeListAllocator(allocator)) {}
+
   HalfedgeTriangulation Triangulate(const PolygonsIdx& polys, double epsilon) {
     ZoneScoped;
 
@@ -271,8 +288,8 @@ class EarClip {
 
  private:
   struct Vert;
-  using VertItr = std::vector<Vert>::iterator;
-  using VertItrC = std::vector<Vert>::const_iterator;
+  using VertItr = typename std::vector<Vert>::iterator;
+  using VertItrC = typename std::vector<Vert>::const_iterator;
   struct MaxX {
     bool operator()(const VertItr& a, const VertItr& b) const {
       return a->pos.x > b->pos.x;
@@ -283,7 +300,15 @@ class EarClip {
       return a->cost < b->cost;
     }
   };
-  using qItr = std::set<VertItr, MinCost>::iterator;
+  using NodeListAllocator = typename std::allocator_traits<
+      NodeAllocator>::template rebind_alloc<VertItr>;
+  using HoleBoxAllocator = typename std::allocator_traits<
+      NodeAllocator>::template rebind_alloc<std::pair<const VertItr, Rect>>;
+  using HoleQueue = std::multiset<VertItr, MaxX, NodeListAllocator>;
+  using HoleBoxes =
+      std::map<VertItr, Rect, std::less<VertItr>, HoleBoxAllocator>;
+  using EarQueue = std::multiset<VertItr, MinCost, NodeListAllocator>;
+  using qItr = typename EarQueue::iterator;
 
   struct IdxCollider {
     Vec<PolyVert> points;
@@ -295,15 +320,15 @@ class EarClip {
   // Initial contour starts, kept as scratch storage between calls.
   std::vector<VertItr> starts_;
   // The set of right-most starting points, one for each negative-area contour.
-  std::multiset<VertItr, MaxX> holes_;
+  HoleQueue holes_;
   // The set of starting points, one for each positive-area contour.
   std::vector<VertItr> outers_;
   // The set of starting points, one for each simple polygon.
   std::vector<VertItr> simples_;
   // Maps each hole (by way of starting point) to its bounding box.
-  std::map<VertItr, Rect> hole2BBox_;
+  HoleBoxes hole2BBox_;
   // A priority queue of valid ears - the multiset allows them to be updated.
-  std::multiset<VertItr, MinCost> earsQueue_;
+  EarQueue earsQueue_;
   // Per-polygon collision data, kept as scratch storage between calls.
   IdxCollider collider_;
   // The output triangulation, represented directly as halfedges.
@@ -975,7 +1000,17 @@ HalfedgeTriangulation TriangulateIdxHalfedgesImpl(
 namespace manifold {
 
 struct PolygonTriangulator::Impl {
-  EarClip earClip;
+#ifdef MANIFOLD_POLYGON_HAS_PMR
+  using PmrAllocator = std::pmr::polymorphic_allocator<std::byte>;
+
+  // Retain freed nodes for reuse by subsequent triangulations on this worker.
+  // The pool grows from its upstream resource when a larger input needs it and
+  // is declared first so it outlives the containers that use it.
+  std::pmr::unsynchronized_pool_resource nodeMemoryResource_;
+  EarClip<PmrAllocator> earClip_{PmrAllocator(&nodeMemoryResource_)};
+#else
+  EarClip<> earClip_;
+#endif
 };
 
 PolygonTriangulator::PolygonTriangulator() = default;
@@ -985,11 +1020,11 @@ PolygonTriangulator::~PolygonTriangulator() = default;
 HalfedgeTriangulation PolygonTriangulator::Triangulate(const PolygonsIdx& polys,
                                                        double epsilon) {
   if (!impl_) impl_ = std::make_unique<Impl>();
-  return impl_->earClip.Triangulate(polys, epsilon);
+  return impl_->earClip_.Triangulate(polys, epsilon);
 }
 
 double PolygonTriangulator::GetPrecision() const {
-  return impl_->earClip.GetPrecision();
+  return impl_->earClip_.GetPrecision();
 }
 
 /**
@@ -1011,10 +1046,10 @@ double PolygonTriangulator::GetPrecision() const {
 HalfedgeTriangulation TriangulateIdxHalfedges(const PolygonsIdx& polys,
                                               double epsilon,
                                               bool allowConvex) {
-  std::optional<EarClip> triangulator;
+  std::optional<EarClip<>> triangulator;
   return TriangulateIdxHalfedgesImpl(
       polys, epsilon, allowConvex,
-      [&]() -> EarClip& { return triangulator.emplace(); });
+      [&]() -> EarClip<>& { return triangulator.emplace(); });
 }
 
 HalfedgeTriangulation TriangulateIdxHalfedges(
