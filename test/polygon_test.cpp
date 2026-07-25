@@ -23,7 +23,9 @@
 #endif
 #include <limits>
 #include <thread>
+#include <utility>
 
+#include "../src/polygon_internal.h"
 #include "polygon_corpus.h"
 #include "test.h"
 
@@ -73,6 +75,18 @@ Polygons StarPolygon(int numVert) {
   return polys;
 }
 
+PolygonsIdx IndexPolygons(const Polygons& polys) {
+  PolygonsIdx indexed;
+  int idx = 0;
+  for (const SimplePolygon& poly : polys) {
+    SimplePolygonIdx simple;
+    simple.reserve(poly.size());
+    for (const vec2& pos : poly) simple.push_back({pos, idx++});
+    indexed.push_back(std::move(simple));
+  }
+  return indexed;
+}
+
 void TestPoly(const Polygons& polys, int expectedNumTri,
               double epsilon = -1.0) {
   std::vector<ivec3> triangles;
@@ -118,29 +132,49 @@ void RegisterPolygonTestsFile(const std::string& filename) {
 TEST(TriangulatorReuse, ClearsState) {
   const Polygons large = StarPolygon(64);
   const Polygons withHole = SquareHole();
+  const PolygonsIdx largeIndexed = IndexPolygons(large);
+  const PolygonsIdx holeIndexed = IndexPolygons(withHole);
+  PolygonTriangulatorStore triangulators;
 
   const auto largeTriangles = Triangulate(large, -1, false);
   const auto holeTriangles = Triangulate(withHole, -1, false);
 
   EXPECT_EQ(largeTriangles.size(), 62);
   EXPECT_EQ(holeTriangles.size(), 8);
-  EXPECT_EQ(Triangulate(large, -1, false), largeTriangles);
+  EXPECT_EQ(
+      TriangulateIdxHalfedges(largeIndexed, -1, false, triangulators.local())
+          .Triangles(),
+      largeTriangles);
+  EXPECT_EQ(
+      TriangulateIdxHalfedges(holeIndexed, -1, false, triangulators.local())
+          .Triangles(),
+      holeTriangles);
+  EXPECT_EQ(
+      TriangulateIdxHalfedges(largeIndexed, -1, false, triangulators.local())
+          .Triangles(),
+      largeTriangles);
 }
 
-#ifndef __EMSCRIPTEN__
+#if MANIFOLD_PAR == 1 && !defined(__EMSCRIPTEN__)
 TEST(TriangulatorReuse, IsThreadLocal) {
   const Polygons large = StarPolygon(64);
   const Polygons withHole = SquareHole();
+  const PolygonsIdx largeIndexed = IndexPolygons(large);
+  const PolygonsIdx holeIndexed = IndexPolygons(withHole);
   const auto largeTriangles = Triangulate(large, -1, false);
   const auto holeTriangles = Triangulate(withHole, -1, false);
+  PolygonTriangulatorStore triangulators;
 
   std::atomic<bool> success = true;
   std::array<std::thread, 8> threads;
   for (std::thread& thread : threads) {
     thread = std::thread([&] {
+      PolygonTriangulator& triangulator = triangulators.local();
       for (int i = 0; i < 10; ++i) {
-        if (Triangulate(large, -1, false) != largeTriangles ||
-            Triangulate(withHole, -1, false) != holeTriangles) {
+        if (TriangulateIdxHalfedges(largeIndexed, -1, false, triangulator)
+                    .Triangles() != largeTriangles ||
+            TriangulateIdxHalfedges(holeIndexed, -1, false, triangulator)
+                    .Triangles() != holeTriangles) {
           success = false;
           return;
         }
