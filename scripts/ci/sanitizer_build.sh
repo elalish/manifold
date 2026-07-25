@@ -12,7 +12,8 @@ cmake_args=(
   -DMANIFOLD_ASSERT=ON
   -DMANIFOLD_PAR=OFF
   -DCMAKE_C_FLAGS="-fsanitize=address,undefined"
-  -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined"
+  # -Wno-maybe-uninitialized: GCC false positive inside libstdc++'s <regex>
+  -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -Wno-maybe-uninitialized"
   -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
   -DCMAKE_SHARED_LINKER_FLAGS="-fsanitize=address,undefined"
   -DCMAKE_BUILD_RPATH_USE_ORIGIN=ON
