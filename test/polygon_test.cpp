@@ -15,11 +15,17 @@
 #include "manifold/polygon.h"
 
 #include <algorithm>
+#include <array>
+#include <atomic>
+#include <cmath>
 #ifndef MANIFOLD_NO_IOSTREAM
 #include <fstream>
 #endif
 #include <limits>
+#include <thread>
+#include <utility>
 
+#include "../src/polygon_internal.h"
 #include "polygon_corpus.h"
 #include "test.h"
 
@@ -56,6 +62,29 @@ Polygons Duplicate(Polygons polys) {
     polys.push_back(poly);
   }
   return polys;
+}
+
+Polygons StarPolygon(int numVert) {
+  Polygons polys(1);
+  polys[0].reserve(numVert);
+  for (int i = 0; i < numVert; ++i) {
+    const double angle = kTwoPi * i / numVert;
+    const double radius = i % 2 == 0 ? 2.0 : 1.0;
+    polys[0].push_back({radius * std::cos(angle), radius * std::sin(angle)});
+  }
+  return polys;
+}
+
+PolygonsIdx IndexPolygons(const Polygons& polys) {
+  PolygonsIdx indexed;
+  int idx = 0;
+  for (const SimplePolygon& poly : polys) {
+    SimplePolygonIdx simple;
+    simple.reserve(poly.size());
+    for (const vec2& pos : poly) simple.push_back({pos, idx++});
+    indexed.push_back(std::move(simple));
+  }
+  return indexed;
 }
 
 void TestPoly(const Polygons& polys, int expectedNumTri,
@@ -99,6 +128,64 @@ void RegisterPolygonTestsFile(const std::string& filename) {
 }
 #endif
 }  // namespace
+
+TEST(TriangulatorReuse, ClearsState) {
+  const Polygons large = StarPolygon(64);
+  const Polygons withHole = SquareHole();
+  const PolygonsIdx largeIndexed = IndexPolygons(large);
+  const PolygonsIdx holeIndexed = IndexPolygons(withHole);
+  PolygonTriangulatorStore triangulators;
+
+  const auto largeTriangles = Triangulate(large, -1, false);
+  const auto holeTriangles = Triangulate(withHole, -1, false);
+
+  EXPECT_EQ(largeTriangles.size(), 62);
+  EXPECT_EQ(holeTriangles.size(), 8);
+  EXPECT_EQ(
+      TriangulateIdxHalfedges(largeIndexed, -1, false, triangulators.local())
+          .Triangles(),
+      largeTriangles);
+  EXPECT_EQ(
+      TriangulateIdxHalfedges(holeIndexed, -1, false, triangulators.local())
+          .Triangles(),
+      holeTriangles);
+  EXPECT_EQ(
+      TriangulateIdxHalfedges(largeIndexed, -1, false, triangulators.local())
+          .Triangles(),
+      largeTriangles);
+}
+
+#if MANIFOLD_PAR == 1 && !defined(__EMSCRIPTEN__)
+TEST(TriangulatorReuse, IsThreadLocal) {
+  const Polygons large = StarPolygon(64);
+  const Polygons withHole = SquareHole();
+  const PolygonsIdx largeIndexed = IndexPolygons(large);
+  const PolygonsIdx holeIndexed = IndexPolygons(withHole);
+  const auto largeTriangles = Triangulate(large, -1, false);
+  const auto holeTriangles = Triangulate(withHole, -1, false);
+  PolygonTriangulatorStore triangulators;
+
+  std::atomic<bool> success = true;
+  std::array<std::thread, 8> threads;
+  for (std::thread& thread : threads) {
+    thread = std::thread([&] {
+      PolygonTriangulator& triangulator = triangulators.local();
+      for (int i = 0; i < 10; ++i) {
+        if (TriangulateIdxHalfedges(largeIndexed, -1, false, triangulator)
+                    .Triangles() != largeTriangles ||
+            TriangulateIdxHalfedges(holeIndexed, -1, false, triangulator)
+                    .Triangles() != holeTriangles) {
+          success = false;
+          return;
+        }
+      }
+    });
+  }
+  for (std::thread& thread : threads) thread.join();
+
+  EXPECT_TRUE(success);
+}
+#endif
 
 #ifndef MANIFOLD_NO_IOSTREAM
 void RegisterPolygonTests() {

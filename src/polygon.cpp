@@ -15,7 +15,10 @@
 #include "manifold/polygon.h"
 
 #include <map>
+#include <memory>
+#include <optional>
 #include <set>
+#include <utility>
 
 #include "manifold/manifold.h"
 #include "manifold/optional_assert.h"
@@ -232,8 +235,10 @@ HalfedgeTriangulation TriangulateConvex(const PolygonsIdx& polys) {
 
 class EarClip {
  public:
-  EarClip(const PolygonsIdx& polys, double epsilon) : epsilon_(epsilon) {
+  HalfedgeTriangulation Triangulate(const PolygonsIdx& polys, double epsilon) {
     ZoneScoped;
+
+    Reset(epsilon);
 
     size_t numVert = 0;
     for (const SimplePolygonIdx& poly : polys) {
@@ -241,19 +246,15 @@ class EarClip {
     }
     polygon_.reserve(numVert + 2 * polys.size());
 
-    std::vector<VertItr> starts = Initialize(polys);
+    Initialize(polys);
 
     for (VertItr v = polygon_.begin(); v != polygon_.end(); ++v) {
       ClipIfDegenerate(v);
     }
 
-    for (const VertItr first : starts) {
+    for (const VertItr first : starts_) {
       FindStart(first);
     }
-  }
-
-  HalfedgeTriangulation Triangulate() {
-    ZoneScoped;
 
     for (const VertItr start : holes_) {
       CutKeyhole(start);
@@ -263,7 +264,7 @@ class EarClip {
       TriangulatePoly(start);
     }
 
-    return result_;
+    return std::move(result_);
   }
 
   double GetPrecision() const { return epsilon_; }
@@ -284,8 +285,15 @@ class EarClip {
   };
   using qItr = std::set<VertItr, MinCost>::iterator;
 
+  struct IdxCollider {
+    Vec<PolyVert> points;
+    std::vector<VertItr> itr;
+  };
+
   // The flat list where all the Verts are stored. Not used much for traversal.
   std::vector<Vert> polygon_;
+  // Initial contour starts, kept as scratch storage between calls.
+  std::vector<VertItr> starts_;
   // The set of right-most starting points, one for each negative-area contour.
   std::multiset<VertItr, MaxX> holes_;
   // The set of starting points, one for each positive-area contour.
@@ -296,17 +304,14 @@ class EarClip {
   std::map<VertItr, Rect> hole2BBox_;
   // A priority queue of valid ears - the multiset allows them to be updated.
   std::multiset<VertItr, MinCost> earsQueue_;
+  // Per-polygon collision data, kept as scratch storage between calls.
+  IdxCollider collider_;
   // The output triangulation, represented directly as halfedges.
   HalfedgeTriangulation result_;
   // Bounding box of the entire set of polygons
   Rect bBox_;
   // Working epsilon: max of float error and input value.
   double epsilon_;
-
-  struct IdxCollider {
-    Vec<PolyVert> points;
-    std::vector<VertItr> itr;
-  };
 
   // A circularly-linked list representing the polygon(s) that still need to be
   // triangulated. This gets smaller as ears are clipped until it degenerates to
@@ -538,6 +543,23 @@ class EarClip {
   // from it, but it is still linked to them.
   static bool Clipped(VertItr v) { return v->right->left != v; }
 
+  void Reset(double epsilon) {
+    // Clear iterator-owning containers before invalidating polygon_.
+    earsQueue_.clear();
+    holes_.clear();
+    hole2BBox_.clear();
+    starts_.clear();
+    outers_.clear();
+    simples_.clear();
+    collider_.itr.clear();
+    collider_.points.clear(false);
+    polygon_.clear();
+
+    result_ = {};
+    bBox_ = {};
+    epsilon_ = epsilon;
+  }
+
   // Apply func to each un-clipped vert in a polygon and return an un-clipped
   // vert.
   template <typename F>
@@ -602,8 +624,8 @@ class EarClip {
   }
 
   // Build the circular list polygon structures.
-  std::vector<VertItr> Initialize(const PolygonsIdx& polys) {
-    std::vector<VertItr> starts;
+  void Initialize(const PolygonsIdx& polys) {
+    starts_.reserve(polys.size());
     const auto invalidItr = polygon_.begin();
     for (const SimplePolygonIdx& poly : polys) {
       auto vert = poly.begin();
@@ -620,7 +642,7 @@ class EarClip {
       VertItr last = first;
       // This is not the real rightmost start, but just an arbitrary vert for
       // now to identify each polygon.
-      starts.push_back(first);
+      starts_.push_back(first);
 
       for (++vert; vert != poly.end(); ++vert) {
         bBox_.Union(vert->pos);
@@ -644,8 +666,7 @@ class EarClip {
 
     result_.AddContours(polys);
     // Slightly more than enough, since each hole can cause two extra triangles.
-    result_.ReserveTriangles(polygon_.size() + 2 * starts.size());
-    return starts;
+    result_.ReserveTriangles(polygon_.size() + 2 * starts_.size());
   }
 
   // Find the actual rightmost starts after degenerate removal. Also calculate
@@ -818,17 +839,17 @@ class EarClip {
   // Create a collider of all vertices in this polygon, each expanded by
   // epsilon_. Each ear uses this BVH to quickly find a subset of vertices to
   // check for cost.
-  IdxCollider VertCollider(VertItr start) const {
+  void BuildVertCollider(VertItr start) {
     ZoneScoped;
-    std::vector<VertItr> itr;
-    Vec<PolyVert> points;
-    Loop(start, [&itr, &points](VertItr v) {
-      points.push_back({v->pos, static_cast<int>(itr.size())});
-      itr.push_back(v);
+    collider_.points.clear(false);
+    collider_.itr.clear();
+    Loop(start, [this](VertItr v) {
+      collider_.points.push_back(
+          {v->pos, static_cast<int>(collider_.itr.size())});
+      collider_.itr.push_back(v);
     });
 
-    BuildTwoDTree(points);
-    return {std::move(points), std::move(itr)};
+    BuildTwoDTree(collider_.points);
   }
 
   // The main ear-clipping loop. This is called once for each simple polygon -
@@ -836,9 +857,9 @@ class EarClip {
   void TriangulatePoly(VertItr start) {
     ZoneScoped;
 
-    IdxCollider vertCollider = VertCollider(start);
+    BuildVertCollider(start);
 
-    if (vertCollider.itr.empty()) {
+    if (collider_.itr.empty()) {
       PRINT("Empty poly");
       return;
     }
@@ -848,7 +869,7 @@ class EarClip {
     earsQueue_.clear();
 
     auto QueueVert = [&](VertItr v) {
-      ProcessEar(v, vertCollider);
+      ProcessEar(v, collider_);
       ++numTri;
       v->PrintVert();
     };
@@ -871,8 +892,8 @@ class EarClip {
       ClipEar(v);
       --numTri;
 
-      ProcessEar(v->left, vertCollider);
-      ProcessEar(v->right, vertCollider);
+      ProcessEar(v->left, collider_);
+      ProcessEar(v->right, collider_);
       // This is a backup vert that is used if the queue is empty (geometrically
       // invalid polygon), to ensure manifoldness.
       v = v->right;
@@ -907,30 +928,11 @@ class EarClip {
 #endif
   }
 };
-}  // namespace
 
-namespace manifold {
-
-/**
- * @brief Triangulates a set of &epsilon;-valid polygons. If the input is not
- * &epsilon;-valid, the triangulation may overlap, but will always return a
- * manifold result that matches the input edge directions.
- *
- * @param polys The set of polygons, wound CCW and representing multiple
- * polygons and/or holes. These have 2D-projected positions as well as
- * references back to the original vertices.
- * @param epsilon The value of &epsilon;, bounding the uncertainty of the
- * input.
- * @param allowConvex If true (default), the triangulator will use a fast
- * triangulation if the input is convex, falling back to ear-clipping if not.
- * The triangle quality may be lower, so set to false to disable this
- * optimization.
- * @return HalfedgeTriangulation The contour and triangle halfedges,
- * referencing the original vertex indicies.
- */
-HalfedgeTriangulation TriangulateIdxHalfedges(const PolygonsIdx& polys,
-                                              double epsilon,
-                                              bool allowConvex) {
+template <typename GetTriangulator>
+HalfedgeTriangulation TriangulateIdxHalfedgesImpl(
+    const PolygonsIdx& polys, double epsilon, bool allowConvex,
+    GetTriangulator getTriangulator) {
   HalfedgeTriangulation result;
   double updatedEpsilon = epsilon;
 #ifdef MANIFOLD_DEBUG
@@ -939,8 +941,8 @@ HalfedgeTriangulation TriangulateIdxHalfedges(const PolygonsIdx& polys,
     if (allowConvex && IsConvex(polys, epsilon)) {  // fast path
       result = TriangulateConvex(polys);
     } else {
-      EarClip triangulator(polys, epsilon);
-      result = triangulator.Triangulate();
+      auto& triangulator = getTriangulator();
+      result = triangulator.Triangulate(polys, epsilon);
       updatedEpsilon = triangulator.GetPrecision();
     }
     result.epsilon = updatedEpsilon;
@@ -967,6 +969,60 @@ HalfedgeTriangulation TriangulateIdxHalfedges(const PolygonsIdx& polys,
   }
 #endif
   return result;
+}
+}  // namespace
+
+namespace manifold {
+
+struct PolygonTriangulator::Impl {
+  EarClip earClip;
+};
+
+PolygonTriangulator::PolygonTriangulator() = default;
+
+PolygonTriangulator::~PolygonTriangulator() = default;
+
+HalfedgeTriangulation PolygonTriangulator::Triangulate(const PolygonsIdx& polys,
+                                                       double epsilon) {
+  if (!impl_) impl_ = std::make_unique<Impl>();
+  return impl_->earClip.Triangulate(polys, epsilon);
+}
+
+double PolygonTriangulator::GetPrecision() const {
+  return impl_->earClip.GetPrecision();
+}
+
+/**
+ * @brief Triangulates epsilon-valid polygons. Invalid input can produce
+ * overlapping output that remains manifold and follows input edge directions.
+ *
+ * @param polys The set of polygons, wound CCW and representing multiple
+ * polygons and/or holes. These have 2D-projected positions as well as
+ * references back to the original vertices.
+ * @param epsilon The value of &epsilon;, bounding the uncertainty of the
+ * input.
+ * @param allowConvex If true (default), the triangulator will use a fast
+ * triangulation if the input is convex, falling back to ear-clipping if not.
+ * The triangle quality may be lower, so set to false to disable this
+ * optimization.
+ * @return HalfedgeTriangulation The contour and triangle halfedges,
+ * referencing the original vertex indices.
+ */
+HalfedgeTriangulation TriangulateIdxHalfedges(const PolygonsIdx& polys,
+                                              double epsilon,
+                                              bool allowConvex) {
+  std::optional<EarClip> triangulator;
+  return TriangulateIdxHalfedgesImpl(
+      polys, epsilon, allowConvex,
+      [&]() -> EarClip& { return triangulator.emplace(); });
+}
+
+HalfedgeTriangulation TriangulateIdxHalfedges(
+    const PolygonsIdx& polys, double epsilon, bool allowConvex,
+    PolygonTriangulator& triangulator) {
+  return TriangulateIdxHalfedgesImpl(
+      polys, epsilon, allowConvex,
+      [&]() -> PolygonTriangulator& { return triangulator; });
 }
 
 std::vector<ivec3> TriangulateIdx(const PolygonsIdx& polys, double epsilon,
