@@ -1160,6 +1160,29 @@ TEST(Manifold, Merge) {
   CheckCube(cubeSTL);
 }
 
+TEST(Manifold, MergeCollapsedEdgeParity) {
+  MeshGL mesh;
+  mesh.vertProperties = {0, 0, 0,  //
+                         0, 0, 0,  //
+                         1, 0, 0,  //
+                         3, 0, 0,  //
+                         3, 0, 0,  //
+                         4, 0, 0};
+  mesh.mergeFromVert = {1, 4};
+  mesh.mergeToVert = {0, 3};
+
+  // These triangles collapse to (0, 0, 2) and (3, 3, 5). Their opposing
+  // non-degenerate edges cancel, leaving one self-edge per triangle. Two
+  // copies of each triangle cancel those self-edges as well.
+  mesh.triVerts = {0, 1, 2, 0, 1, 2, 3, 4, 5, 3, 4, 5};
+  EXPECT_FALSE(mesh.Merge());
+
+  mesh.triVerts = {0, 1, 2, 3, 4, 5};
+  EXPECT_TRUE(mesh.Merge());
+  EXPECT_EQ(mesh.mergeFromVert, (std::vector<uint32_t>{1, 4}));
+  EXPECT_EQ(mesh.mergeToVert, (std::vector<uint32_t>{0, 3}));
+}
+
 TEST(Manifold, MergeEmpty) {
   MeshGL shape;
   shape.numProp = 7;
