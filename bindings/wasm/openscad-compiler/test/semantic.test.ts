@@ -44,7 +44,8 @@ function getAllFiles(dir: string): string[] {
 
 function readPrecomputedEcho(scadPath: string): string[] {
   const echoDir = path.resolve(__dirname, 'echo-results');
-  const relPath = path.relative(path.resolve(__dirname, 'examples/echo'), scadPath);
+  const relPath =
+      path.relative(path.resolve(__dirname, 'examples/echo'), scadPath);
   const echoPath = path.join(echoDir, relPath.replace(/\.scad$/, '.echo'));
   if (!existsSync(echoPath)) {
     throw new Error(`No precomputed echo file at ${echoPath}`);
