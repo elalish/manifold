@@ -627,7 +627,7 @@ jobs:
         IMAGEBASEPATH: ${{ github.workspace }}/bindings/wasm/openscad-compiler/bundle/images
       run: |
         cd bindings/wasm/openscad-compiler
-        npm ci
+        npm i
         npm test
 
   determinism_check:
