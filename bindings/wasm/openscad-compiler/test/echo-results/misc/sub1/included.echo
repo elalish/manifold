@@ -1,0 +1,3 @@
+WARNING: Can't find include file 'not_exist.scad'. in file test/examples/echo/misc/sub1/included.scad, line 3
+ECHO: "included.scad"
+ECHO: "included2.scad"

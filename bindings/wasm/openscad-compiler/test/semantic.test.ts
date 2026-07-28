@@ -1,7 +1,6 @@
 import fs from 'fs';
-import {execFileSync, execSync} from 'node:child_process';
-import {existsSync, mkdtempSync, readFileSync} from 'node:fs';
-import {tmpdir} from 'node:os';
+import {execFileSync} from 'node:child_process';
+import {existsSync, readFileSync} from 'node:fs';
 import path from 'path';
 import {describe, expect, test} from 'vitest';
 
@@ -16,7 +15,7 @@ describe('echo equality', () => {
   test.each(matchFiles)('%s', (scadPath) => {
     const tsPath = tsForMatch(scadPath);
     if (!existsSync(tsPath)) throw new Error(`No compiled file at ${tsPath}`);
-    const expected = normalize(runOpenscad(scadPath), 'openscad');
+    const expected = normalize(readPrecomputedEcho(scadPath), 'openscad');
     const actual = normalize(runCompiled(tsPath), 'ts');
     expect(actual.length).toBe(expected.length);
     expected.forEach((e, i) => expectEchoEqual(actual[i], e, i));
@@ -43,12 +42,14 @@ function getAllFiles(dir: string): string[] {
   return results;
 }
 
-function runOpenscad(scadPath: string): string[] {
-  const out = path.join(mkdtempSync(path.join(tmpdir(), 'scad-')), 'out.echo');
-  execFileSync(
-      'openscad', ['-o', out, '--backend=manifold', scadPath],
-      {stdio: 'ignore'});
-  return readFileSync(out, 'utf8').split(/\r?\n/);
+function readPrecomputedEcho(scadPath: string): string[] {
+  const echoDir = path.resolve(__dirname, 'echo-results');
+  const relPath = path.relative(path.resolve(__dirname, 'examples/echo'), scadPath);
+  const echoPath = path.join(echoDir, relPath.replace(/\.scad$/, '.echo'));
+  if (!existsSync(echoPath)) {
+    throw new Error(`No precomputed echo file at ${echoPath}`);
+  }
+  return readFileSync(echoPath, 'utf8').split(/\r?\n/);
 }
 
 function runCompiled(tsPath: string): string[] {

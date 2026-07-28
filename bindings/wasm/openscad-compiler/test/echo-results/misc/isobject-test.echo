@@ -1,0 +1,35 @@
+ECHO: "returning true"
+WARNING: Experimental builtin function 'is_object' is not enabled in file isobject-test.scad, line 2
+WARNING: Ignoring unknown function 'is_object' in file isobject-test.scad, line 2
+ECHO: undef
+ECHO: "--------"
+ECHO: "returning false"
+WARNING: Experimental builtin function 'is_object' is not enabled in file isobject-test.scad, line 5
+WARNING: Ignoring unknown function 'is_object' in file isobject-test.scad, line 5
+ECHO: undef
+WARNING: Experimental builtin function 'is_object' is not enabled in file isobject-test.scad, line 6
+WARNING: Ignoring unknown function 'is_object' in file isobject-test.scad, line 6
+ECHO: undef
+WARNING: Experimental builtin function 'is_object' is not enabled in file isobject-test.scad, line 7
+WARNING: Ignoring unknown function 'is_object' in file isobject-test.scad, line 7
+ECHO: undef
+WARNING: Experimental builtin function 'is_object' is not enabled in file isobject-test.scad, line 8
+WARNING: Ignoring unknown function 'is_object' in file isobject-test.scad, line 8
+ECHO: undef
+WARNING: Experimental builtin function 'is_object' is not enabled in file isobject-test.scad, line 9
+WARNING: Ignoring unknown function 'is_object' in file isobject-test.scad, line 9
+ECHO: undef
+WARNING: Experimental builtin function 'is_object' is not enabled in file isobject-test.scad, line 10
+WARNING: Ignoring unknown function 'is_object' in file isobject-test.scad, line 10
+ECHO: undef
+WARNING: Experimental builtin function 'is_object' is not enabled in file isobject-test.scad, line 11
+WARNING: Ignoring unknown function 'is_object' in file isobject-test.scad, line 11
+ECHO: undef
+ECHO: "--------"
+ECHO: "causing warnings:"
+WARNING: Experimental builtin function 'is_object' is not enabled in file isobject-test.scad, line 14
+WARNING: Ignoring unknown function 'is_object' in file isobject-test.scad, line 14
+ECHO: undef
+WARNING: Experimental builtin function 'is_object' is not enabled in file isobject-test.scad, line 15
+WARNING: Ignoring unknown function 'is_object' in file isobject-test.scad, line 15
+ECHO: undef
