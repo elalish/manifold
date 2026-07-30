@@ -116,7 +116,7 @@ class Partition {
     const int offset = interiorOffset - newVerts.size();
     size_t old = newVerts.size();
     newVerts.resize_nofill(vertBary.size());
-    std::iota(newVerts.begin() + old, newVerts.end(), old + offset);
+    std::iota(newVerts.begin() + old, newVerts.end(), interiorOffset);
 
     const int numTri = triVert.size();
     Vec<ivec3> newTriVert(numTri);

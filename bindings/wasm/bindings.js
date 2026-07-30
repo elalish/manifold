@@ -87,27 +87,23 @@ Module.setup = function() {
     return vec[0];
   }
 
-  function fillRuleToInt(fillRule) {
-    return fillRule == 'EvenOdd' ? 0 :
-        fillRule == 'NonZero'    ? 1 :
-        fillRule == 'Negative'   ? 3 :
-                                   /* Positive */ 2;
-  }
-
   function joinTypeToInt(joinType) {
-    return joinType == 'Round' ? 1 : joinType == 'Miter' ? 2 : /* Square */ 0;
+    return joinType == 'Round' ? 1 :
+        joinType == 'Miter'    ? 2 :
+        joinType == 'Bevel'    ? 3 :
+                                 /* Square */ 0;
   }
 
   // CrossSection methods
 
   const CrossSectionCtor = Module.CrossSection;
 
-  function cross(polygons, fillRule = 'Positive') {
+  function cross(polygons) {
     if (polygons instanceof CrossSectionCtor) {
       return polygons;
     } else {
       const polygonsVec = polygons2vec(polygons);
-      const cs = new CrossSectionCtor(polygonsVec, fillRuleToInt(fillRule));
+      const cs = new CrossSectionCtor(polygonsVec);
       disposePolygons(polygonsVec);
       return cs;
     }
@@ -164,8 +160,8 @@ Module.setup = function() {
         delta, joinTypeToInt(joinType), miterLimit, circularSegments);
   };
 
-  Module.CrossSection.prototype.simplify = function(epsilon = 1e-6) {
-    return this._Simplify(epsilon);
+  Module.CrossSection.prototype.simplify = function(tolerance = 0) {
+    return this._Simplify(tolerance);
   };
 
   Module.CrossSection.prototype.extrude = function(
@@ -205,7 +201,7 @@ Module.setup = function() {
   // Manifold methods
 
   Module.Manifold.prototype.smoothOut = function(
-      minSharpAngle = 60, minSmoothness = 0) {
+      minSharpAngle = 52.5, minSmoothness = 0) {
     return this._SmoothOut(minSharpAngle, minSmoothness);
   };
 
@@ -252,7 +248,7 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.calculateNormals = function(
-      normalIdx = 0, minSharpAngle = 60) {
+      normalIdx = 0, minSharpAngle = 52.5) {
     return this._CalculateNormals(normalIdx, minSharpAngle);
   };
 
@@ -317,15 +313,25 @@ Module.setup = function() {
 
   Module.Manifold.prototype.slice = function(height = 0.) {
     const polygonsVec = this._Slice(height);
-    const result = new CrossSectionCtor(polygonsVec, fillRuleToInt('Positive'));
+    const result = new CrossSectionCtor(polygonsVec);
     disposePolygons(polygonsVec);
     return result;
   };
 
   Module.Manifold.prototype.project = function() {
     const polygonsVec = this._Project();
-    const result = new CrossSectionCtor(polygonsVec, fillRuleToInt('Positive'));
+    const result = new CrossSectionCtor(polygonsVec);
     disposePolygons(polygonsVec);
+    return result;
+  };
+
+  Module.Manifold.prototype.windingNumber = function(points) {
+    const inVec = new Module.Vector_vec3();
+    for (const p of points) inVec.push_back(vararg2vec3([p]));
+    const outVec = this._WindingNumber(inVec);
+    inVec.delete();
+    const result = fromVec(outVec);
+    outVec.delete();
     return result;
   };
 
@@ -527,15 +533,15 @@ Module.setup = function() {
 
   // CrossSection Constructors
 
-  Module.CrossSection = function(polygons, fillRule = 'Positive') {
+  Module.CrossSection = function(polygons) {
     const polygonsVec = polygons2vec(polygons);
-    const cs = new CrossSectionCtor(polygonsVec, fillRuleToInt(fillRule));
+    const cs = new CrossSectionCtor(polygonsVec);
     disposePolygons(polygonsVec);
     return cs;
   };
 
-  Module.CrossSection.ofPolygons = function(polygons, fillRule = 'Positive') {
-    return new Module.CrossSection(polygons, fillRule);
+  Module.CrossSection.ofPolygons = function(polygons) {
+    return new Module.CrossSection(polygons);
   };
 
   Module.CrossSection.square = function(...args) {
@@ -567,7 +573,6 @@ Module.setup = function() {
     };
   }
 
-  Module.CrossSection.compose = crossSectionBatchbool('Compose');
   Module.CrossSection.union = crossSectionBatchbool('UnionN');
   Module.CrossSection.difference = crossSectionBatchbool('DifferenceN');
   Module.CrossSection.intersection = crossSectionBatchbool('IntersectionN');
@@ -720,6 +725,40 @@ Module.setup = function() {
     }, 'di');
     const out =
         Module._LevelSet(wasmFuncPtr, bounds2, edgeLength, level, tolerance);
+    removeFunction(wasmFuncPtr);
+    return out;
+  };
+
+  // ctx-aware static factories: mirror Manifold.ofMesh / smooth / levelSet but
+  // run under this ExecutionContext so progress/cancellation are observed.
+  Module.ExecutionContext.prototype.fromMesh = function(mesh) {
+    return this._FromMesh(mesh);
+  };
+
+  Module.ExecutionContext.prototype.smooth = function(
+      mesh, sharpenedEdges = []) {
+    const sharp = new Module.Vector_smoothness();
+    toVec(sharp, sharpenedEdges);
+    const result = this._Smooth(mesh, sharp);
+    sharp.delete();
+    return result;
+  };
+
+  Module.ExecutionContext.prototype.levelSet = function(
+      sdf, bounds, edgeLength, level = 0, tolerance = -1) {
+    const bounds2 = {
+      min: {x: bounds.min[0], y: bounds.min[1], z: bounds.min[2]},
+      max: {x: bounds.max[0], y: bounds.max[1], z: bounds.max[2]},
+    };
+    const wasmFuncPtr = addFunction(function(vec3Ptr) {
+      const x = getValue(vec3Ptr, 'double');
+      const y = getValue(vec3Ptr + 8, 'double');
+      const z = getValue(vec3Ptr + 16, 'double');
+      const vert = [x, y, z];
+      return sdf(vert);
+    }, 'di');
+    const out =
+        this._LevelSet(wasmFuncPtr, bounds2, edgeLength, level, tolerance);
     removeFunction(wasmFuncPtr);
     return out;
   };

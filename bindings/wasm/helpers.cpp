@@ -115,13 +115,8 @@ Manifold Smooth(const val& mesh,
 }  // namespace js
 
 namespace cross_js {
-CrossSection OfPolygons(std::vector<std::vector<vec2>> polygons,
-                        int fill_rule) {
-  auto fr = fill_rule == 0   ? CrossSection::FillRule::EvenOdd
-            : fill_rule == 1 ? CrossSection::FillRule::NonZero
-            : fill_rule == 2 ? CrossSection::FillRule::Positive
-                             : CrossSection::FillRule::Negative;
-  return CrossSection(polygons, fr);
+CrossSection OfPolygons(std::vector<std::vector<vec2>> polygons) {
+  return CrossSection(polygons);
 }
 
 CrossSection Union(const CrossSection& a, const CrossSection& b) {
@@ -249,6 +244,26 @@ Manifold LevelSet(uintptr_t funcPtr, Box bounds, double edgeLength,
                   double level, double tolerance) {
   double (*f)(const vec3&) = reinterpret_cast<double (*)(const vec3&)>(funcPtr);
   return Manifold::LevelSet(f, bounds, edgeLength, level, tolerance, false);
+}
+
+// ctx-aware static factories: like the plain factories above, but run under an
+// ExecutionContext so progress / cancellation are observed (these ops have no
+// source Manifold to attach via withContext). Bound as ExecutionContext methods
+// (first arg is the receiver).
+Manifold ExecutionContextFromMesh(ExecutionContext& ctx, const val& mesh) {
+  return ctx.FromMeshGL(js::MeshJS2GL(mesh));
+}
+
+Manifold ExecutionContextSmooth(ExecutionContext& ctx, const val& mesh,
+                                const std::vector<Smoothness>& sharpenedEdges) {
+  return ctx.Smooth(js::MeshJS2GL(mesh), sharpenedEdges);
+}
+
+Manifold ExecutionContextLevelSet(ExecutionContext& ctx, uintptr_t funcPtr,
+                                  Box bounds, double edgeLength, double level,
+                                  double tolerance) {
+  double (*f)(const vec3&) = reinterpret_cast<double (*)(const vec3&)>(funcPtr);
+  return ctx.LevelSet(f, bounds, edgeLength, level, tolerance, false);
 }
 
 std::string ErrorToString(Manifold::Error error) {

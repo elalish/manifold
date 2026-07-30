@@ -16,7 +16,7 @@
  * @primaryExport
  */
 
-import {Box, ErrorStatus, ExecutionContext, FillRule, JoinType, Mat3, Mat4, Polygons, RayHit, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
+import {Box, ErrorStatus, ExecutionContext, JoinType, Mat3, Mat4, Polygons, RayHit, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
 
 export {ExecutionContext} from './manifold-global-types';
 
@@ -93,12 +93,10 @@ export function resetToCircularDefaults(): void;
 
 /**
  * Two-dimensional cross sections guaranteed to be without self-intersections,
- * or overlaps between polygons (from construction onwards). This class makes
- * use of the Clipper2 library for polygon clipping (boolean) and offsetting
- * operations.
+ * or overlaps between polygons (from construction onwards). Polygon clipping
+ * (boolean) and offsetting use Manifold's own robust floating-point predicates.
  *
  * @see {@link https://manifoldcad.org/docs/html/classmanifold_1_1_cross_section.html | C++ API: CrossSection Class Reference}
- * @see {@link https://www.angusj.com/clipper2/Docs/Overview.htm | Clipper2 - Polygon Clipping Offsetting & Triangulating}
  * @group Basics
  */
 export class CrossSection {
@@ -110,11 +108,9 @@ export class CrossSection {
    *
    * @param contours A set of closed paths describing zero or more complex
    * polygons.
-   * @param fillRule The filling rule used to interpret polygon sub-regions in
-   * contours.
    * @group Basics
    */
-  constructor(contours: Polygons, fillRule?: FillRule);
+  constructor(contours: Polygons);
 
   // Shapes
 
@@ -264,22 +260,27 @@ export class CrossSection {
 
   /**
    * Remove vertices from the contours in this CrossSection that are less than
-   * the specified distance epsilon from an imaginary line that passes through
+   * the specified distance tolerance from an imaginary line that passes through
    * its two adjacent vertices. Near duplicate vertices and collinear points
-   * will be removed at lower epsilons, with elimination of line segments
-   * becoming increasingly aggressive with larger epsilons.
+   * will be removed at lower tolerances, with elimination of line segments
+   * becoming increasingly aggressive with larger tolerances.
    *
    * It is recommended to apply this function following Offset, in order to
    * clean up any spurious tiny line segments introduced that do not improve
    * quality in any meaningful way. This is particularly important if further
    * offseting operations are to be performed, which would compound the issue.
    *
-   * @param epsilon minimum distance vertices must diverge from the hypothetical
-   *     outline without them in order to be included in the output (default
-   *     1e-6)
+   * @param tolerance minimum distance vertices must diverge from the
+   *     hypothetical outline without them in order to be included in the
+   *     output. Default 0 uses the cross-section's own tolerance (from
+   *     tolerance()), which is geometry-scale-derived and may be larger than a
+   *     fixed epsilon for large-coordinate geometry. Pass an explicit value to
+   *     override.
    * @group Transformations
    */
-  simplify(epsilon?: number): CrossSection;
+  simplify(tolerance?: number): CrossSection;
+  tolerance(): number;
+  setTolerance(tolerance: number): CrossSection;
 
   // Clipping Operations
 
@@ -357,13 +358,6 @@ export class CrossSection {
   // Topological Operations
 
   /**
-   * Construct a CrossSection from a vector of other Polygons (batch
-   * boolean union).
-   * @group Boolean
-   */
-  static compose(polygons: readonly(CrossSection|Polygons)[]): CrossSection;
-
-  /**
    * This operation returns a vector of CrossSections that are topologically
    * disconnected, each containing one outline contour with zero or more
    * holes.
@@ -381,11 +375,9 @@ export class CrossSection {
    *
    * @param contours A set of closed paths describing zero or more complex
    * polygons.
-   * @param fillRule The filling rule used to interpret polygon sub-regions in
-   * contours.
    * @group Input & Output
    */
-  static ofPolygons(contours: Polygons, fillRule?: FillRule): CrossSection;
+  static ofPolygons(contours: Polygons): CrossSection;
 
   /**
    * Return the contours of this CrossSection as a list of simple polygons.
@@ -752,7 +744,7 @@ export class Manifold {
    * interpolate the surface. This version uses the geometry of the triangles
    * and pseudo-normals to define the tangent vectors.
    *
-   * @param minSharpAngle degrees, default 60. Any edges with angles greater
+   * @param minSharpAngle degrees, default 52.5. Any edges with angles greater
    * than this value will remain sharp. The rest will be smoothed to G1
    * continuity, with the caveat that flat faces of three or more triangles will
    * always remain flat. With a value of zero, the model is faceted, but in this
@@ -1161,6 +1153,20 @@ export class Manifold {
    * @group Spatial Queries
    */
   rayCast(origin: Vec3, endpoint: Vec3): RayHit[];
+
+  /**
+   * Returns the winding number of this manifold around each of the given
+   * points. Returns 0 for points outside and a non-zero value (typically ±1)
+   * for points inside a simple closed surface. May exceed ±1 in magnitude for
+   * manifolds with overlapping regions.
+   *
+   * @param points The 3D query points.
+   *
+   * @group Spatial Queries
+   */
+  windingNumber(points: Vec3[]): number[];
+
+
 
   /**
    * Returns the reason for an input Mesh producing an empty Manifold. This

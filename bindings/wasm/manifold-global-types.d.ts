@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Type-only import for the ctx-aware factories on ExecutionContext below.
+import type {Manifold, Mesh} from './manifold-encapsulated-types';
+
 /**
  * @inline
  * @hidden
@@ -109,9 +112,7 @@ export type RayHit = {
   normal: Vec3
 };
 
-export type FillRule = 'EvenOdd'|'NonZero'|'Positive'|'Negative';
-
-export type JoinType = 'Square'|'Round'|'Miter';
+export type JoinType = 'Square'|'Round'|'Miter'|'Bevel';
 
 /**
  * @see {@link Manifold.status}
@@ -144,6 +145,19 @@ export interface ExecutionContext {
    * complete -- e.g. a single-leaf manifold has nothing to evaluate).
    */
   progress(): number;
+
+  // ctx-aware static factories: like Manifold.ofMesh / smooth / levelSet, but
+  // run under this context so progress / cancellation are observed (these ops
+  // have no source Manifold to attach via Manifold.withContext).
+
+  /** Like {@link Manifold.ofMesh}, observed/cancellable via this context. */
+  fromMesh(mesh: Mesh): Manifold;
+  /** Like {@link Manifold.smooth}, observed/cancellable via this context. */
+  smooth(mesh: Mesh, sharpenedEdges?: readonly Smoothness[]): Manifold;
+  /** Like {@link Manifold.levelSet}, observed/cancellable via this context. */
+  levelSet(
+      sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
+      level?: number, tolerance?: number): Manifold;
 
   // Memory
 

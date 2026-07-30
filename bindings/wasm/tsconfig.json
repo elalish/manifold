@@ -27,10 +27,10 @@
   ],
   "files": [
     "./types/manifoldCAD.d.ts",
-    "./types/manifoldCADGlobals.d.ts"
+    "./types/manifoldCADGlobals.d.ts",
+    "./types/manifoldCADUserGuide.d.ts"
   ],
   "exclude": [
     "./lib/*.test.ts"
   ]
 }
-

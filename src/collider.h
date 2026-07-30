@@ -306,7 +306,7 @@ class Collider {
     ZoneScoped;
     DEBUG_ASSERT(IsAxisAligned(transform), userErr,
                  "transform must be axis-aligned");
-    for_each(autoPolicy(nodeBBox_.size()), countAt(0),
+    for_each(autoPolicy(nodeBBox_.size()), countAt(0_uz),
              countAt(nodeBBox_.size()), [&transform, this](size_t i) {
                nodeBBox_[i] = nodeBBox_[i].Transform(transform);
              });

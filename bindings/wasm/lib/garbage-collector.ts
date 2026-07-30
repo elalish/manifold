@@ -65,13 +65,14 @@ const manifoldMemberFunctions = [
 
 // CrossSection static methods (that return a new cross-section)
 const crossSectionStaticFunctions = [
-  'square', 'circle', 'union', 'difference', 'intersection', 'compose',
-  'ofPolygons', 'hull'
+  'square', 'circle', 'union', 'difference', 'intersection', 'ofPolygons',
+  'hull'
 ];
 // CrossSection member functions (that return a new cross-section)
 const crossSectionMemberFunctions = [
   'add', 'subtract', 'intersect', 'rectClip', 'decompose', 'transform',
-  'translate', 'rotate', 'scale', 'mirror', 'simplify', 'offset', 'hull'
+  'translate', 'rotate', 'scale', 'mirror', 'simplify', 'setTolerance',
+  'offset', 'hull'
 ];
 
 /**

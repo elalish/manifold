@@ -17,9 +17,7 @@
 #include <algorithm>
 
 #include "../src/execution_impl.h"
-#ifdef MANIFOLD_CROSS_SECTION
 #include "manifold/cross_section.h"
-#endif
 #include "test.h"
 
 namespace {
@@ -429,8 +427,11 @@ TEST(Manifold, GetNormalLegacyContract) {
         la::inverse(la::transpose(mat3(gl_legacy.GetRunTransform(run)))) *
         (gl_legacy.Backside(run) ? -1.0 : 1.0);
     const mat3 inv = la::inverse(fwd);
-    for (uint32_t* itr = &gl_legacy.triVerts[gl_legacy.runIndex[run]];
-         itr < &gl_legacy.triVerts[gl_legacy.runIndex[run + 1]]; ++itr) {
+    // `data() + i` rather than `&v[i]`: the latter is UB when `i == size()`
+    // (one-past-the-end of the final run) and traps under libc++ fast
+    // hardening - see #1735.
+    for (uint32_t* itr = gl_legacy.triVerts.data() + gl_legacy.runIndex[run];
+         itr < gl_legacy.triVerts.data() + gl_legacy.runIndex[run + 1]; ++itr) {
       const uint32_t v = *itr;
       if (visited[v]) continue;
       visited[v] = true;
@@ -813,14 +814,12 @@ TEST(Manifold, Revolve2) {
   EXPECT_NEAR(donutHole.SurfaceArea(), 96.0 * kPi, 1.0);
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Manifold, Revolve3) {
   CrossSection circle = CrossSection::Circle(1, 32);
   Manifold sphere = Manifold::Revolve(circle.ToPolygons(), 32);
   EXPECT_NEAR(sphere.Volume(), 4.0 / 3.0 * kPi, 0.1);
   EXPECT_NEAR(sphere.SurfaceArea(), 4 * kPi, 0.15);
 }
-#endif
 
 TEST(Manifold, RevolveClip) {
   Polygons polys = {{{-5, -10}, {5, 0}, {-5, 10}}};
@@ -860,7 +859,6 @@ TEST(Manifold, PartialRevolveOffset) {
   }
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Manifold, Warp) {
   CrossSection square = CrossSection::Square({1, 1});
   Manifold shape =
@@ -895,7 +893,6 @@ TEST(Manifold, Warp2) {
   EXPECT_NEAR(shape.SurfaceArea(), simplified.SurfaceArea(), 0.0001);
   EXPECT_NEAR(shape.Volume(), 321, 1);
 }
-#endif
 
 TEST(Manifold, WarpBatch) {
   Manifold cube = Manifold::Cube({2, 3, 4});
@@ -921,7 +918,6 @@ TEST(Manifold, WarpBatch) {
   EXPECT_EQ(shape1.SurfaceArea(), shape2.SurfaceArea());
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Manifold, Project) {
   MeshGL input;
   input.numProp = 3;
@@ -1006,7 +1002,6 @@ TEST(Manifold, Project) {
   CrossSection projected = in.Project();
   EXPECT_NEAR(projected.Area(), 0.72, 0.01);
 }
-#endif
 
 /**
  * Testing more advanced Manifold operations.
@@ -1037,7 +1032,6 @@ TEST(Manifold, Transform) {
   Identical(cube.GetMeshGL(), cube2.GetMeshGL());
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Manifold, Slice) {
   Manifold cube = Manifold::Cube();
   CrossSection bottom = cube.Slice();
@@ -1062,7 +1056,6 @@ TEST(Manifold, Simplify) {
 
   if (options.exportModels) WriteTestOBJ("torus.obj", simplified);
 }
-#endif
 
 TEST(Manifold, MeshID) {
   const Manifold cube = Manifold::Cube();
@@ -1165,6 +1158,29 @@ TEST(Manifold, Merge) {
   EXPECT_TRUE(cubeSTL.Merge());
   EXPECT_EQ(cubeSTL.mergeFromVert.size(), 28);
   CheckCube(cubeSTL);
+}
+
+TEST(Manifold, MergeCollapsedEdgeParity) {
+  MeshGL mesh;
+  mesh.vertProperties = {0, 0, 0,  //
+                         0, 0, 0,  //
+                         1, 0, 0,  //
+                         3, 0, 0,  //
+                         3, 0, 0,  //
+                         4, 0, 0};
+  mesh.mergeFromVert = {1, 4};
+  mesh.mergeToVert = {0, 3};
+
+  // These triangles collapse to (0, 0, 2) and (3, 3, 5). Their opposing
+  // non-degenerate edges cancel, leaving one self-edge per triangle. Two
+  // copies of each triangle cancel those self-edges as well.
+  mesh.triVerts = {0, 1, 2, 0, 1, 2, 3, 4, 5, 3, 4, 5};
+  EXPECT_FALSE(mesh.Merge());
+
+  mesh.triVerts = {0, 1, 2, 3, 4, 5};
+  EXPECT_TRUE(mesh.Merge());
+  EXPECT_EQ(mesh.mergeFromVert, (std::vector<uint32_t>{1, 4}));
+  EXPECT_EQ(mesh.mergeToVert, (std::vector<uint32_t>{0, 3}));
 }
 
 TEST(Manifold, MergeEmpty) {
@@ -1276,7 +1292,6 @@ TEST(Manifold, MirrorUnion2) {
   EXPECT_TRUE(result.MatchesTriNormals());
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Manifold, Invalid) {
   auto invalid = Manifold::Error::InvalidConstruction;
   auto circ = CrossSection::Circle(10.);
@@ -1294,7 +1309,6 @@ TEST(Manifold, Invalid) {
   EXPECT_EQ(Manifold::Extrude(empty_circ.ToPolygons(), 10.).Status(), invalid);
   EXPECT_EQ(Manifold::Revolve(empty_sq.ToPolygons()).Status(), invalid);
 }
-#endif
 
 TEST(Manifold, MergeDegenerates) {
   MeshGL cube = Manifold::Cube(vec3(1), true).GetMeshGL();

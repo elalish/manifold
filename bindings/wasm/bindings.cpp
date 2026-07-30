@@ -86,12 +86,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .value("InvalidTangents", Manifold::Error::InvalidTangents)
       .value("Cancelled", Manifold::Error::Cancelled);
 
-  enum_<CrossSection::FillRule>("fillrule")
-      .value("EvenOdd", CrossSection::FillRule::EvenOdd)
-      .value("NonZero", CrossSection::FillRule::NonZero)
-      .value("Positive", CrossSection::FillRule::Positive)
-      .value("Negative", CrossSection::FillRule::Negative);
-
   enum_<CrossSection::JoinType>("jointype")
       .value("Square", CrossSection::JoinType::Square)
       .value("Round", CrossSection::JoinType::Round)
@@ -115,7 +109,10 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .constructor<>()
       .function("cancel", &ExecutionContext::Cancel)
       .function("cancelled", &ExecutionContext::Cancelled)
-      .function("progress", &ExecutionContext::Progress);
+      .function("progress", &ExecutionContext::Progress)
+      .function("_FromMesh", &man_js::ExecutionContextFromMesh)
+      .function("_Smooth", &man_js::ExecutionContextSmooth)
+      .function("_LevelSet", &man_js::ExecutionContextLevelSet);
 
   register_vector<RayHit>("Vector_rayHit");
   register_vector<ivec3>("Vector_ivec3");
@@ -123,6 +120,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   register_vector<vec2>("Vector_vec2");
   register_vector<std::vector<vec2>>("Vector2_vec2");
   register_vector<double>("Vector_f64");
+  register_vector<int>("Vector_i32");
   register_vector<CrossSection>("Vector_crossSection");
   register_vector<Manifold>("Vector_manifold");
   register_vector<Smoothness>("Vector_smoothness");
@@ -146,6 +144,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("numContour", &CrossSection::NumContour)
       .function("_Bounds", &CrossSection::Bounds)
       .function("_Simplify", &CrossSection::Simplify)
+      .function("tolerance", &CrossSection::GetTolerance)
+      .function("setTolerance", &CrossSection::SetTolerance)
       .function("_Offset", &cross_js::Offset)
       .function("_ToPolygons", &CrossSection::ToPolygons)
       .function("hull",
@@ -154,14 +154,13 @@ EMSCRIPTEN_BINDINGS(whatever) {
   // CrossSection Static Methods
   function("_Square", &CrossSection::Square);
   function("_Circle", &CrossSection::Circle);
-  function("_crossSectionCompose", &CrossSection::Compose);
   function("_crossSectionUnionN", &cross_js::UnionN);
   function("_crossSectionDifferenceN", &cross_js::DifferenceN);
   function("_crossSectionIntersectionN", &cross_js::IntersectionN);
   function("_crossSectionCollectVertices", &cross_js::CollectVertices);
-  function(
-      "_crossSectionHullPoints",
-      select_overload<CrossSection(std::vector<vec2>)>(&CrossSection::Hull));
+  function("_crossSectionHullPoints",
+           select_overload<CrossSection(const std::vector<vec2>&)>(
+               &CrossSection::Hull));
 
   class_<Manifold>("Manifold")
       .constructor(&man_js::FromMeshJS)
@@ -209,6 +208,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("surfaceArea", &Manifold::SurfaceArea)
       .function("minGap", &Manifold::MinGap)
       .function("_RayCast", &man_js::RayCast)
+      .function("_WindingNumber", &Manifold::WindingNumber)
       .function("calculateCurvature", &Manifold::CalculateCurvature)
       .function("_CalculateNormals", &Manifold::CalculateNormals)
       .function("originalID", &Manifold::OriginalID)

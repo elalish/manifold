@@ -693,8 +693,11 @@ namespace manifold {
 Manifold::Impl Boolean3::Result(OpType op) const {
   ZoneScoped;
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
-  Timer assemble;
-  assemble.Start();
+  // Per-Result local timing baseline, kept off the shared ctx so concurrent
+  // booleans in a CSG tree don't clobber it; the uid tags each printed phase
+  // line so interleaved parallel output can be split apart. Replaces the old
+  // per-stage Timers.
+  LocalPhaseTiming phaseTiming = BeginLocalPhaseTiming();
 #endif
 
   DEBUG_ASSERT(expandP_ == (op == OpType::Add), logicErr,
@@ -752,7 +755,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     return inP_;
   }
 
-  auto phase = [&]() -> std::optional<Manifold::Impl> {
+  auto phase = [&](int line) -> std::optional<Manifold::Impl> {
     if (ctx_) ctx_->donePhases.fetch_add(1, std::memory_order_relaxed);
     ++balance.published;
     if (IsCancelled(ctx_)) {
@@ -760,12 +763,17 @@ Manifold::Impl Boolean3::Result(OpType op) const {
       impl.status_ = Manifold::Error::Cancelled;
       return impl;
     }
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+    // Record this boundary against the per-Result baseline; `line` is the call
+    // site so each phase reports its own location (the lambda body has one).
+    if (ctx_) RecordPhase(phaseTiming, balance.published, __FILE__, line);
+#endif
     return std::nullopt;
   };
 
   // Invariant: every ctx-passing parallel op is followed by IsCancelled to
   // keep partial output from feeding unconditional downstream consumers.
-  if (auto c = phase()) return *c;
+  if (auto c = phase(__LINE__)) return *c;
 
   if (!valid) {
     auto impl = Manifold::Impl();
@@ -836,7 +844,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
              DuplicateVerts({outR.vertPos_, i12, v12R, xv12_.v12}));
   for_each_n(autoPolicy(i21.size(), 1e4), countAt(0), i21.size(), ctx_,
              DuplicateVerts({outR.vertPos_, i21, v21R, xv21_.v12}));
-  if (auto c = phase()) return *c;
+  if (auto c = phase(__LINE__)) return *c;
 
   PRINT(nPv << " verts from inP");
   PRINT(nQv << " verts from inQ");
@@ -858,7 +866,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
                   0, ctx_);
   AddNewEdgeVerts(edgesQ, edgesNew, xv21_.p1q2, i21, v21R, inQ_.halfedge_,
                   false, xv12_.p1q2.size(), ctx_);
-  if (auto c = phase()) return *c;
+  if (auto c = phase(__LINE__)) return *c;
 
   v12R.clear();
   v21R.clear();
@@ -869,7 +877,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   std::tie(faceEdge, facePQ2R) =
       SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, xv12_.p1q2, xv21_.p1q2,
                  invertQ, ctx_);
-  if (auto c = phase()) return *c;
+  if (auto c = phase(__LINE__)) return *c;
 
   i12.clear();
   i21.clear();
@@ -894,14 +902,14 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   AppendPartialEdges(outR, faceHalfedges, wholeHalfedgeQ, facePtrR, edgesQ,
                      halfedgeRef, inQ_, i30, vQ2R,
                      facePQ2R.begin() + inP_.NumTri(), false, ctx_);
-  if (auto c = phase()) return *c;
+  if (auto c = phase(__LINE__)) return *c;
 
   edgesP.clear();
   edgesQ.clear();
 
   AppendNewEdges(outR, faceHalfedges, facePtrR, edgesNew, halfedgeRef, facePQ2R,
                  inP_.NumTri(), ctx_);
-  if (auto c = phase()) return *c;
+  if (auto c = phase(__LINE__)) return *c;
 
   edgesNew.clear();
 
@@ -911,7 +919,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   AppendWholeEdges(outR, facePtrR, faceHalfedges, halfedgeRef, inQ_,
                    wholeHalfedgeQ, i30, vQ2R,
                    facePQ2R.cview(inP_.NumTri(), inQ_.NumTri()), false, ctx_);
-  if (auto c = phase()) return *c;
+  if (auto c = phase(__LINE__)) return *c;
 
   wholeHalfedgeP.clear();
   wholeHalfedgeQ.clear();
@@ -922,12 +930,6 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   vP2R.clear();
   vQ2R.clear();
 
-#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
-  assemble.Stop();
-  Timer triangulate;
-  triangulate.Start();
-#endif
-
   // Level 6
   outR.Face2Tri(faceEdge, faceHalfedges, halfedgeRef, /*allowConvex=*/false,
                 ctx_);
@@ -936,23 +938,17 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   faceEdge.clear();
 
   outR.ReorderHalfedges(ctx_);
-  if (auto c = phase()) return *c;
-
-#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
-  triangulate.Stop();
-  Timer simplify;
-  simplify.Start();
-#endif
+  if (auto c = phase(__LINE__)) return *c;
 
   if (ManifoldParams().intermediateChecks)
     DEBUG_ASSERT(outR.IsManifold(), logicErr,
                  "triangulated mesh is not manifold!");
 
   CreateProperties(outR, inP_, inQ_, invertQ, ctx_);
-  if (auto c = phase()) return *c;
+  if (auto c = phase(__LINE__)) return *c;
 
   UpdateReference(outR, inP_, inQ_, invertQ, ctx_);
-  if (auto c = phase()) return *c;
+  if (auto c = phase(__LINE__)) return *c;
 
   outR.SimplifyTopology(nPv + nQv);
   outR.RemoveUnreferencedVerts();
@@ -961,26 +957,18 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     DEBUG_ASSERT(outR.Is2Manifold(), logicErr,
                  "simplified mesh is not 2-manifold!");
 
-#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
-  simplify.Stop();
-  Timer sort;
-  sort.Start();
-#endif
-
   outR.CalculateBBox();
   outR.SortGeometry(ctx_);
   outR.IncrementMeshIDs();
-  if (auto c = phase()) return *c;
+  if (auto c = phase(__LINE__)) return *c;
 
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
-  sort.Stop();
+  // Per-stage timing now comes from the phase() boundaries above (verbose >= 2,
+  // ctx attached); this keeps the result-size summary, tagged with the same uid
+  // so it groups with this boolean's phase lines.
   if (ManifoldParams().verbose >= 2) {
-    assemble.Print("Assembly");
-    triangulate.Print("Triangulation");
-    simplify.Print("Simplification");
-    sort.Print("Sorting");
-    std::cout << outR.NumVert() << " verts and " << outR.NumTri() << " tris"
-              << std::endl;
+    std::cout << "  [b" << phaseTiming.uid << "] " << outR.NumVert()
+              << " verts and " << outR.NumTri() << " tris" << std::endl;
   }
 #endif
 

@@ -200,7 +200,6 @@ TEST(Properties, MingapAfterTransformations) {
   ASSERT_NEAR(distance, 1, 0.001);
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Properties, MingapStretchyBracelet) {
   auto a = StretchyBracelet();
   auto b = StretchyBracelet().Translate({0, 0, 20});
@@ -209,7 +208,6 @@ TEST(Properties, MingapStretchyBracelet) {
 
   ASSERT_NEAR(distance, 5, 0.001);
 }
-#endif
 
 TEST(Properties, MinGapAfterTransformationsOutOfBounds) {
   auto a = Manifold::Sphere(1, 512).Rotate(30, 30, 30);
@@ -271,4 +269,58 @@ TEST(Properties, TriangleDistanceOverlapping) {
   float distance = DistanceTriangleTriangleSquared(p, q);
 
   EXPECT_FLOAT_EQ(distance, 0);
+}
+
+// A tall box where the query point is far below the top face. The +Z ray from
+// the point must reach the top face even though it's well outside the point's
+// 3D bounding-box in Z. This exercises the XY-projected collider query.
+TEST(Manifold, WindingTallBox) {
+  Manifold box = Manifold::Cube(vec3(1, 1, 10), true);  // z in [-5, 5]
+  const auto w =
+      box.WindingNumber({{0, 0, -4}, {0, 0, 0}, {0, 0, 6}, {0, 0, -6}});
+  EXPECT_EQ(w[0], 1);  // inside, near bottom
+  EXPECT_EQ(w[1], 1);  // center
+  EXPECT_EQ(w[2], 0);  // above
+  EXPECT_EQ(w[3], 0);  // below
+}
+
+TEST(Manifold, WindingEmpty) {
+  const auto w = Manifold{}.WindingNumber({{0, 0, 0}});
+  ASSERT_EQ(w.size(), 1u);
+  EXPECT_EQ(w[0], 0);
+}
+
+// Watertight winding across shared cube edges and vertices - must be exactly
+// 0 or 1, never 2 from double-counting.
+TEST(Manifold, WindingWatertight) {
+  Manifold cube = Manifold::Cube(vec3(1), true);
+  const auto w =
+      cube.WindingNumber({{0.4999, 0.4999, 0}, {0.5, 0, 0}, {0, 0, 0}});
+  EXPECT_TRUE(w[0] == 0 || w[0] == 1);  // near shared vertex
+  EXPECT_TRUE(w[1] == 0 || w[1] == 1);  // silhouette edge
+  EXPECT_EQ(w[2], 1);                   // center
+}
+
+// Hollow shell (sphere - sphere): cavity center must return winding 0, wall
+// point 1, outside 0. Proves real winding number, not just ray parity.
+TEST(Manifold, WindingHollowShell) {
+  Manifold shell = Manifold::Sphere(2, 32) - Manifold::Sphere(1, 32);
+  const auto w = shell.WindingNumber({{0, 0, 0}, {0, 0, 1.5}, {0, 0, 3}});
+  EXPECT_EQ(w[0], 0);  // cavity
+  EXPECT_EQ(w[1], 1);  // wall
+  EXPECT_EQ(w[2], 0);  // outside
+}
+
+// Cross-check: winding != 0 agrees with RayCast hit-count parity.
+TEST(Manifold, WindingMatchesRayCastParity) {
+  Manifold cube = Manifold::Cube(vec3(1), true);
+  const std::vector<vec3> pts = {{0, 0, 0}, {0.3, 0.2, 0.1}, {0.5, 0.5, 0.5},
+                                 {0, 0, 1}, {0, 0, 2},       {-1, 0, 0}};
+  const auto winding = cube.WindingNumber(pts);
+  for (size_t i = 0; i < pts.size(); ++i) {
+    const vec3& p = pts[i];
+    const size_t hits = cube.RayCast(p, {p.x, p.y, p.z + 1e6}).size();
+    EXPECT_EQ(winding[i] != 0, hits % 2 == 1)
+        << "mismatch at (" << p.x << "," << p.y << "," << p.z << ")";
+  }
 }

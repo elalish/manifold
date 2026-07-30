@@ -14,6 +14,7 @@
 
 #pragma once
 #include <cmath>
+#include <functional>
 #include <limits>
 #include <memory>
 #include <vector>
@@ -27,6 +28,16 @@
 #include "linalg.h"
 
 namespace manifold {
+
+// Forward decls for ExecutionContext factory methods (full defs in
+// manifold.h / mesh.h).
+class Manifold;
+template <typename Precision, typename I = uint32_t>
+struct MeshGLP;
+using MeshGL = MeshGLP<float>;
+using MeshGL64 = MeshGLP<double, uint64_t>;
+struct Box;  // defined below; needed by ExecutionContext::LevelSet
+
 /** @addtogroup Math
  * @ingroup Core
  * @brief Simple math operations.
@@ -249,6 +260,31 @@ class ExecutionContext {
   /// evaluate, and `Progress()` called before any `Status(ctx)` reflects
   /// the same "no pending work" state).
   double Progress() const;
+
+  /// Eager ctx-aware `Manifold(MeshGL)`. The heavy ingest steps check
+  /// cancel and credit `Progress()` between phases. Precedence: a
+  /// Cancel() before this call wins over empty/malformed input;
+  /// validation errors win over a Cancel() that races in after that.
+  /// Concurrent calls on the same ctx produce undefined progress
+  /// values; the returned Manifolds remain valid.
+  Manifold FromMeshGL(const MeshGL& mesh);
+  Manifold FromMeshGL(const MeshGL64& mesh);
+
+  /// Eager ctx-aware `Manifold::Smooth(MeshGL[64])`. The ingest phases
+  /// plus the tangent-creation phases check cancel and credit
+  /// `Progress()` between phases. Same cancel-vs-validation precedence
+  /// as `FromMeshGL`.
+  Manifold Smooth(const MeshGL& mesh,
+                  const std::vector<Smoothness>& sharpenedEdges = {});
+  Manifold Smooth(const MeshGL64& mesh,
+                  const std::vector<Smoothness>& sharpenedEdges = {});
+
+  /// Eager ctx-aware `Manifold::LevelSet`. The voxel-sampling and
+  /// mesh-extraction phases check cancel and credit `Progress()` between
+  /// phases. A Cancel() before or during the call yields a Cancelled result.
+  Manifold LevelSet(std::function<double(vec3)> sdf, Box bounds,
+                    double edgeLength, double level = 0, double tolerance = -1,
+                    bool canParallel = true);
 
   /// @internal Opaque implementation. Defined in src/execution_impl.h;
   /// accessible only to internal code that includes that header.
@@ -588,6 +624,39 @@ struct Rect {
  * Intersect.
  */
 enum class OpType : char { Add, Subtract, Intersect };
+
+// Adapted from Clipper2 docs:
+// http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/JoinType.htm
+// (Copyright © 2010-2023 Angus Johnson)
+/**
+ * Specifies the treatment of path/contour joins (corners) when offseting
+ * CrossSections. See the [Clipper2
+ * doc](http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/JoinType.htm)
+ * for illustrations.
+ */
+enum class JoinType {
+  Square, /*!< Squaring is applied uniformly at all joins where the internal
+            join angle is less that 90 degrees. The squared edge will be at
+            exactly the offset distance from the join vertex. */
+  Round,  /*!< Rounding is applied to all joins that have convex external
+           angles, and it maintains the exact offset distance from the join
+           vertex. */
+  Miter,  /*!< There's a necessary limit to mitered joins (to avoid narrow
+           angled joins producing excessively long and narrow
+           [spikes](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)).
+           So where mitered joins would exceed a given maximum miter distance
+           (relative to the offset distance), these are 'squared' instead. */
+  Bevel   /*!< Bevelled joins are similar to 'squared' joins except that
+           squaring won't occur at a fixed distance. While bevelled joins may
+           not be as pretty as squared joins, bevelling is much easier (ie
+           faster) than squaring. And perhaps this is why bevelling rather
+           than squaring is preferred in numerous graphics display formats
+           (including
+           [SVG](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-linejoin)
+           and
+           [PDF](https://helpx.adobe.com/indesign/using/applying-line-stroke-settings.html)
+           document formats). */
+};
 
 constexpr int DEFAULT_SEGMENTS = 0;
 constexpr double DEFAULT_ANGLE = 10.0;

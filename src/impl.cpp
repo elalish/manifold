@@ -15,6 +15,7 @@
 #include "impl.h"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <cstdio>
 #include <cstdlib>
@@ -78,14 +79,6 @@ double FromChars(T buffer) {
 }  // namespace
 
 namespace manifold {
-
-#if (MANIFOLD_PAR == 1)
-#if (TBB_VERSION_MAJOR < 2021)
-tbb::task_arena gc_arena(1, 1);
-#else
-tbb::task_arena gc_arena(1, 1, tbb::task_arena::priority::low);
-#endif
-#endif
 
 std::atomic<uint32_t> Manifold::Impl::meshIDCounter_(1);
 
@@ -821,15 +814,14 @@ static std::ostream& WriteOBJWithEpsilon(std::ostream& stream,
     }
     stream << std::endl;
   }
-  std::vector<ivec3> triangles;
+  std::vector<std::array<uint64_t, 3>> triangles;
   triangles.reserve(mesh.NumTri());
   for (size_t i = 0; i < mesh.NumTri(); i++)
-    triangles.emplace_back(mesh.triVerts[3 * i] + 1,
-                           mesh.triVerts[3 * i + 1] + 1,
-                           mesh.triVerts[3 * i + 2] + 1);
+    triangles.push_back({mesh.triVerts[3 * i] + 1, mesh.triVerts[3 * i + 1] + 1,
+                         mesh.triVerts[3 * i + 2] + 1});
   sort(triangles.begin(), triangles.end());
   for (const auto& tri : triangles)
-    stream << "f " << tri.x << " " << tri.y << " " << tri.z << std::endl;
+    stream << "f " << tri[0] << " " << tri[1] << " " << tri[2] << std::endl;
   stream << "# ======== end mesh =======" << std::endl;
   return stream;
 }

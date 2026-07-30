@@ -97,7 +97,9 @@ void Quality::SetCircularSegments(int number) {
 int Quality::GetCircularSegments(double radius) {
   if (circularSegments_ > 0) return circularSegments_;
   int nSegA = 360.0 / circularAngle_;
-  int nSegL = 2.0 * std::abs(radius) * kPi / circularEdgeLength_;
+  // Keep nSegL a double so the truncating cast happens after fmin bounds it by
+  // nSegA; a raw int cast is undefined for non-finite or huge radius.
+  double nSegL = 2.0 * std::abs(radius) * kPi / circularEdgeLength_;
   int nSeg = fmin(nSegA, nSegL) + 3;
   nSeg -= nSeg % 4;
   return std::max(nSeg, 4);
@@ -144,6 +146,10 @@ Manifold Manifold::PropagateStatus(Error status) {
   auto pImpl = std::make_shared<Impl>();
   pImpl->status_ = status;
   return Manifold(pImpl);
+}
+
+Manifold Manifold::FromImpl(std::shared_ptr<Impl> pImpl) {
+  return Manifold(std::move(pImpl));
 }
 
 Manifold& Manifold::operator=(const Manifold& other) {
@@ -680,7 +686,7 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
 
 /**
  * Fills in vertex properties for normal vectors, calculated from the mesh
- * geometry. Flat faces composed of three or more triangles will remain flat.
+ * geometry.
  *
  * @param normalIdx The property channel in which to store the X values of the
  * normals. The X, Y, and Z channels will be sequential. The property set will
@@ -718,11 +724,9 @@ Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
  * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
  * geometry will remain unchanged until Refine, RefineToLength, or
  * RefineToTolerance is called to interpolate the surface. This version uses the
- * supplied vertex normal properties to define the tangent vectors. Faces of two
- * coplanar triangles will be marked as quads, while faces with three or more
- * will be flat. Zero-length normals are considered missing and will defer to
- * their neighboring normals instead. If all normals are missing, the vertex
- * pseudonormal will be used.
+ * supplied vertex normal properties to define the tangent vectors. Zero-length
+ * normals are considered missing and will defer to their neighboring normals
+ * instead. If all normals are missing, the vertex pseudonormal will be used.
  *
  * @param normalIdx The first property channel of the normals. NumProp must be
  * at least normalIdx + 3. Any vertex where multiple normals exist and don't
@@ -746,13 +750,13 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
  * geometry will remain unchanged until Refine, RefineToLength, or
  * RefineToTolerance is called to interpolate the surface. This version uses the
  * geometry of the triangles and pseudo-normals to define the tangent vectors.
- * Faces of two coplanar triangles will be marked as quads.
+ * Faces of two coplanar triangles will be marked as quads, while faces with
+ * three or more will be flat.
  *
- * @param minSharpAngle degrees, default 60. Any edges with angles greater than
- * this value will remain sharp. The rest will be smoothed to G1 continuity,
- * with the caveat that flat faces of three or more triangles will always remain
- * flat. With a value of zero, the model is faceted, but in this case there is
- * no point in smoothing.
+ * @param minSharpAngle degrees, default 52.5. Any edges with angles greater
+ * than this value will remain sharp. The rest will be smoothed to G1
+ * continuity. With a value of zero, the model is faceted, but in this case
+ * there is no point in smoothing.
  *
  * @param minSmoothness range: 0 - 1, default 0. The smoothness applied to sharp
  * angles. The default gives a hard edge, while values > 0 will give a small
@@ -765,19 +769,7 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
     return PropagateStatus(leafImpl->status_);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (!IsEmpty()) {
-    if (minSmoothness == 0) {
-      const int numProp = pImpl->numProp_;
-      Vec<double> properties = pImpl->properties_;
-      Halfedges halfedge(pImpl->halfedge_.ToData());
-      pImpl->SetNormals(0, minSharpAngle);
-      pImpl->CreateTangents(0);
-      // Reset the properties to the original values, removing temporary normals
-      pImpl->numProp_ = numProp;
-      pImpl->properties_ = std::move(properties);
-      pImpl->halfedge_ = std::move(halfedge);
-    } else {
-      pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
-    }
+    pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -1145,5 +1137,22 @@ double Manifold::MinGap(const Manifold& other, double searchLength) const {
  */
 std::vector<RayHit> Manifold::RayCast(vec3 origin, vec3 endpoint) const {
   return GetCsgLeafNode().GetImpl()->RayCast(origin, endpoint);
+}
+
+/**
+ * Returns the winding number of this manifold around each of the given points.
+ * Returns 0 for points outside, and a non-zero value (typically ±1) for points
+ * inside a simple closed surface. For manifolds with overlapping regions the
+ * magnitude may exceed 1.
+ *
+ * @param points The 3D query points.
+ */
+std::vector<int> Manifold::WindingNumber(
+    const std::vector<vec3>& points) const {
+  if (points.empty()) return {};
+  const auto impl = GetCsgLeafNode().GetImpl();
+  Vec<int> w =
+      impl->PointWinding(VecView<const vec3>(points.data(), points.size()));
+  return std::vector<int>(w.begin(), w.end());
 }
 }  // namespace manifold

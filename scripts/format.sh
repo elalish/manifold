@@ -21,7 +21,6 @@ find bindings/wasm/openscad-compiler \
   -not -path '*/node_modules/*' -not -path '*/dist/*' \
   -print0 | xargs -0 $CLANG_FORMAT -i &
 $CLANG_FORMAT -i src/*.{h,cpp} &
-$CLANG_FORMAT -i src/*/*.cpp &
 $CLANG_FORMAT -i include/manifold/*.h &
 
 black --quiet bindings/python/examples/*.py &

@@ -14,6 +14,7 @@
 
 #include <cmath>
 
+#include "execution_impl.h"
 #include "hashtable.h"
 #include "impl.h"
 #include "manifold/manifold.h"
@@ -468,12 +469,31 @@ namespace manifold {
 Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
                             double edgeLength, double level, double tolerance,
                             bool canParallel) {
+  auto pImpl = std::make_shared<Impl>();
+  pImpl->CreateLevelSet(sdf, bounds, edgeLength, level, tolerance, canParallel);
+  return Manifold(pImpl);
+}
+
+// Shared body of Manifold::LevelSet and ExecutionContext::LevelSet. Populates
+// this (empty) Impl. When ctx is non-null, the grid loops check cancel per
+// chunk and the ADVANCE_PHASE_OR_RETURN sites credit Progress(); their count
+// must equal kPhasesPerLevelSet (whose docstring enumerates the phases).
+void Manifold::Impl::CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
+                                    double edgeLength, double level,
+                                    double tolerance, bool canParallel,
+                                    ExecutionContext::Impl* ctx) {
+  // Pre-cancel wins over the (potentially large) voxel allocation and the
+  // sampling pass below.
+  if (IsCancelled(ctx)) {
+    MakeEmpty(Error::Cancelled);
+    return;
+  }
+
   if (tolerance <= 0) {
     tolerance = std::numeric_limits<double>::infinity();
   }
 
-  auto pImpl_ = std::make_shared<Impl>();
-  auto& vertPos = pImpl_->vertPos_;
+  auto& vertPos = vertPos_;
 
   const vec3 dim = bounds.Size();
   const ivec3 gridSize(dim / edgeLength + 1.0);
@@ -490,12 +510,15 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
 
   const vec3 origin = bounds.min;
   Vec<double> voxels(maxIndex);
+  // Per-chunk cancel only: a cancel cannot interrupt a single in-flight user
+  // sdf evaluation, same granularity as the other eager ops.
   for_each_n(
-      pol, countAt(0_uz), maxIndex,
+      pol, countAt(0_uz), maxIndex, ctx,
       [&voxels, sdf, level, origin, spacing, gridSize, gridPow](uint64_t idx) {
         voxels[idx] = BoundedSDF(DecodeIndex(idx, gridPow) - kVoxelOffset,
                                  origin, spacing, gridSize, level, sdf);
       });
+  ADVANCE_PHASE_OR_RETURN(ctx);
 
   const uint64_t tableSizeCap =
       static_cast<uint64_t>(std::numeric_limits<size_t>::max());
@@ -514,10 +537,17 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   while (1) {
     Vec<int> index(1, 0);
     for_each_n(pol, countAt(0_uz), EncodeIndex(ivec4(gridSize, 1), gridPow),
+               ctx,
                NearSurface({vertPos, index, gridVerts.D(), voxels, sdf, origin,
                             gridSize, gridPow, spacing, level, tolerance}));
 
     if (gridVerts.Full()) {  // Resize HashTable
+      // Skip the reallocation and the NearSurface re-run if cancel landed
+      // during this pass, before reading partial NearSurface output below.
+      if (IsCancelled(ctx)) {
+        MakeEmpty(Error::Cancelled);
+        return;
+      }
       const vec3 lastVert = vertPos[index[0] - 1];
       const uint64_t lastIndex =
           EncodeIndex(ivec4(ivec3((lastVert - origin) / spacing), 1), gridPow);
@@ -530,10 +560,13 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
       gridVerts = HashTable<GridVert>(tableSize);
       vertPos = Vec<vec3>(gridVerts.Size() * 7);
     } else {  // Success
+      // NearSurface counts as one phase regardless of resize iterations.
+      ADVANCE_PHASE_OR_RETURN(ctx);
       for_each_n(
-          pol, countAt(0), gridVerts.Size(),
+          pol, countAt(0), gridVerts.Size(), ctx,
           ComputeVerts({vertPos, index, gridVerts.D(), voxels, sdf, origin,
                         gridSize, gridPow, spacing, level, tolerance}));
+      ADVANCE_PHASE_OR_RETURN(ctx);
       vertPos.resize(index[0]);
       break;
     }
@@ -542,18 +575,28 @@ Manifold Manifold::LevelSet(std::function<double(vec3)> sdf, Box bounds,
   Vec<ivec3> triVerts(gridVerts.Entries() * 12);  // worst case
 
   Vec<int> index(1, 0);
-  for_each_n(pol, countAt(0), gridVerts.Size(),
+  for_each_n(pol, countAt(0), gridVerts.Size(), ctx,
              BuildTris({triVerts, index, gridVerts.D(), gridPow}));
+  ADVANCE_PHASE_OR_RETURN(ctx);
   triVerts.resize(index[0]);
 
-  pImpl_->CreateHalfedges(triVerts);
-  pImpl_->CleanupTopology();
-  pImpl_->RemoveUnreferencedVerts();
-  pImpl_->InitializeOriginal();
-  pImpl_->CalculateBBox();
-  pImpl_->SetEpsilon();
-  pImpl_->SortGeometry();
-  pImpl_->SetNormalsAndCoplanar();
-  return Manifold(pImpl_);
+  // Finalize, lumped as one phase. (This sequence differs from the
+  // Manifold(MeshGL) ingest pipeline; do not route through that.) SortGeometry
+  // is the heavy step, so it takes ctx for cancel responsiveness like the
+  // sibling ops; its contract then requires a cancel check before its
+  // partial-on-cancel output feeds an unconditional consumer.
+  CreateHalfedges(triVerts);
+  CleanupTopology();
+  RemoveUnreferencedVerts();
+  InitializeOriginal();
+  CalculateBBox();
+  SetEpsilon();
+  SortGeometry(ctx);
+  if (IsCancelled(ctx)) {
+    MakeEmpty(Error::Cancelled);
+    return;
+  }
+  SetNormalsAndCoplanar();
+  ADVANCE_PHASE_OR_RETURN(ctx);
 }
 }  // namespace manifold

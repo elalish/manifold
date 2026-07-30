@@ -194,6 +194,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   Vec<TriRef>& triRef = meshRelation_.triRef;
   triRef.clear();
   Vec<int> contour2Tri(faceHalfedge.size(), -1);
+  PolygonTriangulatorStore triangulators;
 
   auto generalTriangulation = [&](int face) {
     const vec3 normal = faceNormal_[face];
@@ -203,7 +204,8 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
                           faceHalfedge.cbegin() + faceEdge[face + 1],
                           faceEdge[face]),
         faceHalfedge, vertPos_, projection);
-    return TriangulateIdxHalfedges(polys, epsilon_, allowConvex);
+    return TriangulateIdxHalfedges(polys, epsilon_, allowConvex,
+                                   triangulators.local());
   };
 
   auto outputFace = [&](int face, size_t firstTri,
@@ -309,7 +311,7 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
   if (IsCancelled(ctx)) return;
 #else
   std::unordered_map<int, HalfedgeTriangulation> results;
-  for (size_t face = 0; face < faceEdge.size() - 1; ++face) {
+  for (int face = 0; face < static_cast<int>(faceEdge.size()) - 1; ++face) {
     if (IsCancelled(ctx)) return;
     const int numEdge = faceEdge[face + 1] - faceEdge[face];
     if (numEdge == 0) {

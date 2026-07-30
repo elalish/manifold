@@ -256,6 +256,66 @@ TEST(CBIND, level_set) {
   free(context);
 }
 
+TEST(CBIND, execution_context_factories) {
+  double (*sdf)(double, double, double, void*) = [](double x, double y,
+                                                    double z, void*) {
+    return 15.0 - sqrtf(x * x + y * y + z * z);
+  };
+  const double bb = 30;
+  ManifoldBox* bounds =
+      manifold_box(alloc_box_buffer(), -bb, -bb, -bb, bb, bb, bb);
+
+  // LevelSet under an ExecutionContext: runs to completion, progress hits 1.
+  ManifoldExecutionContext* ec =
+      manifold_execution_context(malloc(manifold_execution_context_size()));
+  ManifoldManifold* sdf_man = manifold_execution_context_level_set(
+      alloc_manifold_buffer(), ec, sdf, bounds, 0.5, 0, -1, NULL);
+  EXPECT_EQ(manifold_status(sdf_man), MANIFOLD_NO_ERROR);
+  EXPECT_FALSE(manifold_execution_context_cancelled(ec));
+  EXPECT_DOUBLE_EQ(manifold_execution_context_progress(ec), 1.0);
+
+  // FromMeshGL under an ExecutionContext: round-trip a cube's mesh.
+  ManifoldManifold* cube =
+      manifold_cube(alloc_manifold_buffer(), 2.0, 2.0, 2.0, 1);
+  ManifoldMeshGL* mesh = manifold_get_meshgl(alloc_meshgl_buffer(), cube);
+  ManifoldExecutionContext* ec2 =
+      manifold_execution_context(malloc(manifold_execution_context_size()));
+  ManifoldManifold* ingested =
+      manifold_execution_context_of_meshgl(alloc_manifold_buffer(), ec2, mesh);
+  EXPECT_EQ(manifold_status(ingested), MANIFOLD_NO_ERROR);
+  EXPECT_DOUBLE_EQ(manifold_execution_context_progress(ec2), 1.0);
+
+  // A pre-cancelled ctx must propagate through the factory. This is what
+  // distinguishes the ctx factory from the plain one: NoError + progress==1
+  // alone would also pass if the binding bypassed the ctx (a fresh ctx reads
+  // progress 1.0), so assert the cancel actually lands.
+  ManifoldExecutionContext* ec3 =
+      manifold_execution_context(malloc(manifold_execution_context_size()));
+  manifold_execution_context_cancel(ec3);
+  ManifoldManifold* cancelled = manifold_execution_context_level_set(
+      alloc_manifold_buffer(), ec3, sdf, bounds, 0.5, 0, -1, NULL);
+  EXPECT_EQ(manifold_status(cancelled), MANIFOLD_CANCELLED);
+
+  manifold_destruct_execution_context(ec);
+  manifold_destruct_execution_context(ec2);
+  manifold_destruct_execution_context(ec3);
+  manifold_destruct_manifold(sdf_man);
+  manifold_destruct_manifold(cube);
+  manifold_destruct_manifold(ingested);
+  manifold_destruct_manifold(cancelled);
+  manifold_destruct_meshgl(mesh);
+  manifold_destruct_box(bounds);
+  free(ec);
+  free(ec2);
+  free(ec3);
+  free(sdf_man);
+  free(bounds);
+  free(cube);
+  free(mesh);
+  free(ingested);
+  free(cancelled);
+}
+
 TEST(CBIND, level_set_64) {
   // can't convert lambda with captures to funptr
   double (*sdf)(double, double, double, void*) = [](double x, double y,
@@ -698,6 +758,29 @@ TEST(CBIND, run_flag_accessors) {
   free(cut);
   free(sphere);
   free(cube);
+}
+
+TEST(CBIND, cross_section_tolerance) {
+  void* buf = malloc(manifold_cross_section_size());
+
+  ManifoldCrossSection* sq = manifold_cross_section_square(buf, 10.0, 5.0, 0);
+  double tol = manifold_cross_section_get_tolerance(sq);
+  EXPECT_GT(tol, 0.0);
+
+  ManifoldCrossSection* tighter = manifold_cross_section_set_tolerance(
+      malloc(manifold_cross_section_size()), sq, tol * 0.5);
+  EXPECT_NEAR(manifold_cross_section_get_tolerance(tighter), tol, tol * 0.5);
+
+  ManifoldCrossSection* wider = manifold_cross_section_set_tolerance(
+      malloc(manifold_cross_section_size()), sq, tol * 2.0);
+  EXPECT_NEAR(manifold_cross_section_get_tolerance(wider), tol * 2.0, tol);
+
+  manifold_destruct_cross_section(sq);
+  manifold_destruct_cross_section(tighter);
+  manifold_destruct_cross_section(wider);
+  free(sq);
+  free(tighter);
+  free(wider);
 }
 
 // Smoke test for the manifold_alloc_* + manifold_delete_* pattern. The

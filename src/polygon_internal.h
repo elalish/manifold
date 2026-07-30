@@ -15,11 +15,16 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <unordered_map>
 #include <vector>
 
 #include "manifold/polygon.h"
 #include "shared.h"
+
+#if MANIFOLD_PAR == 1
+#include <tbb/combinable.h>
+#endif
 
 namespace manifold {
 
@@ -111,8 +116,49 @@ struct HalfedgeTriangulation {
   }
 };
 
+// Reuses ear-clipping scratch allocations across sequential calls.
+class PolygonTriangulator {
+ public:
+  PolygonTriangulator();
+  ~PolygonTriangulator();
+
+  PolygonTriangulator(const PolygonTriangulator&) = delete;
+  PolygonTriangulator& operator=(const PolygonTriangulator&) = delete;
+
+  HalfedgeTriangulation Triangulate(const PolygonsIdx& polys, double epsilon);
+  double GetPrecision() const;
+
+ private:
+  struct Impl;
+  std::unique_ptr<Impl> impl_;
+};
+
+// Supplies one reusable triangulator per worker in parallel builds and one per
+// operation in sequential builds.
+class PolygonTriangulatorStore {
+ public:
+  PolygonTriangulator& local() {
+#if MANIFOLD_PAR == 1
+    return store_.local();
+#else
+    return store_;
+#endif
+  }
+
+ private:
+#if MANIFOLD_PAR == 1
+  tbb::combinable<PolygonTriangulator> store_;
+#else
+  PolygonTriangulator store_;
+#endif
+};
+
 HalfedgeTriangulation TriangulateIdxHalfedges(const PolygonsIdx& polys,
                                               double epsilon = -1,
                                               bool allowConvex = true);
+
+HalfedgeTriangulation TriangulateIdxHalfedges(
+    const PolygonsIdx& polys, double epsilon, bool allowConvex,
+    PolygonTriangulator& triangulator);
 
 }  // namespace manifold

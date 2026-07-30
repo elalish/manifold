@@ -188,6 +188,7 @@ class Manifold {
   double Volume() const;
   double MinGap(const Manifold& other, double searchLength) const;
   std::vector<RayHit> RayCast(vec3 origin, vec3 endpoint) const;
+  std::vector<int> WindingNumber(const std::vector<vec3>& points) const;
   ///@}
 
   /** @name Mesh ID
@@ -245,7 +246,8 @@ class Manifold {
       int numProp,
       std::function<void(double*, vec3, const double*)> propFunc) const;
   Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
-  Manifold CalculateNormals(int normalIdx = 0, double minSharpAngle = 60) const;
+  Manifold CalculateNormals(int normalIdx = 0,
+                            double minSharpAngle = 52.5) const;
   ///@}
 
   /** @name Smoothing
@@ -257,7 +259,8 @@ class Manifold {
   Manifold RefineToLength(double) const;
   Manifold RefineToTolerance(double) const;
   Manifold SmoothByNormals(int normalIdx = 0) const;
-  Manifold SmoothOut(double minSharpAngle = 60, double minSmoothness = 0) const;
+  Manifold SmoothOut(double minSharpAngle = 52.5,
+                     double minSmoothness = 0) const;
   static Manifold Smooth(const MeshGL&,
                          const std::vector<Smoothness>& sharpenedEdges = {});
   static Manifold Smooth(const MeshGL64&,
@@ -322,6 +325,12 @@ class Manifold {
   ///@}
 
   struct Impl;
+
+  /// @internal Wrap a fully-built Impl into a leaf-node Manifold.
+  /// Caller is responsible for the invariants the public ctors enforce
+  /// (in particular, calling `MakeEmpty(status)` on error). Used by
+  /// ctx-aware static factories on `ExecutionContext`.
+  static Manifold FromImpl(std::shared_ptr<Impl> pImpl);
 
  private:
   Manifold(std::shared_ptr<CsgNode> pNode_);

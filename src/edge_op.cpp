@@ -739,7 +739,7 @@ void Manifold::Impl::SplitPinchedVerts() {
     // halfedges because it is thread local. This is why we need a vector to
     // deduplicate the probematic halfedges we found.
     std::vector<std::atomic<size_t>> largestEdge(NumVert());
-    for_each(ExecutionPolicy::Par, countAt(0), countAt(NumVert()),
+    for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(NumVert()),
              [&largestEdge](size_t i) {
                largestEdge[i].store(std::numeric_limits<size_t>::max());
              });

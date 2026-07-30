@@ -87,6 +87,33 @@ inline vec2 Interpolate(vec3 aL, vec3 aR, double x) {
 }
 
 /**
+ * Intersect two projected segments aL-aR and bL-bR. The segments are ordered
+ * over the same x interval, and their y gaps must bracket zero. The returned
+ * value is (x, y, a.z, b.z) at the crossing.
+ */
+inline vec4 Intersect(const vec3& aL, const vec3& aR, const vec3& bL,
+                      const vec3& bR) {
+  const double dyL = bL.y - aL.y;
+  const double dyR = bR.y - aR.y;
+  DEBUG_ASSERT(dyL * dyR <= 0, logicErr,
+               "Boolean manifold error: no intersection");
+  const bool useL = fabs(dyL) < fabs(dyR);
+  const double dx = aR.x - aL.x;
+  double lambda = (useL ? dyL : dyR) / (dyL - dyR);
+  if (!std::isfinite(lambda)) lambda = 0.0;
+  vec4 xyzz;
+  xyzz.x = lambda * dx + (useL ? aL.x : aR.x);
+  const double aDy = aR.y - aL.y;
+  const double bDy = bR.y - bL.y;
+  const bool useA = fabs(aDy) < fabs(bDy);
+  xyzz.y = lambda * (useA ? aDy : bDy) +
+           (useL ? (useA ? aL.y : bL.y) : (useA ? aR.y : bR.y));
+  xyzz.z = lambda * (aR.z - aL.z) + (useL ? aL.z : aR.z);
+  xyzz.w = lambda * (bR.z - bL.z) + (useL ? bL.z : bR.z);
+  return xyzz;
+}
+
+/**
  * `p < q` with symbolic perturbation: when `p == q` exactly, `dir < 0`
  * acts as the tiebreaker. Used to give consistent strict-ordering answers
  * regardless of which side of an FP equality we land on.

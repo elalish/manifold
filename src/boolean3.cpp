@@ -19,6 +19,7 @@
 
 #include "disjoint_sets.h"
 #include "parallel.h"
+#include "shared.h"
 
 #if (MANIFOLD_PAR == 1)
 #include <tbb/combinable.h>
@@ -27,30 +28,6 @@
 using namespace manifold;
 
 namespace {
-
-// `Intersect` stays local to the Boolean3 kernel cascade; the lower-level
-// symbolic perturbation primitives it uses live in shared.h.
-
-vec4 Intersect(const vec3& aL, const vec3& aR, const vec3& bL, const vec3& bR) {
-  const double dyL = bL.y - aL.y;
-  const double dyR = bR.y - aR.y;
-  DEBUG_ASSERT(dyL * dyR <= 0, logicErr,
-               "Boolean manifold error: no intersection");
-  const bool useL = fabs(dyL) < fabs(dyR);
-  const double dx = aR.x - aL.x;
-  double lambda = (useL ? dyL : dyR) / (dyL - dyR);
-  if (!std::isfinite(lambda)) lambda = 0.0;
-  vec4 xyzz;
-  xyzz.x = lambda * dx + (useL ? aL.x : aR.x);
-  const double aDy = aR.y - aL.y;
-  const double bDy = bR.y - bL.y;
-  const bool useA = fabs(aDy) < fabs(bDy);
-  xyzz.y = lambda * (useA ? aDy : bDy) +
-           (useL ? (useA ? aL.y : bL.y) : (useA ? aR.y : bR.y));
-  xyzz.z = lambda * (aR.z - aL.z) + (useL ? aL.z : aR.z);
-  xyzz.w = lambda * (bR.z - bL.z) + (useL ? bL.z : bR.z);
-  return xyzz;
-}
 
 struct FaceEdge {
   int edge;
@@ -387,7 +364,7 @@ Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   sequence(i12.begin(), i12.end());
 
   int index = forward ? 0 : 1;
-  stable_sort(i12.begin(), i12.end(), [&](int a, int b) {
+  stable_sort(i12.begin(), i12.end(), [&](auto a, auto b) {
     return p1q2[a][index] < p1q2[b][index] ||
            (p1q2[a][index] == p1q2[b][index] &&
             p1q2[a][1 - index] < p1q2[b][1 - index]);
@@ -422,7 +399,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   // keep partial output from feeding unconditional downstream consumers.
   DisjointSets uA(a.vertPos_.size());
   for_each(autoPolicy(a.halfedge_.size()), countAt(0),
-           countAt(a.halfedge_.size()), ctx, [&](int edge) {
+           countAt(static_cast<int>(a.halfedge_.size())), ctx, [&](int edge) {
              const int start = a.halfedge_.Start(edge);
              const int end = a.halfedge_.End(edge);
              if (start >= end) return;
@@ -437,14 +414,14 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   if (IsCancelled(ctx)) return Vec<int>{};
 
   // find components, the hope is the number of components should be small
-  std::unordered_set<int> components;
+  std::unordered_set<size_t> components;
 #if (MANIFOLD_PAR == 1)
   if (a.vertPos_.size() > 1e5) {
-    tbb::combinable<std::unordered_set<int>> componentsShared;
-    for_each(autoPolicy(a.vertPos_.size()), countAt(0),
+    tbb::combinable<std::unordered_set<size_t>> componentsShared;
+    for_each(autoPolicy(a.vertPos_.size()), countAt(0_uz),
              countAt(a.vertPos_.size()), ctx,
-             [&](int v) { componentsShared.local().insert(uA.find(v)); });
-    componentsShared.combine_each([&](const std::unordered_set<int>& data) {
+             [&](size_t v) { componentsShared.local().insert(uA.find(v)); });
+    componentsShared.combine_each([&](const std::unordered_set<size_t>& data) {
       components.insert(data.begin(), data.end());
     });
   } else
@@ -456,7 +433,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   if (IsCancelled(ctx)) return Vec<int>{};
   Vec<int> verts;
   verts.reserve(components.size());
-  for (int c : components) verts.push_back(c);
+  for (size_t c : components) verts.push_back(static_cast<int>(c));
 
   Vec<int> w03(a.NumVert(), 0);
   Kernel02<expandP, forward> k02{a, b};
@@ -471,7 +448,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   b.collider_.Collisions<false>(recorder, f, verts.size(), true, ctx);
   if (IsCancelled(ctx)) return Vec<int>{};
   // flood fill
-  for_each(autoPolicy(w03.size()), countAt(0), countAt(w03.size()), ctx,
+  for_each(autoPolicy(w03.size()), countAt(0_uz), countAt(w03.size()), ctx,
            [&](size_t i) {
              size_t root = uA.find(i);
              if (root == i) return;
@@ -573,6 +550,45 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   }
 #endif
 }
+Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
+  ZoneScoped;
+  Vec<int> winding(points.size(), 0);
+  if (points.empty() || IsEmpty()) return winding;
+
+  // Points outside the bounding box have winding 0 for any closed manifold.
+  Vec<int> query2input;
+  query2input.reserve(points.size());
+  for (size_t i = 0; i < points.size(); ++i)
+    if (bBox_.Contains(points[i])) query2input.push_back(static_cast<int>(i));
+  if (query2input.empty()) return winding;
+
+  // Build a minimal Impl for the query points. Kernel02 only reads vertPos_
+  // and vertNormal_ from inA; halfedges and faces are not accessed.
+  Impl pointImpl;
+  pointImpl.vertPos_.resize(query2input.size());
+  pointImpl.vertNormal_.resize(query2input.size(), vec3(0.0));
+  for (size_t i = 0; i < query2input.size(); ++i)
+    pointImpl.vertPos_[i] = points[query2input[i]];
+
+  // expandP=false: no symbolic perturbation from the query side (zero normals).
+  // forward=true: project along +Z to count signed face crossings above each
+  // point. f returns vec3 → collider uses DoesOverlap(vec3), which is
+  // XY-projected, so all faces with XY overlap are returned regardless of Z
+  // (correct for +Z winding).
+  Kernel02<false, true> k02{pointImpl, *this};
+  auto recorderf = [&](int localIdx, int tri) {
+    const auto [s02, z02] = k02(localIdx, tri);
+    if (std::isfinite(z02)) winding[query2input[localIdx]] += s02;
+  };
+  auto recorder = MakeSimpleRecorder(recorderf);
+  auto f = [&pointImpl](int i) { return pointImpl.vertPos_[i]; };
+  // Each queryIdx is processed by at most one thread (for_each_n), so the
+  // per-queryIdx accumulation into winding[] is race-free without atomics.
+  collider_.Collisions<false>(recorder, f, static_cast<int>(query2input.size()),
+                              true);
+  return winding;
+}
+
 std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
   ZoneScoped;
   if (IsEmpty()) return {};

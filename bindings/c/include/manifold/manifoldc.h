@@ -257,6 +257,9 @@ ManifoldRayHitVec* manifold_ray_cast(void* mem, ManifoldManifold* m,
 size_t manifold_ray_hit_vec_length(ManifoldRayHitVec* v);
 ManifoldRayHit manifold_ray_hit_vec_get(ManifoldRayHitVec* v, size_t idx);
 
+// Point containment
+int manifold_winding_number(ManifoldManifold* m, double x, double y, double z);
+
 // ExecutionContext: observe progress and request cancellation of a
 // long-running Manifold evaluation. Attach to a manifold via
 // manifold_with_context; subsequent operations on that manifold observe
@@ -268,21 +271,42 @@ void manifold_execution_context_cancel(ManifoldExecutionContext* ctx);
 int manifold_execution_context_cancelled(ManifoldExecutionContext* ctx);
 double manifold_execution_context_progress(ManifoldExecutionContext* ctx);
 
+// ctx-aware static factories. These ops have no source manifold to attach via
+// manifold_with_context, so they run on the ExecutionContext directly to report
+// progress / observe cancellation. Mirror manifold_level_set /
+// manifold_of_meshgl / manifold_smooth; `sdf_context` is the SDF callback's
+// user-data.
+ManifoldManifold* manifold_execution_context_level_set(
+    void* mem, ManifoldExecutionContext* ec, ManifoldSdf sdf,
+    ManifoldBox* bounds, double edge_length, double level, double tolerance,
+    void* sdf_context);
+ManifoldManifold* manifold_execution_context_level_set_seq(
+    void* mem, ManifoldExecutionContext* ec, ManifoldSdf sdf,
+    ManifoldBox* bounds, double edge_length, double level, double tolerance,
+    void* sdf_context);
+ManifoldManifold* manifold_execution_context_of_meshgl(
+    void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL* mesh);
+ManifoldManifold* manifold_execution_context_of_meshgl64(
+    void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL64* mesh);
+ManifoldManifold* manifold_execution_context_smooth(
+    void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL* mesh,
+    size_t* half_edges, double* smoothness, size_t n_edges);
+ManifoldManifold* manifold_execution_context_smooth64(
+    void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL64* mesh,
+    size_t* half_edges, double* smoothness, size_t n_edges);
+
 // CrossSection Shapes/Constructors
 ManifoldCrossSection* manifold_cross_section_empty(void* mem);
 ManifoldCrossSection* manifold_cross_section_copy(void* mem,
                                                   ManifoldCrossSection* cs);
 ManifoldCrossSection* manifold_cross_section_of_simple_polygon(
-    void* mem, ManifoldSimplePolygon* p, ManifoldFillRule fr);
+    void* mem, ManifoldSimplePolygon* p);
 ManifoldCrossSection* manifold_cross_section_of_polygons(void* mem,
-                                                         ManifoldPolygons* p,
-                                                         ManifoldFillRule fr);
+                                                         ManifoldPolygons* p);
 ManifoldCrossSection* manifold_cross_section_square(void* mem, double x,
                                                     double y, int center);
 ManifoldCrossSection* manifold_cross_section_circle(void* mem, double radius,
                                                     int circular_segments);
-ManifoldCrossSection* manifold_cross_section_compose(
-    void* mem, ManifoldCrossSectionVec* csv);
 ManifoldCrossSectionVec* manifold_cross_section_decompose(
     void* mem, ManifoldCrossSection* cs);
 
@@ -351,7 +375,9 @@ ManifoldCrossSection* manifold_cross_section_warp_context(
     ManifoldVec2 (*fun)(double, double, void*), void* ctx);
 ManifoldCrossSection* manifold_cross_section_simplify(void* mem,
                                                       ManifoldCrossSection* cs,
-                                                      double epsilon);
+                                                      double tolerance);
+ManifoldCrossSection* manifold_cross_section_set_tolerance(
+    void* mem, ManifoldCrossSection* cs, double tolerance);
 ManifoldCrossSection* manifold_cross_section_offset(
     void* mem, ManifoldCrossSection* cs, double delta, ManifoldJoinType jt,
     double miter_limit, int circular_segments);
@@ -359,6 +385,7 @@ ManifoldCrossSection* manifold_cross_section_offset(
 // CrossSection Info
 
 double manifold_cross_section_area(ManifoldCrossSection* cs);
+double manifold_cross_section_get_tolerance(ManifoldCrossSection* cs);
 size_t manifold_cross_section_num_vert(ManifoldCrossSection* cs);
 size_t manifold_cross_section_num_contour(ManifoldCrossSection* cs);
 int manifold_cross_section_is_empty(ManifoldCrossSection* cs);
