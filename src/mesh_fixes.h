@@ -59,10 +59,11 @@ struct FlipTris {
       std::swap(face[i].startVert, face[i].endVert);
       face[i].pairedHalfedge = FlipHalfedge(face[i].pairedHalfedge);
     }
+    const std::array<int, 3> props = {halfedge.Prop(3 * tri), halfedge.Prop(3 * tri + 2), halfedge.Prop(3 * tri + 1)};
     for (const int i : {0, 1, 2}) {
       halfedge.SetStart(3 * tri + i, face[i].startVert);
       halfedge.SetPair(3 * tri + i, face[i].pairedHalfedge);
-      halfedge.SetProp(3 * tri + i, face[i].propVert);
+      halfedge.SetProp(3 * tri + i, props[i]);
     }
   }
 };
