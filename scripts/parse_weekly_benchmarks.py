@@ -324,13 +324,10 @@ def build_gtest_summary(suite: dict) -> list[str]:
     for test in suite["tests"]:
         timing = test["time_ms"]
         lines.append(
-            "| {name} | {mean:.2f} | {median:.2f} | {min_:.2f} | {max_:.2f} | {runs} |".format(
+            "| {name} | {mean_ms:.2f} | {median_ms:.2f} | {min_ms:.2f} | "
+            "{max_ms:.2f} | {n_runs} |".format(
                 name=test["name"],
-                mean=timing["mean_ms"],
-                median=timing["median_ms"],
-                min_=timing["min_ms"],
-                max_=timing["max_ms"],
-                runs=timing["n_runs"],
+                **timing,
             )
         )
     lines.append("")
@@ -341,12 +338,12 @@ def build_summary(suites: dict, metadata: dict, repeats: int) -> str:
     lines = []
     lines.append("### Weekly Benchmarks")
     lines.append("")
-    lines.append(f"Commit: `{metadata.get('commit_sha') or 'unknown'}`")
-    lines.append(f"Runner: `{metadata.get('runner') or 'unknown'}`")
-    lines.append(f"OS: `{metadata.get('os') or 'unknown'}`")
-    lines.append(f"Compiler: `{metadata.get('compiler') or 'unknown'}`")
-    lines.append(f"CPU: `{metadata.get('cpu_model') or 'unknown'}`")
-    lines.append(f"CPU count: `{metadata.get('cpu_count') or 'unknown'}`")
+    lines.append(f"Commit: `{metadata['commit_sha'] or 'unknown'}`")
+    lines.append(f"Runner: `{metadata['runner'] or 'unknown'}`")
+    lines.append(f"OS: `{metadata['os'] or 'unknown'}`")
+    lines.append(f"Compiler: `{metadata['compiler'] or 'unknown'}`")
+    lines.append(f"CPU: `{metadata['cpu_model'] or 'unknown'}`")
+    lines.append(f"CPU count: `{metadata['cpu_count'] or 'unknown'}`")
     if metadata.get("cpu_model_identifier"):
         lines.append(f"CPU model identifier: `{metadata['cpu_model_identifier']}`")
     if metadata.get("cpu_physical_count"):

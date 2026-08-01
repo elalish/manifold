@@ -7,20 +7,28 @@ import shutil
 import sys
 from pathlib import Path
 
+# Metadata fields copied into each index entry. The index is a lightweight
+# listing, so it deliberately carries a subset - the full metadata (cmake
+# details, per-core CPU counts, ...) stays in the run's result.json.
+INDEX_METADATA_FIELDS = (
+    "commit_sha",
+    "workflow",
+    "runner",
+    "os",
+    "compiler",
+    "cpu_model",
+    "cpu_count",
+)
+
 
 def utc_now() -> datetime.datetime:
     return datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
 
 
-def parse_timestamp(raw: str | None) -> datetime.datetime:
-    if not raw:
-        return utc_now()
-    try:
-        return datetime.datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone(
-            datetime.timezone.utc
-        )
-    except ValueError:
-        return utc_now()
+def parse_timestamp(raw: str) -> datetime.datetime:
+    return datetime.datetime.fromisoformat(raw.replace("Z", "+00:00")).astimezone(
+        datetime.timezone.utc
+    )
 
 
 def json_dump(path: Path, payload: dict) -> None:
@@ -56,7 +64,6 @@ def sanitizer_summary(args: argparse.Namespace) -> dict | None:
     optional_field(summary, "test_result", args.sanitizer_test_result)
     optional_field(summary, "runner", args.sanitizer_runner)
     optional_field(summary, "os", args.sanitizer_os)
-    optional_field(summary, "compiler", args.sanitizer_compiler)
     return summary or None
 
 
@@ -70,7 +77,6 @@ def main() -> int:
     parser.add_argument("--sanitizer-test-result")
     parser.add_argument("--sanitizer-runner")
     parser.add_argument("--sanitizer-os")
-    parser.add_argument("--sanitizer-compiler")
     args = parser.parse_args()
 
     result_path = args.suite_dir / "result.json"
@@ -81,8 +87,8 @@ def main() -> int:
         raise FileNotFoundError(f"Missing weekly benchmark summary: {summary_path}")
 
     result = json.loads(result_path.read_text(encoding="utf-8-sig"))
-    metadata = result.get("metadata", {})
-    timestamp = parse_timestamp(metadata.get("timestamp"))
+    metadata = result["metadata"]
+    timestamp = parse_timestamp(metadata["timestamp"])
     timestamp_iso = timestamp.isoformat().replace("+00:00", "Z")
     run_id = os.getenv("GITHUB_RUN_ID") or timestamp.strftime("%Y%m%dT%H%M%SZ")
 
@@ -100,13 +106,7 @@ def main() -> int:
         "run_id": run_id,
         "timestamp": timestamp_iso,
         "date": timestamp.strftime("%Y-%m-%d"),
-        "commit_sha": metadata.get("commit_sha"),
-        "workflow": metadata.get("workflow"),
-        "runner": metadata.get("runner"),
-        "os": metadata.get("os"),
-        "compiler": metadata.get("compiler"),
-        "cpu_model": metadata.get("cpu_model"),
-        "cpu_count": metadata.get("cpu_count"),
+        **{name: metadata[name] for name in INDEX_METADATA_FIELDS},
         "result_path": str(dated_rel / "result.json").replace("\\", "/"),
         "summary_path": str(dated_rel / "summary.md").replace("\\", "/"),
         "github_run_url": github_run_url(run_id),

@@ -15,57 +15,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build_sanitizer:
-    name: Sanitizer build (ASan+UBSan)
-    timeout-minutes: 30
-    runs-on: ubuntu-24.04
-    steps:
-    - uses: actions/checkout@v6
-    - name: Install apt packages
-      uses: awalsh128/cache-apt-pkgs-action@v1.6.0
-      with:
-        packages: libgtest-dev libtbb-dev cmake
-        version: 1
-    - name: Build (asan/ubsan)
-      run: ./scripts/ci/sanitizer_build.sh
-    - name: Upload sanitizer build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: sanitizer-build
-        path: build/
-        retention-days: 1
-    - name: Upload sanitizer cmake configure log
-      uses: actions/upload-artifact@v4
-      with:
-        name: sanitizer-cmake-log
-        path: build/cmake_configure.log
-        retention-days: 1
-
-  test_sanitizer:
-    name: Sanitizer extended subset (ASan+UBSan)
-    needs: build_sanitizer
-    timeout-minutes: 30
-    runs-on: ubuntu-24.04
-    env:
-      ASAN_OPTIONS: detect_container_overflow=0
-      UBSAN_OPTIONS: print_stacktrace=1
-      SANITIZER_TEST_TIMEOUT_SEC: 1200
-      SANITIZER_SUBSET: extended
-    steps:
-    - uses: actions/checkout@v6
-    - name: Download sanitizer build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: sanitizer-build
-        path: build
-    - name: Test extended sanitizer subset
-      shell: bash
-      run: bash ./scripts/ci/sanitizer_test.sh
+  sanitizer:
+    uses: ./.github/workflows/sanitizer.yml
+    with:
+      subset: extended
+      retention-days: 1
 
   weekly_benchmark:
     name: Weekly benchmarks
-    needs: [build_sanitizer, test_sanitizer]
-    if: ${{ always() && !cancelled() }}
+    needs: sanitizer
+    if: ${{ !cancelled() }}
     timeout-minutes: 60
     runs-on: macos-15
     env:
@@ -77,8 +36,8 @@ jobs:
       SANITIZER_SUMMARY_SUBSET: extended
       SANITIZER_SUMMARY_RUNNER: ubuntu-24.04
       SANITIZER_SUMMARY_OS: Linux
-      SANITIZER_BUILD_RESULT: ${{ needs.build_sanitizer.result }}
-      SANITIZER_TEST_RESULT: ${{ needs.test_sanitizer.result }}
+      SANITIZER_BUILD_RESULT: ${{ needs.sanitizer.outputs.build-result }}
+      SANITIZER_TEST_RESULT: ${{ needs.sanitizer.outputs.test-result }}
     steps:
     - uses: actions/checkout@v6
       with:
@@ -86,24 +45,6 @@ jobs:
     - uses: actions/setup-python@v5
       with:
         python-version: '3.x'
-    - name: Download sanitizer cmake configure log
-      if: always()
-      continue-on-error: true
-      uses: actions/download-artifact@v4
-      with:
-        name: sanitizer-cmake-log
-        path: sanitizer-cmake-log
-    - name: Resolve sanitizer compiler
-      run: |
-        python3 - <<'PY' >> "$GITHUB_ENV"
-        import sys
-        sys.path.insert(0, "scripts")
-        from pathlib import Path
-        from system_metadata import cmake_compiler, parse_cmake_configure_log
-
-        cmake = parse_cmake_configure_log(Path("sanitizer-cmake-log/cmake_configure.log"))
-        print(f"SANITIZER_SUMMARY_COMPILER={cmake_compiler(cmake) or 'unknown'}")
-        PY
     - name: Install brew packages
       run: brew install googletest assimp tbb cmake
     - name: Run weekly benchmarks
@@ -125,15 +66,8 @@ jobs:
         # token, see https://github.com/actions/checkout#push-a-commit-using-the-built-in-token
         git config user.name "github-actions[bot]"
         git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-        if git ls-remote --exit-code --heads origin "${DATA_BRANCH}" >/dev/null 2>&1; then
-          git fetch origin "${DATA_BRANCH}"
-          git worktree add benchmark-data "origin/${DATA_BRANCH}"
-        else
-          git worktree add --detach benchmark-data
-          git -C benchmark-data checkout --orphan "${DATA_BRANCH}"
-          git -C benchmark-data rm -rf . >/dev/null 2>&1 || true
-          find benchmark-data -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
-        fi
+        git fetch origin "${DATA_BRANCH}"
+        git worktree add benchmark-data "origin/${DATA_BRANCH}"
 
         python3 ./scripts/publish_weekly_benchmark_results.py \
           ./bench/weekly ./benchmark-data \
@@ -142,13 +76,8 @@ jobs:
           --sanitizer-build-result "${SANITIZER_BUILD_RESULT}" \
           --sanitizer-test-result "${SANITIZER_TEST_RESULT}" \
           --sanitizer-runner "${SANITIZER_SUMMARY_RUNNER}" \
-          --sanitizer-os "${SANITIZER_SUMMARY_OS}" \
-          --sanitizer-compiler "${SANITIZER_SUMMARY_COMPILER}"
+          --sanitizer-os "${SANITIZER_SUMMARY_OS}"
 
         git -C benchmark-data add weekly
-        if git -C benchmark-data diff --cached --quiet; then
-          echo "No benchmark data changes to publish."
-          exit 0
-        fi
         git -C benchmark-data commit -m "add weekly benchmark result ${GITHUB_RUN_ID}"
         git -C benchmark-data push origin "HEAD:${DATA_BRANCH}"

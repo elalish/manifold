@@ -11,46 +11,25 @@ case "${SANITIZER_SUBSET}" in
     SANITIZER_GTEST_FILTER="${SANITIZER_GTEST_FILTER_EXTENDED}"
     ;;
   *)
-    echo "::warning::Unknown SANITIZER_SUBSET=${SANITIZER_SUBSET}, falling back to core."
-    SANITIZER_GTEST_FILTER="${SANITIZER_GTEST_FILTER_CORE}"
+    echo "::error::Unknown SANITIZER_SUBSET=${SANITIZER_SUBSET}"
+    exit 2
     ;;
 esac
 
-SANITIZER_TEST_BIN=""
-for CANDIDATE in \
-  ./build/test/manifold_test \
-  ./test/manifold_test \
-  ./sanitizer-build/test/manifold_test \
-  ./sanitizer-build/build/test/manifold_test; do
-  if [ -f "${CANDIDATE}" ]; then
-    SANITIZER_TEST_BIN="${CANDIDATE}"
-    break
-  fi
-done
-
-if [ -z "${SANITIZER_TEST_BIN}" ]; then
-  SANITIZER_TEST_BIN="$(find . -type f -name manifold_test | head -n 1)"
-fi
-if [ -z "${SANITIZER_TEST_BIN}" ]; then
-  echo "::error::Could not find manifold_test after downloading sanitizer artifacts."
+# The sanitizer build artifact is always downloaded into build/.
+SANITIZER_TEST_BIN=./build/test/manifold_test
+if [ ! -f "${SANITIZER_TEST_BIN}" ]; then
+  echo "::error::Could not find ${SANITIZER_TEST_BIN} after downloading sanitizer artifacts."
   echo "::group::Artifact layout"
   find . -maxdepth 4 -type d | sort
   echo "::endgroup::"
   exit 127
 fi
-chmod +x "${SANITIZER_TEST_BIN}" || true
-
-TIMEOUT_CMD=()
-if command -v timeout >/dev/null 2>&1; then
-  TIMEOUT_CMD=(timeout "${SANITIZER_TEST_TIMEOUT_SEC}")
-elif command -v gtimeout >/dev/null 2>&1; then
-  TIMEOUT_CMD=(gtimeout "${SANITIZER_TEST_TIMEOUT_SEC}")
-else
-  echo "::warning::timeout command not found; relying on the workflow timeout."
-fi
+# Artifact downloads do not preserve the executable bit.
+chmod +x "${SANITIZER_TEST_BIN}"
 
 set +e
-"${TIMEOUT_CMD[@]}" "${SANITIZER_TEST_BIN}" --gtest_filter="${SANITIZER_GTEST_FILTER}"
+timeout "${SANITIZER_TEST_TIMEOUT_SEC}" "${SANITIZER_TEST_BIN}" --gtest_filter="${SANITIZER_GTEST_FILTER}"
 TEST_RC="$?"
 set -e
 if [ "${TEST_RC}" -eq 124 ]; then
