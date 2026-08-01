@@ -1292,6 +1292,22 @@ TEST(Manifold, MirrorUnion2) {
   EXPECT_TRUE(result.MatchesTriNormals());
 }
 
+TEST(Manifold, MirroredNormals) {
+  // Issue #1781: Ensure that when a Manifold is mirrored the normals are
+  // mirrored along with it, so the resulting mesh vertices do not get
+  // duplicated. We check that the MeshGL vertex count remains the same, and
+  // that the mirrored normals remain outward-pointing.
+  const Manifold s = Manifold::Sphere(1.0, 32).CalculateNormals(0, 180);
+  const MeshGL mesh = s.GetMeshGL();
+  const MeshGL mirrored = s.Mirror({1, 0, 0}).GetMeshGL();
+  EXPECT_EQ(mesh.NumVert(), mirrored.NumVert());
+  EXPECT_TRUE(mirrored.HasNormals(0));
+  const auto [good, bad] = CountSphereNormalAlignment(
+      mirrored, 1.0, 3, [](vec3 pos) { return la::normalize(pos); });
+  EXPECT_EQ(bad, 0);
+  EXPECT_EQ(good, static_cast<int>(mirrored.NumVert()));
+}
+
 TEST(Manifold, Invalid) {
   auto invalid = Manifold::Error::InvalidConstruction;
   auto circ = CrossSection::Circle(10.);
