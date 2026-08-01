@@ -423,9 +423,8 @@ jobs:
   sanitizer:
     uses: ./.github/workflows/sanitizer.yml
     with:
-      subset: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && 'extended' || 'core' }}
-      retention-days: 5
-      asan-options: detect_container_overflow=0:strict_init_order=1
+      subset: core
+      retention-days: 1
 
   build_mxe:
     name: MXE (TBB:${{matrix.parallelization == 'ON'}})

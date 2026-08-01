@@ -8,13 +8,11 @@ on:
         type: string
         required: true
       retention-days:
-        description: Retention for the shared sanitizer build artifacts.
+        description: >
+          Retention for the shared sanitizer build artifact. It only exists to
+          hand the build from the build job to the test job, so this is short.
         type: number
-        default: 5
-      asan-options:
-        description: ASAN_OPTIONS for the test job.
-        type: string
-        default: detect_container_overflow=0
+        default: 1
       test-timeout-sec:
         description: Per-run timeout applied inside sanitizer_test.sh.
         type: number
@@ -54,7 +52,7 @@ jobs:
     timeout-minutes: 30
     runs-on: ubuntu-24.04
     env:
-      ASAN_OPTIONS: ${{ inputs.asan-options }}
+      ASAN_OPTIONS: detect_container_overflow=0:strict_init_order=1
       UBSAN_OPTIONS: print_stacktrace=1
       SANITIZER_TEST_TIMEOUT_SEC: ${{ inputs.test-timeout-sec }}
       SANITIZER_SUBSET: ${{ inputs.subset }}
