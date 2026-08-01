@@ -220,8 +220,7 @@ To animate a compiled model, assign `$t` before `result` is evaluated.
 ### Not supported yet
 
 - `import()` of external geometry (STL/OFF/3MF/DXF/SVG)
-- 2D `minkowski()`
-- `resize()` along an axis normal to a flat object (warns and skips)
+- 2D `minkowski()` — throws at runtime if any operand is 2D
 - `is_object()` and other experimental/opt-in builtins
 
 ## Testing
