@@ -37,7 +37,7 @@ jobs:
     - name: Install apt packages
       uses: awalsh128/cache-apt-pkgs-action@v1.6.0
       with:
-        packages: libgtest-dev libtbb-dev cmake
+        packages: libgtest-dev cmake
         version: 1
     - name: Build (asan/ubsan)
       run: ./scripts/ci/sanitizer_build.sh

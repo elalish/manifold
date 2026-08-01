@@ -94,11 +94,12 @@ def configure_build(ctx: BuildContext) -> None:
         "-B",
         str(ctx.build_dir),
         "-DCMAKE_BUILD_TYPE=Release",
-        "-DMANIFOLD_STRICT=ON",
-        "-DMANIFOLD_PYBIND=OFF",
-        "-DMANIFOLD_TEST=ON",
+        "-DMANIFOLD_STRICT=OFF",
         "-DMANIFOLD_PAR=ON",
+        # TIMING gates the Boolean3 phase Timer output that the ember suite
+        # parses - without it those phases silently report zero.
         "-DMANIFOLD_TIMING=ON",
+        # ASSIMP is needed to load the ember test meshes.
         "-DASSIMP_ENABLE=ON",
     ]
     if sys.platform == "darwin":

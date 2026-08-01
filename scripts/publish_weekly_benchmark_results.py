@@ -7,6 +7,8 @@ import shutil
 import sys
 from pathlib import Path
 
+SCHEMA_VERSION = 1
+
 # Metadata fields copied into each index entry. The index is a lightweight
 # listing, so it deliberately carries a subset - the full metadata (cmake
 # details, per-core CPU counts, ...) stays in the run's result.json.
@@ -48,7 +50,7 @@ def github_run_url(run_id: str) -> str | None:
 
 def load_index(index_path: Path) -> dict:
     if not index_path.exists():
-        return {"schema_version": 1, "runs": []}
+        return {"schema_version": SCHEMA_VERSION, "runs": []}
     return json.loads(index_path.read_text(encoding="utf-8-sig"))
 
 
@@ -133,7 +135,7 @@ def main() -> int:
     runs.append(entry)
     runs.sort(key=lambda run: run.get("timestamp", ""))
     index = {
-        "schema_version": 1,
+        "schema_version": SCHEMA_VERSION,
         "generated_at": utc_now().isoformat().replace("+00:00", "Z"),
         "latest_run_id": run_id,
         "runs": runs,
