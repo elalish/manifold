@@ -2,6 +2,7 @@
 
 # Only CXX flags are set: manifold is declared `project(manifold LANGUAGES CXX)`,
 # so cmake never reads CMAKE_C_FLAGS.
+cmake \
   -DCMAKE_BUILD_TYPE=RelWithDebInfo \
   -DBUILD_SHARED_LIBS=ON \
   -DMANIFOLD_STRICT=ON \
