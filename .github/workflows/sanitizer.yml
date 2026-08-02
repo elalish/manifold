@@ -1,0 +1,68 @@
+name: Sanitizer
+
+on:
+  workflow_call:
+    inputs:
+      subset:
+        description: Which gtest subset to run - core or extended.
+        type: string
+        required: true
+      retention-days:
+        description: >
+          Retention for the shared sanitizer build artifact. It only exists to
+          hand the build from the build job to the test job, so this is short.
+        type: number
+        default: 1
+      test-timeout-sec:
+        description: Per-run timeout applied inside sanitizer_test.sh.
+        type: number
+        default: 1200
+    outputs:
+      build-result:
+        description: Result of the sanitizer build job.
+        value: ${{ jobs.build_sanitizer.result }}
+      test-result:
+        description: Result of the sanitizer test job.
+        value: ${{ jobs.test_sanitizer.result }}
+
+jobs:
+  build_sanitizer:
+    name: Sanitizer build (ASan+UBSan)
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    steps:
+    - uses: actions/checkout@v6
+    - name: Install apt packages
+      uses: awalsh128/cache-apt-pkgs-action@v1.6.0
+      with:
+        packages: libgtest-dev cmake
+        version: 1
+    - name: Build (asan/ubsan)
+      run: ./scripts/ci/sanitizer_build.sh
+    - name: Upload sanitizer build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: sanitizer-build
+        path: build/
+        retention-days: ${{ inputs.retention-days }}
+
+  test_sanitizer:
+    name: Sanitizer ${{ inputs.subset }} subset (ASan+UBSan)
+    needs: build_sanitizer
+    timeout-minutes: 30
+    runs-on: ubuntu-24.04
+    env:
+      ASAN_OPTIONS: detect_container_overflow=0:strict_init_order=1
+      UBSAN_OPTIONS: print_stacktrace=1
+      SANITIZER_TEST_TIMEOUT_SEC: ${{ inputs.test-timeout-sec }}
+      SANITIZER_SUBSET: ${{ inputs.subset }}
+    steps:
+    - uses: actions/checkout@v6
+    - name: Download sanitizer build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: sanitizer-build
+        path: build
+    - name: Test sanitizer subset
+      shell: bash
+      run: bash ./scripts/ci/sanitizer_test.sh

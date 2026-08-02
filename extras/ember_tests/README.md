@@ -15,10 +15,11 @@ decompress and put the `raw_meshes` directory inside `testfiles`.
 1. Download the dataset.
 2. Build the binary with `MANIFOLD_PAR` and `ASSIMP_ENABLE` enabled. The
    binary should be inside `build/extras` (relative to the project root).
-3. Run `python do_ember_tests.py`. This will take 10 minutes to an hour
-   depending on your machine. At the end, a `benchmark.csv` file will be
-   generated.
-4. Run `python analyze_ember_tests.py` to analyze the result.
+3. Run the selected Ember benchmark cases through
+   `scripts/run_weekly_benchmarks.py`, or run `man_bench` directly with the
+   case arguments from `testfiles/ember-benchmark-cases.json`.
+4. Run `python analyze_ember_tests.py` to analyze the full `benchmark.csv`
+   result.
 
 ## Files
 
@@ -30,13 +31,8 @@ decompress and put the `raw_meshes` directory inside `testfiles`.
   file with the argument and timing information.
 - `testfiles/test_file/ember-benchmark-cases.json`: JSON file describing each
   test case.
-- `do_ember_tests.py` reads the description of the files and transforms
-  from the supplemental material of the Ember paper, and executes
-  man_bench on each pair.  This creates a benchmark.csv file (remember
-  to remove that file again if you want a clean new run of data).
 - `analyze_ember_tests.py` reads the benchmark.csv file and calculates
   statistics and does a plot.
 - `bug-case.json` is a single test case that takes abnormally long.
 - `m3max_benchmarks.csv` is the benchmarks file gotten by running on a
   Macbook Pro M3 Max (12 performance cores, 4 efficiency cores).
-

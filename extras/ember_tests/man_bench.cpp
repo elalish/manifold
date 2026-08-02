@@ -155,7 +155,7 @@ static MeshGL do_boolean(const std::string& file1, const std::string& file2,
 
 static void usage() {
   std::cout << "Usage: %s file1 file2 [-t1 <12 floats>] [-t2 <12 floats>] "
-               "[--threads <int>]\n";
+               "[--threads <int>] [--verbose <int>]\n";
 }
 
 int main(int argc, const char** argv) {
@@ -170,6 +170,7 @@ int main(int argc, const char** argv) {
   mat3x4 transform1 = linalg::identity;
   mat3x4 transform2 = linalg::identity;
   int threads = 1000;
+  int manifold_verbose = 0;
   if (argc > 3) {
     int argi = 3;
     while (argi < argc) {
@@ -201,12 +202,25 @@ int main(int argc, const char** argv) {
           return 1;
         }
         argi += 2;
+      } else if (strcmp(argv[argi], "--verbose") == 0) {
+        if (argi + 1 >= argc) {
+          usage();
+          return 1;
+        }
+        try {
+          manifold_verbose = std::stoi(argv[argi + 1]);
+        } catch (...) {
+          usage();
+          return 1;
+        }
+        argi += 2;
       } else {
         usage();
         return 1;
       }
     }
   }
+  ManifoldParams().verbose = manifold_verbose;
   if (verbose) {
     std::cout << "files: " << file1 << ", " << file2 << "\n";
     if (threads > 0) {
