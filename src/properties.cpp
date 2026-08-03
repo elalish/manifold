@@ -232,8 +232,9 @@ int Manifold::Impl::NumDegenerateTris() const {
 
     const int ccw = CCW(v[0], v[1], v[2], tolerance_ / 2);
     // if (ccw == 0) {
-    //   std::cout << "degenerate tri: " << face << ", " << faceNormal_[face]
-    //             << ", " << vertPos_[halfedge_.Start(3 * face + 0)] << ", "
+    //   std::cout << "degenerate tri: " << face << ", e: " << face * 3 << ", "
+    //             << faceNormal_[face] << ", "
+    //             << vertPos_[halfedge_.Start(3 * face + 0)] << ", "
     //             << vertPos_[halfedge_.Start(3 * face + 1)] << ", "
     //             << vertPos_[halfedge_.Start(3 * face + 2)] << std::endl;
     // }

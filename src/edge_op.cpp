@@ -38,6 +38,13 @@ bool Is01Longest(vec2 v0, vec2 v1, vec2 v2) {
   return l[0] > l[1] && l[0] > l[2];
 }
 
+bool Is01Longest(vec3 v0, vec3 v1, vec3 v2) {
+  const vec3 e[3] = {v1 - v0, v2 - v1, v0 - v2};
+  double l[3];
+  for (int i : {0, 1, 2}) l[i] = la::dot(e[i], e[i]);
+  return l[0] > l[1] && l[0] > l[2];
+}
+
 struct FlagStore {
 #if MANIFOLD_PAR == 1
   tbb::combinable<Vec<size_t>> store;
@@ -222,26 +229,40 @@ bool Manifold::Impl::Continuous(int edge) const {
          halfedge_.Prop(pair) == halfedge_.PropEnd(edge);
 }
 
-bool Manifold::Impl::Swappable(int edge) const {
+bool Manifold::Impl::Swappable(int edge, int firstNewVert) const {
   const int pair = halfedge_.Pair(edge);
   const ivec3 triEdge = TriOf(edge);
   const ivec3 pairTriEdge = TriOf(pair);
 
   int tri = edge / 3;
   mat2x3 projection = GetAxisAlignedProjection(faceNormal_[tri]);
-  vec2 v[3];
-  for (int i : {0, 1, 2})
-    v[i] = projection * vertPos_[halfedge_.Start(triEdge[i])];
-  if (CCW(v[0], v[1], v[2], epsilon_) > 0 || !Is01Longest(v[0], v[1], v[2]))
+  vec3 v[4];
+  vec2 vp[4];
+  bool valid = false;
+  for (int i : {0, 1, 2}) {
+    const int vert = halfedge_.Start(triEdge[i]);
+    if (vert >= firstNewVert) valid = true;
+    v[i] = vertPos_[vert];
+    vp[i] = projection * v[i];
+  }
+  const int vert3 = halfedge_.Start(pairTriEdge[2]);
+  if (vert3 >= firstNewVert) valid = true;
+  if (!valid) return false;
+  v[3] = vertPos_[vert3];
+
+  if (CCW(vp[0], vp[1], vp[2], epsilon_) > 0 || !Is01Longest(v[0], v[1], v[2]))
     return false;
 
   // Switch to neighbor's projection.
   edge = pair;
   tri = edge / 3;
   projection = GetAxisAlignedProjection(faceNormal_[tri]);
-  for (int i : {0, 1, 2})
-    v[i] = projection * vertPos_[halfedge_.Start(pairTriEdge[i])];
-  return CCW(v[0], v[1], v[2], epsilon_) > 0 || Is01Longest(v[0], v[1], v[2]);
+  for (int i : {0, 1, 2, 3}) vp[i] = projection * v[i];
+
+  return Is01Longest(v[1], v[0], v[3]) ||
+         (CCW(vp[1], vp[0], vp[3], epsilon_) > 0 &&
+          CCW(vp[1], vp[2], vp[3], epsilon_) > 0 &&
+          CCW(vp[2], vp[0], vp[3], epsilon_) > 0);
 }
 
 void Manifold::Impl::SwapEdge(int edge, double a) {
@@ -325,16 +346,9 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
           const int pair = halfedge_.Pair(edge);
           if (!halfedge_.Valid(edge)) return;
 
-          // Optimization: When decimating a Boolean result, operate only
-          // on new verts by only collapsing edges where the end vert is
-          // new. StartVerts get updated to their EndVert, so retained
-          // verts can become new, but not vice-versa.
-          if (!merger[edge].Valid() && halfedge_.End(edge) < firstNewVert)
-            return;
-
           // Swappable edges differ on forward and backward, so check before the
           // forward-only optimization.
-          if (Swappable(edge)) {
+          if (Swappable(edge, firstNewVert)) {
             const vec3 v0 = vertPos_[halfedge_.Start(edge)];
             const double l01 = la::length(vertPos_[halfedge_.End(edge)] - v0);
             const double l02 =
@@ -343,6 +357,13 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
             merger[edge] = {0, Merger::kSwap, a, vec3(NAN)};
             return;
           }
+
+          // Optimization: When decimating a Boolean result, operate only
+          // on new verts by only collapsing edges where the end vert is
+          // new. StartVerts get updated to their EndVert, so retained
+          // verts can become new, but not vice-versa.
+          if (!merger[edge].Valid() && halfedge_.End(edge) < firstNewVert)
+            return;
 
           // Optimization: only calculate for forward halfedges, then copy
           // result to the pair. However, this conflicts with the above
@@ -378,8 +399,9 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
     std::fill(vertsVisited.begin(), vertsVisited.end(), false);
     auto itr = edges.begin();
     size_t numCollapsed = 0;
+    size_t numSwapped = 0;
     // Collapse short edges first so that long edges calculate correct cost.
-    const bool freeCollapse = merger[*itr].Free();
+    const bool shortCollapse = merger[*itr].Short();
     for (; itr != end; ++itr) {
       const int edge = *itr;
       if (!halfedge_.Valid(edge)) {
@@ -388,13 +410,13 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
       if (merger[edge].totalCost > maxCost) {
         break;  // Sorting means no further edges can be collapsed this round.
       }
-      if (freeCollapse && !merger[edge].Free()) {
+      if (shortCollapse && !merger[edge].Free()) {
         break;  // force recalculation of cost after free edges collapse.
       }
       const int startV = halfedge_.Start(edge);
       const int endV = halfedge_.End(edge);
       // Allow short merges to stack to ensure all are collapsed.
-      if (!freeCollapse && (vertsVisited[startV] || vertsVisited[endV])) {
+      if (!shortCollapse && (vertsVisited[startV] || vertsVisited[endV])) {
         continue;
       }
       if (merger[edge].Swap()) {
@@ -407,7 +429,7 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
         SwapEdge(edge, merger[edge].a);
         vertsVisited.resize(vertPos_.size(), true);
         totalCost.resize(vertPos_.size(), 0);
-        ++numCollapsed;
+        ++numSwapped;
         continue;
       }
       const bool didCollapse = CollapseEdge2(edge, scratchBuffer, merger[edge]);
@@ -430,11 +452,13 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
       return halfedge_.Valid(edge) && merger[edge].Valid();
     });
     // edges.Dump();
-    // std::cout << "short? " << freeCollapse << ", collapsed: " << numCollapsed
+    // std::cout << "short? " << shortCollapse << ", collapsed: " <<
+    // numCollapsed
+    //           << ", swapped: " << numSwapped
     //           << ", edges left: " << (end - edges.begin()) << ", "
     //           << itr - edges.begin() << std::endl;
     totalCollapsed += numCollapsed;
-    if (numCollapsed == 0) break;
+    if (numCollapsed == 0 && numSwapped == 0) break;
     // break;
 
     for_each_n(autoPolicy(NumTri(), 1e4), countAt(0), NumTri(), [&](int tri) {
