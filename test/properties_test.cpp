@@ -74,7 +74,7 @@ TEST(Properties, Tolerance) {
 }
 
 TEST(Properties, ToleranceSphere) {
-  const int n = 100;
+  const int n = 500;
   Manifold sphere = Manifold::Sphere(1, 4 * n);
   EXPECT_EQ(sphere.NumTri(), 8 * n * n);
 

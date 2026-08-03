@@ -201,14 +201,21 @@ struct Manifold::Impl {
     double a = std::numeric_limits<double>::quiet_NaN();
     vec3 newPos = vec3(a);
 
+    static constexpr double kShort = -2;
+    static constexpr double kSwap = -1;
+
     bool Valid() const { return std::isfinite(addedCost); }
-    bool Short() const { return totalCost < 0; }
+    bool Free() const { return totalCost < 0; }
+    bool Short() const { return totalCost == kShort; }
+    bool Swap() const { return totalCost == kSwap; }
   };
   double MaxCost() const { return tolerance_ * tolerance_; }
   void CleanupTopology();
   void SimplifyTopology2(int firstNewVert = 0);
   Merger CheckEdge(int edge) const;
   bool Continuous(int edge) const;
+  bool Swappable(int edge) const;
+  void SwapEdge(int edge, double a);
   void SimplifyTopology(int firstNewVert = 0);
   void CollapseShortEdges(int firstNewVert = 0);
   void CollapseColinearEdges(int firstNewVert = 0);
