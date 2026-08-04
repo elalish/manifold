@@ -250,7 +250,7 @@ int Manifold::Impl::NumDegenerateTris() const {
  * combination of boolean operations and simplifications.
  */
 bool Manifold::Impl::HasSimpleProps() const {
-  if (halfedge_.size() == 0) return true;
+  if (halfedge_.size() == 0 || NumProp() == 0) return true;
   return all_of(countAt(0_uz), countAt(halfedge_.size()), [this](size_t edge) {
     const int pair = halfedge_.Pair(edge);
     if (pair < 0 || !halfedge_.IsForward(edge)) return true;

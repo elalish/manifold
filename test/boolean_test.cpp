@@ -170,6 +170,19 @@ TEST(Boolean, Cubes) {
   if (options.exportModels) WriteTestOBJ("cubes.obj", result);
 }
 
+TEST(Boolean, Cubes2) {
+  Manifold cube = Manifold::Cube();
+
+  Manifold result = cube + cube.Rotate(0, 0, 45);
+
+  // has 14 verts instead of 12 because of symbolic perturbation making a jagged
+  // intersection, which is maintained to keep meshIDs separate. I don't love
+  // either of those behaviors by default...
+  ExpectMeshes(result, {{14, 24}});
+
+  if (options.exportModels) WriteTestOBJ("cubes2.obj", result);
+}
+
 TEST(Boolean, DeterminismSimpleSubtract) {
   const Manifold a = Manifold::Cube({1, 1, 1}, true);
   const Manifold b = Manifold::Cube({1, 1, 1}, true).Translate({0.5, 0, 0});
@@ -508,7 +521,6 @@ TEST(Boolean, Perturb3) {
   EXPECT_NEAR(nastyGear.SurfaceArea(), expectedArea, 1e-4);
 
   if (options.exportModels) {
-    WriteTestOBJ("nastyGear.obj", nastyGear);
     WriteTestOBJ("perturb3_nastyGear.obj", nastyGear);
   }
 }

@@ -977,6 +977,9 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 #endif
 
   balance.fullPath = true;
+  // if (!outR.HasSimpleProps())
+  //   std::cout << "Boolean3::Result: final output has non-simple properties!"
+  //             << std::endl;
   return outR;
 }
 

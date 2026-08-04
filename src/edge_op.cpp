@@ -225,8 +225,8 @@ bool Manifold::Impl::Continuous(int edge) const {
   const TriRef ref0 = meshRelation_.triRef[halfedge_.Tri(edge)];
   const TriRef ref1 = meshRelation_.triRef[halfedge_.Tri(pair)];
   return ref0.meshID == ref1.meshID && ref0.faceID == ref1.faceID &&
-         halfedge_.Prop(edge) == halfedge_.PropEnd(pair) &&
-         halfedge_.Prop(pair) == halfedge_.PropEnd(edge);
+         (NumProp() == 0 || (halfedge_.Prop(edge) == halfedge_.PropEnd(pair) &&
+                             halfedge_.Prop(pair) == halfedge_.PropEnd(edge)));
 }
 
 bool Manifold::Impl::Swappable(int edge, int firstNewVert) const {
@@ -459,7 +459,6 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
     //           << itr - edges.begin() << std::endl;
     totalCollapsed += numCollapsed;
     if (numCollapsed == 0 && numSwapped == 0) break;
-    // break;
 
     for_each_n(autoPolicy(NumTri(), 1e4), countAt(0), NumTri(), [&](int tri) {
       if (!halfedge_.Valid(3 * tri)) return;
@@ -1000,13 +999,19 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges,
     }
   }
 
-  const int startProp = halfedge_.Prop(tri0edge[0]);
-  const int endProp = halfedge_.Prop(tri0edge[1]);
+  const int startProp0 = halfedge_.Prop(tri0edge[0]);
+  const int endProp0 = halfedge_.Prop(tri0edge[1]);
+  const int startProp1 = halfedge_.Prop(tri1edge[1]);
+  const int endProp1 = halfedge_.Prop(tri1edge[0]);
   const size_t numProp = NumProp();
   for (int p = 0; p < numProp; ++p) {
-    properties_[numProp * endProp + p] =
-        la::lerp(properties_[numProp * startProp + p],
-                 properties_[numProp * endProp + p], merger.a);
+    properties_[numProp * endProp0 + p] =
+        la::lerp(properties_[numProp * startProp0 + p],
+                 properties_[numProp * endProp0 + p], merger.a);
+    if (endProp1 != endProp0)
+      properties_[numProp * endProp1 + p] =
+          la::lerp(properties_[numProp * startProp1 + p],
+                   properties_[numProp * endProp1 + p], merger.a);
   }
 
   int start = halfedge_.Pair(tri1edge[1]);
@@ -1019,8 +1024,12 @@ bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges,
   int current = start;
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
-    if (halfedge_.Prop(current) == startProp) {
-      halfedge_.SetProp(current, endProp);
+    if (numProp > 0) {
+      if (halfedge_.Prop(current) == startProp0) {
+        halfedge_.SetProp(current, endProp0);
+      } else if (halfedge_.Prop(current) == startProp1) {
+        halfedge_.SetProp(current, endProp1);
+      }
     }
     const int vert = halfedge_.End(current);
     const int next = halfedge_.Pair(current);
