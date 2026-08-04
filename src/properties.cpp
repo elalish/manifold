@@ -243,6 +243,27 @@ int Manifold::Impl::NumDegenerateTris() const {
 }
 
 /**
+ * Returns true if properties are shared everywhere except across mesh
+ * boundaries. This is not true in general, but only because an input mesh may
+ * have property discontinuities. For simple input meshes where properties are
+ * 1:1 with verts, this HasSimpleProps condition should still be true after any
+ * combination of boolean operations and simplifications.
+ */
+bool Manifold::Impl::HasSimpleProps() const {
+  if (halfedge_.size() == 0) return true;
+  return all_of(countAt(0_uz), countAt(halfedge_.size()), [this](size_t edge) {
+    const int pair = halfedge_.Pair(edge);
+    if (pair < 0 || !halfedge_.IsForward(edge)) return true;
+
+    const bool propsMatch = halfedge_.Prop(edge) == halfedge_.PropEnd(pair) &&
+                            halfedge_.Prop(pair) == halfedge_.PropEnd(edge);
+    const bool meshesMatch = meshRelation_.triRef[halfedge_.Tri(edge)].meshID ==
+                             meshRelation_.triRef[halfedge_.Tri(pair)].meshID;
+    return meshesMatch == propsMatch;
+  });
+}
+
+/**
  * Returns true if the Manifold is genus 0 and contains no concave edges.
  */
 bool Manifold::Impl::IsConvex() const {
