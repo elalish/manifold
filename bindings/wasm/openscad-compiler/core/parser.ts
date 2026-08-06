@@ -9,7 +9,6 @@ export class Parser {
   private prev!: Token;
   private filename: string;
   private comments: Comment[] = [];
-  readonly warnings: string[] = [];
 
   constructor(lexer: Lexer) {
     this.filename = lexer.filename;
@@ -84,53 +83,15 @@ export class Parser {
     const start = this.startLoc();
     const statements: Statement[] = [];
     while (this.current.type !== TokenType.EOF) {
-      const posBefore = this.pos;
-      try {
-        const stmt = this.parseStatement();
-        stmt.filename = this.filename;
-        statements.push(stmt);
-      } catch (err) {
-        // Recover instead of aborting the whole file: record the error, skip
-        // past the broken statement, and keep emitting the surrounding code.
-        this.warnings.push((err as Error).message);
-        this.synchronize();
-        if (this.pos === posBefore) this.advance();
-      }
+      const stmt = this.parseStatement();
+      stmt.filename = this.filename;
+      statements.push(stmt);
     }
     const program:
         Program = {kind: 'program', statements, loc: this.rangeSince(start)};
     program.filename = this.filename;
     attachComments(program, this.comments);
     return program;
-  }
-
-  private synchronize(): void {
-    let depth = 0;
-    while (this.current.type !== TokenType.EOF) {
-      const t = this.current.type;
-      if (t === TokenType.LBrace || t === TokenType.LParen ||
-          t === TokenType.LBracket) {
-        depth++;
-        this.advance();
-        continue;
-      }
-      if (t === TokenType.RBrace) {
-        if (depth <= 0) return;
-        depth--;
-        this.advance();
-        continue;
-      }
-      if (t === TokenType.RParen || t === TokenType.RBracket) {
-        if (depth > 0) depth--;
-        this.advance();
-        continue;
-      }
-      if (t === TokenType.Semicolon && depth <= 0) {
-        this.advance();
-        return;
-      }
-      this.advance();
-    }
   }
 
   // Statements

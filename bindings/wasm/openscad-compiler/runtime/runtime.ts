@@ -3,7 +3,6 @@
  * Loaded via import from compiled files. Initializes manifold-3d and provides
  * OpenSCAD built-ins and helpers. Exports all symbols for use by compiled code.
  */
-import {createCanvas, loadImage} from 'canvas';
 import Module from 'manifold-3d';
 import * as opentype from 'opentype.js';
 
@@ -3064,17 +3063,35 @@ function __parse_color_for_scope(c: any, alpha: any): any {
 }
 
 
-async function gridFromImage(dataUrl: string, invert: boolean): Promise<{
+// A PNG decoded at compile time
+export interface SurfaceImage {
+  width: number;
+  height: number;
+  rgb: string;
+}
+
+function __b64ToBytes(b64: string): Uint8Array {
+  if (typeof Buffer !== 'undefined') {
+    return new Uint8Array(Buffer.from(b64, 'base64'));
+  }
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+function gridFromImage(image: SurfaceImage, invert: boolean): {
   width: number; height: number; Z: (x: number, y: number) => number;
   minVal: number
-}> {
-  const {width, height, data} = await decodeImageToPixels(dataUrl);
+} {
+  const {width, height} = image;
+  const data = __b64ToBytes(image.rgb);
   // Flip the image vertically and apply `invert` as `1 - pixel`, even if it
   // produces negative values
   const Z = (x: number, y: number): number => {
-    const i = ((height - 1 - y) * width + x) * 4;
+    const i = ((height - 1 - y) * width + x) * 3;
     const gray =
-        0.2126 * data![i]! + 0.7152 * data![i + 1]! + 0.0722 * data![i + 2]!;
+        0.2126 * data[i]! + 0.7152 * data[i + 1]! + 0.0722 * data[i + 2]!;
     return (100 / 255) * (invert ? 1 - gray : gray);
   };
   let minVal = 200;
@@ -3110,7 +3127,8 @@ function gridFromText(text: string): {
   return {width, height, Z, minVal};
 }
 
-async function __surface(source: string, opts: {
+// Text matrices are parsed here, and images arrive already decoded from the compiler
+function __surface(source: string|SurfaceImage, opts: {
   center?: boolean;
   invert?: boolean;
   kind?: 'image' | 'text';
@@ -3120,8 +3138,9 @@ async function __surface(source: string, opts: {
 } = {}) {
   const {center = false, invert = false, kind = 'image'} = opts;
   // OpenSCAD only honors a bool invert, and only for images
-  const grid = kind === 'text' ? gridFromText(source) :
-                                 await gridFromImage(source, invert === true);
+  const grid = kind === 'text' ?
+      gridFromText(source as string) :
+      gridFromImage(source as SurfaceImage, invert === true);
   return buildSurfaceMesh(grid, center);
 }
 
@@ -3196,34 +3215,6 @@ function buildSurfaceMesh(
     triVerts: new Uint32Array(tris),
     numProp: 3,
   }));
-}
-
-
-async function decodeImageToPixels(dataUrl: string):
-    Promise<{width: number; height: number; data: Uint8ClampedArray;}> {
-  if (typeof OffscreenCanvas !== 'undefined') {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = new OffscreenCanvas(img.width, img.height);
-        const ctx = canvas.getContext('2d')!;
-        ctx.drawImage(img, 0, 0);
-        const {data, width, height} =
-            ctx.getImageData(0, 0, img.width, img.height);
-        resolve({width, height, data});
-      };
-      img.onerror = () =>
-          reject(new Error('__surface: failed to decode image'));
-      img.src = dataUrl;
-    });
-  } else {
-    const img = await loadImage(dataUrl);
-    const canvas = createCanvas(img.width, img.height);
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    const {data, width, height} = ctx.getImageData(0, 0, img.width, img.height);
-    return {width, height, data: data as unknown as Uint8ClampedArray};
-  }
 }
 
 function pow_fn(base: any, exp: any) {

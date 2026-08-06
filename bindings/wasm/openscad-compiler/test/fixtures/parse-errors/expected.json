@@ -1,0 +1,73 @@
+{
+  "issue1890-comment.scad": {
+    "expect": "throw"
+  },
+  "issue1890-string.scad": {
+    "expect": "throw"
+  },
+  "issue1890-include.scad": {
+    "expect": "throw"
+  },
+  "issue1890-use.scad": {
+    "expect": "throw"
+  },
+
+  "error.scad": {
+    "expect": "throw",
+    "at": "error.scad:3"
+  },
+  "mainincludingerror.scad": {
+    "expect": "throw",
+    "at": "error.scad:3"
+  },
+  "mainusingerror.scad": {
+    "expect": "resolve",
+    "warns": true,
+    "from": {"mainusingerror.scad": 1}
+  },
+  "mainuseincludingerror.scad": {
+    "expect": "resolve",
+    "warns": true,
+    "from": {"mainuseincludingerror.scad": 1}
+  },
+
+  "syntax-error-in-line-2.scad": {
+    "expect": "throw",
+    "at": "syntax-error-in-line-2.scad:2"
+  },
+  "bad-include-synerr.scad": {
+    "expect": "throw",
+    "at": "syntax-error-in-line-2.scad:2"
+  },
+
+  "entry-ok.scad": {
+    "expect": "resolve",
+    "from": {"entry-ok.scad": 1}
+  },
+  "broken.scad": {
+    "expect": "throw",
+    "at": "broken.scad:4"
+  },
+  "lib-broken.scad": {
+    "expect": "throw",
+    "at": "lib-broken.scad:3"
+  },
+  "mid-includes-broken.scad": {
+    "expect": "throw",
+    "at": "lib-broken.scad:3"
+  },
+  "entry-include-broken.scad": {
+    "expect": "throw",
+    "at": "lib-broken.scad:3"
+  },
+  "entry-use-broken.scad": {
+    "expect": "resolve",
+    "warns": true,
+    "from": {"entry-use-broken.scad": 2}
+  },
+  "entry-use-transitive.scad": {
+    "expect": "resolve",
+    "warns": true,
+    "from": {"entry-use-transitive.scad": 1}
+  }
+}

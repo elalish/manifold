@@ -11,7 +11,7 @@
     "serve": "npx serve .",
     "compile-all": "npx tsx index.ts compile-all",
     "pretest": "npm run build && npm link && npm run compile-all",
-    "test": "cd test && npx vitest run geometry.test.ts && npx vitest run source-location.test.ts && npx vitest run semantic.test.ts",
+    "test": "cd test && npx vitest run geometry.test.ts && npx vitest run source-location.test.ts && npx vitest run semantic.test.ts && npx vitest run parse-errors.test.ts",
     "test:geometry": "cd test && npx vitest run geometry.test.ts",
     "test:source-location": "cd test && npx vitest run source-location.test.ts",
     "test:semantic": "cd test && npx vitest run semantic.test.ts",

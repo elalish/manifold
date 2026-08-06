@@ -1,7 +1,9 @@
+import {createCanvas, Image} from 'canvas';
 import fs from 'fs';
 import path from 'path';
 
-import type {Argument, ASTNode, BlockStmt, Comment, Expr, ForStmt, ForVariable, IfStmt, ListCompGenerator, ModuleCallStmt, Program, Statement,} from './ast.js';
+import {forEachChild} from './ast.js';
+import type {Argument, ASTNode, BlockStmt, Comment, Expr, ForStmt, ForVariable, IfStmt, KindedNode, ListCompGenerator, ModuleCallStmt, Program, ScopeStmt, Statement,} from './ast.js';
 import type {IRBooleanNode, IRChildrenNode, IRForNode, IRIfNode, IRModuleCallNode, IRNode, IRPrimitiveNode, IRSequenceNode, IRTransformNode,} from './ir.js';
 import {getFontPath} from './resolver.js';
 import type {LibraryClosure} from './resolver.js';
@@ -39,6 +41,15 @@ export interface CompileOptions {
   runtimePath?: string;
   externalLibraries?: ResolvedExternalLib[];
 }
+
+const BUILTIN_CONSTANTS_CODE =
+    `let PI: number = __rt.PI;\n` +
+    `let INF: number = __rt.INF;\n` +
+    `let NAN: number = __rt.NAN;\n` +
+    `let undef: undefined = __rt.undef;\n` +
+    `let _EPSILON: number = __rt._EPSILON;\n` +
+    `let __NO_ARG: symbol = Symbol.for("__OPENSCAD_NO_ARG__");\n`;
+
 
 const BUILTIN_MODULES = new Set([
   'cube',
@@ -88,132 +99,23 @@ function collectProgramReferences(stmts: Statement[]): ProgramReferences {
   const functions = new Set<string>();
   const variables = new Set<string>();
 
-  const visitExpr = (e: Expr|undefined): void => {
-    if (!e) return;
-    switch (e.kind) {
+  const visit = (node: KindedNode): void => {
+    switch (node.kind) {
       case 'identifier':
-        if (e.name !== '$children' && !e.name.startsWith('$'))
-          variables.add(e.name);
+        if (node.name !== '$children' && !node.name.startsWith('$'))
+          variables.add(node.name);
         break;
       case 'call':
-        functions.add(e.name);
-        e.args.forEach(a => visitExpr(a.value));
-        break;
-      case 'vector':
-        e.elements.forEach(visitExpr);
-        break;
-      case 'range':
-        visitExpr(e.start);
-        visitExpr(e.end);
-        visitExpr(e.step);
-        break;
-      case 'binary':
-        visitExpr(e.left);
-        visitExpr(e.right);
-        break;
-      case 'unary':
-        visitExpr(e.operand);
-        break;
-      case 'group':
-      case 'each':
-        visitExpr(e.expr);
-        break;
-      case 'ternary':
-        visitExpr(e.condition);
-        visitExpr(e.ifTrue);
-        visitExpr(e.ifFalse);
-        break;
-      case 'index':
-        visitExpr(e.object);
-        visitExpr(e.index);
-        break;
-      case 'member':
-        visitExpr(e.object);
-        break;
-      case 'echo':
-      case 'assert':
-        e.args.forEach(a => visitExpr(a.value));
-        visitExpr(e.expr);
-        break;
-      case 'let':
-        e.assignments.forEach(a => visitExpr(a.value));
-        visitExpr(e.body);
-        break;
-      case 'lambda':
-        e.params.forEach(p => visitExpr(p.defaultValue));
-        visitExpr(e.body);
-        break;
-      case 'dynCall':
-        visitExpr(e.callee);
-        e.args.forEach(a => visitExpr(a.value));
-        break;
-      case 'listComp':
-        visitGenerator(e.generator);
-        break;
-    }
-  };
-  const visitGenerator = (g: ListCompGenerator|undefined): void => {
-    if (!g) return;
-    switch (g.kind) {
-      case 'lcFor':
-        g.variables.forEach(v => visitExpr(v.range));
-        visitGenerator(g.body);
-        break;
-      case 'lcCFor':
-        g.inits.forEach(a => visitExpr(a.value));
-        visitExpr(g.condition);
-        g.updates.forEach(a => visitExpr(a.value));
-        visitGenerator(g.body);
-        break;
-      case 'lcIf':
-        visitExpr(g.condition);
-        visitGenerator(g.ifTrue);
-        visitGenerator(g.ifFalse);
-        break;
-      case 'lcLet':
-        g.assignments.forEach(a => visitExpr(a.value));
-        visitGenerator(g.body);
-        break;
-      case 'lcExpr':
-        visitExpr(g.expr);
-        break;
-    }
-  };
-  const visitStmt = (s: Statement|undefined): void => {
-    if (!s) return;
-    switch (s.kind) {
-      case 'variableDecl':
-        visitExpr(s.value);
-        break;
-      case 'functionDecl':
-        s.params.forEach(p => visitExpr(p.defaultValue));
-        visitExpr(s.body);
-        break;
-      case 'moduleDecl':
-        s.params.forEach(p => visitExpr(p.defaultValue));
-        visitStmt(s.body);
+        functions.add(node.name);
         break;
       case 'moduleCall':
-        if (s.name !== 'children') modules.add(s.name);
-        s.args.forEach(a => visitExpr(a.value));
-        visitStmt(s.child);
-        break;
-      case 'block':
-        s.statements.forEach(visitStmt);
-        break;
-      case 'for':
-        s.variables.forEach(v => visitExpr(v.range));
-        visitStmt(s.body);
-        break;
-      case 'if':
-        visitExpr(s.condition);
-        visitStmt(s.thenBody);
-        visitStmt(s.elseBody);
+        if (node.name !== 'children') modules.add(node.name);
         break;
     }
+    forEachChild(node, visit);
   };
 
-  stmts.forEach(visitStmt);
+  stmts.forEach(visit);
   return {modules, functions, variables};
 }
 
@@ -322,6 +224,9 @@ let currentRuntimePath: string = './runtime/runtime.js';
 // Name of the file currently being compiled
 let currentMainFilename: string = '';
 
+// Source file the statement being emitted came from
+let currentSourceFilename: string = '';
+
 // Aborts a C-style for loop once its counter exceeds this many iterations,
 // guarding against infinite loops
 const MAX_FOR_ITERATIONS = 1000000;
@@ -348,7 +253,7 @@ function generateFontBase64(fontSpec: string, compilerDir: string): string|
     undefined {
   const fontDir = getFontPath();
   if (!fontDir) {
-    console.warn(`Warning: FONTPATH not set in .env — cannot load font "${
+    console.warn(`Warning: FONTPATH environment variable not set — cannot load font "${
         fontSpec}". Text will render as empty cross-section.`);
     return undefined;
   }
@@ -444,7 +349,7 @@ function collectSignatures(stmts: Statement[]) {
       if (stmt.kind === 'moduleDecl' && stmt.body.kind === 'block') {
         collectSignatures(stmt.body.statements);
       }
-    } else if (stmt.kind === 'block') {
+    } else if (stmt.kind === 'block' || stmt.kind === 'scope') {
       collectSignatures(stmt.statements);
     } else if (stmt.kind === 'if') {
       if (stmt.thenBody.kind === 'block')
@@ -468,7 +373,7 @@ function collectModuleDeclarations(
       }
       continue;
     }
-    if (stmt.kind === 'block') {
+    if (stmt.kind === 'block' || stmt.kind === 'scope') {
       collectModuleDeclarations(stmt.statements, into);
       continue;
     }
@@ -486,285 +391,31 @@ function baseIRContext(modules = moduleDeclRegistry): IRLowerContext {
   return {modules, children: [], callStack: []};
 }
 
-function estimateExprComplexity(expr: Expr): number {
-  switch (expr.kind) {
-    case 'number':
-    case 'string':
-    case 'boolean':
-    case 'undef':
-    case 'identifier':
-      return 1;
-    case 'vector':
-      return 1 +
-          expr.elements.reduce(
-              (sum, item) => sum + estimateExprComplexity(item), 0);
-    case 'range':
-      return 1 + estimateExprComplexity(expr.start) +
-          estimateExprComplexity(expr.end) +
-          (expr.step ? estimateExprComplexity(expr.step) : 0);
-    case 'binary':
-      return 1 + estimateExprComplexity(expr.left) +
-          estimateExprComplexity(expr.right);
-    case 'unary':
-      return 1 + estimateExprComplexity(expr.operand);
-    case 'group':
-      return 1 + estimateExprComplexity(expr.expr);
-    case 'each':
-      return 1 + estimateExprComplexity(expr.expr);
-    case 'ternary':
-      return 1 + estimateExprComplexity(expr.condition) +
-          estimateExprComplexity(expr.ifTrue) +
-          estimateExprComplexity(expr.ifFalse);
-    case 'call':
-      return 1 +
-          expr.args.reduce(
-              (sum, arg) => sum + estimateExprComplexity(arg.value), 0);
-    case 'echo':
-      return 1 +
-          expr.args.reduce(
-              (sum, arg) => sum + estimateExprComplexity(arg.value), 0) +
-          estimateExprComplexity(expr.expr);
-    case 'assert':
-      return 1 +
-          expr.args.reduce(
-              (sum, arg) => sum + estimateExprComplexity(arg.value), 0) +
-          estimateExprComplexity(expr.expr);
-    case 'index':
-      return 1 + estimateExprComplexity(expr.object) +
-          estimateExprComplexity(expr.index);
-    case 'member':
-      return 1 + estimateExprComplexity(expr.object);
-    case 'let':
-      return 1 +
-          expr.assignments.reduce(
-              (sum, item) => sum + estimateExprComplexity(item.value), 0) +
-          estimateExprComplexity(expr.body);
-    case 'listComp':
-      return 1 + estimateListCompComplexity(expr.generator);
-    case 'lambda':
-      return 1 +
-          expr.params.reduce(
-              (sum, item) => sum +
-                  (item.defaultValue ?
-                       estimateExprComplexity(item.defaultValue) :
-                       0),
-              0) +
-          estimateExprComplexity(expr.body);
-    case 'dynCall':
-      return 1 + estimateExprComplexity(expr.callee) +
-          expr.args.reduce(
-              (sum, arg) => sum + estimateExprComplexity(arg.value), 0);
-    default:
-      return 1;
-  }
+// Node count of a subtree, used only to keep IR inlining to small bodies
+function estimateNodeComplexity(node: KindedNode): number {
+  let total = 1;
+  forEachChild(node, child => {
+    total += estimateNodeComplexity(child);
+  });
+  return total;
 }
 
-function estimateListCompComplexity(generator: ListCompGenerator): number {
-  switch (generator.kind) {
-    case 'lcFor':
-      return 1 +
-          generator.variables.reduce(
-              (sum, item) => sum + estimateExprComplexity(item.range), 0) +
-          estimateListCompComplexity(generator.body);
-    case 'lcCFor':
-      return 1 +
-          generator.inits.reduce(
-              (sum, item) => sum + estimateExprComplexity(item.value), 0) +
-          estimateExprComplexity(generator.condition) +
-          generator.updates.reduce(
-              (sum, item) => sum + estimateExprComplexity(item.value), 0) +
-          estimateListCompComplexity(generator.body);
-    case 'lcIf':
-      return 1 + estimateExprComplexity(generator.condition) +
-          estimateListCompComplexity(generator.ifTrue) +
-          (generator.ifFalse ? estimateListCompComplexity(generator.ifFalse) :
-                               0);
-    case 'lcLet':
-      return 1 +
-          generator.assignments.reduce(
-              (sum, item) => sum + estimateExprComplexity(item.value), 0) +
-          estimateListCompComplexity(generator.body);
-    case 'lcExpr':
-      return 1 + estimateExprComplexity(generator.expr);
-    default:
-      return 1;
-  }
-}
 
-function estimateStatementComplexity(stmt: Statement): number {
-  switch (stmt.kind) {
-    case 'empty':
-    case 'use':
-    case 'include':
-      return 1;
-    case 'variableDecl':
-      return 1 + estimateExprComplexity(stmt.value);
-    case 'functionDecl':
-      return 1 +
-          stmt.params.reduce(
-              (sum, item) => sum +
-                  (item.defaultValue ?
-                       estimateExprComplexity(item.defaultValue) :
-                       0),
-              0) +
-          estimateExprComplexity(stmt.body);
-    case 'moduleDecl':
-      return 1 +
-          stmt.params.reduce(
-              (sum, item) => sum +
-                  (item.defaultValue ?
-                       estimateExprComplexity(item.defaultValue) :
-                       0),
-              0) +
-          estimateStatementComplexity(stmt.body);
-    case 'moduleCall':
-      return 1 +
-          stmt.args.reduce(
-              (sum, arg) => sum + estimateExprComplexity(arg.value), 0) +
-          (stmt.child ? estimateStatementComplexity(stmt.child) : 0);
-    case 'block':
-      return 1 +
-          stmt.statements.reduce(
-              (sum, item) => sum + estimateStatementComplexity(item), 0);
-    case 'for':
-      return 1 +
-          stmt.variables.reduce(
-              (sum, item) => sum + estimateExprComplexity(item.range), 0) +
-          estimateStatementComplexity(stmt.body);
-    case 'if':
-      return 1 + estimateExprComplexity(stmt.condition) +
-          estimateStatementComplexity(stmt.thenBody) +
-          (stmt.elseBody ? estimateStatementComplexity(stmt.elseBody) : 0);
-    default:
-      return 1;
-  }
-}
-
-function exprUsesModuleScope(expr: Expr): boolean {
-  switch (expr.kind) {
-    case 'identifier':
-      return expr.name === '$children';
-    case 'number':
-    case 'string':
-    case 'boolean':
-    case 'undef':
-      return false;
-    case 'vector':
-      return expr.elements.some(exprUsesModuleScope);
-    case 'range':
-      return exprUsesModuleScope(expr.start) || exprUsesModuleScope(expr.end) ||
-          (expr.step ? exprUsesModuleScope(expr.step) : false);
-    case 'binary':
-      return exprUsesModuleScope(expr.left) || exprUsesModuleScope(expr.right);
-    case 'unary':
-      return exprUsesModuleScope(expr.operand);
-    case 'ternary':
-      return exprUsesModuleScope(expr.condition) ||
-          exprUsesModuleScope(expr.ifTrue) || exprUsesModuleScope(expr.ifFalse);
-    case 'call':
-      return expr.args.some(arg => exprUsesModuleScope(arg.value));
-    case 'index':
-      return exprUsesModuleScope(expr.object) ||
-          exprUsesModuleScope(expr.index);
-    case 'member':
-      return exprUsesModuleScope(expr.object);
-    case 'group':
-      return exprUsesModuleScope(expr.expr);
-    case 'echo':
-    case 'assert':
-      return expr.args.some(arg => exprUsesModuleScope(arg.value)) ||
-          exprUsesModuleScope(expr.expr);
-    case 'let':
-      return expr.assignments.some(item => exprUsesModuleScope(item.value)) ||
-          exprUsesModuleScope(expr.body);
-    case 'listComp':
-      return listCompUsesModuleScope(expr.generator);
-    case 'each':
-      return exprUsesModuleScope(expr.expr);
-    case 'lambda':
-      return expr.params.some(
-                 item => item.defaultValue ?
-                     exprUsesModuleScope(item.defaultValue) :
-                     false) ||
-          exprUsesModuleScope(expr.body);
-    case 'dynCall':
-      return exprUsesModuleScope(expr.callee) ||
-          expr.args.some(arg => exprUsesModuleScope(arg.value));
-    default:
-      return false;
-  }
-}
-
-function listCompUsesModuleScope(generator: ListCompGenerator): boolean {
-  switch (generator.kind) {
-    case 'lcFor':
-      return generator.variables.some(
-                 item => exprUsesModuleScope(item.range)) ||
-          listCompUsesModuleScope(generator.body);
-    case 'lcCFor':
-      return generator.inits.some(item => exprUsesModuleScope(item.value)) ||
-          exprUsesModuleScope(generator.condition) ||
-          generator.updates.some(item => exprUsesModuleScope(item.value)) ||
-          listCompUsesModuleScope(generator.body);
-    case 'lcIf':
-      return exprUsesModuleScope(generator.condition) ||
-          listCompUsesModuleScope(generator.ifTrue) ||
-          (generator.ifFalse ? listCompUsesModuleScope(generator.ifFalse) :
-                               false);
-    case 'lcLet':
-      return generator.assignments.some(
-                 item => exprUsesModuleScope(item.value)) ||
-          listCompUsesModuleScope(generator.body);
-    case 'lcExpr':
-      return exprUsesModuleScope(generator.expr);
-    default:
-      return false;
-  }
-}
-
-function statementUsesModuleScope(stmt: Statement): boolean {
-  switch (stmt.kind) {
-    case 'empty':
-    case 'use':
-    case 'include':
-      return false;
-    case 'variableDecl':
-      return exprUsesModuleScope(stmt.value);
-    case 'functionDecl':
-      return stmt.params.some(
-                 item => item.defaultValue ?
-                     exprUsesModuleScope(item.defaultValue) :
-                     false) ||
-          exprUsesModuleScope(stmt.body);
-    case 'moduleDecl':
-      return stmt.params.some(
-                 item => item.defaultValue ?
-                     exprUsesModuleScope(item.defaultValue) :
-                     false) ||
-          statementUsesModuleScope(stmt.body);
-    case 'moduleCall':
-      return stmt.name === 'children' ||
-          stmt.args.some(arg => exprUsesModuleScope(arg.value)) ||
-          (stmt.child ? statementUsesModuleScope(stmt.child) : false);
-    case 'block':
-      return stmt.statements.some(statementUsesModuleScope);
-    case 'for':
-      return stmt.variables.some(item => exprUsesModuleScope(item.range)) ||
-          statementUsesModuleScope(stmt.body);
-    case 'if':
-      return exprUsesModuleScope(stmt.condition) ||
-          statementUsesModuleScope(stmt.thenBody) ||
-          (stmt.elseBody ? statementUsesModuleScope(stmt.elseBody) : false);
-    default:
-      return false;
-  }
+function nodeUsesModuleScope(node: KindedNode): boolean {
+  if (node.kind === 'identifier') return node.name === '$children';
+  if (node.kind === 'moduleCall' && node.name === 'children') return true;
+  let found = false;
+  forEachChild(node, child => {
+    found = found || nodeUsesModuleScope(child);
+  });
+  return found;
 }
 
 function shouldInlineModuleToIR(
     decl: ModuleDeclStmtType, ctx: IRLowerContext): boolean {
   if (ctx.callStack.length >= MAX_IR_INLINE_DEPTH) return false;
-  if (statementUsesModuleScope(decl.body)) return false;
-  return estimateStatementComplexity(decl.body) <= MAX_IR_INLINE_COMPLEXITY;
+  if (nodeUsesModuleScope(decl.body)) return false;
+  return estimateNodeComplexity(decl.body) <= MAX_IR_INLINE_COMPLEXITY;
 }
 
 function compileArgList(name: string, args: Argument[]): string {
@@ -983,7 +634,24 @@ let dynamicScopeVars: Set<string> = new Set();
 const localScopes: Set<string>[] = [];
 
 let globalVarNames: Set<string> = new Set();
+// Variables private to the `use`d file currently being emitted
+let filePrivateVars: Set<string> = new Set();
 let activeShadowRenames: Map<string, string> = new Map();
+
+// Does this name resolve to a variable of an enclosing OpenSCAD file scope
+function isOuterVarName(name: string): boolean {
+  return globalVarNames.has(name) || filePrivateVars.has(name);
+}
+
+function withFilePrivateVars<T>(names: string[], fn: () => T): T {
+  const saved = filePrivateVars;
+  filePrivateVars = new Set([...saved, ...names]);
+  try {
+    return fn();
+  } finally {
+    filePrivateVars = saved;
+  }
+}
 
 // A new local binding (let/lambda/comprehension) should ignore any active
 // rename of the same name, so it doesn't reference the outer one
@@ -1030,109 +698,9 @@ function collectLocalVariableNames(stmts: Statement[]): string[] {
   return names;
 }
 
-function collectStringLiteralsInExpr(expr: Expr, literals: Set<string>): void {
-  if (!expr) return;
-  switch (expr.kind) {
-    case 'string':
-      literals.add(expr.value);
-      break;
-    case 'vector':
-      for (const el of expr.elements) collectStringLiteralsInExpr(el, literals);
-      break;
-    case 'range':
-      collectStringLiteralsInExpr(expr.start, literals);
-      collectStringLiteralsInExpr(expr.end, literals);
-      if (expr.step) collectStringLiteralsInExpr(expr.step, literals);
-      break;
-    case 'binary':
-      collectStringLiteralsInExpr(expr.left, literals);
-      collectStringLiteralsInExpr(expr.right, literals);
-      break;
-    case 'unary':
-      collectStringLiteralsInExpr(expr.operand, literals);
-      break;
-    case 'ternary':
-      collectStringLiteralsInExpr(expr.condition, literals);
-      collectStringLiteralsInExpr(expr.ifTrue, literals);
-      collectStringLiteralsInExpr(expr.ifFalse, literals);
-      break;
-    case 'call':
-      for (const arg of expr.args)
-        collectStringLiteralsInExpr(arg.value, literals);
-      break;
-    case 'index':
-      collectStringLiteralsInExpr(expr.object, literals);
-      collectStringLiteralsInExpr(expr.index, literals);
-      break;
-    case 'member':
-      collectStringLiteralsInExpr(expr.object, literals);
-      break;
-    case 'group':
-      collectStringLiteralsInExpr(expr.expr, literals);
-      break;
-    case 'echo':
-    case 'assert':
-      for (const arg of expr.args)
-        collectStringLiteralsInExpr(arg.value, literals);
-      collectStringLiteralsInExpr(expr.expr, literals);
-      break;
-    case 'let':
-      for (const assign of expr.assignments)
-        collectStringLiteralsInExpr(assign.value, literals);
-      collectStringLiteralsInExpr(expr.body, literals);
-      break;
-    case 'each':
-      collectStringLiteralsInExpr(expr.expr, literals);
-      break;
-    case 'lambda':
-      for (const param of expr.params) {
-        if (param.defaultValue)
-          collectStringLiteralsInExpr(param.defaultValue, literals);
-      }
-      collectStringLiteralsInExpr(expr.body, literals);
-      break;
-    case 'dynCall':
-      collectStringLiteralsInExpr(expr.callee, literals);
-      for (const arg of expr.args)
-        collectStringLiteralsInExpr(arg.value, literals);
-      break;
-    case 'listComp':
-      collectStringLiteralsInGenerator(expr.generator, literals);
-      break;
-  }
-}
-
-function collectStringLiteralsInGenerator(
-    gen: ListCompGenerator, literals: Set<string>): void {
-  if (!gen) return;
-  switch (gen.kind) {
-    case 'lcFor':
-      for (const v of gen.variables)
-        collectStringLiteralsInExpr(v.range, literals);
-      collectStringLiteralsInGenerator(gen.body, literals);
-      break;
-    case 'lcCFor':
-      for (const init of gen.inits)
-        collectStringLiteralsInExpr(init.value, literals);
-      collectStringLiteralsInExpr(gen.condition, literals);
-      for (const update of gen.updates)
-        collectStringLiteralsInExpr(update.value, literals);
-      collectStringLiteralsInGenerator(gen.body, literals);
-      break;
-    case 'lcIf':
-      collectStringLiteralsInExpr(gen.condition, literals);
-      collectStringLiteralsInGenerator(gen.ifTrue, literals);
-      if (gen.ifFalse) collectStringLiteralsInGenerator(gen.ifFalse, literals);
-      break;
-    case 'lcLet':
-      for (const assign of gen.assignments)
-        collectStringLiteralsInExpr(assign.value, literals);
-      collectStringLiteralsInGenerator(gen.body, literals);
-      break;
-    case 'lcExpr':
-      collectStringLiteralsInExpr(gen.expr, literals);
-      break;
-  }
+function collectStringLiterals(node: KindedNode, literals: Set<string>): void {
+  if (node.kind === 'string') literals.add(node.value);
+  forEachChild(node, child => collectStringLiterals(child, literals));
 }
 
 // Collect every identifier referenced as a value, and every name bound anywhere
@@ -1149,164 +717,38 @@ function collectIdentifierUsage(program: Program): IdentifierUsage {
   const referenced = new Set<string>();
   const bound = new Set<string>();
 
-  const visitGenerator = (gen: ListCompGenerator|undefined): void => {
-    if (!gen) return;
-    switch (gen.kind) {
-      case 'lcFor':
-        gen.variables.forEach(v => {
-          bound.add(escapeName(v.name));
-          visitExpr(v.range);
-        });
-        visitGenerator(gen.body);
-        break;
-      case 'lcCFor':
-        gen.inits.forEach(a => {
-          bound.add(escapeName(a.name));
-          visitExpr(a.value);
-        });
-        visitExpr(gen.condition);
-        gen.updates.forEach(a => {
-          bound.add(escapeName(a.name));
-          visitExpr(a.value);
-        });
-        visitGenerator(gen.body);
-        break;
-      case 'lcIf':
-        visitExpr(gen.condition);
-        visitGenerator(gen.ifTrue);
-        visitGenerator(gen.ifFalse);
-        break;
-      case 'lcLet':
-        gen.assignments.forEach(a => {
-          bound.add(escapeName(a.name));
-          visitExpr(a.value);
-        });
-        visitGenerator(gen.body);
-        break;
-      case 'lcExpr':
-        visitExpr(gen.expr);
-        break;
-    }
-  };
-
-  const visitExpr = (expr: Expr|undefined): void => {
-    if (!expr) return;
-    switch (expr.kind) {
+  // Only the names a node binds are per-kind here; reaching the children is
+  // the visitor's job
+  const visit = (node: KindedNode): void => {
+    switch (node.kind) {
       case 'identifier':
-        if (expr.name !== '$children') referenced.add(escapeName(expr.name));
+        if (node.name !== '$children') referenced.add(escapeName(node.name));
         break;
-      case 'number':
-      case 'string':
-      case 'boolean':
-      case 'undef':
-        break;
-      case 'vector':
-        expr.elements.forEach(visitExpr);
-        break;
-      case 'range':
-        visitExpr(expr.start);
-        visitExpr(expr.end);
-        visitExpr(expr.step);
-        break;
-      case 'binary':
-        visitExpr(expr.left);
-        visitExpr(expr.right);
-        break;
-      case 'unary':
-        visitExpr(expr.operand);
-        break;
-      case 'group':
-      case 'each':
-        visitExpr(expr.expr);
-        break;
-      case 'ternary':
-        visitExpr(expr.condition);
-        visitExpr(expr.ifTrue);
-        visitExpr(expr.ifFalse);
-        break;
-      case 'call':
-        expr.args.forEach(a => visitExpr(a.value));
-        break;
-      case 'index':
-        visitExpr(expr.object);
-        visitExpr(expr.index);
-        break;
-      case 'member':
-        visitExpr(expr.object);
-        break;
-      case 'echo':
-      case 'assert':
-        expr.args.forEach(a => visitExpr(a.value));
-        visitExpr(expr.expr);
-        break;
-      case 'let':
-        expr.assignments.forEach(a => {
-          bound.add(escapeName(a.name));
-          visitExpr(a.value);
-        });
-        visitExpr(expr.body);
+      case 'variableDecl':
+        bound.add(escapeName(node.name));
         break;
       case 'lambda':
-        expr.params.forEach(p => {
-          bound.add(escapeName(p.name));
-          visitExpr(p.defaultValue);
-        });
-        visitExpr(expr.body);
-        break;
-      case 'dynCall':
-        visitExpr(expr.callee);
-        expr.args.forEach(a => visitExpr(a.value));
-        break;
-      case 'listComp':
-        visitGenerator(expr.generator);
-        break;
-    }
-  };
-
-  const visitStmt = (stmt: Statement|undefined): void => {
-    if (!stmt) return;
-    switch (stmt.kind) {
-      case 'variableDecl':
-        bound.add(escapeName(stmt.name));
-        visitExpr(stmt.value);
-        break;
       case 'functionDecl':
-        stmt.params.forEach(p => {
-          bound.add(escapeName(p.name));
-          visitExpr(p.defaultValue);
-        });
-        visitExpr(stmt.body);
-        break;
       case 'moduleDecl':
-        stmt.params.forEach(p => {
-          bound.add(escapeName(p.name));
-          visitExpr(p.defaultValue);
-        });
-        visitStmt(stmt.body);
+        node.params.forEach(p => bound.add(escapeName(p.name)));
         break;
-      case 'moduleCall':
-        stmt.args.forEach(a => visitExpr(a.value));
-        visitStmt(stmt.child);
-        break;
-      case 'block':
-        stmt.statements.forEach(visitStmt);
+      case 'let':
+      case 'lcLet':
+        node.assignments.forEach(a => bound.add(escapeName(a.name)));
         break;
       case 'for':
-        stmt.variables.forEach(v => {
-          bound.add(escapeName(v.name));
-          visitExpr(v.range);
-        });
-        visitStmt(stmt.body);
+      case 'lcFor':
+        node.variables.forEach(v => bound.add(escapeName(v.name)));
         break;
-      case 'if':
-        visitExpr(stmt.condition);
-        visitStmt(stmt.thenBody);
-        visitStmt(stmt.elseBody);
+      case 'lcCFor':
+        node.inits.forEach(a => bound.add(escapeName(a.name)));
+        node.updates.forEach(a => bound.add(escapeName(a.name)));
         break;
     }
+    forEachChild(node, visit);
   };
 
-  program.statements.forEach(visitStmt);
+  program.statements.forEach(visit);
   return {referenced, bound};
 }
 
@@ -1348,11 +790,14 @@ function resolveCallArgs(
 
 function collectFontRelatedLiterals(program: Program): Set<string> {
   const modulesCallingText = new Set<string>(['text']);
+  const flatten = (stmts: Statement[]): Statement[] => stmts.flatMap(
+      s => s.kind === 'scope' ? flatten(s.statements) : [s]);
+  const topLevel = flatten(program.statements);
 
   let changed = true;
   while (changed) {
     changed = false;
-    for (const stmt of program.statements) {
+    for (const stmt of topLevel) {
       if (stmt.kind === 'moduleDecl' && !modulesCallingText.has(stmt.name)) {
         let callsText = false;
 
@@ -1362,7 +807,7 @@ function collectFontRelatedLiterals(program: Program): Set<string> {
               callsText = true;
             }
             if (s.child) checkCalls(s.child);
-          } else if (s.kind === 'block') {
+          } else if (s.kind === 'block' || s.kind === 'scope') {
             for (const sub of s.statements) checkCalls(sub);
           } else if (s.kind === 'for') {
             checkCalls(s.body);
@@ -1386,7 +831,7 @@ function collectFontRelatedLiterals(program: Program): Set<string> {
   // Helper to collect all string literals from an expression
   const collectExpr = (expr: Expr) => {
     if (!expr) return;
-    collectStringLiteralsInExpr(expr, literals);
+    collectStringLiterals(expr, literals);
   };
 
   // Traverse AST to collect literals from related definitions and invocations
@@ -1417,7 +862,7 @@ function collectFontRelatedLiterals(program: Program): Set<string> {
       if (isRelated) {
         collectExpr(s.value);
       }
-    } else if (s.kind === 'block') {
+    } else if (s.kind === 'block' || s.kind === 'scope') {
       for (const sub of s.statements) traverse(sub, insideTextModule);
     } else if (s.kind === 'for') {
       traverse(s.body, insideTextModule);
@@ -1438,6 +883,7 @@ function collectFontRelatedLiterals(program: Program): Set<string> {
 export function compile(program: Program, options?: CompileOptions): string {
   currentRuntimePath = options?.runtimePath ?? './runtime/runtime.js';
   currentMainFilename = program.filename ?? '';
+  currentSourceFilename = currentMainFilename;
   dynamicScopeVars = new Set();
   encounteredFonts = new Set();
   encounteredSurfaceData.clear();
@@ -1539,13 +985,34 @@ export function compile(program: Program, options?: CompileOptions): string {
   const declOrder: string[] = [];
   const geometryLines: string[] = [];
 
+  const scopeUnits: string[] = [];
+
   let lastGeoFilename = '';
   const processStmt = (stmt: Statement) => {
     if (stmt.kind === 'empty') return;
+    if (stmt.filename) currentSourceFilename = stmt.filename;
     // `{}` doesn't create a new scope in OpenSCAD: merge its assignments into
     // the enclosing scope (last assignment wins) and inline its actions
     if (stmt.kind === 'block') {
       for (const s of stmt.statements) processStmt(s);
+      return;
+    }
+    // A `use`d file is a scope: its variables stay inside
+    // and only its modules and functions are published, as forwarders so they
+    // dedupe against the consumer's own declarations of the same name
+    if (stmt.kind === 'scope') {
+      const unit = `__scope${scopeUnits.length}`;
+      const {code, exports} = compileUsedFileScope(stmt, unit);
+      scopeUnits.push(code);
+      for (const ex of exports) {
+        const key = `fn:${ex}`;
+        if (!declMap.has(key)) declOrder.push(key);
+        declMap.set(key, {
+          stmt,
+          code: `function ${ex}(...__args: any[]): any { return ${unit}.${
+              ex}(...__args); }`,
+        });
+      }
       return;
     }
     if (stmt.kind === 'variableDecl' || stmt.kind === 'moduleDecl' ||
@@ -1620,6 +1087,7 @@ export function compile(program: Program, options?: CompileOptions): string {
         hoistNames.map(n => `${globalVarDeclKeyword} ${n}: any = undef;`)
             .join('\n'));
   }
+  declarations.push(...scopeUnits);
   let lastFilename = '';
   for (const k of declOrder) {
     const entry = declMap.get(k)!;
@@ -1709,14 +1177,12 @@ export function compile(program: Program, options?: CompileOptions): string {
     output += `import { fontBase64 as ${varName} } from "${importPath}";\n`;
   }
 
-  // Add image base64 imports for each resolved image.
+  // Add data imports for each resolved surface file (decoded pixels or matrix)
   for (const [filename, info] of encounteredSurfaceData) {
     const runtimeDir = options?.runtimePath ?
         path.dirname(options.runtimePath).replace(/\\/g, '/') :
         './runtime';
-    const importPath = info.kind === 'image' ?
-        `${runtimeDir}/surface_data/${info.stem}_base64.js` :
-        `${runtimeDir}/surface_data/${info.stem}_data.js`;
+    const importPath = `${runtimeDir}/surface_data/${info.stem}_data.js`;
     output += `import { ${info.exportName} } from "${importPath}";\n`;
   }
 
@@ -1730,12 +1196,7 @@ export function compile(program: Program, options?: CompileOptions): string {
   }
   output += `};\n\n`;
 
-  output += `let PI: any = __rt.PI;\n` +
-      `let INF: any = __rt.INF;\n` +
-      `let NAN: any = __rt.NAN;\n` +
-      `let undef: any = __rt.undef;\n` +
-      `let _EPSILON: any = __rt._EPSILON;\n` +
-      `let __NO_ARG: any = Symbol.for("__OPENSCAD_NO_ARG__");\n\n`;
+  output += BUILTIN_CONSTANTS_CODE + '\n';
 
   if (declarations.length) {
     output += declarations.join('\n') + '\n\n';
@@ -1971,6 +1432,7 @@ function emitLibraryFile(
   encounteredSurfaceData.clear();
   currentRuntimePath = ctx.runtimePath;
   currentMainFilename = program.filename ?? '';
+  currentSourceFilename = currentMainFilename;
 
   // Top-level declarations, deduped last-wins (matching compile())
   const declMap = new Map < string, {
@@ -2093,12 +1555,7 @@ function emitLibraryFile(
   out += sideEffectBlock;
   out += importBlock;
   out += `const __font_registry: Record<string, string> = {};\n`;
-  out += `let PI: any = __rt.PI;\n`;
-  out += `let INF: any = __rt.INF;\n`;
-  out += `let NAN: any = __rt.NAN;\n`;
-  out += `let undef: any = __rt.undef;\n`;
-  out += `let _EPSILON: any = __rt._EPSILON;\n`;
-  out += `let __NO_ARG: any = Symbol.for("__OPENSCAD_NO_ARG__");\n`;
+  out += BUILTIN_CONSTANTS_CODE;
   for (const name of undefinedNames) out += `let ${name}: any = undefined;\n`;
   out += '\n';
   if (declarations.length) out += declarations.join('\n') + '\n';
@@ -2133,6 +1590,64 @@ const PRE_DECLARED_VARS = new Set([
   '$fn', '$fa', '$fs', '$vpr', '$vpt', '$vpd', '$vpf', '$parent_modules', '$t',
   '$preview', '$color', '$idx', 'PI', 'INF', 'NAN', 'undef', '_EPSILON'
 ]);
+
+// Emit a `use`d file's scope as a JS scope of its own. The file's top-level variables become plain bindings inside an IIFE, so they keep their OpenSCAD names and are private by construction: the consumer has no way to reach them and no way to shadow them. The modules and functions declared alongside them close over those bindings and are returned, for the caller to publish under their global names.
+function compileUsedFileScope(scope: ScopeStmt, unitName: string): {code: string; exports: string[]} {
+  // `$` variables never reach here (they stay dynamically scoped) and the
+  // pre-declared names refer to the program-wide bindings, so neither becomes
+  // private to the file.
+  const privateNames: string[] = [];
+  const seenPrivate = new Set<string>();
+  for (const s of scope.statements) {
+    if (s.kind !== 'variableDecl') continue;
+    if (s.name.startsWith('$') || PRE_DECLARED_VARS.has(s.name)) continue;
+    const n = escapeName(s.name);
+    if (seenPrivate.has(n)) continue;
+    seenPrivate.add(n);
+    privateNames.push(n);
+  }
+
+  return withFilePrivateVars(privateNames, () => {
+    // Deduplicate by output name the same way the top level does: last
+    // declaration wins, at the position where the name first appeared.
+    const declCode = new Map<string, string>();
+    const declOrder: string[] = [];
+    const exports: string[] = [];
+    const savedSourceFilename = currentSourceFilename;
+
+    for (const s of scope.statements) {
+      if (s.filename) currentSourceFilename = s.filename;
+      let key: string;
+      if (s.kind === 'variableDecl')
+        key = `var:${escapeName(s.name)}`;
+      else if (s.kind === 'moduleDecl')
+        key = `${escapeName(s.name)}$mod`;
+      else if (s.kind === 'functionDecl')
+        key = `${escapeName(s.name)}_fn`;
+      else
+        continue;
+      if (!declCode.has(key)) {
+        declOrder.push(key);
+        if (s.kind !== 'variableDecl') exports.push(key);
+      }
+      declCode.set(key, compileDeclaration(s, {assignmentOnly: true}));
+    }
+
+    currentSourceFilename = savedSourceFilename;
+
+    const lines = [`const ${unitName} = (() => {`];
+    if (privateNames.length) {
+      lines.push(`  let ${
+          privateNames.map(n => `${n}: any = undef`).join(', ')};`);
+    }
+    for (const k of declOrder) {
+      lines.push('  ' + declCode.get(k)!.split('\n').join('\n  '));
+    }
+    lines.push(`  return {${exports.join(', ')}};`);
+    lines.push('})();');
+    return {code: lines.join('\n'), exports};
+  });
+}
 
 function compileDeclaration(
     stmt: Statement, opts?: {assignmentOnly?: boolean}): string {
@@ -2275,23 +1790,15 @@ function emitNoArgDefaults(params: Param[], indent: string): string {
 }
 
 // True when an expression references the identifier name anywhere within it
-function nodeReferencesIdentifier(node: unknown, name: string): boolean {
-  if (!node || typeof node !== 'object') return false;
-  const n = node as Record<string, unknown>;
-  if (n.kind === 'identifier' && n.name === name) return true;
-  for (const key in n) {
-    if (key === 'loc' || key === 'leadingComments' ||
-        key === 'trailingComments')
-      continue;
-    const v = n[key];
-    if (Array.isArray(v)) {
-      for (const item of v)
-        if (nodeReferencesIdentifier(item, name)) return true;
-    } else if (v && typeof v === 'object') {
-      if (nodeReferencesIdentifier(v, name)) return true;
-    }
-  }
-  return false;
+function nodeReferencesIdentifier(
+    node: KindedNode|undefined, name: string): boolean {
+  if (!node) return false;
+  if (node.kind === 'identifier' && node.name === name) return true;
+  let found = false;
+  forEachChild(node, child => {
+    found = found || nodeReferencesIdentifier(child, name);
+  });
+  return found;
 }
 
 // Compile-time divergence detection for non-tail recursion
@@ -2314,6 +1821,7 @@ function collectFunctionDefs(
         into.set(s.name, s);
         break;
       case 'block':
+      case 'scope':
         collectFunctionDefs(s.statements, into);
         break;
       case 'if':
@@ -2336,23 +1844,14 @@ function collectFunctionDefs(
 
 // True when `node` contains a call to `name` anywhere (over-approximate; used
 // only to decide whether a function is worth attempting to evaluate)
-function containsCallTo(node: unknown, name: string): boolean {
-  if (!node || typeof node !== 'object') return false;
-  const n = node as Record<string, unknown>;
-  if (n.kind === 'call' && n.name === name) return true;
-  for (const key in n) {
-    if (key === 'loc' || key === 'leadingComments' ||
-        key === 'trailingComments')
-      continue;
-    const v = n[key];
-    if (Array.isArray(v)) {
-      for (const item of v)
-        if (containsCallTo(item, name)) return true;
-    } else if (v && typeof v === 'object') {
-      if (containsCallTo(v, name)) return true;
-    }
-  }
-  return false;
+function containsCallTo(node: KindedNode|undefined, name: string): boolean {
+  if (!node) return false;
+  if (node.kind === 'call' && node.name === name) return true;
+  let found = false;
+  forEachChild(node, child => {
+    found = found || containsCallTo(child, name);
+  });
+  return found;
 }
 
 // Evaluate a purely-constant expression. Returns the value, CONST_UNKNOWN when
@@ -2490,17 +1989,9 @@ function detectDivergentCalls(stmts: Statement[]): void {
         }
       }
     }
-    for (const key in expr) {
-      if (key === 'loc' || key === 'leadingComments' ||
-          key === 'trailingComments')
-        continue;
-      const v = (expr as Record<string, unknown>)[key];
-      if (Array.isArray(v)) {
-        for (const item of v) visitExpr(item as Expr);
-      } else if (v && typeof v === 'object')
-        visitExpr(v as Expr);
-    }
+    forEachChild(expr, child => visitExpr(child as Expr));
   };
+  
   const visitStmt = (s: Statement): void => {
     switch (s.kind) {
       case 'variableDecl':
@@ -2511,6 +2002,7 @@ function detectDivergentCalls(stmts: Statement[]): void {
         if (s.child) visitStmt(s.child);
         break;
       case 'block':
+      case 'scope':
         s.statements.forEach(visitStmt);
         break;
       case 'if':
@@ -2775,7 +2267,7 @@ function compileModuleBody(
   }
 
   const shadowLocals =
-      new Set([...localVarNames].filter(n => globalVarNames.has(n)));
+      new Set([...localVarNames].filter(n => isOuterVarName(n)));
   const savedShadowRenames = activeShadowRenames;
   activeShadowRenames = new Map();
 
@@ -4617,16 +4109,28 @@ function compileUserModuleCall(stmt: ModuleCallStmt): string {
   return result;
 }
 
-function guessMimeType(filePath: string): string {
-  const ext = path.extname(filePath).toLowerCase();
-  const map: Record<string, string> = {
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.bmp': 'image/bmp',
-    '.gif': 'image/gif',
-  };
-  return map[ext] ?? 'image/png';
+// Decodes an image to raw pixels at compile time so the runtime never has to
+function decodeImagePixels(filePath: string):
+    {width: number, height: number, rgb: string}|undefined {
+  const img = new Image();
+  // A Buffer src decodes in place; the typings only admit a string
+  (img as {src: unknown}).src = fs.readFileSync(filePath);
+  const {width, height} = img;
+  if (!width || !height) return undefined;
+
+  const canvas = createCanvas(width, height);
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  const {data} = ctx.getImageData(0, 0, width, height);
+
+  // Drop the alpha channel: surface() only reads luminance
+  const rgb = Buffer.allocUnsafe(width * height * 3);
+  for (let i = 0, j = 0; j < rgb.length; i += 4, j += 3) {
+    rgb[j] = data[i]!;
+    rgb[j + 1] = data[i + 1]!;
+    rgb[j + 2] = data[i + 2]!;
+  }
+  return {width, height, rgb: rgb.toString('base64')};
 }
 
 // compile surface
@@ -4643,14 +4147,11 @@ export function compileSurface(args: Argument[]): string {
   }
   const filenameStr = file.value.value;
 
-  const basePath = process.env.IMAGEBASEPATH;
-  if (!basePath) {
-    console.warn(`Warning: surface("${
-        filenameStr}"): IMAGEBASEPATH is not set, can't open file, ignoring.`);
-    return 'Manifold.union([])';
-  }
-
-  const filePath = path.join(basePath, path.basename(filenameStr));
+  // OpenSCAD resolves a surface() file relative to the .scad file that contains the call
+  const sourceFile = currentSourceFilename || currentMainFilename;
+  const basePath = sourceFile ? path.dirname(path.resolve(sourceFile)) :
+                                process.cwd();
+  const filePath = path.resolve(basePath, filenameStr);
   if (!fs.existsSync(filePath)) {
     console.warn(`Warning: surface("${filenameStr}"): can't open file "${
         filePath}", ignoring.`);
@@ -4676,23 +4177,30 @@ export function compileSurface(args: Argument[]): string {
   const invertStr = invert ? compileExpr(invert.value) : 'false';
 
   if (isImage) {
-    const base64 = fs.readFileSync(filePath).toString('base64');
-    const mimeType = guessMimeType(filePath);
-    const dataUrl = `data:${mimeType};base64,${base64}`;
+    // Embed the decoded pixels
+    const pixels = decodeImagePixels(filePath);
+    if (!pixels) {
+      console.warn(`Warning: surface("${filenameStr}"): can't decode image "${
+          filePath}", ignoring.`);
+      return 'Manifold.union([])';
+    }
     const exportName = `__img_${stem}`;
 
     const tsContent = `// Auto-generated by OpenSCAD compiler — do not edit\n` +
         `// Source: ${filePath}\n` +
-        `export const ${exportName} = "${dataUrl}";\n`;
+        `// ${pixels.width}x${pixels.height}, base64 of 3 bytes (RGB) per ` +
+        `pixel, row-major from the top-left\n` +
+        `export const ${exportName} = { width: ${pixels.width}, height: ${
+            pixels.height}, rgb: "${pixels.rgb}" };\n`;
 
     fs.writeFileSync(
-        path.join(surfaceDataDir, `${stem}_base64.ts`), tsContent, 'utf8');
+        path.join(surfaceDataDir, `${stem}_data.ts`), tsContent, 'utf8');
     encounteredSurfaceData.set(filenameStr, {stem, exportName, kind: 'image'});
 
-    return `await __surface(${exportName}, { center: ${centerStr}, invert: ${
+    return `__surface(${exportName}, { center: ${centerStr}, invert: ${
         invertStr}, kind: "image", fn: __ctx.$fn, fa: __ctx.$fa, fs: __ctx.$fs })`;
   } else {
-    // Text matrix (.dat / .txt) - embed raw content as a string literal.
+    // Text matrix (.dat / .txt) - embed raw content as a string literal
     const raw = fs.readFileSync(filePath, 'utf8');
     const exportName = `__surfacedata_${stem}`;
 
@@ -4704,7 +4212,7 @@ export function compileSurface(args: Argument[]): string {
         path.join(surfaceDataDir, `${stem}_data.ts`), tsContent, 'utf8');
     encounteredSurfaceData.set(filenameStr, {stem, exportName, kind: 'text'});
 
-    return `await __surface(${exportName}, { center: ${
+    return `__surface(${exportName}, { center: ${
         centerStr}, kind: "text", fn: __ctx.$fn, fa: __ctx.$fa, fs: __ctx.$fs })`;
   }
 }
@@ -5104,7 +4612,7 @@ function compileCallExpr(
   // function.
   const isSpecialVarCallee =
       expr.name.startsWith('$') && expr.name !== '$children';
-  const isCallableValue = isLocalName(escaped) || globalVarNames.has(escaped) ||
+  const isCallableValue = isLocalName(escaped) || isOuterVarName(escaped) ||
       externalFunctionNames.has(expr.name) || isSpecialVarCallee;
   if (!isKnownFunction && !isCallableValue) {
     const line = expr.loc?.start.line;
@@ -5122,8 +4630,8 @@ function compileCallExpr(
   // OpenSCAD resolves variables and functions separately, so if both share a
   // name, dispatch at runtime: call the variable only if it's a function,
   // otherwise use the named function
-  const shadowingValue = !isSpecialVarCallee &&
-      (isLocalName(escaped) || globalVarNames.has(escaped));
+  const shadowingValue =
+      !isSpecialVarCallee && (isLocalName(escaped) || isOuterVarName(escaped));
   const dualDispatch = isKnownFunction && shadowingValue;
 
   // When the callee isn't a known function definition but resolves to a value

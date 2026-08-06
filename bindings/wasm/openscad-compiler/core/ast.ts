@@ -124,7 +124,7 @@ export interface Argument extends ASTNode {
 
 export type Statement =
     |ModuleCallStmt|BlockStmt|VariableDeclStmt|ModuleDeclStmt|FunctionDeclStmt|
-    ForStmt|IfStmt|EmptyStmt|UseStmt|IncludeStmt;
+    ForStmt|IfStmt|EmptyStmt|UseStmt|IncludeStmt|ScopeStmt;
 
 export interface ModuleCallStmt extends ASTNode {
   kind: 'moduleCall';
@@ -177,6 +177,11 @@ export interface IfStmt extends ASTNode {
 
 export interface EmptyStmt extends ASTNode {
   kind: 'empty';
+}
+
+export interface ScopeStmt extends ASTNode {
+  kind: 'scope';
+  statements: Statement[];
 }
 
 export interface Parameter extends ASTNode {
@@ -238,4 +243,82 @@ export interface LCExprGenerator extends ASTNode {
 export interface Program extends ASTNode {
   kind: 'program';
   statements: Statement[];
+}
+
+// Every AST node that carries a `kind` discriminant
+export type KindedNode = Expr|Statement|ListCompGenerator|Program;
+
+type NodeOfKind<K extends KindedNode['kind']> = Extract<KindedNode, {kind: K}>;
+
+// The child-bearing fields of each node kind.
+const CHILD_KEYS: {[K in KindedNode['kind']]: readonly(keyof NodeOfKind<K>)[]} =
+    {
+      // Expressions
+      number: [],
+      string: [],
+      boolean: [],
+      undef: [],
+      identifier: [],
+      vector: ['elements'],
+      range: ['start', 'end', 'step'],
+      binary: ['left', 'right'],
+      unary: ['operand'],
+      ternary: ['condition', 'ifTrue', 'ifFalse'],
+      call: ['args'],
+      index: ['object', 'index'],
+      member: ['object'],
+      group: ['expr'],
+      echo: ['args', 'expr'],
+      let: ['assignments', 'body'],
+      assert: ['args', 'expr'],
+      listComp: ['generator'],
+      each: ['expr'],
+      lambda: ['params', 'body'],
+      dynCall: ['callee', 'args'],
+      // Statements
+      moduleCall: ['args', 'child'],
+      block: ['statements'],
+      scope: ['statements'],
+      variableDecl: ['value'],
+      moduleDecl: ['params', 'body'],
+      functionDecl: ['params', 'body'],
+      for: ['variables', 'body'],
+      if: ['condition', 'thenBody', 'elseBody'],
+      empty: [],
+      use: [],
+      include: [],
+      // List-comprehension generators
+      lcFor: ['variables', 'body'],
+      lcCFor: ['inits', 'condition', 'updates', 'body'],
+      lcIf: ['condition', 'ifTrue', 'ifFalse'],
+      lcLet: ['assignments', 'body'],
+      lcExpr: ['expr'],
+      // Root
+      program: ['statements'],
+    };
+
+const WRAPPER_CHILD_KEYS = ['value', 'defaultValue', 'range'] as const;
+
+function visitChildValue(
+    value: unknown, visit: (child: KindedNode) => void): void {
+  if (!value || typeof value !== 'object') return;
+  if (Array.isArray(value)) {
+    for (const item of value) visitChildValue(item, visit);
+    return;
+  }
+  if ('kind' in value) {
+    visit(value as KindedNode);
+    return;
+  }
+  for (const key of WRAPPER_CHILD_KEYS)
+    visitChildValue((value as Record<string, unknown>)[key], visit);
+}
+
+// Traverses through the AST nodes and invoke a callback for each child
+export function forEachChild(
+    node: KindedNode, visit: (child: KindedNode) => void): void {
+  const keys = (CHILD_KEYS as Record<string, readonly string[]>)[node.kind];
+  if (!keys) return;
+  for (const key of keys)
+    visitChildValue((node as unknown as Record<string, unknown>)[key], visit);
 }

@@ -5,8 +5,7 @@ module children_test() {
 }
 children_test() noop();
 
-import("../../dxf/circle.dxf") noop();
 
-surface("../../image/smiley.png") noop();
+surface("../assets/smiley.png") noop();
 
 text("Hello World!", 26, font = "Liberation Sans:style=Regular") noop();

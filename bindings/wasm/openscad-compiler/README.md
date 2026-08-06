@@ -71,13 +71,11 @@ npm install
 
 ### 2. Configure paths
 
-Copy `.env.example` to `.env` and fill in what you need. Values are also read from the
-real environment; `.env` only fills in variables that aren't already set.
+Set these in your shell/OS environment (the same variables OpenSCAD itself uses):
 
-```ini
-OPENSCADPATH=/path/to/openscad/libraries   # for include/use of BOSL2, MCAD, ...
-FONTPATH=./bundle/fonts                    # TTF/OTF fonts for text()
-IMAGEBASEPATH=./bundle/images              # base dir for surface() PNG/DAT files
+```bash
+export OPENSCADPATH=/path/to/openscad/libraries   # for include/use of BOSL2, MCAD, ...
+export FONTPATH=./bundle/fonts                    # TTF/OTF fonts for text()
 ```
 
 `OPENSCADPATH` accepts multiple `path.delimiter`-separated entries. The standard per-OS
@@ -86,9 +84,12 @@ user library directories (`~/Documents/OpenSCAD/libraries`,
 directory of the file being compiled and the current working directory are always
 searched first.
 
-`bundle/fonts` ships Liberation Sans (regular/bold) and `bundle/images` ships the
-surface fixtures used by the test corpus, so pointing at those is enough to run
-everything in this repo.
+Asset files referenced from the OpenSCAD source — the `file` argument of `surface()` —
+need no configuration: they are resolved relative to the `.scad` file containing the
+call, exactly like OpenSCAD does.
+
+`bundle/fonts` ships Liberation Sans (regular/bold), so pointing `FONTPATH` at it is
+enough to run everything in this repo.
 
 ### 3. Build
 
@@ -270,8 +271,8 @@ Both need `openscad` on `PATH` for the comparison numbers; `benchmark-phases` ac
 ## CI
 
 The `OpenSCAD Compiler` job in `.github/workflows/manifold.yml` clones BOSL2 and MCAD into
-a scratch directory, points `OPENSCADPATH`/`FONTPATH`/`IMAGEBASEPATH` at them and at
-`bundle/`, and runs `npm test`. The main WASM job explicitly excludes
+a scratch directory, points `OPENSCADPATH`/`FONTPATH` at them and at `bundle/`, and runs
+`npm test`. The main WASM job explicitly excludes
 `openscad-compiler/**` so the two never run together.
 
 ## See also

@@ -2,4 +2,4 @@
 surface();
 surface("notfound.dat");
 surface("notfound.png");
-surface("surface.dat", center=true);
+surface("../assets/surface.dat", center=true);

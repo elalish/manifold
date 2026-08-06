@@ -628,7 +628,6 @@ jobs:
       env:
         OPENSCADPATH: ${{ github.workspace }}/external_libraries
         FONTPATH: ${{ github.workspace }}/bindings/wasm/openscad-compiler/bundle/fonts
-        IMAGEBASEPATH: ${{ github.workspace }}/bindings/wasm/openscad-compiler/bundle/images
       run: |
         cd bindings/wasm/openscad-compiler
         npm i

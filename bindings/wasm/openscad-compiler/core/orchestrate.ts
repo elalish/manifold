@@ -32,25 +32,33 @@ export function ensureLibraryCompiled(
         () => {}): {manifest: LibraryManifest; libDir: string} {
   const libDir = libraryDir(cwd, ref.name);
   const manifestPath = path.join(libDir, '.manifest.json');
+  const runtimeVersion = getRuntimeVersion(cwd);
 
   // Carry over files from the previous build so existing references keep
   // working across the full set during recompilation
   let priorFiles: string[] = [];
+  let staleRuntime = false;
   if (fs.existsSync(libDir) && fs.existsSync(manifestPath)) {
     const manifest =
         JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as LibraryManifest;
     const relOf = (abs: string) =>
         path.relative(ref.root, abs).replace(/\\/g, '/');
     const missing = ref.entries.filter(e => !(relOf(e.file) in manifest.files));
-    if (missing.length === 0) {
+    // Emitted code is tied to the runtime it was compiled against, so a version change invalidates every cached file regardless of coverage
+    staleRuntime = manifest.runtimeVersion !== runtimeVersion;
+    if (!staleRuntime && missing.length === 0) {
       log(`Library ${ref.name}: cache hit (${
           Object.keys(manifest.files).length} files)`);
       return {manifest, libDir};
     }
     priorFiles =
         Object.keys(manifest.files).map(rel => path.join(ref.root, rel));
-    log(`Library ${ref.name}: cache is missing ${
-        missing.map(e => relOf(e.file)).join(', ')}; recompiling...`);
+    log(staleRuntime ? `Library ${ref.name}: cached build targets runtime ${
+                           manifest.runtimeVersion ?? 'unknown'}, current is ${
+                           runtimeVersion}; recompiling...` :
+                       `Library ${ref.name}: cache is missing ${
+                           missing.map(e => relOf(e.file)).join(', ')
+                       }; recompiling...`);
   } else {
     log(`Library ${ref.name}: compiling...`);
   }
@@ -65,9 +73,10 @@ export function ensureLibraryCompiled(
   const runtimePathFor = (outRel: string) => toPosixSpecifier(
       path.relative(path.dirname(path.join(libDir, outRel)), runtimeJsAbs));
 
-  const compiled = compileLibrary(
-      closure, {runtimeVersion: getRuntimeVersion(cwd), runtimePathFor});
+  const compiled = compileLibrary(closure, {runtimeVersion, runtimePathFor});
 
+  // Clear out any output the new build does not overwrite by name, so nothing emitted by the old version of compiler
+  if (staleRuntime) fs.rmSync(libDir, {recursive: true, force: true});
   fs.mkdirSync(libDir, {recursive: true});
   for (const f of compiled.files) {
     const outPath = path.join(libDir, f.outRel);

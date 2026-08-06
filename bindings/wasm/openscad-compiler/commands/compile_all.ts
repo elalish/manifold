@@ -7,8 +7,6 @@ import {getOpenSCADLibraryPaths} from '../core/resolver.js';
 
 const compileAllCommand = new Command();
 
-const exampleDir = 'test/examples';
-
 function getAllScadFiles(dir: string, baseDir: string = dir): string[] {
   let results: string[] = [];
   const list = fs.readdirSync(dir, {withFileTypes: true});
@@ -25,18 +23,22 @@ function getAllScadFiles(dir: string, baseDir: string = dir): string[] {
 
 
 compileAllCommand.name('compile-all')
-    .description(
-        'Compile all OpenSCAD files in the examples directory to manifold mesh files')
-    .action(() => {
+    .description('Compile all OpenSCAD files in the given input directory to given output directory')
+    .option('--input <input>', 'Input directory path')
+    .option('--output <output>', 'Output directory path')
+    .action((options) => {
       try {
-        const allFiles = getAllScadFiles(exampleDir);
+        const inputDir = options.input || 'test/examples';
+        const outputDir = options.output || 'test/out';
+        
+        const allFiles = getAllScadFiles(inputDir);
         console.log('All files to compile:', allFiles);
 
         const failed: string[] = [];
 
         for (const file of allFiles) {
           console.log(`\n=== Compiling ${file} ===`);
-          const absFile = path.resolve(exampleDir, file);
+          const absFile = path.resolve(inputDir, file);
 
           try {
             const libraryPaths = [
@@ -47,7 +49,7 @@ compileAllCommand.name('compile-all')
 
             const basename = path.basename(file, path.extname(file));
             const outputFile =
-                path.join('test/out', path.dirname(file), basename + '.ts');
+                path.join(outputDir, path.dirname(file), basename + '.ts');
 
             const {code: js, externalLibraries} = compileConsumer(
                 absFile, outputFile, libraryPaths, process.cwd(),

@@ -59,6 +59,48 @@ export enum TokenType {
   EOF,
 }
 
+// Operator and punctuation lexemes. This single table
+// drives both lexing (text -> TokenType) and printing (TokenType -> text)
+const OPERATOR_TABLE: ReadonlyArray<readonly[string, TokenType]> = [
+  ['(', TokenType.LParen],
+  [')', TokenType.RParen],
+  ['[', TokenType.LBracket],
+  [']', TokenType.RBracket],
+  ['{', TokenType.LBrace],
+  ['}', TokenType.RBrace],
+  [',', TokenType.Comma],
+  [';', TokenType.Semicolon],
+  [':', TokenType.Colon],
+  ['#', TokenType.Hash],
+  ['=', TokenType.Equals],
+  ['+', TokenType.Plus],
+  ['-', TokenType.Minus],
+  ['*', TokenType.Star],
+  ['/', TokenType.Slash],
+  ['%', TokenType.Percent],
+  ['^', TokenType.Caret],
+  ['<', TokenType.Lt],
+  ['>', TokenType.Gt],
+  ['<=', TokenType.LtEq],
+  ['>=', TokenType.GtEq],
+  ['==', TokenType.EqEq],
+  ['!=', TokenType.BangEq],
+  ['&&', TokenType.And],
+  ['||', TokenType.Or],
+  ['!', TokenType.Bang],
+  ['&', TokenType.Amp],
+  ['|', TokenType.Pipe],
+  ['~', TokenType.Tilde],
+  ['<<', TokenType.Shl],
+  ['>>', TokenType.Shr],
+  ['.', TokenType.Dot],
+  ['?', TokenType.Question],
+];
+
+const OPERATOR_TYPES = new Map<string, TokenType>(OPERATOR_TABLE);
+const OPERATOR_LEXEMES = new Map<TokenType, string>(
+    OPERATOR_TABLE.map(([text, type]) => [type, text]));
+
 // Position in the source code
 export interface SourceLocation {
   line: number;
@@ -84,88 +126,10 @@ export function fmtLoc(loc: SourceLocation, filename: string): string {
 }
 
 export function tokenTypeToString(type: TokenType): string {
-  switch (type) {
-    case TokenType.Identifier:
-      return 'Identifier';
-    case TokenType.Number:
-      return 'Number';
-    case TokenType.String:
-      return 'String';
-    case TokenType.LParen:
-      return '\'(\'';
-    case TokenType.RParen:
-      return '\')\'';
-    case TokenType.LBracket:
-      return '\'[\'';
-    case TokenType.RBracket:
-      return '\']\'';
-    case TokenType.LBrace:
-      return '\'{\'';
-    case TokenType.RBrace:
-      return '\'}\'';
-    case TokenType.Comma:
-      return '\',\'';
-    case TokenType.Semicolon:
-      return '\';\'';
-    case TokenType.Colon:
-      return '\':\'';
-    case TokenType.Hash:
-      return '\'#\'';
-    case TokenType.Equals:
-      return '\'=\'';
-    case TokenType.Plus:
-      return '\'+\'';
-    case TokenType.Minus:
-      return '\'-\'';
-    case TokenType.Star:
-      return '\'*\'';
-    case TokenType.Slash:
-      return '\'/\'';
-    case TokenType.Percent:
-      return '\'%\'';
-    case TokenType.Caret:
-      return '\'^\'';
-    case TokenType.Lt:
-      return '\'<\'';
-    case TokenType.Gt:
-      return '\'>\'';
-    case TokenType.LtEq:
-      return '\'<=\'';
-    case TokenType.GtEq:
-      return '\'>=\'';
-    case TokenType.EqEq:
-      return '\'==\'';
-    case TokenType.BangEq:
-      return '\'!=\'';
-    case TokenType.And:
-      return '\'&&\'';
-    case TokenType.Or:
-      return '\'||\'';
-    case TokenType.Bang:
-      return '\'!\'';
-    case TokenType.Amp:
-      return '\'&\'';
-    case TokenType.Pipe:
-      return '\'|\'';
-    case TokenType.Tilde:
-      return '\'~\'';
-    case TokenType.Shl:
-      return '\'<<\'';
-    case TokenType.Shr:
-      return '\'>>\'';
-    case TokenType.Dot:
-      return '\'.\'';
-    case TokenType.Question:
-      return '\'?\'';
-    case TokenType.LineComment:
-      return 'LineComment';
-    case TokenType.BlockComment:
-      return 'BlockComment';
-    case TokenType.EOF:
-      return 'EOF';
-    default:
-      return TokenType[type] || 'Unknown';
-  }
+  const lexeme = OPERATOR_LEXEMES.get(type);
+  if (lexeme !== undefined) return `'${lexeme}'`;
+
+  return TokenType[type] ?? 'Unknown';
 }
 
 // Format a source range for display in error messages
@@ -177,6 +141,15 @@ export function fmtRange(range: SourceRange, filename: string): string {
   return `${filename}:${range.start.line}:${range.start.column} – ${filename}:${
       range.end.line}:${range.end.column}`;
 }
+
+// Regular expressions
+const HEX_NUMBER_REGEX = /^0[xX][0-9a-fA-F]+/;
+const IDENTIFIER_REGEX = /^[0-9]*[a-zA-Z_$][a-zA-Z0-9_$]*/;
+const NUMBER_REGEX =
+    /^(?:(?:[0-9]*\.[0-9]+)|(?:[0-9]+(?:\.[0-9]*)?))(?:[eE][+-]?[0-9]+)?/;
+const OCTAL_DIGIT_REGEX = /[0-7]/;
+const HEX_DIGIT_REGEX = /[0-9a-fA-F]/;
+const WHITESPACE_REGEX = /\s/;
 
 export class Lexer {
   private pos = 0;
@@ -202,15 +175,19 @@ export class Lexer {
         '\0';
   }
 
-  private advance(): string {
-    const ch = this.input[this.pos++] ?? '\0';
-    if (ch === '\n') {
-      this.line++;
-      this.column = 1;
-    } else {
-      this.column++;
+  private advance(count: number = 1): string {
+    let lastCh = '\0';
+    for (let i = 0; i < count; i++) {
+      const ch = this.input[this.pos++] ?? '\0';
+      if (ch === '\n') {
+        this.line++;
+        this.column = 1;
+      } else {
+        this.column++;
+      }
+      lastCh = ch;
     }
-    return ch;
+    return lastCh;
   }
 
   private isAtEnd(): boolean {
@@ -222,7 +199,7 @@ export class Lexer {
       const ch = this.peek();
 
       // Whitespace
-      if (/\s/.test(ch)) {
+      if (WHITESPACE_REGEX.test(ch)) {
         this.advance();
         continue;
       }
@@ -269,9 +246,9 @@ export class Lexer {
     // Number or Identifier (handles identifiers starting with digits)
     const remaining = this.input.slice(this.pos);
 
-    const hexMatch = remaining.match(/^0[xX][0-9a-fA-F]+/);
+    const hexMatch = remaining.match(HEX_NUMBER_REGEX);
     if (hexMatch) {
-      for (let i = 0; i < hexMatch[0].length; i++) this.advance();
+      this.advance(hexMatch[0].length);
       return {
         type: TokenType.Number,
         value: hexMatch[0],
@@ -279,19 +256,17 @@ export class Lexer {
       };
     }
 
-    const idMatch = remaining.match(/^[0-9]*[a-zA-Z_$][a-zA-Z0-9_$]*/);
-    const numMatch = remaining.match(
-        /^(?:(?:[0-9]*\.[0-9]+)|(?:[0-9]+(?:\.[0-9]*)?))(?:[eE][+-]?[0-9]+)?/);
+    const idMatch = remaining.match(IDENTIFIER_REGEX);
+    const numMatch = remaining.match(NUMBER_REGEX);
 
-    if (idMatch || numMatch) {
-      const idLen = idMatch ? idMatch[0].length : 0;
-      const numLen = numMatch ? numMatch[0].length : 0;
+    const idLen = idMatch?.[0].length ?? 0;
+    const numLen = numMatch?.[0].length ?? 0;
 
-      if (idLen > numLen) {
-        return this.readIdentifier(start);
-      } else if (numLen > 0) {
-        return this.readNumber(start);
-      }
+    if (idMatch && idLen > numLen) {
+      return this.readIdentifier(start, idMatch[0]);
+    } else if (numMatch) {
+      // NUMBER_REGEX always consumes at least one digit, so a match is a token.
+      return this.readNumber(start, numMatch[0]);
     }
 
     // String literal
@@ -299,134 +274,22 @@ export class Lexer {
       return this.readString(start);
     }
 
-    // Operators and punctuation
-    this.advance();
-
-    const mk = (type: TokenType): Token =>
-        ({type, range: {start, end: this.loc()}});
-
-    switch (ch) {
-      case '(':
-        return mk(TokenType.LParen);
-      case ')':
-        return mk(TokenType.RParen);
-      case '[':
-        return mk(TokenType.LBracket);
-      case ']':
-        return mk(TokenType.RBracket);
-      case '{':
-        return mk(TokenType.LBrace);
-      case '}':
-        return mk(TokenType.RBrace);
-      case ',':
-        return mk(TokenType.Comma);
-      case ';':
-        return mk(TokenType.Semicolon);
-      case ':':
-        return mk(TokenType.Colon);
-      case '#':
-        return mk(TokenType.Hash);
-      case '?':
-        return mk(TokenType.Question);
-      case '.':
-        return mk(TokenType.Dot);
-      case '+':
-        return mk(TokenType.Plus);
-      case '-':
-        return mk(TokenType.Minus);
-      case '*':
-        return mk(TokenType.Star);
-      case '%':
-        return mk(TokenType.Percent);
-      case '^':
-        return mk(TokenType.Caret);
-      case '~':
-        return mk(TokenType.Tilde);
-
-      case '/':
-        return mk(TokenType.Slash);
-
-      case '=':
-        if (this.peek() === '=') {
-          this.advance();
-          return mk(TokenType.EqEq);
-        }
-        return mk(TokenType.Equals);
-
-      case '!':
-        if (this.peek() === '=') {
-          this.advance();
-          return mk(TokenType.BangEq);
-        }
-        return mk(TokenType.Bang);
-
-      case '<':
-        if (this.peek() === '=') {
-          this.advance();
-          return mk(TokenType.LtEq);
-        }
-        if (this.peek() === '<') {
-          this.advance();
-          return mk(TokenType.Shl);
-        }
-        return mk(TokenType.Lt);
-
-      case '>':
-        if (this.peek() === '=') {
-          this.advance();
-          return mk(TokenType.GtEq);
-        }
-        if (this.peek() === '>') {
-          this.advance();
-          return mk(TokenType.Shr);
-        }
-        return mk(TokenType.Gt);
-
-      case '&':
-        if (this.peek() === '&') {
-          this.advance();
-          return mk(TokenType.And);
-        }
-        return mk(TokenType.Amp);
-
-      case '|':
-        if (this.peek() === '|') {
-          this.advance();
-          return mk(TokenType.Or);
-        }
-        return mk(TokenType.Pipe);
+    // Prefer the two-character lexeme, then fall back to the single-character one.
+    for (const lexeme of [ch + this.peekNext(), ch]) {
+      const type = OPERATOR_TYPES.get(lexeme);
+      if (type !== undefined) {
+        this.advance(lexeme.length);
+        return {type, range: {start, end: this.loc()}};
+      }
     }
 
     throw new Error(
         `Unexpected character '${ch}' at ${fmtLoc(start, this.filename)}`);
   }
 
-  private readNumber(start: SourceLocation): Token {
-    const startPos = this.pos;
-
-    // Integer part
-    while (/\d/.test(this.peek())) this.advance();
-
-    // Fractional part
-    if (this.peek() === '.' && /[\d\0]/.test(this.peekNext())) {
-      this.advance();
-      while (/\d/.test(this.peek())) this.advance();
-    } else if (this.peek() === '.') {
-      this.advance();  // trailing dot
-    }
-
-    // Scientific notation
-    if (this.peek() === 'e' || this.peek() === 'E') {
-      this.advance();
-      if (this.peek() === '+' || this.peek() === '-') this.advance();
-      while (/\d/.test(this.peek())) this.advance();
-    }
-
-    return {
-      type: TokenType.Number,
-      value: this.input.slice(startPos, this.pos),
-      range: {start, end: this.loc()}
-    };
+  private readNumber(start: SourceLocation, value: string): Token {
+    this.advance(value.length);
+    return {type: TokenType.Number, value, range: {start, end: this.loc()}};
   }
 
   private readString(start: SourceLocation): Token {
@@ -454,9 +317,9 @@ export class Lexer {
             result += '"';
             break;
           case 'x': {
-            if (/[0-7]/.test(this.peek())) {
+            if (OCTAL_DIGIT_REGEX.test(this.peek())) {
               const hi = this.advance();
-              if (/[0-9a-fA-F]/.test(this.peek())) {
+              if (HEX_DIGIT_REGEX.test(this.peek())) {
                 const code = parseInt(hi + this.advance(), 16);
                 if (code !== 0) result += String.fromCharCode(code);
               } else {
@@ -470,7 +333,7 @@ export class Lexer {
           case 'u': {
             let hex = '';
             for (let i = 0; i < 4; i++) {
-              if (/[0-9a-fA-F]/.test(this.peek())) {
+              if (HEX_DIGIT_REGEX.test(this.peek())) {
                 hex += this.advance();
               } else {
                 break;
@@ -488,7 +351,7 @@ export class Lexer {
           case 'U': {
             let hex = '';
             for (let i = 0; i < 6; i++) {
-              if (/[0-9a-fA-F]/.test(this.peek())) {
+              if (HEX_DIGIT_REGEX.test(this.peek())) {
                 hex += this.advance();
               } else {
                 break;
@@ -524,10 +387,8 @@ export class Lexer {
     };
   }
 
-  private readIdentifier(start: SourceLocation): Token {
-    const startPos = this.pos;
-    while (/[a-zA-Z_$0-9]/.test(this.peek())) this.advance();
-    const value = this.input.slice(startPos, this.pos);
+  private readIdentifier(start: SourceLocation, value: string): Token {
+    this.advance(value.length);
     if (value === 'include' || value === 'use') this.pathState = 'expectOpen';
     return {type: TokenType.Identifier, value, range: {start, end: this.loc()}};
   }
