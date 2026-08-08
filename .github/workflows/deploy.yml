@@ -1,4 +1,4 @@
-name: Deploy documentation 
+name: Deploy documentation
 
 on:
   workflow_run:
@@ -6,13 +6,21 @@ on:
     types:
       - completed
     branches: [master]
+  release:
+    types: [published]
 
 jobs:
   deploy_github_pages:
     runs-on: ubuntu-latest
+    if: >
+      (github.event_name == 'release') ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success')
 
     steps:
     - uses: actions/checkout@v6
+      with:
+        ref: ${{ github.event_name == 'release' && github.ref || github.event.workflow_run.head_sha }}
 
     - name: Doxygen Action
       uses: mattnotmitt/doxygen-action@edge
@@ -25,23 +33,77 @@ jobs:
         # weekly benchmark dashboard, served at /dashboard
         mv ./dashboard ./public
 
-    - name: Download manifoldCAD editor, examples and documentation
+    - name: Download manifoldCAD editor, examples and documentation (master)
+      if: github.event_name == 'workflow_run'
       uses: dawidd6/action-download-artifact@v6
       with:
         workflow: manifold.yml
         workflow_conclusion: completed
-        # specific to the triggering workflow
-        run_id: ${{github.event.workflow_run.id}}
-        # do not download from old run
-        check_artifacts: true 
+        run_id: ${{ github.event.workflow_run.id }}
+        check_artifacts: true
         name: wasmpublic
         path: ./public
 
-    - name: Deploy to Github Pages
+    - name: Download manifoldCAD editor, examples and documentation (release)
+      if: github.event_name == 'release'
+      uses: dawidd6/action-download-artifact@v6
+      with:
+        workflow: manifold.yml
+        workflow_conclusion: success
+        commit: ${{ github.sha }}
+        check_artifacts: true
+        name: wasmpublic
+        path: ./public
+
+    - name: Deploy to master/
+      if: github.event_name == 'workflow_run'
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_branch: gh-pages
-        force_orphan: true
-        cname: manifoldcad.org
         publish_dir: ./public
+        destination_dir: master
+        keep_files: true
+
+    - name: Deploy to vX.Y.Z/
+      if: github.event_name == 'release'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_branch: gh-pages
+        publish_dir: ./public
+        destination_dir: ${{ github.ref_name }}
+        keep_files: true
+
+    - name: Deploy to latest/
+      if: github.event_name == 'release'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_branch: gh-pages
+        publish_dir: ./public
+        destination_dir: latest
+        keep_files: true
+
+    - name: Create root redirect
+      run: |
+        mkdir root
+        cat > root/index.html << 'EOF'
+        <!doctype html>
+        <html>
+          <head>
+            <meta http-equiv="refresh" content="0; url=latest/">
+            <script>location.replace("latest/")</script>
+          </head>
+          <body><a href="latest/">latest docs</a></body>
+        </html>
+        EOF
+
+    - name: Publish root redirect
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_branch: gh-pages
+        publish_dir: ./root
+        keep_files: true
+        cname: manifoldcad.org
