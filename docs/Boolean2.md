@@ -123,8 +123,15 @@ Boolean2 predicates are:
   multiplicity, then using `Add`.
 - `Intersect`: `w > 1`, which corresponds to both operands covering a side for
   normalized unit-winding operands.
+- `EvenOdd`: `w` odd, reachable from `CrossSection::EvenOdd` for input authored
+  against an even-odd tool. It reads the same signed winding by parity rather
+  than sign, so unlike `Add` it fills a lone clockwise contour (`w == -1`).
 
-Boolean2 construction is Positive-only.
+The rule is not selectable for boolean operations - `Boolean2D` picks `Add` or
+`Intersect` from the `OpType`. It is selectable only where the input's own
+winding is first read, which is single-operand construction. What gets stored is
+normal-oriented and positive either way, so nothing downstream sees the
+difference.
 
 ## Regularization And Epsilon
 

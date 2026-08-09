@@ -263,7 +263,45 @@ CrossSection::CrossSection(const SimplePolygon& contour)
  */
 CrossSection::CrossSection(const Polygons& contours) {
   tolerance_ = InferEps(contours, {});
-  paths_ = shared_paths(ApplyFillRule(contours, tolerance_));
+  paths_ = shared_paths(ApplyFillRule(contours, tolerance_, WindRule::Add));
+}
+
+/**
+ * Create a 2d cross-section from a single contour, reading it by the even-odd
+ * rule rather than the positive rule the constructors use. See
+ * CrossSection::EvenOdd(const Polygons&).
+ *
+ * @param contour A closed path outlining the desired cross-section.
+ */
+CrossSection CrossSection::EvenOdd(const SimplePolygon& contour) {
+  return EvenOdd(Polygons{contour});
+}
+
+/**
+ * Create a 2d cross-section from a set of contours, reading them by the
+ * even-odd rule: a sub-region is filled when its winding number is odd, so
+ * overlapping an odd number of contours fills and overlapping an even number
+ * leaves a hole. The constructors instead use the positive rule (filled where
+ * the winding number is greater than zero), which ignores contour count and
+ * only cares about direction. Use this to take input authored for an even-odd
+ * tool such as OpenSCAD.
+ *
+ * The rule only decides how these contours are read. The result is regularized
+ * and normal-oriented like any other CrossSection, so every later operation
+ * behaves the same. Note that Manifold::Extrude and Manifold::Revolve take raw
+ * contours straight to the triangulator without applying any fill rule, so
+ * even-odd input has to be regularized here first, by passing
+ * EvenOdd(contours).ToPolygons() to them.
+ *
+ * @param contours A set of closed paths describing zero or more complex
+ * polygons.
+ */
+CrossSection CrossSection::EvenOdd(const Polygons& contours) {
+  const double eps = InferEps(contours, {});
+  CrossSection out(
+      shared_paths(ApplyFillRule(contours, eps, WindRule::EvenOdd)));
+  out.tolerance_ = eps;
+  return out;
 }
 
 /**
@@ -569,7 +607,9 @@ CrossSection CrossSection::WarpBatch(
   // Warping can self-intersect the rings, so re-apply the fill rule at machine
   // eps (not the drift tolerance - this is regularization, not decimation).
   const double eps = InferEps(paths, {});
-  CrossSection out(shared_paths(ApplyFillRule(paths, eps)));
+  // Positive regardless of how this section was originally read: a CrossSection
+  // carries no fill rule, and its stored geometry is already regularized.
+  CrossSection out(shared_paths(ApplyFillRule(paths, eps, WindRule::Add)));
   out.tolerance_ = std::max(tolerance_, eps);
   return out;
 }

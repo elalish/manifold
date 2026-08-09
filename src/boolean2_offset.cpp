@@ -281,7 +281,7 @@ Polygons Offset(const Polygons& in, double delta, JoinType jt,
   // so Positive/Add cleanup keeps the filled side for both dilation and inset.
   // This is fill-rule application at machine eps, not tolerance decimation -
   // the caller can Simplify the result if it wants collinear verts removed.
-  return ApplyFillRule(offsetRings, eps);
+  return ApplyFillRule(offsetRings, eps, WindRule::Add);
 }
 
 // ===== Containment decompose =====

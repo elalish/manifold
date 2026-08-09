@@ -34,6 +34,8 @@ std::string WindRuleName(WindRule rule) {
       return "Add";
     case WindRule::Intersect:
       return "Intersect";
+    case WindRule::EvenOdd:
+      return "EvenOdd";
   }
   return "Unknown";
 }

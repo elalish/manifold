@@ -215,12 +215,12 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
   return polys;
 }
 
-// Apply the Positive (Add) winding rule to one polygon set, regularizing it at
-// machine-scale eps with no extra tolerance. This is fill-rule application -
-// what construction and Offset use to resolve self-intersections - as opposed
-// to CrossSection::Simplify, which decimates at a user-designated tolerance.
-Polygons ApplyFillRule(const Polygons& polys, double eps) {
-  return ApplyFillRule(polys, {}, 1, WindRule::Add, eps);
+// Apply a winding rule to one polygon set, regularizing it at machine-scale eps
+// with no extra tolerance. This is fill-rule application - what construction
+// and Offset use to resolve self-intersections - as opposed to
+// CrossSection::Simplify, which decimates at a user-designated tolerance.
+Polygons ApplyFillRule(const Polygons& polys, double eps, WindRule rule) {
+  return ApplyFillRule(polys, {}, 1, rule, eps);
 }
 
 // Infer eps from a polygon set's absolute coordinate scale via Smith's

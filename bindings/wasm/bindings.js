@@ -544,6 +544,13 @@ Module.setup = function() {
     return new Module.CrossSection(polygons);
   };
 
+  Module.CrossSection.evenOdd = function(polygons) {
+    const polygonsVec = polygons2vec(polygons);
+    const cs = Module._EvenOdd(polygonsVec);
+    disposePolygons(polygonsVec);
+    return cs;
+  };
+
   Module.CrossSection.square = function(...args) {
     let size = undefined;
     if (args.length == 0)
@@ -675,7 +682,7 @@ Module.setup = function() {
       scaleTop = [1.0, 1.0], center = false) {
     const cs = (polygons instanceof CrossSectionCtor) ?
         polygons :
-        Module.CrossSection(polygons, 'Positive');
+        Module.CrossSection(polygons);
     return cs.extrude(height, nDivisions, twistDegrees, scaleTop, center);
   };
 
@@ -683,7 +690,7 @@ Module.setup = function() {
       polygons, circularSegments = 0, revolveDegrees = 360.0) {
     const cs = (polygons instanceof CrossSectionCtor) ?
         polygons :
-        Module.CrossSection(polygons, 'Positive');
+        Module.CrossSection(polygons);
     return cs.revolve(circularSegments, revolveDegrees);
   };
 
