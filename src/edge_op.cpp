@@ -457,9 +457,8 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
         //           << merger[edge].totalCost << std::endl;
       }
     }
-    end = std::partition(edges.begin(), end, [&](int edge) {
-      return halfedge_.Valid(edge) && merger[edge].Valid();
-    });
+    end = std::partition(edges.begin(), end,
+                         [&](int edge) { return halfedge_.Valid(edge); });
     // edges.Dump();
     // std::cout << "short? " << shortCollapse << ", collapsed: " <<
     // numCollapsed
