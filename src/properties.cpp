@@ -259,6 +259,11 @@ bool Manifold::Impl::HasSimpleProps() const {
                             halfedge_.Prop(pair) == halfedge_.PropEnd(edge);
     const bool meshesMatch = meshRelation_.triRef[halfedge_.Tri(edge)].meshID ==
                              meshRelation_.triRef[halfedge_.Tri(pair)].meshID;
+    // if (meshesMatch != propsMatch) {
+    //   std::cout << "edge: " << edge << ", pair: " << pair
+    //             << ", meshesMatch: " << meshesMatch
+    //             << ", propsMatch: " << propsMatch << std::endl;
+    // }
     return meshesMatch == propsMatch;
   });
 }

@@ -273,36 +273,40 @@ void Manifold::Impl::SwapEdge(int edge, double a) {
   const ivec3 tri1edge = TriOf(pair);
 
   // The 0-verts are swapped to the opposite 2-verts.
-  const int v0 = halfedge_.Start(tri0edge[2]);
-  const int v1 = halfedge_.Start(tri1edge[2]);
-  halfedge_.SetStart(tri0edge[0], v1);
-  halfedge_.SetEnd(tri0edge[2], v1);
-  halfedge_.SetStart(tri1edge[0], v0);
-  halfedge_.SetEnd(tri1edge[2], v0);
+  halfedge_.SetStart(tri0edge[0], halfedge_.Start(tri1edge[2]));
+  halfedge_.SetStart(tri1edge[0], halfedge_.Start(tri0edge[2]));
   PairUp(tri0edge[0], halfedge_.Pair(tri1edge[2]));
   PairUp(tri1edge[0], halfedge_.Pair(tri0edge[2]));
   PairUp(tri0edge[2], tri1edge[2]);
   // Both triangles are now subsets of the neighboring triangle.
-  const int tri0 = tri0edge[0] / 3;
-  const int tri1 = tri1edge[0] / 3;
+  const int tri0 = halfedge_.Tri(tri0edge[0]);
+  const int tri1 = halfedge_.Tri(tri1edge[0]);
   faceNormal_[tri0] = faceNormal_[tri1];
   triRef[tri0] = triRef[tri1];
-  // Update properties if applicable
-  if (properties_.size() > 0) {
-    Vec<double>& prop = properties_;
-    halfedge_.SetProp(tri0edge[1], halfedge_.Prop(tri1edge[0]));
-    halfedge_.SetProp(tri0edge[0], halfedge_.Prop(tri1edge[2]));
-    halfedge_.SetProp(tri0edge[2], halfedge_.Prop(tri1edge[2]));
-    const int numProp = NumProp();
-    const int newProp = prop.size() / numProp;
+
+  const int numProp = NumProp();
+  if (numProp > 0) {
     const int propIdx0 = halfedge_.Prop(tri1edge[0]);
     const int propIdx1 = halfedge_.Prop(tri1edge[1]);
-    for (int p = 0; p < numProp; ++p) {
-      prop.push_back(a * prop[numProp * propIdx0 + p] +
-                     (1 - a) * prop[numProp * propIdx1 + p]);
+    halfedge_.SetProp(tri0edge[1], halfedge_.Prop(tri1edge[0]));
+    halfedge_.SetProp(tri0edge[0], halfedge_.Prop(tri1edge[2]));
+    if (propIdx0 == halfedge_.PropEnd(halfedge_.Pair(tri0edge[1]))) {
+      const int midProp = halfedge_.Prop(halfedge_.Pair(tri0edge[1]));
+      halfedge_.SetProp(tri1edge[0], midProp);
+      halfedge_.SetProp(tri0edge[2], midProp);
+    } else if (propIdx1 == halfedge_.Prop(halfedge_.Pair(tri1edge[0]))) {
+      const int midProp = halfedge_.PropEnd(halfedge_.Pair(tri1edge[0]));
+      halfedge_.SetProp(tri1edge[0], midProp);
+      halfedge_.SetProp(tri0edge[2], midProp);
+    } else {
+      const int newProp = properties_.size() / numProp;
+      for (int p = 0; p < numProp; ++p) {
+        properties_.push_back(a * properties_[numProp * propIdx0 + p] +
+                              (1 - a) * properties_[numProp * propIdx1 + p]);
+      }
+      halfedge_.SetProp(tri1edge[0], newProp);
+      halfedge_.SetProp(tri0edge[2], newProp);
     }
-    halfedge_.SetProp(tri1edge[0], newProp);
-    halfedge_.SetProp(tri0edge[2], newProp);
   }
 
   // if the new edge already exists, duplicate the verts and split the mesh.
@@ -325,6 +329,11 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
 
   CleanupTopology();
   ZoneScopedN("CollapseEdges");
+
+  // if (!HasSimpleProps()) {
+  //   std::cout << "cleaned up, but now has non-simple properties!" <<
+  //   std::endl;
+  // }
 
   Vec<int> edges(halfedge_.size());
   auto end = edges.end();
