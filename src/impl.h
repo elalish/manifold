@@ -215,7 +215,7 @@ struct Manifold::Impl {
   void SimplifyTopology2(int firstNewVert = 0);
   Merger CheckEdge(int edge) const;
   bool Continuous(int edge) const;
-  bool Swappable(int edge, int firstNewVert) const;
+  bool Swappable(int edge) const;
   void SwapEdge(int edge, double a);
   void SimplifyTopology(int firstNewVert = 0);
   void CollapseShortEdges(int firstNewVert = 0);

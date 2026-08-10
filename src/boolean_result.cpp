@@ -953,10 +953,6 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   outR.SimplifyTopology(nPv + nQv);
   outR.RemoveUnreferencedVerts();
 
-  // if (!outR.HasSimpleProps()) {
-  //   std::cout << "not simple props!" << std::endl;
-  // }
-
   if (ManifoldParams().intermediateChecks)
     DEBUG_ASSERT(outR.Is2Manifold(), logicErr,
                  "simplified mesh is not 2-manifold!");
@@ -981,9 +977,6 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 #endif
 
   balance.fullPath = true;
-  // if (!outR.HasSimpleProps())
-  //   std::cout << "Boolean3::Result: final output has non-simple properties!"
-  //             << std::endl;
   return outR;
 }
 

@@ -229,26 +229,20 @@ bool Manifold::Impl::Continuous(int edge) const {
                              halfedge_.Prop(pair) == halfedge_.PropEnd(edge)));
 }
 
-bool Manifold::Impl::Swappable(int edge, int firstNewVert) const {
+bool Manifold::Impl::Swappable(int edge) const {
   const int pair = halfedge_.Pair(edge);
-  const ivec3 triEdge = TriOf(edge);
-  const ivec3 pairTriEdge = TriOf(pair);
+  const ivec4 quadEdge = {edge, NextHalfedge(edge), PrevHalfedge(edge),
+                          PrevHalfedge(pair)};
 
   int tri = edge / 3;
   mat2x3 projection = GetAxisAlignedProjection(faceNormal_[tri]);
   vec3 v[4];
   vec2 vp[4];
-  bool valid = false;
-  for (int i : {0, 1, 2}) {
-    const int vert = halfedge_.Start(triEdge[i]);
-    if (vert >= firstNewVert) valid = true;
+  for (int i : {0, 1, 2, 3}) {
+    const int vert = halfedge_.Start(quadEdge[i]);
     v[i] = vertPos_[vert];
     vp[i] = projection * v[i];
   }
-  const int vert3 = halfedge_.Start(pairTriEdge[2]);
-  if (vert3 >= firstNewVert) valid = true;
-  if (!valid) return false;
-  v[3] = vertPos_[vert3];
 
   if (CCW(vp[0], vp[1], vp[2], epsilon_) > 0 || !Is01Longest(v[0], v[1], v[2]))
     return false;
@@ -355,9 +349,20 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
           const int pair = halfedge_.Pair(edge);
           if (!halfedge_.Valid(edge)) return;
 
+          if (halfedge_.Start(edge) < firstNewVert &&
+              halfedge_.End(edge) < firstNewVert &&
+              halfedge_.End(NextHalfedge(edge)) < firstNewVert)
+            return;
+
+          if (merger[edge].Valid() && !vertsVisited[halfedge_.Start(edge)] &&
+              !vertsVisited[halfedge_.End(edge)] &&
+              !vertsVisited[halfedge_.End(NextHalfedge(edge))] &&
+              !vertsVisited[halfedge_.End(NextHalfedge(pair))])
+            return;
+
           // Swappable edges differ on forward and backward, so check before the
           // forward-only optimization.
-          if (Swappable(edge, firstNewVert)) {
+          if (Swappable(edge)) {
             const vec3 v0 = vertPos_[halfedge_.Start(edge)];
             const double l01 = la::length(vertPos_[halfedge_.End(edge)] - v0);
             const double l02 =
@@ -385,8 +390,7 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
           // this one. Technically its cost can also change from a
           // neighbor's collapse, but probably not enough to worry about,
           // and this is a much cheaper check.
-          if (halfedge_.Valid(edge) && merger[edge].Valid() &&
-              !vertsVisited[halfedge_.Start(edge)] &&
+          if (merger[edge].Valid() && !vertsVisited[halfedge_.Start(edge)] &&
               !vertsVisited[halfedge_.End(edge)])
             return;
 
