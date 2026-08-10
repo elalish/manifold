@@ -22,6 +22,8 @@ jobs:
         mkdir public
         mv ./samples ./public
         mv ./docs ./public
+        # weekly benchmark dashboard, served at /dashboard
+        mv ./dashboard ./public
 
     - name: Download manifoldCAD editor, examples and documentation
       uses: dawidd6/action-download-artifact@v6

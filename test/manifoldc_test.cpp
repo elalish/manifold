@@ -760,6 +760,79 @@ TEST(CBIND, run_flag_accessors) {
   free(cube);
 }
 
+TEST(CBIND, cross_section_even_odd) {
+  // Two same-direction squares, one nested in the other: positive fill leaves
+  // the pair solid, even-odd cuts the inner square out.
+  ManifoldVec2 outerPts[] = {{-2, -2}, {2, -2}, {2, 2}, {-2, 2}};
+  ManifoldVec2 innerPts[] = {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}};
+  ManifoldSimplePolygon* outer =
+      manifold_simple_polygon(alloc_simple_polygon_buffer(), outerPts, 4);
+  ManifoldSimplePolygon* inner =
+      manifold_simple_polygon(alloc_simple_polygon_buffer(), innerPts, 4);
+  ManifoldSimplePolygon* sps[] = {outer, inner};
+  ManifoldPolygons* ps = manifold_polygons(alloc_polygons_buffer(), sps, 2);
+
+  ManifoldCrossSection* positive = manifold_cross_section_of_polygons(
+      malloc(manifold_cross_section_size()), ps);
+  ManifoldCrossSection* evenOdd = manifold_cross_section_even_odd_polygons(
+      malloc(manifold_cross_section_size()), ps);
+  EXPECT_NEAR(manifold_cross_section_area(positive), 16.0, 1e-9);
+  EXPECT_NEAR(manifold_cross_section_area(evenOdd), 12.0, 1e-9);
+
+  // The single-contour entry point, on a clockwise square: even-odd goes by
+  // parity so it fills, while positive fill discards the negative winding.
+  ManifoldVec2 cwPts[] = {{0, 0}, {0, 2}, {2, 2}, {2, 0}};
+  ManifoldSimplePolygon* cw =
+      manifold_simple_polygon(alloc_simple_polygon_buffer(), cwPts, 4);
+  ManifoldCrossSection* cwPositive = manifold_cross_section_of_simple_polygon(
+      malloc(manifold_cross_section_size()), cw);
+  ManifoldCrossSection* cwEvenOdd =
+      manifold_cross_section_even_odd_simple_polygon(
+          malloc(manifold_cross_section_size()), cw);
+  EXPECT_NEAR(manifold_cross_section_area(cwPositive), 0.0, 1e-9);
+  EXPECT_NEAR(manifold_cross_section_area(cwEvenOdd), 4.0, 1e-9);
+
+  manifold_destruct_simple_polygon(outer);
+  manifold_destruct_simple_polygon(inner);
+  manifold_destruct_simple_polygon(cw);
+  manifold_destruct_polygons(ps);
+  manifold_destruct_cross_section(positive);
+  manifold_destruct_cross_section(evenOdd);
+  manifold_destruct_cross_section(cwPositive);
+  manifold_destruct_cross_section(cwEvenOdd);
+  free(outer);
+  free(inner);
+  free(cw);
+  free(ps);
+  free(positive);
+  free(evenOdd);
+  free(cwPositive);
+  free(cwEvenOdd);
+}
+
+TEST(CBIND, cross_section_tolerance) {
+  void* buf = malloc(manifold_cross_section_size());
+
+  ManifoldCrossSection* sq = manifold_cross_section_square(buf, 10.0, 5.0, 0);
+  double tol = manifold_cross_section_get_tolerance(sq);
+  EXPECT_GT(tol, 0.0);
+
+  ManifoldCrossSection* tighter = manifold_cross_section_set_tolerance(
+      malloc(manifold_cross_section_size()), sq, tol * 0.5);
+  EXPECT_NEAR(manifold_cross_section_get_tolerance(tighter), tol, tol * 0.5);
+
+  ManifoldCrossSection* wider = manifold_cross_section_set_tolerance(
+      malloc(manifold_cross_section_size()), sq, tol * 2.0);
+  EXPECT_NEAR(manifold_cross_section_get_tolerance(wider), tol * 2.0, tol);
+
+  manifold_destruct_cross_section(sq);
+  manifold_destruct_cross_section(tighter);
+  manifold_destruct_cross_section(wider);
+  free(sq);
+  free(tighter);
+  free(wider);
+}
+
 // Smoke test for the manifold_alloc_* + manifold_delete_* pattern. The
 // rest of this file covers the malloc + manifold_destruct_* + free
 // pattern; this one fills in the alloc/delete variant (used by

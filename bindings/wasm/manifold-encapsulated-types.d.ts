@@ -16,7 +16,7 @@
  * @primaryExport
  */
 
-import {Box, ErrorStatus, ExecutionContext, FillRule, JoinType, Mat3, Mat4, Polygons, RayHit, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
+import {Box, ErrorStatus, ExecutionContext, JoinType, Mat3, Mat4, Polygons, RayHit, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
 
 export {ExecutionContext} from './manifold-global-types';
 
@@ -102,17 +102,15 @@ export function resetToCircularDefaults(): void;
 export class CrossSection {
   /**
    * Create a 2d cross-section from a set of contours (complex polygons). A
-   * boolean union operation (with Positive filling rule by default) is
-   * performed to combine overlapping polygons and ensure the resulting
-   * CrossSection is free of intersections.
+   * boolean union operation (with the Positive filling rule) is performed to
+   * combine overlapping polygons and ensure the resulting CrossSection is free
+   * of intersections.
    *
    * @param contours A set of closed paths describing zero or more complex
    * polygons.
-   * @param fillRule The filling rule used to interpret polygon sub-regions in
-   * contours.
    * @group Basics
    */
-  constructor(contours: Polygons, fillRule?: FillRule);
+  constructor(contours: Polygons);
 
   // Shapes
 
@@ -262,22 +260,27 @@ export class CrossSection {
 
   /**
    * Remove vertices from the contours in this CrossSection that are less than
-   * the specified distance epsilon from an imaginary line that passes through
+   * the specified distance tolerance from an imaginary line that passes through
    * its two adjacent vertices. Near duplicate vertices and collinear points
-   * will be removed at lower epsilons, with elimination of line segments
-   * becoming increasingly aggressive with larger epsilons.
+   * will be removed at lower tolerances, with elimination of line segments
+   * becoming increasingly aggressive with larger tolerances.
    *
    * It is recommended to apply this function following Offset, in order to
    * clean up any spurious tiny line segments introduced that do not improve
    * quality in any meaningful way. This is particularly important if further
    * offseting operations are to be performed, which would compound the issue.
    *
-   * @param epsilon minimum distance vertices must diverge from the hypothetical
-   *     outline without them in order to be included in the output (default
-   *     1e-6)
+   * @param tolerance minimum distance vertices must diverge from the
+   *     hypothetical outline without them in order to be included in the
+   *     output. Default 0 uses the cross-section's own tolerance (from
+   *     tolerance()), which is geometry-scale-derived and may be larger than a
+   *     fixed epsilon for large-coordinate geometry. Pass an explicit value to
+   *     override.
    * @group Transformations
    */
-  simplify(epsilon?: number): CrossSection;
+  simplify(tolerance?: number): CrossSection;
+  tolerance(): number;
+  setTolerance(tolerance: number): CrossSection;
 
   // Clipping Operations
 
@@ -355,13 +358,6 @@ export class CrossSection {
   // Topological Operations
 
   /**
-   * Construct a CrossSection from a vector of other Polygons (batch
-   * boolean union).
-   * @group Boolean
-   */
-  static compose(polygons: readonly(CrossSection|Polygons)[]): CrossSection;
-
-  /**
    * This operation returns a vector of CrossSections that are topologically
    * disconnected, each containing one outline contour with zero or more
    * holes.
@@ -373,17 +369,29 @@ export class CrossSection {
 
   /**
    * Create a 2d cross-section from a set of contours (complex polygons). A
-   * boolean union operation (with Positive filling rule by default) is
-   * performed to combine overlapping polygons and ensure the resulting
-   * CrossSection is free of intersections.
+   * boolean union operation (with the Positive filling rule) is performed to
+   * combine overlapping polygons and ensure the resulting CrossSection is free
+   * of intersections.
    *
    * @param contours A set of closed paths describing zero or more complex
    * polygons.
-   * @param fillRule The filling rule used to interpret polygon sub-regions in
-   * contours.
    * @group Input & Output
    */
-  static ofPolygons(contours: Polygons, fillRule?: FillRule): CrossSection;
+  static ofPolygons(contours: Polygons): CrossSection;
+
+  /**
+   * Create a 2d cross-section from a set of contours, reading them by the
+   * even-odd rule: a sub-region is filled when its winding number is odd, so
+   * overlapping an odd number of contours fills and overlapping an even number
+   * leaves a hole. Use this to take input authored for an even-odd tool such
+   * as OpenSCAD. The result is regularized like any other CrossSection, so
+   * every later operation behaves the same.
+   *
+   * @param contours A set of closed paths describing zero or more complex
+   * polygons.
+   * @group Input & Output
+   */
+  static evenOdd(contours: Polygons): CrossSection;
 
   /**
    * Return the contours of this CrossSection as a list of simple polygons.

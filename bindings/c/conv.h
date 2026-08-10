@@ -53,7 +53,6 @@ manifold::Polygons* from_c(ManifoldPolygons* m);
 manifold::MeshGL* from_c(ManifoldMeshGL* m);
 manifold::MeshGL64* from_c(ManifoldMeshGL64* m);
 OpType from_c(ManifoldOpType op);
-CrossSection::FillRule from_c(ManifoldFillRule fillrule);
 CrossSection::JoinType from_c(ManifoldJoinType jt);
 manifold::Box* from_c(ManifoldBox* m);
 manifold::Rect* from_c(ManifoldRect* r);

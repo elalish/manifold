@@ -37,10 +37,7 @@ struct Trace;
 struct PhaseAcc {
   std::atomic<int64_t> mergeNs{0};
   std::atomic<int64_t> remapNs{0};
-  std::atomic<int64_t> findIxNs{0};
-  std::atomic<int64_t> nearbyIxMergeNs{0};
-  std::atomic<int64_t> canonNs{0};
-  std::atomic<int64_t> filterHalfedgeNs{0};
+  std::atomic<int64_t> filterWindingNs{0};
   std::atomic<int64_t> totalNs{0};
   std::atomic<int64_t> cases{0};
   std::atomic<int64_t> bvhBuildNs{0};
@@ -50,10 +47,7 @@ struct PhaseAcc {
   void Reset() {
     mergeNs = 0;
     remapNs = 0;
-    findIxNs = 0;
-    nearbyIxMergeNs = 0;
-    canonNs = 0;
-    filterHalfedgeNs = 0;
+    filterWindingNs = 0;
     totalNs = 0;
     cases = 0;
     bvhBuildNs = 0;
@@ -190,20 +184,6 @@ class TraceRecorder {
                             const std::vector<int>& inputVert2Merged);
   void RecordCollapsedEdges(const std::vector<vec2>& verts,
                             const std::vector<EdgeM>& edges);
-  void RecordBroadPhasePairs(const std::vector<vec2>& verts,
-                             const std::vector<EdgeM>& edges,
-                             const std::vector<std::pair<int, int>>& pairs);
-  void RecordEdgeVertLists(const std::vector<vec2>& verts,
-                           const std::vector<EdgeM>& edges,
-                           const std::vector<std::vector<int>>& lists);
-  void RecordInsertedIntersections(const std::vector<vec2>& verts,
-                                   const std::vector<EdgeM>& edges,
-                                   const std::vector<std::vector<int>>& lists);
-  void RecordNearbyIntersectionMerge(
-      const std::vector<vec2>& verts, const std::vector<EdgeM>& edges,
-      const std::vector<std::vector<int>>& lists);
-  void RecordCanonicalSubedges(const std::vector<vec2>& verts,
-                               const CanonicalSubEdges& canon);
   void RecordFilteredOutput(const std::vector<vec2>& verts,
                             const std::vector<OutEdge>& edges);
 

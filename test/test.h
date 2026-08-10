@@ -38,6 +38,21 @@ struct ManifoldParamGuard {
   ~ManifoldParamGuard() { ManifoldParams() = params; }
 };
 
+inline double RawSignedArea(const manifold::SimplePolygon& ring) {
+  if (ring.size() < 3) return 0.0;
+  double sum = 0.0;
+  for (size_t i = 0; i < ring.size(); ++i) {
+    const manifold::vec2& a = ring[i];
+    const manifold::vec2& b = ring[(i + 1) % ring.size()];
+    sum += la::cross(a, b);
+  }
+  return 0.5 * sum;
+}
+
+inline double RawArea(const manifold::SimplePolygon& ring) {
+  return std::fabs(RawSignedArea(ring));
+}
+
 Polygons SquareHole(double xOffset = 0.0);
 MeshGL Csaszar();
 Manifold Gyroid();
