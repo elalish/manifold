@@ -258,7 +258,6 @@ void Manifold::Impl::SetNormalsAndCoplanar() {
       if (std::abs(dot(v - base, normal)) < tolerance_) {
         const size_t tri = h / 3;
         meshRelation_.triRef[tri].coplanarID = tp.tri;
-        // faceNormal_[tri] = normal;
 
         if (interiorHalfedges.empty() ||
             h != halfedge_.Pair(interiorHalfedges.back())) {

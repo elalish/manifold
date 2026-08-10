@@ -210,7 +210,7 @@ bool Manifold::Impl::MatchesTriNormals() const {
       max = std::max(max, d);
       min = std::min(min, d);
     }
-    if (max - min > std::max(100 * epsilon_, 2 * tolerance_)) return false;
+    if (max - min > 2 * tolerance_) return false;
 
     const int ccw = CCW(v[0], v[1], v[2], epsilon_ * 2);
     return ccw >= 0;

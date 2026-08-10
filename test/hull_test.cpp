@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "gtest/gtest.h"
 #include "manifold/manifold.h"
 #include "samples.h"
 #include "test.h"
-#include "gtest/gtest.h"
 
 using namespace manifold;
 

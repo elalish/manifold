@@ -235,11 +235,11 @@ TEST(Smooth, Fillet) {
   Manifold chamfered = cylinder + chamfer + base;
   EXPECT_EQ(chamfered.NumDegenerateTris(), 0);
   EXPECT_EQ(chamfered.NumTri(), 56);
-  // Manifold fillet = chamfered.SmoothByNormals(0).RefineToTolerance(0.01);
-  // EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);
-  // EXPECT_NEAR(fillet.Volume(), 7745, 1);
-  // EXPECT_NEAR(fillet.SurfaceArea(), 2622, 1);
-  if (options.exportModels) WriteTestOBJ("fillet.obj", chamfer);
+  Manifold fillet = chamfered.SmoothByNormals(0).RefineToTolerance(0.01);
+  EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);
+  EXPECT_NEAR(fillet.Volume(), 7745, 1);
+  EXPECT_NEAR(fillet.SurfaceArea(), 2622, 1);
+  if (options.exportModels) WriteTestOBJ("fillet.obj", fillet);
 }
 
 TEST(Smooth, Manual) {

@@ -18,7 +18,6 @@
 #include "impl.h"
 #include "parallel.h"
 #include "shared.h"
-#include "svd.h"
 
 namespace {
 using namespace manifold;
@@ -324,11 +323,6 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
   CleanupTopology();
   ZoneScopedN("CollapseEdges");
 
-  // if (!HasSimpleProps()) {
-  //   std::cout << "cleaned up, but now has non-simple properties!" <<
-  //   std::endl;
-  // }
-
   Vec<int> edges(halfedge_.size());
   auto end = edges.end();
   std::iota(edges.begin(), end, 0);
@@ -341,8 +335,6 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
   scratchBuffer.reserve(10);
 
   while (edges.begin() != end) {
-    // std::cout << NumDegenerateTris() << " degenerate triangles remain"
-    //           << std::endl;
     for_each(
         autoPolicy(end - edges.begin(), 1e4), edges.begin(), end,
         [&](int edge) {
@@ -433,8 +425,6 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
         continue;
       }
       if (merger[edge].Swap()) {
-        // std::cout << "swapping edge " << edge << " with cost "
-        //           << merger[edge].totalCost << std::endl;
         vertsVisited[startV] = true;
         vertsVisited[endV] = true;
         vertsVisited[halfedge_.End(NextHalfedge(edge))] = true;
@@ -449,21 +439,15 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
       vertsVisited.resize(vertPos_.size(), true);
       totalCost.resize(vertPos_.size(), 0);
       if (didCollapse) {
-        // std::cout << "collapsed edge " << edge << " with cost "
-        //           << merger[edge].totalCost << std::endl;
         totalCost[startV] += merger[edge].addedCost;
         totalCost[endV] += merger[edge].addedCost;
         vertsVisited[startV] = true;
         vertsVisited[endV] = true;
         ++numCollapsed;
-      } else {
-        // std::cout << "failed to collapse edge " << edge << " with cost "
-        //           << merger[edge].totalCost << std::endl;
       }
     }
     end = std::partition(edges.begin(), end,
                          [&](int edge) { return halfedge_.Valid(edge); });
-    // edges.Dump();
     // std::cout << "short? " << shortCollapse << ", collapsed: " <<
     // numCollapsed
     //           << ", swapped: " << numSwapped

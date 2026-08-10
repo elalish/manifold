@@ -25,9 +25,9 @@
 #include "../src/execution_impl.h"
 #include "../src/parallel.h"
 #include "../src/vec.h"
+#include "gtest/gtest.h"
 #include "manifold/manifold.h"
 #include "test.h"
-#include "gtest/gtest.h"
 
 using namespace manifold;
 
