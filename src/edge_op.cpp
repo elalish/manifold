@@ -316,7 +316,7 @@ void Manifold::Impl::SwapEdge(int edge, double a) {
   }
 }
 
-void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
+void Manifold::Impl::SimplifyTopology2() {
   if (!halfedge_.size()) return;
   halfedge_.MakeUnique();
 
@@ -341,10 +341,12 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
           const int pair = halfedge_.Pair(edge);
           if (!halfedge_.Valid(edge)) return;
 
-          if (halfedge_.Start(edge) < firstNewVert &&
-              halfedge_.End(edge) < firstNewVert &&
-              halfedge_.End(NextHalfedge(edge)) < firstNewVert)
-            return;
+          // Optimization: only calculate for forward halfedges, then copy
+          // result to the pair. However, this conflicts with the above
+          // optimization because forward halfedges with two retained verts
+          // get discarded, but can later become edges with new verts,
+          // which are then needed.
+          if (!halfedge_.IsForward(edge)) return;
 
           if (merger[edge].Valid() && !vertsVisited[halfedge_.Start(edge)] &&
               !vertsVisited[halfedge_.End(edge)] &&
@@ -354,29 +356,18 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
 
           // Swappable edges differ on forward and backward, so check before the
           // forward-only optimization.
-          if (Swappable(edge)) {
+          const bool swapEdge = Swappable(edge);
+          if (swapEdge || Swappable(pair)) {
             const vec3 v0 = vertPos_[halfedge_.Start(edge)];
             const double l01 = la::length(vertPos_[halfedge_.End(edge)] - v0);
-            const double l02 =
-                la::length(vertPos_[halfedge_.End(NextHalfedge(edge))] - v0);
+            const double l02 = la::length(
+                vertPos_[halfedge_.End(NextHalfedge(swapEdge ? edge : pair))] -
+                v0);
             const double a = std::max(0.0, std::min(1.0, l02 / l01));
-            merger[edge] = {0, Merger::kSwap, a, vec3(NAN)};
+            merger[swapEdge ? edge : pair] = {0, Merger::kSwap,
+                                              swapEdge ? a : 1 - a, vec3(NAN)};
             return;
           }
-
-          // Optimization: When decimating a Boolean result, operate only
-          // on new verts by only collapsing edges where the end vert is
-          // new. StartVerts get updated to their EndVert, so retained
-          // verts can become new, but not vice-versa.
-          if (!merger[edge].Valid() && halfedge_.End(edge) < firstNewVert)
-            return;
-
-          // Optimization: only calculate for forward halfedges, then copy
-          // result to the pair. However, this conflicts with the above
-          // optimization because forward halfedges with two retained verts
-          // get discarded, but can later become edges with new verts,
-          // which are then needed.
-          if (!halfedge_.IsForward(edge) && firstNewVert == 0) return;
 
           // Optimization: only recalculate when an edge has collapsed into
           // this one. Technically its cost can also change from a
@@ -391,12 +382,10 @@ void Manifold::Impl::SimplifyTopology2(int firstNewVert) {
           edgeCost.totalCost += std::max(totalCost[halfedge_.Start(edge)],
                                          totalCost[halfedge_.End(edge)]);
           merger[edge] = edgeCost;
-          if (firstNewVert == 0) {
-            // Forward edge optimization is enabled, so copy the result to
-            // the pair.
-            edgeCost.a = 1 - edgeCost.a;
-            merger[pair] = edgeCost;
-          }
+          // Forward edge optimization is enabled, so copy the result to
+          // the pair.
+          edgeCost.a = 1 - edgeCost.a;
+          merger[pair] = edgeCost;
         });
     stable_sort(edges.begin(), end, [&](int a, int b) {
       return merger[a].totalCost < merger[b].totalCost;

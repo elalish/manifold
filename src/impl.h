@@ -212,7 +212,7 @@ struct Manifold::Impl {
   };
   double MaxCost() const { return tolerance_ * tolerance_; }
   void CleanupTopology();
-  void SimplifyTopology2(int firstNewVert = 0);
+  void SimplifyTopology2();
   Merger CheckEdge(int edge) const;
   bool Continuous(int edge) const;
   bool Swappable(int edge) const;
