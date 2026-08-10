@@ -66,7 +66,7 @@ const manifoldMemberFunctions = [
 // CrossSection static methods (that return a new cross-section)
 const crossSectionStaticFunctions = [
   'square', 'circle', 'union', 'difference', 'intersection', 'ofPolygons',
-  'hull'
+  'evenOdd', 'hull'
 ];
 // CrossSection member functions (that return a new cross-section)
 const crossSectionMemberFunctions = [

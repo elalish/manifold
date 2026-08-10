@@ -303,6 +303,10 @@ ManifoldCrossSection* manifold_cross_section_of_simple_polygon(
     void* mem, ManifoldSimplePolygon* p);
 ManifoldCrossSection* manifold_cross_section_of_polygons(void* mem,
                                                          ManifoldPolygons* p);
+ManifoldCrossSection* manifold_cross_section_even_odd_simple_polygon(
+    void* mem, ManifoldSimplePolygon* p);
+ManifoldCrossSection* manifold_cross_section_even_odd_polygons(
+    void* mem, ManifoldPolygons* p);
 ManifoldCrossSection* manifold_cross_section_square(void* mem, double x,
                                                     double y, int center);
 ManifoldCrossSection* manifold_cross_section_circle(void* mem, double radius,

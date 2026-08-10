@@ -176,6 +176,136 @@ TEST(CrossSection, Square) {
   EXPECT_FLOAT_EQ((a - b).Volume(), 0.);
 }
 
+// Two same-direction squares, one nested in the other. Positive fill only
+// cares that the winding is above zero, so the pair is solid; even-odd sees
+// winding 2 in the middle and cuts a hole.
+TEST(CrossSection, EvenOddNestedContours) {
+  const Polygons nested = {
+      {{-2, -2}, {2, -2}, {2, 2}, {-2, 2}},
+      {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}},
+  };
+
+  const CrossSection positive(nested);
+  EXPECT_EQ(positive.NumContour(), 1u);
+  EXPECT_NEAR(positive.Area(), 16., 1e-9);
+
+  const CrossSection evenOdd = CrossSection::EvenOdd(nested);
+  EXPECT_EQ(evenOdd.NumContour(), 2u);
+  EXPECT_NEAR(evenOdd.Area(), 12., 1e-9);
+}
+
+// Reverse the inner square and the two rules agree: winding 0 is neither
+// positive nor odd, so the normal hole convention is unaffected.
+TEST(CrossSection, EvenOddReversedInnerIsAHoleEitherWay) {
+  const Polygons ring = {
+      {{-2, -2}, {2, -2}, {2, 2}, {-2, 2}},
+      {{-1, -1}, {-1, 1}, {1, 1}, {1, -1}},
+  };
+
+  const CrossSection positive(ring);
+  const CrossSection evenOdd = CrossSection::EvenOdd(ring);
+  EXPECT_NEAR(positive.Area(), 12., 1e-9);
+  EXPECT_NEAR(evenOdd.Area(), 12., 1e-9);
+  EXPECT_EQ(positive.NumContour(), evenOdd.NumContour());
+}
+
+// One contour crossing itself into two lobes of opposite winding. Positive
+// fill keeps only the counter-clockwise lobe; even-odd keeps both, since +1
+// and -1 are both odd.
+TEST(CrossSection, EvenOddBowtieKeepsBothLobes) {
+  const SimplePolygon bowtie = {{0, 0}, {2, 2}, {0, 2}, {2, 0}};
+
+  const CrossSection positive(bowtie);
+  EXPECT_EQ(positive.NumContour(), 1u);
+  EXPECT_NEAR(positive.Area(), 1., 1e-9);
+
+  const CrossSection evenOdd = CrossSection::EvenOdd(bowtie);
+  EXPECT_EQ(evenOdd.NumContour(), 2u);
+  EXPECT_NEAR(evenOdd.Area(), 2., 1e-9);
+}
+
+// Three same-direction nested squares alternate filled/hole/filled by depth.
+// Area() is the signed total, so 36 - 16 + 4 also pins the stored contours to
+// alternating orientation - a counter-clockwise middle ring would give 56.
+TEST(CrossSection, EvenOddNestingAlternatesByDepth) {
+  const Polygons nested = {
+      {{-3, -3}, {3, -3}, {3, 3}, {-3, 3}},
+      {{-2, -2}, {2, -2}, {2, 2}, {-2, 2}},
+      {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}},
+  };
+
+  const CrossSection positive(nested);
+  EXPECT_EQ(positive.NumContour(), 1u);
+  EXPECT_NEAR(positive.Area(), 36., 1e-9);
+
+  const CrossSection evenOdd = CrossSection::EvenOdd(nested);
+  EXPECT_EQ(evenOdd.NumContour(), 3u);
+  EXPECT_NEAR(evenOdd.Area(), 24., 1e-9);
+
+  // Probe each depth so the totals can't hide a hole in the wrong place.
+  const CrossSection probe = CrossSection::Square({0.5, 0.5}, true);
+  EXPECT_NEAR((evenOdd ^ probe).Area(), 0.25, 1e-9);
+  EXPECT_TRUE((evenOdd ^ probe.Translate({1.5, 0})).IsEmpty());
+  EXPECT_NEAR((evenOdd ^ probe.Translate({2.5, 0})).Area(), 0.25, 1e-9);
+}
+
+// Even-odd goes by parity, not sign, so a lone clockwise contour (winding -1)
+// is filled where positive fill discards it.
+TEST(CrossSection, EvenOddFillsAClockwiseContour) {
+  const SimplePolygon clockwise = {{0, 0}, {0, 2}, {2, 2}, {2, 0}};
+
+  EXPECT_TRUE(CrossSection(clockwise).IsEmpty());
+
+  const CrossSection evenOdd = CrossSection::EvenOdd(clockwise);
+  EXPECT_EQ(evenOdd.NumContour(), 1u);
+  EXPECT_NEAR(evenOdd.Area(), 4., 1e-9);
+}
+
+// The single-contour overload. A pentagram's core is wound twice by one
+// self-crossing path, so positive fills the whole silhouette and even-odd
+// leaves the core hollow.
+TEST(CrossSection, EvenOddSelfIntersectingContour) {
+  SimplePolygon pentagram;
+  for (int i = 0; i < 5; ++i) {
+    const double theta = kPi / 2 + i * 4 * kPi / 5;
+    pentagram.push_back({std::cos(theta), std::sin(theta)});
+  }
+  // Points sit on the unit circle and the self-crossings on a circle of
+  // radius cos(72 deg) / cos(36 deg). The silhouette is the 10-gon through
+  // both, and the twice-wound core is the inner regular pentagon.
+  const double r = std::cos(2 * kPi / 5) / std::cos(kPi / 5);
+  const double silhouette = 5 * r * std::sin(kPi / 5);
+  const double core = 2.5 * r * r * std::sin(2 * kPi / 5);
+
+  const CrossSection positive(pentagram);
+  EXPECT_EQ(positive.NumContour(), 1u);
+  EXPECT_NEAR(positive.Area(), silhouette, 1e-9);
+
+  const CrossSection evenOdd = CrossSection::EvenOdd(pentagram);
+  EXPECT_EQ(evenOdd.NumContour(), 2u);
+  EXPECT_NEAR(evenOdd.Area(), silhouette - core, 1e-9);
+}
+
+// The rule only decides how the input contours are read. What gets stored is
+// normal-oriented and positive either way, so re-reading the output with the
+// default rule changes nothing and later ops see an ordinary CrossSection.
+TEST(CrossSection, EvenOddOutputIsCanonicalPositive) {
+  const Polygons nested = {
+      {{-2, -2}, {2, -2}, {2, 2}, {-2, 2}},
+      {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}},
+  };
+  const CrossSection evenOdd = CrossSection::EvenOdd(nested);
+
+  const CrossSection reread(evenOdd.ToPolygons());
+  EXPECT_EQ(reread.NumContour(), evenOdd.NumContour());
+  EXPECT_NEAR(reread.Area(), evenOdd.Area(), 1e-9);
+
+  // The hole survives a boolean against a shape covering the whole thing.
+  const CrossSection box(CrossSection::Square({5, 5}, true));
+  EXPECT_NEAR((evenOdd ^ box).Area(), evenOdd.Area(), 1e-9);
+  EXPECT_NEAR((box - evenOdd).Area(), 13., 1e-9);
+}
+
 TEST(CrossSection, MirrorUnion) {
   auto a = CrossSection::Square({5., 5.}, true);
   auto b = a.Translate({2.5, 2.5});

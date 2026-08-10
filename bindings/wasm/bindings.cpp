@@ -152,6 +152,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
                 select_overload<CrossSection() const>(&CrossSection::Hull));
 
   // CrossSection Static Methods
+  function("_EvenOdd", &cross_js::EvenOdd);
   function("_Square", &CrossSection::Square);
   function("_Circle", &CrossSection::Circle);
   function("_crossSectionUnionN", &cross_js::UnionN);

@@ -577,6 +577,27 @@ TEST(Boolean2, CleanupPassMatchesValidAddSinglePass) {
   EXPECT_NEAR(TotalSignedArea(pass1Polys), TotalSignedArea(pass2Polys), 1e-12);
 }
 
+// EvenOdd only changes which sub-edges the winding pass retains: `rule` is
+// read in SweepMode::Winding and nowhere in the arrangement. So on the same
+// self-intersecting input it must produce a graph the independent oracle still
+// accepts, over the same vertex merge Add gets.
+TEST(Boolean2, EvenOddRetainedGraphMatchesAddArrangement) {
+  Polygons polys{RandomTopologicalRing(8, 15)};
+  const double eps = InferEps(polys, {});
+  const auto [verts, edges] = PolygonsToInput(polys);
+
+  const auto add =
+      RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::Add);
+  const auto evenOdd =
+      RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::EvenOdd);
+
+  EXPECT_TRUE(CheckRetainedGraphValidity(
+      evenOdd, edges, evenOdd.inputVert2Merged, evenOdd.numMergedVerts, eps));
+  EXPECT_EQ(evenOdd.numMergedVerts, add.numMergedVerts);
+  EXPECT_EQ(evenOdd.inputVert2Merged, add.inputVert2Merged);
+  EXPECT_FALSE(OutEdgesToPolygons(evenOdd.verts, evenOdd.edges).empty());
+}
+
 TEST(Boolean2, OffsetRoundUsesRequestedSegments) {
   SimplePolygon square = {{0, 0}, {20, 0}, {20, 20}, {0, 20}};
   const int segments = 20;

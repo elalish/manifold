@@ -79,12 +79,16 @@ enum class Side : uint8_t { UNDER, OVER, ON, ENDS };
 
 // Positive fill (Add: w > 0), intersection (Intersect: w > 1). Subtract feeds
 // the second operand with negative multiplicity, so it uses the Add rule.
+// EvenOdd reads the same signed winding by parity, so unlike Add it fills a
+// lone clockwise contour (w == -1) as well as a counter-clockwise one.
 bool IsInside(WindRule rule, int64_t w) {
   switch (rule) {
     case WindRule::Add:
       return w > 0;
     case WindRule::Intersect:
       return w > 1;
+    case WindRule::EvenOdd:
+      return w % 2 != 0;
   }
   return false;
 }
