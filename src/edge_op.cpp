@@ -37,6 +37,13 @@ bool Is01Longest(vec2 v0, vec2 v1, vec2 v2) {
   return l[0] > l[1] && l[0] > l[2];
 }
 
+bool Is01Longest(vec3 v0, vec3 v1, vec3 v2) {
+  const vec3 e[3] = {v1 - v0, v2 - v1, v0 - v2};
+  double l[3];
+  for (int i : {0, 1, 2}) l[i] = la::dot(e[i], e[i]);
+  return l[0] > l[1] && l[0] > l[2];
+}
+
 struct FlagStore {
 #if MANIFOLD_PAR == 1
   tbb::combinable<Vec<size_t>> store;
@@ -150,15 +157,315 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
   CalculateVertNormals();
 }
 
-void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
+Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge) const {
+  const int pair = halfedge_.Pair(edge);
+  const int start = halfedge_.Start(edge);
+  const int end = halfedge_.End(edge);
+  const vec3 delta = vertPos_[end] - vertPos_[start];
+  const double lenSq = la::dot(delta, delta);
+  const vec3 mid = vertPos_[start] + delta / 2;
+  if (lenSq < epsilon_ * epsilon_) {
+    return {0, Merger::kShort, 0.5, mid};
+  }
+  mat3 A(0.);
+  vec3 b(0.);
+  double c = 0;
+
+  auto addCost = [&](vec3 normal, vec3 pos) {
+    A += la::outerprod(normal, normal);
+    double d = la::dot(normal, pos - mid);
+    b += normal * d;
+    c += d * d;
+  };
+
+  int firstEdge = edge;
+
+  auto addTri = [&](int current) {
+    if (current == firstEdge) {
+      return;  // don't double-count the collapsing triangles.
+    }
+    const vec3 normal = faceNormal_[halfedge_.Tri(current)];
+    const vec3 pos = vertPos_[halfedge_.Start(current)];
+
+    // Equal-weighted per triangle, keeps the cost in terms of distance.
+    // Angle-weighting like pseudo-normals may be better, but it is more
+    // expensive to compute and may be less stable on degenerates.
+    addCost(normal, pos);
+
+    if (!Continuous(current)) {
+      // Penalize motion across an edge that contains a property boundary.
+      addCost(SafeNormalize(
+                  la::cross(normal, vertPos_[halfedge_.End(current)] - pos)),
+              pos);
+    }
+  };
+  ForVert(firstEdge, addTri);
+  firstEdge = halfedge_.Pair(edge);
+  ForVert(firstEdge, addTri);
+
+  // Constrain the solution to the plane containing the edge and its normal.
+  const mat3x2 P = {delta, (faceNormal_[edge / 3] + faceNormal_[pair / 3]) / 2};
+  // Epsilon stabilizes the inverse, driving the solution toward the midpoint.
+  const mat2 A2 = transpose(P) * A * P;
+  const vec2 b2 = transpose(P) * b;
+  vec2 u = inverse(A2) * b2;
+  if (!std::isfinite(u[0])) return {0, 0, 0.5, mid};
+  // u[0] is the interpolation along the collapsed edge, which is used to
+  // interpolate the properties. It is clamped to avoid extrapolation.
+  u[0] = la::clamp(u[0], -0.5, 0.5);
+  // Cost has units of length^2.
+  const double cost =
+      std::max(0.0, la::dot(u, A2 * u) - 2 * la::dot(b2, u) + c);
+  return {cost, cost, u[0] + 0.5, mid + P * u};
+}
+
+bool Manifold::Impl::Continuous(int edge) const {
+  const int pair = halfedge_.Pair(edge);
+  const TriRef ref0 = meshRelation_.triRef[halfedge_.Tri(edge)];
+  const TriRef ref1 = meshRelation_.triRef[halfedge_.Tri(pair)];
+  return ref0.meshID == ref1.meshID && ref0.faceID == ref1.faceID &&
+         (NumProp() == 0 || (halfedge_.Prop(edge) == halfedge_.PropEnd(pair) &&
+                             halfedge_.Prop(pair) == halfedge_.PropEnd(edge)));
+}
+
+bool Manifold::Impl::Swappable(int edge) const {
+  const int pair = halfedge_.Pair(edge);
+  const ivec4 quadEdge = {edge, NextHalfedge(edge), PrevHalfedge(edge),
+                          PrevHalfedge(pair)};
+
+  int tri = edge / 3;
+  mat2x3 projection = GetAxisAlignedProjection(faceNormal_[tri]);
+  vec3 v[4];
+  vec2 vp[4];
+  for (int i : {0, 1, 2, 3}) {
+    const int vert = halfedge_.Start(quadEdge[i]);
+    v[i] = vertPos_[vert];
+    vp[i] = projection * v[i];
+  }
+
+  if (CCW(vp[0], vp[1], vp[2], epsilon_) > 0 || !Is01Longest(v[0], v[1], v[2]))
+    return false;
+
+  // Switch to neighbor's projection.
+  edge = pair;
+  tri = edge / 3;
+  projection = GetAxisAlignedProjection(faceNormal_[tri]);
+  for (int i : {0, 1, 2, 3}) vp[i] = projection * v[i];
+
+  return Is01Longest(v[1], v[0], v[3]) ||
+         (CCW(vp[1], vp[0], vp[3], epsilon_) > 0 &&
+          CCW(vp[1], vp[2], vp[3], epsilon_) > 0 &&
+          CCW(vp[2], vp[0], vp[3], epsilon_) > 0);
+}
+
+void Manifold::Impl::SwapEdge(int edge, double a) {
+  Vec<TriRef>& triRef = meshRelation_.triRef;
+
+  const int pair = halfedge_.Pair(edge);
+  const ivec3 tri0edge = TriOf(edge);
+  const ivec3 tri1edge = TriOf(pair);
+
+  // The 0-verts are swapped to the opposite 2-verts.
+  halfedge_.SetStart(tri0edge[0], halfedge_.Start(tri1edge[2]));
+  halfedge_.SetStart(tri1edge[0], halfedge_.Start(tri0edge[2]));
+  PairUp(tri0edge[0], halfedge_.Pair(tri1edge[2]));
+  PairUp(tri1edge[0], halfedge_.Pair(tri0edge[2]));
+  PairUp(tri0edge[2], tri1edge[2]);
+  // Both triangles are now subsets of the neighboring triangle.
+  const int tri0 = halfedge_.Tri(tri0edge[0]);
+  const int tri1 = halfedge_.Tri(tri1edge[0]);
+  faceNormal_[tri0] = faceNormal_[tri1];
+  triRef[tri0] = triRef[tri1];
+
+  const int numProp = NumProp();
+  if (numProp > 0) {
+    const int propIdx0 = halfedge_.Prop(tri1edge[0]);
+    const int propIdx1 = halfedge_.Prop(tri1edge[1]);
+    halfedge_.SetProp(tri0edge[1], halfedge_.Prop(tri1edge[0]));
+    halfedge_.SetProp(tri0edge[0], halfedge_.Prop(tri1edge[2]));
+    if (propIdx0 == halfedge_.PropEnd(halfedge_.Pair(tri0edge[1]))) {
+      const int midProp = halfedge_.Prop(halfedge_.Pair(tri0edge[1]));
+      halfedge_.SetProp(tri1edge[0], midProp);
+      halfedge_.SetProp(tri0edge[2], midProp);
+    } else if (propIdx1 == halfedge_.Prop(halfedge_.Pair(tri1edge[0]))) {
+      const int midProp = halfedge_.PropEnd(halfedge_.Pair(tri1edge[0]));
+      halfedge_.SetProp(tri1edge[0], midProp);
+      halfedge_.SetProp(tri0edge[2], midProp);
+    } else {
+      const int newProp = properties_.size() / numProp;
+      for (int p = 0; p < numProp; ++p) {
+        properties_.push_back(a * properties_[numProp * propIdx0 + p] +
+                              (1 - a) * properties_[numProp * propIdx1 + p]);
+      }
+      halfedge_.SetProp(tri1edge[0], newProp);
+      halfedge_.SetProp(tri0edge[2], newProp);
+    }
+  }
+
+  // if the new edge already exists, duplicate the verts and split the mesh.
+  int current = halfedge_.Pair(tri1edge[0]);
+  const int endVert = halfedge_.End(tri1edge[1]);
+  while (current != tri0edge[1]) {
+    current = NextHalfedge(current);
+    if (halfedge_.End(current) == endVert) {
+      FormLoop(tri0edge[2], current);
+      RemoveIfFolded(tri0edge[2]);
+      return;
+    }
+    current = halfedge_.Pair(current);
+  }
+}
+
+void Manifold::Impl::SimplifyTopology2() {
   if (!halfedge_.size()) return;
   halfedge_.MakeUnique();
 
   CleanupTopology();
-  CollapseShortEdges(firstNewVert);
-  SwapDegenerates(firstNewVert);
+  ZoneScopedN("CollapseEdges");
+
+  Vec<int> edges(halfedge_.size());
+  auto end = edges.end();
+  std::iota(edges.begin(), end, 0);
+  Vec<bool> vertsVisited(vertPos_.size(), false);
+  Vec<double> totalCost(vertPos_.size(), 0);
+  size_t totalCollapsed = 0;
+  Vec<Merger> merger(edges.size(), {});
+  const double maxCost = MaxCost();
+  Vec<int> scratchBuffer;
+  scratchBuffer.reserve(10);
+
+  while (edges.begin() != end) {
+    for_each(
+        autoPolicy(end - edges.begin(), 1e4), edges.begin(), end,
+        [&](int edge) {
+          const int pair = halfedge_.Pair(edge);
+          if (!halfedge_.Valid(edge)) return;
+
+          // Optimization: only calculate for forward halfedges, then copy
+          // result to the pair. However, this conflicts with the above
+          // optimization because forward halfedges with two retained verts
+          // get discarded, but can later become edges with new verts,
+          // which are then needed.
+          if (!halfedge_.IsForward(edge)) return;
+
+          if (merger[edge].Valid() && !vertsVisited[halfedge_.Start(edge)] &&
+              !vertsVisited[halfedge_.End(edge)] &&
+              !vertsVisited[halfedge_.End(NextHalfedge(edge))] &&
+              !vertsVisited[halfedge_.End(NextHalfedge(pair))])
+            return;
+
+          // Swappable edges differ on forward and backward, so check before the
+          // forward-only optimization.
+          const bool swapEdge = Swappable(edge);
+          if (swapEdge || Swappable(pair)) {
+            const vec3 v0 = vertPos_[halfedge_.Start(edge)];
+            const double l01 = la::length(vertPos_[halfedge_.End(edge)] - v0);
+            const double l02 = la::length(
+                vertPos_[halfedge_.End(NextHalfedge(swapEdge ? edge : pair))] -
+                v0);
+            const double a = std::max(0.0, std::min(1.0, l02 / l01));
+            merger[swapEdge ? edge : pair] = {0, Merger::kSwap,
+                                              swapEdge ? a : 1 - a, vec3(NAN)};
+            return;
+          }
+
+          // Optimization: only recalculate when an edge has collapsed into
+          // this one. Technically its cost can also change from a
+          // neighbor's collapse, but probably not enough to worry about,
+          // and this is a much cheaper check.
+          if (merger[edge].Valid() && !vertsVisited[halfedge_.Start(edge)] &&
+              !vertsVisited[halfedge_.End(edge)])
+            return;
+
+          Merger edgeCost = CheckEdge(edge);
+
+          edgeCost.totalCost += std::max(totalCost[halfedge_.Start(edge)],
+                                         totalCost[halfedge_.End(edge)]);
+          merger[edge] = edgeCost;
+          // Forward edge optimization is enabled, so copy the result to
+          // the pair.
+          edgeCost.a = 1 - edgeCost.a;
+          merger[pair] = edgeCost;
+        });
+    stable_sort(edges.begin(), end, [&](int a, int b) {
+      return merger[a].totalCost < merger[b].totalCost;
+    });
+    std::fill(vertsVisited.begin(), vertsVisited.end(), false);
+    auto itr = edges.begin();
+    size_t numCollapsed = 0;
+    size_t numSwapped = 0;
+    // Collapse short edges first so that long edges calculate correct cost.
+    const bool shortCollapse = merger[*itr].Short();
+    for (; itr != end; ++itr) {
+      const int edge = *itr;
+      if (!halfedge_.Valid(edge)) {
+        continue;
+      }
+      if (merger[edge].totalCost > maxCost) {
+        break;  // Sorting means no further edges can be collapsed this round.
+      }
+      if (shortCollapse && !merger[edge].Free()) {
+        break;  // force recalculation of cost after free edges collapse.
+      }
+      const int startV = halfedge_.Start(edge);
+      const int endV = halfedge_.End(edge);
+      // Allow short merges to stack to ensure all are collapsed.
+      if (!shortCollapse && (vertsVisited[startV] || vertsVisited[endV])) {
+        continue;
+      }
+      if (merger[edge].Swap()) {
+        vertsVisited[startV] = true;
+        vertsVisited[endV] = true;
+        vertsVisited[halfedge_.End(NextHalfedge(edge))] = true;
+        vertsVisited[halfedge_.End(NextHalfedge(halfedge_.Pair(edge)))] = true;
+        SwapEdge(edge, merger[edge].a);
+        vertsVisited.resize(vertPos_.size(), true);
+        totalCost.resize(vertPos_.size(), 0);
+        ++numSwapped;
+        continue;
+      }
+      const bool didCollapse = CollapseEdge2(edge, scratchBuffer, merger[edge]);
+      vertsVisited.resize(vertPos_.size(), true);
+      totalCost.resize(vertPos_.size(), 0);
+      if (didCollapse) {
+        totalCost[startV] += merger[edge].addedCost;
+        totalCost[endV] += merger[edge].addedCost;
+        vertsVisited[startV] = true;
+        vertsVisited[endV] = true;
+        ++numCollapsed;
+      }
+    }
+    end = std::partition(edges.begin(), end,
+                         [&](int edge) { return halfedge_.Valid(edge); });
+    // std::cout << "short? " << shortCollapse << ", collapsed: " <<
+    // numCollapsed
+    //           << ", swapped: " << numSwapped
+    //           << ", edges left: " << (end - edges.begin()) << ", "
+    //           << itr - edges.begin() << std::endl;
+    totalCollapsed += numCollapsed;
+    if (numCollapsed == 0 && numSwapped == 0) break;
+
+    for_each_n(autoPolicy(NumTri(), 1e4), countAt(0), NumTri(), [&](int tri) {
+      if (!halfedge_.Valid(3 * tri)) return;
+      bool update = false;
+      for (const int i : {0, 1, 2})
+        update |= vertsVisited[halfedge_.Start(3 * tri + i)];
+      if (!update) return;
+
+      const vec3 center = vertPos_[halfedge_.Start(3 * tri)];
+      faceNormal_[tri] = SafeNormalize(
+          la::cross(vertPos_[halfedge_.Start(3 * tri + 1)] - center,
+                    vertPos_[halfedge_.Start(3 * tri + 2)] - center));
+    });
+  }
   // Merging verts causes their normals to change
   CalculateVertNormals();
+
+#ifdef MANIFOLD_DEBUG
+  if (ManifoldParams().verbose >= 2 && totalCollapsed > 0) {
+    std::cout << "collapsed " << totalCollapsed << " edges" << std::endl;
+  }
+#endif
 }
 
 void Manifold::Impl::CollapseShortEdges(int firstNewVert) {
@@ -219,14 +526,14 @@ void Manifold::Impl::CollapseColinearEdges(int firstNewVert) {
     // Collapse colinear edges, but only remove new verts, i.e. verts with
     // index
     // >= firstNewVert. This is used to keep the Boolean from changing the
-    // non-intersecting parts of the input meshes. Colinear is defined not by a
-    // local check, but by the global MarkCoplanar function, which keeps this
-    // from being vulnerable to error stacking.
+    // non-intersecting parts of the input meshes. Colinear is defined not by
+    // a local check, but by the global MarkCoplanar function, which keeps
+    // this from being vulnerable to error stacking.
     auto colinearEdge = [&](int edge) {
       const int pair = halfedge_.Pair(edge);
       if (pair < 0 || halfedge_.Start(edge) < firstNewVert) return false;
-      // Flag redundant edges - those where the startVert is surrounded by only
-      // two original triangles.
+      // Flag redundant edges - those where the startVert is surrounded by
+      // only two original triangles.
       const TriRef ref0 = meshRelation_.triRef[edge / 3];
       int current = NextHalfedge(pair);
       TriRef ref1 = meshRelation_.triRef[current / 3];
@@ -526,8 +833,8 @@ bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges, double tol,
       const int tri = current / 3;
       const TriRef ref = triRef[tri];
       const mat2x3 projection = GetAxisAlignedProjection(faceNormal_[tri]);
-      // Don't collapse if the edge is not redundant (this may have changed due
-      // to the collapse of neighbors).
+      // Don't collapse if the edge is not redundant (this may have changed
+      // due to the collapse of neighbors).
       if (!ref.SameFace(refCheck)) {
         const TriRef oldRef = refCheck;
         refCheck = triRef[edge / 3];
@@ -586,6 +893,129 @@ bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges, double tol,
       }
     }
 
+    const int vert = halfedge_.End(current);
+    const int next = halfedge_.Pair(current);
+    for (size_t i = 0; i < edges.size(); ++i) {
+      if (vert == halfedge_.End(edges[i])) {
+        FormLoop(edges[i], current);
+        start = next;
+        edges.resize(i);
+        break;
+      }
+    }
+    current = next;
+  }
+
+  UpdateVert(endVert, start, tri0edge[2]);
+  CollapseTri(tri0edge);
+  RemoveIfFolded(start);
+  return true;
+}
+
+// Collapses the given edge by removing startVert - returns false if the edge
+// cannot be collapsed. May split the mesh topologically if the collapse would
+// have resulted in a 4-manifold edge. Do not collapse an edge if startVert is
+// pinched - the vert would be marked NaN, but other edges could still be
+// pointing to it.
+bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges,
+                                   const Merger& merger) {
+  edges.resize(0);
+  Vec<TriRef>& triRef = meshRelation_.triRef;
+
+  const int pair = halfedge_.Pair(edge);
+  if (pair < 0) return false;
+
+  const ivec3 tri0edge = TriOf(edge);
+  const ivec3 tri1edge = TriOf(pair);
+  const int startVert = halfedge_.Start(tri0edge[0]);
+  const int endVert = halfedge_.Start(tri0edge[1]);
+
+  if (!merger.Short()) {
+    int firstEdge = edge;
+    double oldWorst = 0;
+    double newWorst = 0;
+    bool collapse = true;
+    auto checkTri = [&](int current) {
+      const int last = halfedge_.Pair(PrevHalfedge(current));
+      if (!collapse || current == firstEdge || last == firstEdge) {
+        return;  // ignore the collapsing triangles.
+      }
+      const vec3 pOld = vertPos_[halfedge_.Start(current)];
+      const vec3 pCurr = vertPos_[halfedge_.End(current)];
+      const vec3 pLast = vertPos_[halfedge_.End(last)];
+      const mat3 oldEdges(normalize(pOld - pLast), normalize(pLast - pCurr),
+                          normalize(pCurr - pOld));
+      const mat3 newEdges(normalize(merger.newPos - pLast),
+                          normalize(pLast - pCurr),
+                          normalize(pCurr - merger.newPos));
+      if (la::dot(la::cross(newEdges[1], newEdges[0]),
+                  faceNormal_[current / 3]) < 0) {
+        collapse = false;
+        return;
+      }
+      for (const int i : {0, 1, 2}) {
+        oldWorst = std::max(oldWorst, la::dot(oldEdges[i], oldEdges[Next3(i)]));
+        newWorst = std::max(newWorst, la::dot(newEdges[i], newEdges[Next3(i)]));
+      }
+    };
+    ForVert(firstEdge, checkTri);
+    if (!collapse) return false;
+    firstEdge = halfedge_.Pair(edge);
+    ForVert(firstEdge, checkTri);
+    if (!collapse) return false;
+    // Reject a collapse that would worsen the Delaunay condition too much,
+    // which is equivalent to having no obtuse angles. This would be a threshold
+    // of zero on this dot product, but 0.5 is used to allow obtuse angles up to
+    // 120 degrees to allow more edges to collapse. Planar cases (small cost)
+    // relax this threshold to allow generic polygon triangulation, but not so
+    // much as to create new degenerate triangles.
+    const double threshold =
+        merger.addedCost > epsilon_ * epsilon_ ? 0.5 : 0.99;
+    if (newWorst > threshold && newWorst > oldWorst) return false;
+  }
+
+  // Orbit endVert
+  {
+    int current = halfedge_.Pair(tri0edge[1]);
+    while (current != tri1edge[2]) {
+      current = NextHalfedge(current);
+      edges.push_back(current);
+      current = halfedge_.Pair(current);
+    }
+  }
+
+  const int startProp0 = halfedge_.Prop(tri0edge[0]);
+  const int endProp0 = halfedge_.Prop(tri0edge[1]);
+  const int startProp1 = halfedge_.Prop(tri1edge[1]);
+  const int endProp1 = halfedge_.Prop(tri1edge[0]);
+  const size_t numProp = NumProp();
+  for (int p = 0; p < numProp; ++p) {
+    properties_[numProp * endProp0 + p] =
+        la::lerp(properties_[numProp * startProp0 + p],
+                 properties_[numProp * endProp0 + p], merger.a);
+    if (endProp1 != endProp0)
+      properties_[numProp * endProp1 + p] =
+          la::lerp(properties_[numProp * startProp1 + p],
+                   properties_[numProp * endProp1 + p], merger.a);
+  }
+
+  int start = halfedge_.Pair(tri1edge[1]);
+  // Remove toRemove.startVert and replace with endVert.
+  vertPos_[startVert] = vec3(NAN);
+  vertPos_[endVert] = merger.newPos;
+  CollapseTri(tri1edge);
+
+  // Orbit startVert
+  int current = start;
+  while (current != tri0edge[2]) {
+    current = NextHalfedge(current);
+    if (numProp > 0) {
+      if (halfedge_.Prop(current) == startProp0) {
+        halfedge_.SetProp(current, endProp0);
+      } else if (halfedge_.Prop(current) == startProp1) {
+        halfedge_.SetProp(current, endProp1);
+      }
+    }
     const int vert = halfedge_.End(current);
     const int next = halfedge_.Pair(current);
     for (size_t i = 0; i < edges.size(); ++i) {

@@ -17,6 +17,7 @@
 #include <fstream>
 #endif
 
+#include "gtest/gtest.h"
 #include "manifold/manifold.h"
 #include "test.h"
 

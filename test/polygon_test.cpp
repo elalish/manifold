@@ -26,6 +26,7 @@
 #include <utility>
 
 #include "../src/polygon_internal.h"
+#include "gtest/gtest.h"
 #include "polygon_corpus.h"
 #include "test.h"
 

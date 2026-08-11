@@ -230,9 +230,7 @@ void Manifold::Impl::SetNormalsAndCoplanar() {
                const vec3 v = vertPos_[halfedge_.Start(3 * tri)];
                const vec3 n = cross(vertPos_[halfedge_.End(3 * tri)] - v,
                                     vertPos_[halfedge_.End(3 * tri + 1)] - v);
-               faceNormal_[tri] = normalize(n);
-               if (std::isnan(faceNormal_[tri].x))
-                 faceNormal_[tri] = vec3(0, 0, 1);
+               faceNormal_[tri] = SafeNormalize(n);
                triPriority[tri] = {length2(n), tri};
              });
 
@@ -260,7 +258,6 @@ void Manifold::Impl::SetNormalsAndCoplanar() {
       if (std::abs(dot(v - base, normal)) < tolerance_) {
         const size_t tri = h / 3;
         meshRelation_.triRef[tri].coplanarID = tp.tri;
-        faceNormal_[tri] = normal;
 
         if (interiorHalfedges.empty() ||
             h != halfedge_.Pair(interiorHalfedges.back())) {
@@ -365,10 +362,7 @@ struct PrepHalfedges {
 
 /**
  * Create the halfedge_ data structure from a list of triangles. If the optional
- * prop2vert array is missing, it's assumed these triangles are are pointing to
- * both vert and propVert indices. If prop2vert is present, the triangles are
- * assumed to be pointing to propVert indices only. The prop2vert array is used
- * to map the propVert indices to vert indices.
+ * triVert array is missing, it's assumed that triProp is identical to triVert.
  */
 void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
                                      const Vec<ivec3>& triVert) {

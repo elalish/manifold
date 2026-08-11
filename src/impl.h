@@ -59,26 +59,6 @@ struct Manifold::Impl {
   int numProp_ = 0;
   Error status_ = Error::NoError;
 
-  // True only when every meshID carries normals at slot 0..2 - the
-  // condition under which GetMeshGL(-1) can safely auto-substitute that
-  // slot. A mixed Boolean output (some meshIDs with normals, some
-  // without) returns false; the output MeshGL's per-run bit 1 still
-  // marks the with-normals runs individually.
-  bool AllHaveNormals() const {
-    if (meshRelation_.meshIDtransform.empty()) return false;
-    for (const auto& m : meshRelation_.meshIDtransform) {
-      if (!m.second.hasNormals) return false;
-    }
-    return true;
-  }
-
-  // True iff the meshID owning `tri` has hasNormals set. Returns false when
-  // the meshID isn't in meshRelation_.meshIDtransform (treat as no-normals).
-  static bool TriHasNormals(const MeshRelationD& meshRelation, int tri) {
-    const int meshID = meshRelation.triRef[tri].meshID;
-    auto it = meshRelation.meshIDtransform.find(meshID);
-    return it != meshRelation.meshIDtransform.end() && it->second.hasNormals;
-  }
   Vec<vec3> vertPos_;
   Halfedges halfedge_;
   Vec<double> properties_;
@@ -107,12 +87,33 @@ struct Manifold::Impl {
                       bool canParallel, ExecutionContext::Impl* ctx = nullptr);
 
   template <typename F>
-  inline void ForVert(int halfedge, F func);
+  inline void ForVert(int halfedge, F func) const;
 
   template <typename T>
   void ForVert(
       int halfedge, std::function<T(int halfedge)> transform,
-      std::function<void(int halfedge, const T& here, T& next)> binaryOp);
+      std::function<void(int halfedge, const T& here, T& next)> binaryOp) const;
+
+  // True only when every meshID carries normals at slot 0..2 - the
+  // condition under which GetMeshGL(-1) can safely auto-substitute that
+  // slot. A mixed Boolean output (some meshIDs with normals, some
+  // without) returns false; the output MeshGL's per-run bit 1 still
+  // marks the with-normals runs individually.
+  bool AllHaveNormals() const {
+    if (meshRelation_.meshIDtransform.empty()) return false;
+    for (const auto& m : meshRelation_.meshIDtransform) {
+      if (!m.second.hasNormals) return false;
+    }
+    return true;
+  }
+
+  // True iff the meshID owning `tri` has hasNormals set. Returns false when
+  // the meshID isn't in meshRelation_.meshIDtransform (treat as no-normals).
+  static bool TriHasNormals(const MeshRelationD& meshRelation, int tri) {
+    const int meshID = meshRelation.triRef[tri].meshID;
+    auto it = meshRelation.meshIDtransform.find(meshID);
+    return it != meshRelation.meshIDtransform.end() && it->second.hasNormals;
+  }
 
   void SetNormalsAndCoplanar();
   void DedupePropVerts();
@@ -163,6 +164,7 @@ struct Manifold::Impl {
   bool IsSelfIntersecting() const;
   bool MatchesTriNormals() const;
   int NumDegenerateTris() const;
+  bool HasSimpleProps() const;
   bool IsConvex() const;
   double MinGap(const Impl& other, double searchLength) const;
 
@@ -194,15 +196,35 @@ struct Manifold::Impl {
   Polygons Project() const;
 
   // edge_op.cpp
+  struct Merger {
+    double addedCost = std::numeric_limits<double>::infinity();
+    double totalCost = std::numeric_limits<double>::infinity();
+    double a = std::numeric_limits<double>::quiet_NaN();
+    vec3 newPos = vec3(a);
+
+    static constexpr double kShort = -2;
+    static constexpr double kSwap = -1;
+
+    bool Valid() const { return std::isfinite(addedCost); }
+    bool Free() const { return totalCost < 0; }
+    bool Short() const { return totalCost == kShort; }
+    bool Swap() const { return totalCost == kSwap; }
+  };
+  double MaxCost() const { return tolerance_ * tolerance_; }
   void CleanupTopology();
+  void SimplifyTopology2();
+  Merger CheckEdge(int edge) const;
+  bool Continuous(int edge) const;
+  bool Swappable(int edge) const;
+  void SwapEdge(int edge, double a);
   void SimplifyTopology(int firstNewVert = 0);
-  void RemoveDegenerates(int firstNewVert = 0);
   void CollapseShortEdges(int firstNewVert = 0);
   void CollapseColinearEdges(int firstNewVert = 0);
   void SwapDegenerates(int firstNewVert = 0);
   void DedupeEdge(int edge);
   bool CollapseEdge(int edge, Vec<int>& edges, double tol = -1,
                     int firstNewVert = 0);
+  bool CollapseEdge2(int edge, Vec<int>& scratch, const Merger& merger);
   void RecursiveEdgeSwap(int edge, int& tag, Vec<int>& visited,
                          Vec<int>& edgeSwapStack, Vec<int>& edges);
   void RemoveIfFolded(int edge);
@@ -259,7 +281,7 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl);
 // Template implementations follow:
 
 template <typename F>
-inline void Manifold::Impl::ForVert(int halfedge, F func) {
+inline void Manifold::Impl::ForVert(int halfedge, F func) const {
   int current = halfedge;
   do {
     current = NextHalfedge(halfedge_.Pair(current));
@@ -270,7 +292,7 @@ inline void Manifold::Impl::ForVert(int halfedge, F func) {
 template <typename T>
 void Manifold::Impl::ForVert(
     int halfedge, std::function<T(int halfedge)> transform,
-    std::function<void(int halfedge, const T& here, T& next)> binaryOp) {
+    std::function<void(int halfedge, const T& here, T& next)> binaryOp) const {
   T here = transform(halfedge);
   int current = halfedge;
   do {
@@ -491,9 +513,6 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   ADVANCE_PHASE_OR_RETURN(ctx);
 
   SetNormalsAndCoplanar();
-  ADVANCE_PHASE_OR_RETURN(ctx);
-
-  RemoveDegenerates();
   ADVANCE_PHASE_OR_RETURN(ctx);
 
   RemoveUnreferencedVerts();

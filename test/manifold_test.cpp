@@ -17,6 +17,7 @@
 #include <algorithm>
 
 #include "../src/execution_impl.h"
+#include "gtest/gtest.h"
 #include "manifold/cross_section.h"
 #include "test.h"
 
@@ -1051,8 +1052,8 @@ TEST(Manifold, Simplify) {
       CrossSection::Circle(1, 20).Translate({10, 0}).ToPolygons();
   Manifold torus = Manifold::Revolve(polyCircle, 100);
   Manifold simplified = torus.Simplify(0.4);
-  EXPECT_NEAR(torus.Volume(), simplified.Volume(), 25);
-  EXPECT_NEAR(torus.SurfaceArea(), simplified.SurfaceArea(), 10);
+  EXPECT_NEAR(torus.Volume(), simplified.Volume(), 5);
+  EXPECT_NEAR(torus.SurfaceArea(), simplified.SurfaceArea(), 12);
 
   if (options.exportModels) WriteTestOBJ("torus.obj", simplified);
 }
@@ -1228,6 +1229,7 @@ TEST(Manifold, MergeEmpty) {
   EXPECT_TRUE(shape.Merge());
   Manifold man(shape);
   EXPECT_EQ(man.Status(), Manifold::Error::NoError);
+  man = man.Simplify();
   EXPECT_TRUE(man.IsEmpty());
 }
 

@@ -293,6 +293,20 @@ inline SVDSet SVD(mat3 A) {
 }
 
 /**
+ * Returns the pseudo-inverse of A, which is equal to the inverse if A is
+ * invertible, and otherwise gives a solution to A * x = b that minimizes the
+ * norm of x.
+ */
+inline mat3 PseudoInverse(mat3 A) {
+  SVDSet usv = SVD(A);
+  mat3 invS;
+  for (const int i : {0, 1, 2}) {
+    invS[i][i] = usv.S[i][i] > _SVD_EPSILON ? 1.0 / usv.S[i][i] : 0.0;
+  }
+  return usv.V * invS * la::transpose(usv.U);
+}
+
+/**
  * Returns the largest singular value of A.
  *
  * @param A The matrix to measure.

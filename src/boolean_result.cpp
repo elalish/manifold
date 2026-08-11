@@ -957,6 +957,10 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     DEBUG_ASSERT(outR.Is2Manifold(), logicErr,
                  "simplified mesh is not 2-manifold!");
 
+  // if (ManifoldParams().intermediateChecks)
+  //   DEBUG_ASSERT(outR.NumDegenerateTris() == 0, logicErr,
+  //                "simplified mesh has degenerate triangles!");
+
   outR.CalculateBBox();
   outR.SortGeometry(ctx_);
   outR.IncrementMeshIDs();

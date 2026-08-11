@@ -14,6 +14,7 @@
 
 #include "samples.h"
 
+#include "gtest/gtest.h"
 #include "manifold/cross_section.h"
 #include "test.h"
 

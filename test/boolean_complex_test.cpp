@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "gtest/gtest.h"
 #include "manifold/cross_section.h"
 #include "manifold/manifold.h"
 #include "test.h"
@@ -45,19 +46,18 @@ TEST(BooleanComplex, MeshRelation) {
   MeshGL gyroidMeshGL = gyroid.GetMeshGL();
   gyroid = gyroid.Simplify();
 
-  Manifold gyroid2 = gyroid.Translate(vec3(2.0));
-
   EXPECT_FALSE(gyroid.IsEmpty());
   EXPECT_TRUE(gyroid.MatchesTriNormals());
   EXPECT_LE(gyroid.NumDegenerateTris(), 0);
 
-  Manifold result = gyroid + gyroid2;
+  Manifold result = gyroid + gyroid.Translate(vec3(2.0));
+  EXPECT_LE(result.NumDegenerateTris(), 0);
   result = result.RefineToLength(0.1);
 
   if (options.exportModels) WriteTestOBJ("gyroidUnion.obj", result);
 
   EXPECT_TRUE(result.MatchesTriNormals());
-  EXPECT_LE(result.NumDegenerateTris(), 12);
+  EXPECT_LE(result.NumDegenerateTris(), 0);
   EXPECT_EQ(result.Decompose().size(), 1);
   EXPECT_NEAR(result.Volume(), 226, 1);
   EXPECT_NEAR(result.SurfaceArea(), 387, 1);
