@@ -33,8 +33,8 @@ set(
   hull_test.cpp
   samples_test.cpp
   boolean_complex_test.cpp
-  boolean2_test.cpp
   cross_section_test.cpp
+  cross_section_complex_test.cpp
   cross_section_offset_corpus_test.cpp
   $<$<BOOL:${MANIFOLD_CBIND}>:manifoldc_test.cpp>
 )
