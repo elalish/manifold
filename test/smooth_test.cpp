@@ -221,16 +221,20 @@ TEST(Smooth, MissingNormalsCone) {
 TEST(Smooth, Fillet) {
   float depth = 3;
   float radius = 10;
-  Manifold cylinder =
-      Manifold::Cylinder(10, radius, radius, 6, false).CalculateNormals(0, 80);
-  Manifold chamfer = Manifold::Extrude(cylinder.Slice(0), depth, 0, 0,
-                                       vec2(radius + depth) / radius)
-                         .Simplify()
-                         .Mirror({0, 0, 1});
+  float filletScale = 1 + depth / radius;
+  Manifold cylinder = Manifold::Cylinder(20, radius, radius, 6, true)
+                          .CalculateNormals(0, 80)
+                          .Rotate(20);
+  CrossSection section = cylinder.Slice(0);
+  Manifold chamfer =
+      Manifold::Extrude(section.Simplify().ToPolygons(), depth, 0, 0,
+                        vec2(filletScale, 1.1 * filletScale))
+          .Mirror({0, 0, 1});
   EXPECT_EQ(chamfer.NumDegenerateTris(), 0);
   EXPECT_EQ(chamfer.NumTri(), 20);
-  Manifold base = Manifold::Cylinder(5, 15, 15, 6)
-                      .Translate({0, 0, -5 - depth})
+  Manifold base = Manifold::Cylinder(10, 15, 15, 6)
+                      .Translate({0, 0, -10 - depth})
+                      .Scale({1, 1.2, 1})
                       .CalculateNormals(0, 80);
   Manifold chamfered = cylinder + chamfer + base;
   EXPECT_EQ(chamfered.NumDegenerateTris(), 0);

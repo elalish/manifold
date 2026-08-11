@@ -42,6 +42,9 @@ double Wrap(double radians) {
 // Floating point noise in the dihedral angle computation can reach ~1e-6
 // degrees for nearly-parallel face normals; this threshold must exceed that.
 constexpr double kMinSharpAngle = 1e-4;
+// special flags for tangent.w
+constexpr double kInsideQuad = -1;
+constexpr double kMissingNormal = -3;
 
 // Get the angle between two unit-vectors.
 double AngleBetween(vec3 a, vec3 b) {
@@ -302,34 +305,59 @@ vec4 Manifold::Impl::TangentFromNormal(const vec3& normal, int halfedge) const {
 }
 
 /**
- * Returns true if this halfedge should be marked as the interior of a quad, as
- * defined by its two triangles referring to the same face, and those triangles
- * having no further face neighbors beyond.
- */
-bool Manifold::Impl::IsInsideQuad(int halfedge) const {
-  if (halfedgeTangent_.size() > 0) {
-    return halfedgeTangent_[halfedge].w < 0;
-  }
-  const int tri = halfedge / 3;
-  const TriRef ref = meshRelation_.triRef[tri];
-  const int pair = halfedge_.Pair(halfedge);
-  const int pairTri = pair / 3;
-  const TriRef pairRef = meshRelation_.triRef[pairTri];
-  if (!ref.SameFace(pairRef)) return false;
+Greedily marks pairs of triangles as quads, using a cost based on the four
+corner angles. A rectangle has zero cost, as does a symmetric trapezoid, while a
+parallelogram has positive cost. Two equilateral triangles have cost == 2.0,
+so we only allow a quad when cost < 1.0.
+*/
+void Manifold::Impl::MarkQuads() {
+  ZoneScoped;
+  halfedgeTangent_.resize(halfedge_.size(), vec4(0.));
+  Vec<vec3> edgeDir(halfedge_.size());
+  for_each_n(autoPolicy(edgeDir.size(), 1e5), countAt(0), edgeDir.size(),
+             [this, &edgeDir](int edge) {
+               if (!halfedge_.IsForward(edge)) return;
+               edgeDir[edge] = SafeNormalize(vertPos_[halfedge_.End(edge)] -
+                                             vertPos_[halfedge_.Start(edge)]);
+               edgeDir[halfedge_.Pair(edge)] = -edgeDir[edge];
+             });
 
-  auto SameFace = [this](int halfedge, const TriRef& ref) {
-    return ref.SameFace(meshRelation_.triRef[halfedge_.Pair(halfedge) / 3]);
+  struct EdgeInfo {
+    int halfedge;
+    double cost;
   };
+  Vec<EdgeInfo> edgeInfo(halfedge_.size(),
+                         {-1, std::numeric_limits<double>::infinity()});
+  for_each_n(autoPolicy(edgeInfo.size(), 1e5), countAt(0), edgeInfo.size(),
+             [this, &edgeInfo, &edgeDir](int edge) {
+               if (!halfedge_.IsForward(edge)) return;
+               const int pair = halfedge_.Pair(edge);
+               const ivec4 quad = {NextHalfedge(edge), PrevHalfedge(edge),
+                                   NextHalfedge(pair), PrevHalfedge(pair)};
+               const double cost =
+                   std::abs(la::dot(edgeDir[quad[0]], edgeDir[quad[1]]) +
+                            la::dot(edgeDir[quad[2]], edgeDir[quad[3]])) +
+                   std::abs(la::dot(edgeDir[quad[0]], edgeDir[quad[3]]) +
+                            la::dot(edgeDir[quad[2]], edgeDir[quad[1]]));
+               if (cost < 1) edgeInfo[edge] = {edge, cost};
+             });
 
-  int neighbor = NextHalfedge(halfedge);
-  if (SameFace(neighbor, ref)) return false;
-  neighbor = NextHalfedge(neighbor);
-  if (SameFace(neighbor, ref)) return false;
-  neighbor = NextHalfedge(pair);
-  if (SameFace(neighbor, pairRef)) return false;
-  neighbor = NextHalfedge(neighbor);
-  if (SameFace(neighbor, pairRef)) return false;
-  return true;
+  stable_sort(
+      edgeInfo.begin(), edgeInfo.end(),
+      [](const EdgeInfo& a, const EdgeInfo& b) { return a.cost < b.cost; });
+
+  for (const EdgeInfo& info : edgeInfo) {
+    if (info.halfedge < 0) break;
+    const int edge = info.halfedge;
+    const int pair = halfedge_.Pair(edge);
+    if (IsMarkedInsideQuad(NextHalfedge(edge)) ||
+        IsMarkedInsideQuad(PrevHalfedge(edge)) ||
+        IsMarkedInsideQuad(NextHalfedge(pair)) ||
+        IsMarkedInsideQuad(PrevHalfedge(pair)))
+      continue;
+    halfedgeTangent_[edge] = {0, 0, 0, kInsideQuad};
+    halfedgeTangent_[pair] = {0, 0, 0, kInsideQuad};
+  }
 }
 
 /**
@@ -782,13 +810,8 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
   ZoneScoped;
   const int numVert = NumVert();
   const int numHalfedge = halfedge_.size();
-  halfedgeTangent_.clear();
-  Vec<vec4> tangent(numHalfedge);
   Vec<bool> fixedHalfedge(numHalfedge, false);
-
-  // special flags for tangent.w
-  constexpr double kInsideQuad = -1;
-  constexpr double kMissingNormal = -3;
+  MarkQuads();
 
   Vec<int> vertHalfedge = VertHalfedge();
   for_each_n(
@@ -813,8 +836,6 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               // Tangents not known at first are used as temporary storage for
               // normals and w is set to a negative flag value. This starts with
               // the flag clear.
-              tangent[halfedge].w = 1;
-
               if (here.isFlatFace != next.isFlatFace) {
                 // Record the two halfedges that border a single flat face.
                 if (faceEdges[0] == -1) {
@@ -834,17 +855,20 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 } else {  // both missing
                   if (startHalfedge < 0) startHalfedge = -2;
                 }
-                tangent[halfedge] = {lastNormal, kMissingNormal};
+                if (halfedgeTangent_[halfedge].w != kInsideQuad)
+                  halfedgeTangent_[halfedge].w = kMissingNormal;
               }
 
-              if (IsInsideQuad(halfedge))
-                tangent[halfedge] = {lastNormal, kInsideQuad};
-
-              if (tangent[halfedge].w < 0) return;
+              if (halfedgeTangent_[halfedge].w < 0) {
+                for (const int i : {0, 1, 2})
+                  halfedgeTangent_[halfedge][i] = lastNormal[i];
+                return;
+              }
 
               // calculate tangents
               if (EqualNormals(next.normal, here.normal)) {
-                tangent[halfedge] = TangentFromNormal(here.normal, halfedge);
+                halfedgeTangent_[halfedge] =
+                    TangentFromNormal(here.normal, halfedge);
               } else {
                 // tangents at the intersection of two normals are fixed.
                 fixedHalfedge[halfedge] = true;
@@ -854,7 +878,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 const vec3 edgeVec = vertPos_[halfedge_.End(halfedge)] -
                                      vertPos_[halfedge_.Start(halfedge)];
                 const vec3 dir = la::cross(here.normal, next.normal);
-                tangent[halfedge] = CircularTangent(
+                halfedgeTangent_[halfedge] = CircularTangent(
                     (la::dot(dir, edgeVec) < 0 ? -1.0 : 1.0) * dir, edgeVec);
               }
             });
@@ -863,8 +887,8 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
           // Use vert pseudo normal if no normals are present at all.
           const vec3 normal = vertNormal_[halfedge_.Start(e)];
           ForVert(e, [&](int halfedge) {
-            if (tangent[halfedge].w != kInsideQuad)
-              tangent[halfedge] = TangentFromNormal(normal, halfedge);
+            if (halfedgeTangent_[halfedge].w != kInsideQuad)
+              halfedgeTangent_[halfedge] = TangentFromNormal(normal, halfedge);
           });
           return;
         }
@@ -878,19 +902,20 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
           do {
             DEBUG_ASSERT(prevNormal != vec3(0.), logicErr,
                          "missing prevNormal");
-            if (tangent[current].w == kMissingNormal) {
-              vec3 nextNormal = tangent[current].xyz();
+            if (halfedgeTangent_[current].w == kMissingNormal) {
+              vec3 nextNormal = halfedgeTangent_[current].xyz();
               if (nextNormal == vec3(0.)) {
                 nextNormal = lastNormal;
               }
 
               if (EqualNormals(prevNormal, nextNormal)) {
-                tangent[current] = TangentFromNormal(prevNormal, current);
+                halfedgeTangent_[current] =
+                    TangentFromNormal(prevNormal, current);
               } else {
                 const vec3 dir = la::cross(prevNormal, nextNormal);
                 const vec3 edgeVec = vertPos_[halfedge_.End(current)] -
                                      vertPos_[halfedge_.Start(current)];
-                tangent[current] = CircularTangent(
+                halfedgeTangent_[current] = CircularTangent(
                     (la::dot(dir, edgeVec) < 0 ? -1.0 : 1.0) * dir, edgeVec);
               }
             }
@@ -912,15 +937,14 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
           const vec3 edge1 = vertPos_[halfedge_.End(faceEdges[1])] -
                              vertPos_[halfedge_.Start(faceEdges[1])];
           const vec3 newTangent = la::normalize(edge0) - la::normalize(edge1);
-          tangent[faceEdges[0]] = CircularTangent(newTangent, edge0);
-          tangent[faceEdges[1]] = CircularTangent(-newTangent, edge1);
+          halfedgeTangent_[faceEdges[0]] = CircularTangent(newTangent, edge0);
+          halfedgeTangent_[faceEdges[1]] = CircularTangent(-newTangent, edge1);
           // Fix these tangents to keep them even to the edges.
           fixedHalfedge[faceEdges[0]] = true;
           fixedHalfedge[faceEdges[1]] = true;
         }
       });
 
-  halfedgeTangent_ = std::move(tangent);
   DistributeTangents(fixedHalfedge);
 }
 
@@ -937,8 +961,6 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges,
                                     ExecutionContext::Impl* ctx) {
   ZoneScoped;
   const int numHalfedge = halfedge_.size();
-  halfedgeTangent_.clear();
-  Vec<vec4> tangent(numHalfedge);
   Vec<bool> fixedHalfedge(numHalfedge, false);
 
   Vec<int> vertHalfedge = VertHalfedge();
@@ -952,16 +974,15 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges,
   }
   ADVANCE_PHASE_OR_RETURN(ctx);
 
+  MarkQuads();
+
   for_each_n(autoPolicy(numHalfedge, 1e4), countAt(0), numHalfedge, ctx,
-             [&tangent, &vertNormal, this](const int edgeIdx) {
-               tangent[edgeIdx] =
-                   IsInsideQuad(edgeIdx)
-                       ? vec4(0, 0, 0, -1)
-                       : TangentFromNormal(vertNormal[halfedge_.Start(edgeIdx)],
-                                           edgeIdx);
+             [&vertNormal, this](const int edgeIdx) {
+               if (!IsMarkedInsideQuad(edgeIdx))
+                 halfedgeTangent_[edgeIdx] = TangentFromNormal(
+                     vertNormal[halfedge_.Start(edgeIdx)], edgeIdx);
              });
 
-  halfedgeTangent_ = std::move(tangent);
   ADVANCE_PHASE_OR_RETURN(ctx);
 
   // Add sharpened edges around faces, just on the face side.

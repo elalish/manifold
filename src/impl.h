@@ -244,7 +244,7 @@ struct Manifold::Impl {
                              bool = false);
 
   // smoothing.cpp
-  bool IsInsideQuad(int halfedge) const;
+  void MarkQuads();
   bool IsMarkedInsideQuad(int halfedge) const;
   vec3 GetNormal(int halfedge, int normalIdx) const;
   vec4 TangentFromNormal(const vec3& normal, int halfedge) const;
