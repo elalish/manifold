@@ -1,11 +1,6 @@
 name: Deploy documentation
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types:
-      - completed
-    branches: [master]
   release:
     types: [published]
   workflow_dispatch:
@@ -20,15 +15,11 @@ on:
 jobs:
   deploy_github_pages:
     runs-on: ubuntu-latest
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'release' ||
-      github.event.workflow_run.conclusion == 'success'
 
     steps:
     - uses: actions/checkout@v6
       with:
-        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.event_name == 'release' && github.ref || github.event.workflow_run.head_sha }}
+        ref: ${{ github.event_name == 'workflow_dispatch' && inputs.ref || github.ref }}
 
     - name: Doxygen Action
       uses: mattnotmitt/doxygen-action@edge
@@ -45,20 +36,19 @@ jobs:
       uses: dawidd6/action-download-artifact@v6
       with:
         workflow: manifold.yml
-        workflow_conclusion: completed
-        run_id: ${{ github.event.workflow_run.id }}
-        commit: ${{ github.event_name == 'release' && github.sha || '' }}
+        workflow_conclusion: success
+        commit: ${{ github.sha }}
         check_artifacts: true
         name: wasmpublic
         path: ./public
 
-    - name: Deploy to versioned subdirectory
+    - name: Deploy to vX.Y.Z/
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_branch: gh-pages
         publish_dir: ./public
-        destination_dir: ${{ github.event_name == 'workflow_dispatch' && inputs.destination_dir || github.event_name == 'release' && github.ref_name || 'master' }}
+        destination_dir: ${{ github.event_name == 'release' && github.ref_name || inputs.destination_dir }}
         keep_files: true
 
     - name: Deploy to latest/
