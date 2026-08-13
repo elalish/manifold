@@ -326,9 +326,8 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
       const int vert = halfedge_.Start(edge);
       const int propVert = halfedge_.Prop(edge);
 
-      auto old = std::atomic_exchange(
-          reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]),
-          static_cast<uint8_t>(1));
+      auto old = AtomicRef<uint8_t>(counters[propVert])
+                     .exchange(static_cast<uint8_t>(1));
       if (old == 1) continue;
 
       for (int p = 0; p < oldNumProp; ++p) {

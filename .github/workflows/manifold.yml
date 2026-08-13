@@ -91,17 +91,27 @@ jobs:
         name: meshes-windows
         path: meshes-windows/
   build:
-    name: GCC ${{matrix.gcc}} (TBB:${{matrix.parallelization}})
+    name: GCC ${{matrix.gcc}} (TBB:${{matrix.parallelization}}${{matrix.std == 20 && ', C++20' || ''}})
     timeout-minutes: 45
     strategy:
+      fail-fast: false
       matrix:
         parallelization: [OFF, ON]
         os: [ubuntu-24.04]
         gcc: [13, 14]
+        std: [17]
         include:
           - parallelization: ON
             os: ubuntu-22.04
             gcc: 11
+            std: 17
+          # One strict lane at C++20. Deprecations are silenced for now: the
+          # shared_ptr atomic free functions in manifold.cpp are deprecated
+          # there and removed in C++26. Drop the flag once those are replaced.
+          - parallelization: ON
+            os: ubuntu-24.04
+            gcc: 14
+            std: 20
     runs-on: ${{ matrix.os }}
     env:
       CC: gcc-${{ matrix.gcc }}
@@ -124,6 +134,8 @@ jobs:
       run: |
         cmake \
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+          -DCMAKE_CXX_STANDARD=${{matrix.std}} \
+          -DMANIFOLD_FLAGS=${{matrix.std == 20 && '-Wno-deprecated-declarations' || ''}} \
           -DBUILD_SHARED_LIBS=ON \
           -DMANIFOLD_STRICT=ON \
           -DMANIFOLD_PYBIND=ON \

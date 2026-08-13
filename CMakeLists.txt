@@ -15,9 +15,11 @@
 cmake_minimum_required(VERSION 3.18)
 project(manifold LANGUAGES CXX)
 
-# Use C++17
+# C++17 by default, guarded so -DCMAKE_CXX_STANDARD and parent projects work.
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_STANDARD 17)
+if(NOT DEFINED CMAKE_CXX_STANDARD OR CMAKE_CXX_STANDARD LESS 17)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)

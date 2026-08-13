@@ -412,9 +412,8 @@ Vec<int> Manifold::Impl::VertHalfedge() const {
   for_each_n(autoPolicy(halfedge_.size(), 1e5), countAt(0), halfedge_.size(),
              [&vertHalfedge, &counters, this](const int idx) {
                const int start = halfedge_.Start(idx);
-               auto old = std::atomic_exchange(
-                   reinterpret_cast<std::atomic<uint8_t>*>(&counters[start]),
-                   static_cast<uint8_t>(1));
+               auto old = AtomicRef<uint8_t>(counters[start])
+                              .exchange(static_cast<uint8_t>(1));
                if (old == 1) return;
                // arbitrary, last one wins.
                vertHalfedge[start] = idx;
