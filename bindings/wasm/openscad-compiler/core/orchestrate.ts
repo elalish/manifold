@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import {compile, compileLibrary} from './compiler.js';
+import {compile, compileLibrary, MANIFEST_VERSION} from './compiler.js';
 import type {LibraryManifest, ResolvedExternalLib} from './compiler.js';
 import {type ExternalLibraryRef, resolveLibraryClosure, resolveProgramWithLibraries,} from './resolver.js';
 
@@ -44,8 +44,9 @@ export function ensureLibraryCompiled(
     const relOf = (abs: string) =>
         path.relative(ref.root, abs).replace(/\\/g, '/');
     const missing = ref.entries.filter(e => !(relOf(e.file) in manifest.files));
-    // Emitted code is tied to the runtime it was compiled against, so a version change invalidates every cached file regardless of coverage
-    staleRuntime = manifest.runtimeVersion !== runtimeVersion;
+    // Emitted code is tied to the runtime it was compiled against, so a version change invalidates every cached file regardless of coverage. The manifest's own shape is versioned too, since its signature keys are read back by the consumer
+    staleRuntime = manifest.runtimeVersion !== runtimeVersion ||
+        (manifest.manifestVersion ?? 1) !== MANIFEST_VERSION;
     if (!staleRuntime && missing.length === 0) {
       log(`Library ${ref.name}: cache hit (${
           Object.keys(manifest.files).length} files)`);

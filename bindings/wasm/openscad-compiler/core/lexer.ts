@@ -142,14 +142,17 @@ export function fmtRange(range: SourceRange, filename: string): string {
       range.end.line}:${range.end.column}`;
 }
 
-// Regular expressions
-const HEX_NUMBER_REGEX = /^0[xX][0-9a-fA-F]+/;
-const IDENTIFIER_REGEX = /^[0-9]*[a-zA-Z_$][a-zA-Z0-9_$]*/;
+const HEX_NUMBER_REGEX = /0[xX][0-9a-fA-F]+/y;
+const IDENTIFIER_REGEX = /[0-9]*[a-zA-Z_$][a-zA-Z0-9_$]*/y;
 const NUMBER_REGEX =
-    /^(?:(?:[0-9]*\.[0-9]+)|(?:[0-9]+(?:\.[0-9]*)?))(?:[eE][+-]?[0-9]+)?/;
+    /(?:(?:[0-9]*\.[0-9]+)|(?:[0-9]+(?:\.[0-9]*)?))(?:[eE][+-]?[0-9]+)?/y;
+const LINE_COMMENT_REGEX = /\/\/[^\n]*/y;
+const BLOCK_COMMENT_REGEX = /\/\*[\s\S]*?\*\//y;
+// An include/use path runs to the closing '>', which never spans a line
+const INCLUDE_PATH_REGEX = /[^>\n]*/y;
+const WHITESPACE_REGEX = /\s*/y;
 const OCTAL_DIGIT_REGEX = /[0-7]/;
 const HEX_DIGIT_REGEX = /[0-9a-fA-F]/;
-const WHITESPACE_REGEX = /\s/;
 
 export class Lexer {
   private pos = 0;
@@ -194,18 +197,14 @@ export class Lexer {
     return this.pos >= this.input.length;
   }
 
+  // Match a sticky regex at the current position, without consuming it
+  private match(regex: RegExp): string|null {
+    regex.lastIndex = this.pos;
+    return regex.exec(this.input)?.[0] ?? null;
+  }
+
   private skipWhitespace(): void {
-    while (!this.isAtEnd()) {
-      const ch = this.peek();
-
-      // Whitespace
-      if (WHITESPACE_REGEX.test(ch)) {
-        this.advance();
-        continue;
-      }
-
-      break;
-    }
+    this.advance(this.match(WHITESPACE_REGEX)?.length ?? 0);
   }
 
   nextToken(): Token {
@@ -244,29 +243,27 @@ export class Lexer {
     }
 
     // Number or Identifier (handles identifiers starting with digits)
-    const remaining = this.input.slice(this.pos);
-
-    const hexMatch = remaining.match(HEX_NUMBER_REGEX);
+    const hexMatch = this.match(HEX_NUMBER_REGEX);
     if (hexMatch) {
-      this.advance(hexMatch[0].length);
+      this.advance(hexMatch.length);
       return {
         type: TokenType.Number,
-        value: hexMatch[0],
+        value: hexMatch,
         range: {start, end: this.loc()}
       };
     }
 
-    const idMatch = remaining.match(IDENTIFIER_REGEX);
-    const numMatch = remaining.match(NUMBER_REGEX);
+    const idMatch = this.match(IDENTIFIER_REGEX);
+    const numMatch = this.match(NUMBER_REGEX);
 
-    const idLen = idMatch?.[0].length ?? 0;
-    const numLen = numMatch?.[0].length ?? 0;
+    const idLen = idMatch?.length ?? 0;
+    const numLen = numMatch?.length ?? 0;
 
     if (idMatch && idLen > numLen) {
-      return this.readIdentifier(start, idMatch[0]);
+      return this.readIdentifier(start, idMatch);
     } else if (numMatch) {
       // NUMBER_REGEX always consumes at least one digit, so a match is a token.
-      return this.readNumber(start, numMatch[0]);
+      return this.readNumber(start, numMatch);
     }
 
     // String literal
@@ -394,46 +391,32 @@ export class Lexer {
   }
 
   private readIncludePath(start: SourceLocation): Token {
-    const startPos = this.pos;
-    while (!this.isAtEnd() && this.peek() !== '>' && this.peek() !== '\n') {
-      this.advance();
-    }
-    return {
-      type: TokenType.String,
-      value: this.input.slice(startPos, this.pos),
-      range: {start, end: this.loc()}
-    };
+    const value = this.match(INCLUDE_PATH_REGEX)!;
+    this.advance(value.length);
+    return {type: TokenType.String, value, range: {start, end: this.loc()}};
   }
 
   private readLineComment(start: SourceLocation): Token {
-    const startPos = this.pos;
-    this.advance();
-    this.advance();
-    while (!this.isAtEnd() && this.peek() !== '\n') this.advance();
+    const value = this.match(LINE_COMMENT_REGEX)!;
+    this.advance(value.length);
     return {
       type: TokenType.LineComment,
-      value: this.input.slice(startPos, this.pos),
+      value,
       range: {start, end: this.loc()},
     };
   }
 
   private readBlockComment(start: SourceLocation): Token {
-    const startPos = this.pos;
-    this.advance();
-    this.advance();
-    while (!this.isAtEnd()) {
-      if (this.peek() === '*' && this.peekNext() === '/') {
-        this.advance();
-        this.advance();
-        return {
-          type: TokenType.BlockComment,
-          value: this.input.slice(startPos, this.pos),
-          range: {start, end: this.loc()},
-        };
-      }
-      this.advance();
+    const value = this.match(BLOCK_COMMENT_REGEX);
+    if (value === null) {
+      throw new Error(
+          `Unterminated block comment at ${fmtLoc(start, this.filename)}`);
     }
-    throw new Error(
-        `Unterminated block comment at ${fmtLoc(start, this.filename)}`);
+    this.advance(value.length);
+    return {
+      type: TokenType.BlockComment,
+      value,
+      range: {start, end: this.loc()},
+    };
   }
 }

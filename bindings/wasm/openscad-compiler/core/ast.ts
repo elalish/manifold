@@ -1,3 +1,4 @@
+import type {Binding, CallRef} from './binder.js';
 import type {SourceRange} from './lexer.js';
 
 export interface Comment {
@@ -36,6 +37,9 @@ export interface UndefLiteral extends ASTNode {
 export interface IdentifierExpr extends ASTNode {
   kind: 'identifier';
   name: string;
+  // Attached by the binder pass. `null` means the name is not bound anywhere,
+  // which OpenSCAD resolves to `undef` rather than an error.
+  binding?: Binding|null|undefined;
 }
 export interface VectorExpr extends ASTNode {
   kind: 'vector';
@@ -68,6 +72,8 @@ export interface FunctionCallExpr extends ASTNode {
   kind: 'call';
   name: string;
   args: Argument[];
+  // Attached by the binder pass
+  ref?: CallRef|undefined;
 }
 export interface IndexExpr extends ASTNode {
   kind: 'index';
@@ -132,6 +138,8 @@ export interface ModuleCallStmt extends ASTNode {
   args: Argument[];
   child?: Statement|undefined;
   modifier?: string|undefined;  // *, !, #, %
+  // Attached by the binder pass
+  ref?: CallRef|undefined;
 }
 
 export interface BlockStmt extends ASTNode {
@@ -144,6 +152,7 @@ export interface VariableDeclStmt extends ASTNode {
   kind: 'variableDecl';
   name: string;
   value: Expr;
+  binding?: Binding|undefined;
 }
 
 export interface ModuleDeclStmt extends ASTNode {
@@ -151,6 +160,7 @@ export interface ModuleDeclStmt extends ASTNode {
   name: string;
   params: Parameter[];
   body: Statement;
+  binding?: Binding|undefined;
 }
 
 export interface FunctionDeclStmt extends ASTNode {
@@ -158,6 +168,7 @@ export interface FunctionDeclStmt extends ASTNode {
   name: string;
   params: Parameter[];
   body: Expr;
+  binding?: Binding|undefined;
 }
 
 export interface ForStmt extends ASTNode {
@@ -187,11 +198,13 @@ export interface ScopeStmt extends ASTNode {
 export interface Parameter extends ASTNode {
   name: string;
   defaultValue?: Expr|undefined;
+  binding?: Binding|undefined;
 }
 
 export interface ForVariable extends ASTNode {
   name: string;
   range: Expr;
+  binding?: Binding|undefined;
 }
 
 export interface UseStmt extends ASTNode {
@@ -207,6 +220,7 @@ export interface IncludeStmt extends ASTNode {
 export interface LetAssignment extends ASTNode {
   name: string;
   value: Expr;
+  binding?: Binding|undefined;
 }
 
 export type ListCompGenerator =|LCForGenerator|LCCStyleForGenerator|

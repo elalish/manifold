@@ -5,10 +5,13 @@ import path from 'path';
 import {forEachChild} from './ast.js';
 import type {Argument, ASTNode, BlockStmt, Comment, Expr, ForStmt, ForVariable, IfStmt, KindedNode, ListCompGenerator, ModuleCallStmt, Program, ScopeStmt, Statement,} from './ast.js';
 import type {IRBooleanNode, IRChildrenNode, IRForNode, IRIfNode, IRModuleCallNode, IRNode, IRPrimitiveNode, IRSequenceNode, IRTransformNode,} from './ir.js';
+import {assignPrettyNames, bindLibrary, bindProgram, escapeName, isLexicalVar, lookup, shadowsOuterVar,} from './binder.js';
+import type {BindOptions, BindResult, Binding, CallRef, Namespace, Scope,} from './binder.js';
 import {getFontPath} from './resolver.js';
 import type {LibraryClosure} from './resolver.js';
 
 export interface LibraryManifest {
+  manifestVersion?: number;
   library: string;
   compiledAt: string;
   runtimeVersion: string;
@@ -26,9 +29,17 @@ export interface LibraryManifest {
     variables: Record<string, string>;  // variable name -> owning source file
   };
   ambiguous: Record<string, string[]>;
+  // Emitted JS symbol for each export. Needed because a library picks its own names, and a consumer importing them cannot re-derive what it chose
+  symbols?: {
+    modules: Record<string, string>;
+    functions: Record<string, string>;
+    variables: Record<string, string>;
+  };
   signatures: Record<string, string[]>;
   signatureNoArg?: Record<string, boolean[]>;
 }
+
+export const MANIFEST_VERSION = 2;
 
 export interface ResolvedExternalLib {
   name: string;
@@ -155,28 +166,6 @@ function pushCommentedLine(
   lines.push(`${line}${trailingCommentText(node)}`);
 }
 
-// JavaScript reserved words
-const JS_RESERVED = new Set([
-  'abstract',     'arguments', 'await',    'boolean',    'break',
-  'byte',         'case',      'catch',    'char',       'class',
-  'const',        'continue',  'debugger', 'default',    'delete',
-  'do',           'double',    'else',     'enum',       'eval',
-  'export',       'extends',   'false',    'final',      'finally',
-  'float',        'for',       'function', 'goto',       'if',
-  'implements',   'import',    'in',       'instanceof', 'int',
-  'interface',    'let',       'long',     'native',     'new',
-  'null',         'package',   'private',  'protected',  'public',
-  'return',       'short',     'static',   'super',      'switch',
-  'synchronized', 'this',      'throw',    'throws',     'transient',
-  'true',         'try',       'typeof',   'var',        'void',
-  'volatile',     'while',     'with',     'yield',
-]);
-
-function escapeName(name: string): string {
-  if (JS_RESERVED.has(name)) return `${name}_`;
-  if (/^[0-9]/.test(name)) return `_${name}`;
-  return name;
-}
 
 // Signatures
 interface Signature {
@@ -188,6 +177,19 @@ interface Signature {
   noArg?: boolean[];
 }
 const signatures = new Map<string, Signature>();
+
+// Signature-table key. Namespaced by the OpenSCAD name
+function sigKey(name: string, ns: Namespace): string {
+  return `${ns}:${name}`;
+}
+
+// Manifest signature keys are written in this same namespaced form
+function manifestSigKey(sym: string): string {
+  if (sym.startsWith('fn:') || sym.startsWith('mod:')) return sym;
+  if (sym.endsWith('$mod')) return sigKey(sym.slice(0, -4), 'mod');
+  if (sym.endsWith('_fn')) return sigKey(sym.slice(0, -3), 'fn');
+  return sigKey(sym, 'fn');
+}
 
 // Params whose default is applied via the __NO_ARG prologue: $-params keep
 // dynamic-scope handling and self-referencing defaults (x = x) must evaluate in
@@ -207,8 +209,13 @@ interface IRLowerContext {
 
 let moduleDeclRegistry = new Map<string, ModuleDeclStmtType>();
 
+let tailTempCounter = 0;
+
 // Track unique fonts encountered during compilation for base64 generation.
 let encounteredFonts = new Set<string>();
+
+// OpenSCAD's default typeface, used when a text() call names none
+const DEFAULT_FONT_SPEC = 'Liberation Sans:style=Regular';
 
 // Track unique surface data encountered during compilation for base64
 // generation.
@@ -338,9 +345,8 @@ const BUILTIN_SIGNATURES: Record<string, string[]> = {
 function collectSignatures(stmts: Statement[]) {
   for (const stmt of stmts) {
     if (stmt.kind === 'functionDecl' || stmt.kind === 'moduleDecl') {
-      const name = stmt.kind === 'functionDecl' ?
-          escapeName(stmt.name) + '_fn' :
-          escapeName(stmt.name) + '$mod';
+      const name = sigKey(
+          stmt.name, stmt.kind === 'functionDecl' ? 'fn' : 'mod');
       signatures.set(name, {
         params: stmt.params.map(p => p.name),
         defaults: stmt.params.map(p => p.defaultValue),
@@ -418,8 +424,8 @@ function shouldInlineModuleToIR(
   return estimateNodeComplexity(decl.body) <= MAX_IR_INLINE_COMPLEXITY;
 }
 
-function compileArgList(name: string, args: Argument[]): string {
-  const sig = signatures.get(name);
+function compileArgList(key: string, args: Argument[]): string {
+  const sig = signatures.get(key);
   if (!sig) {
     return args
         .map(
@@ -594,6 +600,7 @@ const RUNTIME_SYMBOLS: string[] = [
   '__echo',
   '__oecho',
   '__fnlit',
+  '__font_registry',
   '__tc',
   '__call',
 ];
@@ -622,6 +629,37 @@ let externalModuleNames: Set<string> = new Set();
 let externalFunctionNames: Set<string> = new Set();
 let externalVariableNames: Set<string> = new Set();
 
+// Constants the runtime pre-declares as ordinary bindings
+const BUILTIN_VAR_CONSTANTS = ['PI', 'INF', 'NAN', 'undef', '_EPSILON'];
+
+// Result of the lexical binding pass for the unit being compiled
+let bindResult: BindResult|undefined;
+
+// Names the emitter or the runtime already owns, which no binding may take
+function reservedNames(): string[] {
+  return [
+    ...RUNTIME_SYMBOLS,
+    ...BUILTIN_VAR_CONSTANTS,
+    '__NO_ARG',
+    // Emitted into every module body, and into the module's own output
+    'children',
+    '$children',
+    'result',
+    'background',
+  ];
+}
+
+function currentBindOptions(): BindOptions {
+  return {
+    builtinFunctions: BUILTIN_FUNCTIONS,
+    builtinModules: BUILTIN_MODULES,
+    builtinConstants: BUILTIN_VAR_CONSTANTS,
+    externalFunctions: externalFunctionNames,
+    externalModules: externalModuleNames,
+    externalVariables: externalVariableNames,
+  };
+}
+
 /* Keyword for top-level (file-scope) variable declarations. `let` for normal
   single-file output; `var` for library files, where cross-file circular ES
   imports would otherwise hit the temporal dead zone on `let` exports. `var`
@@ -631,72 +669,7 @@ let globalVarDeclKeyword = 'let';
 
 // Track $ variables that need module-level declarations for dynamic scoping
 let dynamicScopeVars: Set<string> = new Set();
-const localScopes: Set<string>[] = [];
 
-let globalVarNames: Set<string> = new Set();
-// Variables private to the `use`d file currently being emitted
-let filePrivateVars: Set<string> = new Set();
-let activeShadowRenames: Map<string, string> = new Map();
-
-// Does this name resolve to a variable of an enclosing OpenSCAD file scope
-function isOuterVarName(name: string): boolean {
-  return globalVarNames.has(name) || filePrivateVars.has(name);
-}
-
-function withFilePrivateVars<T>(names: string[], fn: () => T): T {
-  const saved = filePrivateVars;
-  filePrivateVars = new Set([...saved, ...names]);
-  try {
-    return fn();
-  } finally {
-    filePrivateVars = saved;
-  }
-}
-
-// A new local binding (let/lambda/comprehension) should ignore any active
-// rename of the same name, so it doesn't reference the outer one
-function withShadowSuppressed<T>(names: string[], fn: () => T): T {
-  if (!names.some(n => activeShadowRenames.has(n))) return fn();
-  const saved = activeShadowRenames;
-  activeShadowRenames = new Map(saved);
-  for (const n of names) activeShadowRenames.delete(n);
-  try {
-    return fn();
-  } finally {
-    activeShadowRenames = saved;
-  }
-}
-
-function withLocalScope<T>(names: string[], fn: () => T): T {
-  localScopes.push(new Set(names));
-  try {
-    return fn();
-  } finally {
-    localScopes.pop();
-  }
-}
-
-function isLocalName(name: string): boolean {
-  for (let i = localScopes.length - 1; i >= 0; i--) {
-    if (localScopes[i]!.has(name)) return true;
-  }
-  return false;
-}
-
-function registerLocalCallable(name: string) {
-  if (localScopes.length === 0) return;
-  localScopes[localScopes.length - 1]!.add(name);
-}
-
-function collectLocalVariableNames(stmts: Statement[]): string[] {
-  const names: string[] = [];
-  for (const s of stmts) {
-    if (s.kind === 'variableDecl') {
-      names.push(escapeName(s.name));
-    }
-  }
-  return names;
-}
 
 function collectStringLiterals(node: KindedNode, literals: Set<string>): void {
   if (node.kind === 'string') literals.add(node.value);
@@ -722,27 +695,27 @@ function collectIdentifierUsage(program: Program): IdentifierUsage {
   const visit = (node: KindedNode): void => {
     switch (node.kind) {
       case 'identifier':
-        if (node.name !== '$children') referenced.add(escapeName(node.name));
+        if (node.name !== '$children') referenced.add(bindJsName(node));
         break;
       case 'variableDecl':
-        bound.add(escapeName(node.name));
+        bound.add(bindJsName(node));
         break;
       case 'lambda':
       case 'functionDecl':
       case 'moduleDecl':
-        node.params.forEach(p => bound.add(escapeName(p.name)));
+        node.params.forEach(p => bound.add(bindJsName(p)));
         break;
       case 'let':
       case 'lcLet':
-        node.assignments.forEach(a => bound.add(escapeName(a.name)));
+        node.assignments.forEach(a => bound.add(bindJsName(a)));
         break;
       case 'for':
       case 'lcFor':
-        node.variables.forEach(v => bound.add(escapeName(v.name)));
+        node.variables.forEach(v => bound.add(bindJsName(v)));
         break;
       case 'lcCFor':
-        node.inits.forEach(a => bound.add(escapeName(a.name)));
-        node.updates.forEach(a => bound.add(escapeName(a.name)));
+        node.inits.forEach(a => bound.add(bindJsName(a)));
+        node.updates.forEach(a => bound.add(bindJsName(a)));
         break;
     }
     forEachChild(node, visit);
@@ -755,8 +728,7 @@ function collectIdentifierUsage(program: Program): IdentifierUsage {
 function resolveCallArgs(
     moduleCallName: string, callArgs: Argument[]): Map<string, Expr> {
   const resolved = new Map<string, Expr>();
-  const name = `${escapeName(moduleCallName)}$mod`;
-  const sig = signatures.get(name);
+  const sig = signatures.get(sigKey(moduleCallName, 'mod'));
   if (!sig) return resolved;
 
   // Initialize with default values
@@ -890,20 +862,23 @@ export function compile(program: Program, options?: CompileOptions): string {
   externalModuleNames = new Set();
   externalFunctionNames = new Set();
   externalVariableNames = new Set();
+  tailTempCounter = 0;
   signatures.clear();
   for (const [k, v] of Object.entries(BUILTIN_SIGNATURES)) {
     signatures.set(
-        k, {params: v, defaults: new Array(v.length).fill(undefined)});
+        sigKey(k.replace(/\$mod$/, ''), 'mod'),
+        {params: v, defaults: new Array(v.length).fill(undefined)});
   }
   // Register external-library export signatures and names BEFORE collecting
   // local ones, so a local declaration of the same name overrides the import
   const externalLibraries = options?.externalLibraries ?? [];
   for (const lib of externalLibraries) {
     for (const [sym, params] of Object.entries(lib.manifest.signatures)) {
-      signatures.set(sym, {
+      const noArg = lib.manifest.signatureNoArg?.[sym];
+      signatures.set(manifestSigKey(sym), {
         params,
         defaults: new Array(params.length).fill(undefined),
-        noArg: lib.manifest.signatureNoArg?.[sym]
+        ...(noArg ? {noArg} : {}),
       });
     }
     for (const name of Object.keys(lib.manifest.exports.modules))
@@ -916,17 +891,36 @@ export function compile(program: Program, options?: CompileOptions): string {
   collectSignatures(program.statements);
   moduleDeclRegistry = collectModuleDeclarations(program.statements);
 
+  bindResult = bindProgram(program, currentBindOptions());
+  const externalSymbols = new Map<string, string>();
+  for (const lib of externalLibraries) {
+    const syms = lib.manifest.symbols;
+    if (!syms) continue;
+    for (const [n, sym] of Object.entries(syms.modules))
+      externalSymbols.set(`mod:${n}`, sym);
+    for (const [n, sym] of Object.entries(syms.functions))
+      externalSymbols.set(`fn:${n}`, sym);
+    for (const [n, sym] of Object.entries(syms.variables))
+      externalSymbols.set(`var:${n}`, sym);
+  }
+  assignPrettyNames(
+      bindResult, {reserved: reservedNames(), externalSymbols});
+  currentScope = bindResult.global;
+
   // Reject top-level constant-argument calls to non-tail recursive functions
   // that provably never terminate
   userFunctionDefs = new Map();
   collectFunctionDefs(program.statements, userFunctionDefs);
   detectDivergentCalls(program.statements);
 
-  globalVarNames = new Set();
-  activeShadowRenames = new Map();
-  for (const s of program.statements) {
-    if (s.kind === 'variableDecl') globalVarNames.add(escapeName(s.name));
-  }
+
+  /* `text()` compiled straight from the builtin registers its face while
+     emitting. A call routed through a library's own `text` module never
+     reaches that path, so register the default face up front whenever the
+     program mentions text at all. */
+  const programRefs = collectProgramReferences(program.statements);
+  if (programRefs.modules.has('text') || programRefs.functions.has('text'))
+    encounteredFonts.add(DEFAULT_FONT_SPEC);
 
   // Gather all font-related string literals from the program
   const fontLiterals = collectFontRelatedLiterals(program);
@@ -1020,11 +1014,11 @@ export function compile(program: Program, options?: CompileOptions): string {
       // Compute the output name to detect duplicates
       let key: string;
       if (stmt.kind === 'variableDecl')
-        key = `var:${escapeName(stmt.name)}`;
+        key = `var:${declJsName(stmt, 'var')}`;
       else if (stmt.kind === 'moduleDecl')
-        key = `fn:${escapeName(stmt.name)}$mod`;
+        key = `fn:${declJsName(stmt, 'mod')}`;
       else
-        key = `fn:${escapeName(stmt.name)}_fn`;
+        key = `fn:${declJsName(stmt, 'fn')}`;
 
       if (!declMap.has(key)) declOrder.push(key);
       declMap.set(
@@ -1138,15 +1132,15 @@ export function compile(program: Program, options?: CompileOptions): string {
     for (const lib of externalLibraries) {
       for (const m of refs.modules) {
         const file = lib.manifest.exports.modules[m];
-        if (file) addImp(lib.importSpecifierFor(file), `${escapeName(m)}$mod`);
+        if (file) addImp(lib.importSpecifierFor(file), globalJsName(m, 'mod'));
       }
       for (const f of refs.functions) {
         const file = lib.manifest.exports.functions[f];
-        if (file) addImp(lib.importSpecifierFor(file), `${escapeName(f)}_fn`);
+        if (file) addImp(lib.importSpecifierFor(file), globalJsName(f, 'fn'));
       }
       for (const v of refs.variables) {
         const file = lib.manifest.exports.variables[v];
-        if (file) addImp(lib.importSpecifierFor(file), escapeName(v));
+        if (file) addImp(lib.importSpecifierFor(file), globalJsName(v, 'var'));
       }
     }
     // Side-effect imports first so library top-level statements (e.g. setting
@@ -1186,7 +1180,9 @@ export function compile(program: Program, options?: CompileOptions): string {
     output += `import { ${info.exportName} } from "${importPath}";\n`;
   }
 
-  output += `const __font_registry: Record<string, string> = {\n`;
+  // One shared table lives in the runtime, so a `text()` routed through a
+  // library's own module reads the same faces the consumer embedded
+  output += `Object.assign(__font_registry, {\n`;
   const seenSanitized = new Set<string>();
   for (const [fontFamily, sanitized] of resolvedFonts) {
     if (seenSanitized.has(sanitized)) continue;
@@ -1194,7 +1190,7 @@ export function compile(program: Program, options?: CompileOptions): string {
     const varName = `__font_${sanitized.replace(/-/g, '_')}`;
     output += `  ${JSON.stringify(sanitized)}: ${varName},\n`;
   }
-  output += `};\n\n`;
+  output += `});\n\n`;
 
   output += BUILTIN_CONSTANTS_CODE + '\n';
 
@@ -1265,6 +1261,7 @@ export function compile(program: Program, options?: CompileOptions): string {
   return output;
 }
 
+
 // Separate library compilation
 export interface CompiledLibraryFile {
   sourceRel: string;
@@ -1300,7 +1297,8 @@ export function compileLibrary(
   signatures.clear();
   for (const [k, v] of Object.entries(BUILTIN_SIGNATURES)) {
     signatures.set(
-        k, {params: v, defaults: new Array(v.length).fill(undefined)});
+        sigKey(k.replace(/\$mod$/, ''), 'mod'),
+        {params: v, defaults: new Array(v.length).fill(undefined)});
   }
   externalModuleNames = new Set();
   externalFunctionNames = new Set();
@@ -1310,10 +1308,19 @@ export function compileLibrary(
     allStatements.push(...closure.files.get(rel)!.statements);
   collectSignatures(allStatements);
   moduleDeclRegistry = collectModuleDeclarations(allStatements);
-  globalVarNames = new Set();
-  for (const s of allStatements) {
-    if (s.kind === 'variableDecl') globalVarNames.add(escapeName(s.name));
-  }
+
+  // Each file of the closure resolves in a scope of its own, following the
+  // library's own include/use graph
+  const libBind = bindLibrary(
+      sourceRels.map(rel => ({
+                      rel,
+                      program: closure.files.get(rel)!,
+                      edges: closure.edges.get(rel) ?? [],
+                    })),
+      closure.entryRels, currentBindOptions());
+  bindResult = libBind;
+  assignPrettyNames(libBind, {reserved: reservedNames()});
+
 
   // Build the per-kind export map (name -> owning source file), last-wins with
   // collisions recorded, plus the manifest signatures and per-file decl lists
@@ -1324,6 +1331,11 @@ export function compileLibrary(
   };
   const ambiguous: Record<string, string[]> = {};
   const manifestSignatures: Record<string, string[]> = {};
+  const manifestSymbols = {
+    modules: {} as Record<string, string>,
+    functions: {} as Record<string, string>,
+    variables: {} as Record<string, string>,
+  };
   const manifestSignatureNoArg: Record<string, boolean[]> = {};
   const perFileDecls = new Map < string, {
     modules: string[];
@@ -1350,17 +1362,23 @@ export function compileLibrary(
         ambiguous[key].push(rel);
       }
       map.set(dk.name, rel);  // last-wins
+      const ns: Namespace =
+          dk.kind === 'module' ? 'mod' : dk.kind === 'function' ? 'fn' : 'var';
+      manifestSymbols[dk.kind === 'module' ? 'modules' :
+                          dk.kind === 'function' ? 'functions' :
+                                                   'variables'][dk.name] =
+          declJsName(stmt as {name: string; binding?: Binding}, ns);
       if (dk.kind === 'module') {
         lists.modules.push(dk.name);
-        manifestSignatures[`${escapeName(dk.name)}$mod`] =
+        manifestSignatures[sigKey(dk.name, 'mod')] =
             (stmt as any).params.map((p: any) => p.name);
-        manifestSignatureNoArg[`${escapeName(dk.name)}$mod`] =
+        manifestSignatureNoArg[sigKey(dk.name, 'mod')] =
             (stmt as any).params.map(paramUsesNoArg);
       } else if (dk.kind === 'function') {
         lists.functions.push(dk.name);
-        manifestSignatures[`${escapeName(dk.name)}_fn`] =
+        manifestSignatures[sigKey(dk.name, 'fn')] =
             (stmt as any).params.map((p: any) => p.name);
-        manifestSignatureNoArg[`${escapeName(dk.name)}_fn`] =
+        manifestSignatureNoArg[sigKey(dk.name, 'fn')] =
             (stmt as any).params.map(paramUsesNoArg);
       } else {
         lists.variables.push(dk.name);
@@ -1378,10 +1396,10 @@ export function compileLibrary(
       sourceRel: rel,
       outRel,
       code: emitLibraryFile(rel, outRel, program, {
-        exportsByKind,
         deps: closure.deps.get(rel) ?? [],
         outRelOf,
         runtimePath: opts.runtimePathFor(outRel),
+        scope: libBind.fileScopes.get(rel),
       }),
     });
   }
@@ -1393,6 +1411,7 @@ export function compileLibrary(
   }
 
   const manifest: LibraryManifest = {
+    manifestVersion: MANIFEST_VERSION,
     library: closure.name,
     compiledAt: new Date().toISOString(),
     runtimeVersion: opts.runtimeVersion,
@@ -1403,6 +1422,7 @@ export function compileLibrary(
       variables: Object.fromEntries(exportsByKind.variable),
     },
     ambiguous,
+    symbols: manifestSymbols,
     signatures: manifestSignatures,
     signatureNoArg: manifestSignatureNoArg,
   };
@@ -1416,18 +1436,16 @@ function emitLibraryFile(
     outRel: string,
     program: Program,
     ctx: {
-      exportsByKind: {
-        module: Map<string, string>; function: Map<string, string>;
-        variable: Map<string, string>
-      };
       deps: string[];
       outRelOf: (sourceRel: string) => string;
       runtimePath: string;
+      scope?: Scope | undefined;
     },
     ): string {
   // Reset per-file emitter state
+  currentScope = ctx.scope;
+  tailTempCounter = 0;
   dynamicScopeVars = new Set();
-  activeShadowRenames = new Map();
   encounteredFonts = new Set();
   encounteredSurfaceData.clear();
   currentRuntimePath = ctx.runtimePath;
@@ -1453,11 +1471,11 @@ function emitLibraryFile(
         stmt.kind === 'functionDecl') {
       let key: string;
       if (stmt.kind === 'variableDecl')
-        key = `var:${escapeName(stmt.name)}`;
+        key = `var:${declJsName(stmt, 'var')}`;
       else if (stmt.kind === 'moduleDecl')
-        key = `fn:${escapeName(stmt.name)}$mod`;
+        key = `fn:${declJsName(stmt, 'mod')}`;
       else
-        key = `fn:${escapeName(stmt.name)}_fn`;
+        key = `fn:${declJsName(stmt, 'fn')}`;
       if (!declMap.has(key)) declOrder.push(key);
       declMap.set(key, {stmt, code: compileDeclaration(stmt)});
       const dk = declKindAndName(stmt);
@@ -1471,11 +1489,11 @@ function emitLibraryFile(
     declarations.push(entry.code);
     const dk = declKindAndName(entry.stmt);
     if (dk?.kind === 'module')
-      exportedSymbols.push(`${escapeName(dk.name)}$mod`);
+      exportedSymbols.push(declJsName(entry.stmt as any, 'mod'));
     else if (dk?.kind === 'function')
-      exportedSymbols.push(`${escapeName(dk.name)}_fn`);
+      exportedSymbols.push(declJsName(entry.stmt as any, 'fn'));
     else if (dk?.kind === 'variable')
-      exportedSymbols.push(escapeName(dk.name));
+      exportedSymbols.push(declJsName(entry.stmt as any, 'var'));
   }
 
   // Resolve cross-file references to imports
@@ -1492,27 +1510,31 @@ function emitLibraryFile(
     set.add(sym);
   };
 
+  // A reference reaches another file only when it resolves, in this file's scope, to a binding that another file declares. A name resolving to a builtin or to nothing, is never imported
+  const importIfForeign = (name: string, ns: Namespace): Binding|null => {
+    const b = ctx.scope ? lookup(ctx.scope, name, ns) : null;
+    if (!b || b.kind === 'builtin' || b.kind === 'external') return null;
+    if (!b.file || b.file === sourceRel) return null;
+    addImp(b.file, b.jsName);
+    return b;
+  };
+
   for (const m of refs.modules) {
-    if (BUILTIN_MODULES.has(m) || ownNames.module.has(m)) continue;
-    const owner = ctx.exportsByKind.module.get(m);
-    if (owner && owner !== sourceRel)
-      addImp(owner, `${escapeName(m)}$mod`);
-    else if (!owner)
+    if (ownNames.module.has(m)) continue;
+    if (importIfForeign(m, 'mod')) continue;
+    if (!BUILTIN_MODULES.has(m) && !lookup(ctx.scope ?? null, m, 'mod')) {
       console.warn(`Warning: library ${sourceRel}: unresolved module '${
           m}' (emitting no-op call)`);
+    }
   }
   for (const f of refs.functions) {
-    if (BUILTIN_FUNCTIONS.has(f) || ownNames.function.has(f)) continue;
-    const owner = ctx.exportsByKind.function.get(f);
-    if (owner && owner !== sourceRel) addImp(owner, `${escapeName(f)}_fn`);
+    if (ownNames.function.has(f)) continue;
+    importIfForeign(f, 'fn');
   }
   for (const v of refs.variables) {
     if (LIB_BUILTIN_CONSTS.has(v) || ownNames.variable.has(v)) continue;
-    const owner = ctx.exportsByKind.variable.get(v);
-    if (owner && owner !== sourceRel) {
-      addImp(owner, escapeName(v));
-      importedVarNames.add(escapeName(v));
-    }
+    const b = importIfForeign(v, 'var');
+    if (b) importedVarNames.add(b.jsName);
   }
 
   // Side-effect imports for under-root deps, to preserve include-time execution
@@ -1532,12 +1554,17 @@ function emitLibraryFile(
   // Undefined fallbacks: referenced identifiers that aren't local, imported, a
   // builtin const, or a $-special. OpenSCAD resolves unknown reads to undef
   const {referenced} = collectIdentifierUsage(program);
+  // Names this file already declares, under the names it actually emits them with everything else that is referenced needs an `undefined` fallback
+  const declaredHere = (names: Set<string>, ns: Namespace) =>
+      [...names].map(n => globalJsName(n, ns));
   const localDeclared = new Set<string>([
-    ...[...ownNames.variable].map(escapeName),
-    ...[...ownNames.module].map(n => `${escapeName(n)}$mod`),
-    ...[...ownNames.function].map(n => `${escapeName(n)}_fn`),
+    ...declaredHere(ownNames.variable, 'var'),
+    ...declaredHere(ownNames.module, 'mod'),
+    ...declaredHere(ownNames.function, 'fn'),
+    ...exportedSymbols,
+    ...[...importsBySpec.values()].flatMap(set => [...set]),
     ...LIB_BUILTIN_CONSTS,
-    ...BUILTIN_FUNCTIONS,
+    ...RUNTIME_SYMBOLS,
     ...importedVarNames,
     'Manifold',
     'CrossSection',
@@ -1554,7 +1581,6 @@ function emitLibraryFile(
   let out = buildRuntimeImport(ctx.runtimePath);
   out += sideEffectBlock;
   out += importBlock;
-  out += `const __font_registry: Record<string, string> = {};\n`;
   out += BUILTIN_CONSTANTS_CODE;
   for (const name of undefinedNames) out += `let ${name}: any = undefined;\n`;
   out += '\n';
@@ -1601,13 +1627,13 @@ function compileUsedFileScope(scope: ScopeStmt, unitName: string): {code: string
   for (const s of scope.statements) {
     if (s.kind !== 'variableDecl') continue;
     if (s.name.startsWith('$') || PRE_DECLARED_VARS.has(s.name)) continue;
-    const n = escapeName(s.name);
+    const n = bindJsName(s);
     if (seenPrivate.has(n)) continue;
     seenPrivate.add(n);
     privateNames.push(n);
   }
 
-  return withFilePrivateVars(privateNames, () => {
+  return (() => {
     // Deduplicate by output name the same way the top level does: last
     // declaration wins, at the position where the name first appeared.
     const declCode = new Map<string, string>();
@@ -1619,11 +1645,11 @@ function compileUsedFileScope(scope: ScopeStmt, unitName: string): {code: string
       if (s.filename) currentSourceFilename = s.filename;
       let key: string;
       if (s.kind === 'variableDecl')
-        key = `var:${escapeName(s.name)}`;
+        key = `var:${declJsName(s, 'var')}`;
       else if (s.kind === 'moduleDecl')
-        key = `${escapeName(s.name)}$mod`;
+        key = declJsName(s, 'mod');
       else if (s.kind === 'functionDecl')
-        key = `${escapeName(s.name)}_fn`;
+        key = declJsName(s, 'fn');
       else
         continue;
       if (!declCode.has(key)) {
@@ -1646,7 +1672,35 @@ function compileUsedFileScope(scope: ScopeStmt, unitName: string): {code: string
     lines.push(`  return {${exports.join(', ')}};`);
     lines.push('})();');
     return {code: lines.join('\n'), exports};
-  });
+  })();
+}
+
+// Same, for the mangling scheme's own fallback shape.
+function legacyJsName(name: string, ns: Namespace): string {
+  const base = escapeName(name);
+  return ns === 'fn' ? `${base}_fn` : ns === 'mod' ? `${base}$mod` : base;
+}
+
+// The JS name of a bound parameter, let binding or loop variable. Comes from the binder
+function bindJsName(node: {name: string; binding?: Binding|null|undefined}):
+    string {
+  return node.binding ? node.binding.jsName : escapeName(node.name);
+}
+
+// Scope that top-level names resolve in for the unit currently being emitted: the program's global scope, or the current file's scope inside a library.
+let currentScope: Scope|undefined;
+
+function globalJsName(name: string, ns: Namespace): string {
+  const b = currentScope ? lookup(currentScope, name, ns) : null;
+  return b ? b.jsName : legacyJsName(name, ns);
+}
+
+function declJsName(
+    stmt: {name: string; binding?: Binding|undefined},
+    ns: Namespace): string {
+  if (stmt.binding) return stmt.binding.jsName;
+  const base = escapeName(stmt.name);
+  return ns === 'fn' ? `${base}_fn` : ns === 'mod' ? `${base}$mod` : base;
 }
 
 function compileDeclaration(
@@ -1659,7 +1713,7 @@ function compileDeclaration(
 
   switch (stmt.kind) {
     case 'variableDecl': {
-      const name = escapeName(stmt.name);
+      const name = declJsName(stmt, 'var');
       if (stmt.name.startsWith('$') && stmt.name !== '$children') {
         return withLeading(
             `${svTarget(stmt.name)} = ${compileExpr(stmt.value)};`);
@@ -1684,7 +1738,7 @@ function compileDeclaration(
       const params =
           dedup
               .map(p => {
-                const base = escapeName(p.name);
+                const base = bindJsName(p);
                 const selfRef = !!p.defaultValue &&
                     nodeReferencesIdentifier(p.defaultValue, p.name);
                 let pname: string;
@@ -1711,12 +1765,11 @@ function compileDeclaration(
         throw new Error(`Recursion detected calling module '${
             stmt.name}' in file ${base}, line ${line}`);
       }
-      const localParams = dedup.map(p => escapeName(p.name));
-      const dollarParams =
-          dedup.filter(p => isDyn(p.name)).map(p => escapeName(p.name));
+      const localParams = dedup.map(bindJsName);
+      const dollarParams = dedup.filter(p => isDyn(p.name)).map(bindJsName);
       const body = compileModuleBody(
           stmt.body, stmt.name, localParams, dollarParams, renamedParams);
-      return withLeading(`function ${escapeName(stmt.name)}$mod(${
+      return withLeading(`function ${declJsName(stmt, 'mod')}(${
           params}): any {\n${defaultsPrologue}${body}\n}`);
     }
 
@@ -1726,7 +1779,7 @@ function compileDeclaration(
       const params =
           dedup
               .map(p => {
-                const base = escapeName(p.name);
+                const base = bindJsName(p);
                 const selfRef = !!p.defaultValue &&
                     nodeReferencesIdentifier(p.defaultValue, p.name);
                 let pname = base;
@@ -1740,7 +1793,7 @@ function compileDeclaration(
                     `${pname}: any`;
               })
               .join(', ');
-      const localParams = dedup.map(p => escapeName(p.name));
+      const localParams = dedup.map(bindJsName);
       const rebinds =
           renamedParams.map(n => `  let ${n}: any = ${n}__arg;\n`).join('');
       const defaultsPrologue = emitNoArgDefaults(dedup, '  ');
@@ -1756,17 +1809,15 @@ function compileDeclaration(
           throw new Error(`Recursion detected calling function '${
               stmt.name}' in file ${base}, line ${line}`);
         }
-        const loopBody = withLocalScope(
-            localParams,
-            () => emitTailBody(stmt.body, stmt.name, dedup, '    '));
-        return withLeading(`function ${escapeName(stmt.name)}_fn(${
+        const loopBody = (emitTailBody(stmt.body, stmt.name, dedup, '    '));
+        return withLeading(`function ${declJsName(stmt, 'fn')}(${
             params}): any {\n${rebinds}${defaultsPrologue}  while (true) {\n${
             loopBody}\n  }\n}`);
       }
       const bodyExpr =
-          withLocalScope(localParams, () => compileExpr(stmt.body));
+          (compileExpr(stmt.body));
       return withLeading(
-          `function ${escapeName(stmt.name)}_fn(${params}): any {\n${rebinds}${
+          `function ${declJsName(stmt, 'fn')}(${params}): any {\n${rebinds}${
               defaultsPrologue}  return ${bodyExpr};\n}`);
     }
 
@@ -1782,7 +1833,7 @@ function emitNoArgDefaults(params: Param[], indent: string): string {
   let out = '';
   params.forEach((p, i) => {
     if (!paramUsesNoArg(p)) return;
-    const pname = escapeName(p.name);
+    const pname = bindJsName(p);
     out += `${indent}if (${pname} === __NO_ARG || arguments.length <= ${i}) ${
         pname} = ${compileExpr(p.defaultValue!)};\n`;
   });
@@ -2033,7 +2084,6 @@ function deduplicateParams(params: import('./ast.js').Parameter[]):
 }
 
 // Tail-recursion elimination
-let tailTempCounter = 0;
 
 // True when `expr` can reach a tail call to `funcName` along the positions the
 // loop lowering actually handles (so detection stays in sync with emitTailBody)
@@ -2141,18 +2191,16 @@ function resolveArgsToParams(
  parameter - omitted ones reset to their defaults, matching a fresh call.
 */
 function emitSelfTailCall(
-    call: {args: Argument[]}, params: Param[], indent: string): string {
-  // A call passing $-special args needs dynamic-scope save/restore; fall back
-  // to an ordinary recursive call rather than lowering it into the loop
+    call: Extract<Expr, {kind: 'call'}>, params: Param[],
+    indent: string): string {
   if (call.args.some(a => a.name && a.name.startsWith('$'))) {
-    return `${indent}return ${
-        compileCallExpr({kind: 'call', name: '', args: call.args} as any)};`;
+    return `${indent}return ${compileCallExpr(call)};`;
   }
   const provided = resolveArgsToParams(call.args, params);
   const stage: string[] = [];
   const assign: string[] = [];
   for (let i = 0; i < params.length; i++) {
-    const pname = escapeName(params[i]!.name);
+    const pname = bindJsName(params[i]!);
     if (provided[i] !== undefined) {
       const tmp = `__tc${tailTempCounter++}`;
       stage.push(`${indent}const ${tmp}: any = ${compileExpr(provided[i]!)};`);
@@ -2207,25 +2255,26 @@ function emitTailBody(
               a => a.name.startsWith('$') || a.name === funcName)) {
         return `${indent}return ${compileExpr(expr)};`;
       }
-      const localAssignNames = expr.assignments.map(a => escapeName(a.name));
-      return withLocalScope(localAssignNames, () => {
-        const savedRenames = activeShadowRenames;
-        activeShadowRenames = new Map(savedRenames);
+      const localAssignNames = expr.assignments.map(bindJsName);
+      return (() => {
+        const savedNames = expr.assignments.map(a => a.binding?.jsName);
         const lines: string[] = [];
         // Sequential let: each value sees the bindings established before it
         for (const a of expr.assignments) {
           const tmp = `__tl${tailTempCounter++}`;
           // Lambda values see their own binding (all their lookups are deferred
           // to call time), enabling let-bound recursive lambdas
-          if (a.value.kind === 'lambda')
-            activeShadowRenames.set(escapeName(a.name), tmp);
+          if (a.value.kind === 'lambda' && a.binding) a.binding.jsName = tmp;
           lines.push(`${indent}const ${tmp}: any = ${compileExpr(a.value)};`);
-          activeShadowRenames.set(escapeName(a.name), tmp);
+          if (a.binding) a.binding.jsName = tmp;
         }
         const body = emitTailBody(expr.body, funcName, params, indent);
-        activeShadowRenames = savedRenames;
+        expr.assignments.forEach((a, i) => {
+          const saved = savedNames[i];
+          if (a.binding && saved !== undefined) a.binding.jsName = saved;
+        });
         return lines.join('\n') + '\n' + body;
-      });
+      })();
     }
     case 'call':
       if (expr.name === funcName) return emitSelfTailCall(expr, params, indent);
@@ -2240,7 +2289,6 @@ function compileModuleBody(
     body: Statement, moduleName?: string, localParamNames: string[] = [],
     dollarParamNames: string[] = [], renamedParamNames: string[] = []): string {
   const stmts = body.kind === 'block' ? body.statements : [body];
-  const localVarNames = collectLocalVariableNames(stmts);
 
   const lines: string[] = [];
 
@@ -2266,19 +2314,25 @@ function compileModuleBody(
     dollarRestores.push(`  ${svTarget(dp)} = __save_${dp};`);
   }
 
-  const shadowLocals =
-      new Set([...localVarNames].filter(n => isOuterVarName(n)));
-  const savedShadowRenames = activeShadowRenames;
-  activeShadowRenames = new Map();
+  const shadowLocals = new Set<string>();
+  for (const s of stmts) {
+    if (s.kind !== 'variableDecl' || !s.binding) continue;
+    if (s.binding.kind === 'local' && shadowsOuterVar(s.binding))
+      shadowLocals.add(bindJsName(s));
+  }
+  // A body local that shadows an outer variable is emitted under a distinct
+  // name, which its binding then carries. Restored afterwards because a body
+  // may be emitted more than once.
+  const renamedLocals: {binding: Binding; saved: string}[] = [];
 
   const declaredInBody = new Set<string>(localParamNames);
   const savedDollars = new Set<string>(dollarParamNames);
 
-  withLocalScope([...localParamNames, ...localVarNames], () => {
+  {
     for (const s of stmts) {
       if (s.kind === 'empty') continue;
       if (s.kind === 'variableDecl') {
-        const name = escapeName(s.name);
+        const name = bindJsName(s);
         const valueExpr = compileExpr(s.value);
         const commentsBefore = leadingCommentLines(s, '  ');
         const commentAfter = trailingCommentText(s);
@@ -2300,7 +2354,10 @@ function compileModuleBody(
             declaredInBody.add(emitName);
             decls.push(`  let ${emitName}: any = ${valueExpr};${commentAfter}`);
           }
-          if (shadowLocals.has(name)) activeShadowRenames.set(name, emitName);
+          if (shadowLocals.has(name) && s.binding) {
+            renamedLocals.push({binding: s.binding, saved: s.binding.jsName});
+            s.binding.jsName = emitName;
+          }
         }
       } else if (s.kind === 'functionDecl' || s.kind === 'moduleDecl') {
         // Indent the nested declaration
@@ -2317,9 +2374,9 @@ function compileModuleBody(
         }
       }
     }
-  });
+  };
 
-  activeShadowRenames = savedShadowRenames;
+  for (const r of renamedLocals) r.binding.jsName = r.saved;
 
   if (dollarRestores.length > 0) {
     lines.splice(4, 0, ...dollarSaves);
@@ -2426,15 +2483,8 @@ const IR_TRANSFORMS = new Set([
 const IR_BOOLEANS =
     new Set(['union', 'difference', 'intersection', 'hull', 'minkowski']);
 
-const OVERRIDABLE_BUILTINS = new Set([
-  'cube',
-  'sphere',
-  'cylinder',
-  'circle',
-  'square',
-  'polygon',
-  'text',
-]);
+
+
 
 function wrapWithLetBindings(
     node: IRNode, bindings: Argument[], loc?: ASTNode['loc']): IRNode {
@@ -2620,16 +2670,15 @@ function lowerModuleCallToIR(stmt: ModuleCallStmt, ctx: IRLowerContext): IRNode|
     return resolveChildrenReference(stmt.args, ctx.children, stmt.loc);
   }
 
-  // If a library overrides a built-in with an attachable module, use it only
-  // when children exist, otherwise keep the built-in to avoid recursion
-  if (loweredChildren.length > 0 && OVERRIDABLE_BUILTINS.has(name) &&
-      (ctx.modules.has(name) || externalModuleNames.has(name))) {
+  // A library's attachable override is used only when children exist
+  if (stmt.ref?.mod && stmt.ref.mod.kind !== 'builtin') {
     return {
       kind: 'moduleCall',
       name,
       args: stmt.args,
       children: loweredChildren,
       loc: stmt.loc,
+      ref: stmt.ref,
     } as IRModuleCallNode;
   }
 
@@ -2671,6 +2720,7 @@ function lowerModuleCallToIR(stmt: ModuleCallStmt, ctx: IRLowerContext): IRNode|
     args: stmt.args,
     children: loweredChildren,
     loc: stmt.loc,
+    ref: stmt.ref,
   } as IRModuleCallNode;
 }
 
@@ -3049,8 +3099,8 @@ function compileIRModuleCall(node: IRModuleCallNode): string {
         return 'Manifold.union([])';
       }
 
-      const callName = `${escapeName(node.name)}$mod`;
-      const argList = compileArgList(callName, node.args);
+      const callName = node.ref?.mod?.jsName ?? `${escapeName(node.name)}$mod`;
+      const argList = compileArgList(sigKey(node.name, 'mod'), node.args);
       const children = node.children.map(compileIRNode).filter(Boolean);
       return buildWithChildrenCall(
           `${callName}(${argList})`, children, node.name);
@@ -3100,7 +3150,8 @@ function compileGeometryDispatch(stmt: Statement): string {
 function compileModuleCall(stmt: ModuleCallStmt): string {
   const dollarArgs =
       stmt.args.filter(arg => arg.name && arg.name.startsWith('$'));
-  const userSig = signatures.get(`${escapeName(stmt.name)}$mod`);
+  const userSig =
+      signatures.get(sigKey(stmt.name, 'mod'));
   const extraArgs = (moduleDeclRegistry.has(stmt.name) && userSig) ?
       stmt.args.filter(
           a => a.name && !a.name.startsWith('$') &&
@@ -3108,10 +3159,11 @@ function compileModuleCall(stmt: ModuleCallStmt): string {
       [];
 
   let result: string;
-  const hasChildBlock = !!stmt.child && stmt.child.kind !== 'empty';
-  if (hasChildBlock && OVERRIDABLE_BUILTINS.has(stmt.name) &&
-      (moduleDeclRegistry.has(stmt.name) ||
-       externalModuleNames.has(stmt.name))) {
+  // A user or library module of the same name shadows the builtin, exactly as
+  // any other declaration shadows what it is declared over. A library's own
+  // wrapper still reaches the builtin, because a `use`d file resolves in a
+  // scope where the override was never declared.
+  if (stmt.ref?.mod && stmt.ref.mod.kind !== 'builtin') {
     result = compileUserModuleCall(stmt);
   } else
     switch (stmt.name) {
@@ -3458,7 +3510,7 @@ function compileText(args: Argument[]): string {
   // Track font for base64 generation and resolve variable name.
   const rawFontSpec = font && font.value.kind === 'string' ?
       font.value.value :
-      'Liberation Sans:style=Regular';
+      DEFAULT_FONT_SPEC;
   encounteredFonts.add(rawFontSpec);
   const filename = fontSpecToFilename(rawFontSpec);
   console.log('Font file name: ', filename);
@@ -3576,24 +3628,27 @@ function isSideEffectOnlyModule(s: Statement): boolean {
 }
 
 function collectChildrenWithDecls(
-    stmt: ModuleCallStmt,
-    sideEffectsAsChildren = false): {decls: string[]; geos: string[]} {
-  if (!stmt.child) return {decls: [], geos: []};
+    stmt: ModuleCallStmt, sideEffectsAsChildren = false):
+    {decls: string[]; geos: string[];
+     dollars: {name: string; code: string}[]} {
+  if (!stmt.child) return {decls: [], geos: [], dollars: []};
   if (stmt.child.kind === 'block') {
     return compileBlockStatementsWithDecls(
         stmt.child.statements, sideEffectsAsChildren);
   }
-  if (hasBackgroundModifier(stmt.child)) return {decls: [], geos: []};
+  if (hasBackgroundModifier(stmt.child))
+    return {decls: [], geos: [], dollars: []};
   if (isSideEffectOnlyModule(stmt.child) && !sideEffectsAsChildren) {
-    return {decls: [`${compileGeometry(stmt.child)};`], geos: []};
+    return {decls: [`${compileGeometry(stmt.child)};`], geos: [], dollars: []};
   }
   const g = compileGeometry(stmt.child);
-  return {decls: [], geos: g ? [g] : []};
+  return {decls: [], geos: g ? [g] : [], dollars: []};
 }
 
 function compileBlockStatementsWithDecls(
-    stmts: Statement[],
-    sideEffectsAsChildren = false): {decls: string[]; geos: string[]} {
+    stmts: Statement[], sideEffectsAsChildren = false):
+    {decls: string[]; geos: string[];
+     dollars: {name: string; code: string}[]} {
   const varDecls = new Map < string, {
     code: string;
     order: number
@@ -3601,6 +3656,7 @@ function compileBlockStatementsWithDecls(
   >();
   const otherDecls: string[] = [];
   const geos: string[] = [];
+  const dollars: {name: string; code: string}[] = [];
   let order = 0;
 
   const collect = (list: Statement[]) => {
@@ -3608,7 +3664,14 @@ function compileBlockStatementsWithDecls(
       if (s.kind === 'empty') continue;
       if (hasBackgroundModifier(s)) continue;
       if (s.kind === 'variableDecl') {
-        const name = escapeName(s.name);
+        const name = bindJsName(s);
+        if (s.name.startsWith('$') && s.name !== '$children') {
+          const prior = dollars.findIndex(d => d.name === name);
+          const entry = {name, code: compileExpr(s.value)};
+          if (prior >= 0) dollars[prior] = entry;
+          else dollars.push(entry);
+          continue;
+        }
         const code = `${leadingCommentLines(s).join('\n')}${
             s.leadingComments?.length ? '\n' : ''}let ${name}: any = ${
             compileExpr(s.value)};${trailingCommentText(s)}`;
@@ -3636,7 +3699,26 @@ function compileBlockStatementsWithDecls(
       [...varDecls.values()].sort((a, b) => a.order - b.order).map(v => v.code);
   const decls = [...orderedVars, ...otherDecls];
 
-  return {decls, geos};
+  return {decls, geos, dollars};
+}
+
+function wrapDollarScope(
+    body: string, dollars: {name: string; code: string}[]): string {
+  let out = body;
+  for (let i = dollars.length - 1; i >= 0; i--) {
+    const d = dollars[i]!;
+    const t = svTarget(d.name);
+    if (out.includes('await ')) {
+      out = `await (async () => { let __save_${d.name}: any = ${t}; ${t} = ${
+          d.code}; try { return await ${
+          returnExpr(out, '  ')}; } finally { ${t} = __save_${d.name}; } })()`;
+    } else {
+      out = `(() => { let __save_${d.name}: any = ${t}; ${t} = ${
+          d.code}; try { return ${returnExpr(out, '  ')}; } finally { ${
+          t} = __save_${d.name}; } })()`;
+    }
+  }
+  return out;
 }
 
 function emptyGeometryWithDecls(decls: string[]): string {
@@ -3799,15 +3881,14 @@ function compileRotateExtrude(stmt: ModuleCallStmt): string {
 function compileBlockGeometry(block: BlockStmt): string {
   const items: {kind: 'var'|'dollar'|'func'|'geo'; name?: string;
                                                    code: string}[] = [];
-  const localVarNames = collectLocalVariableNames(block.statements);
 
-  withLocalScope(localVarNames, () => {
+  {
     for (const s of block.statements) {
       if (s.kind === 'empty') continue;
       // A '%' (background) subtree is excluded from the enclosing union.
       if (hasBackgroundModifier(s)) continue;
       if (s.kind === 'variableDecl') {
-        const name = escapeName(s.name);
+        const name = bindJsName(s);
         const code = compileExpr(s.value);
         if (s.name.startsWith('$')) {
           items.push({kind: 'dollar', name, code});
@@ -3827,7 +3908,7 @@ function compileBlockGeometry(block: BlockStmt): string {
         }
       }
     }
-  });
+  };
 
   // Collect geometry expressions
   const geos = items.filter(i => i.kind === 'geo').map(i => i.code);
@@ -3933,8 +4014,8 @@ function buildNestedIntersectionFor(
   // vector iteration
   const rangeExpr = compileExpr(v.range);
   return `__intersection2d3d(__flat_map_iter(${rangeExpr}, (${
-      escapeName(
-          v.name)}: any, __i: any) => { let __save_$idx: any = __ctx.$idx; __ctx.$idx = __i; try { return [${
+      bindJsName(
+          v)}: any, __i: any) => { let __save_$idx: any = __ctx.$idx; __ctx.$idx = __i; try { return [${
       inner}]; } finally { __ctx.$idx = __save_$idx; } }))`;
 }
 
@@ -3987,8 +4068,8 @@ function buildNestedFor(
   // vector iteration
   const rangeExpr = compileExpr(v.range);
   return `__union2d3d(__flat_map_iter(${rangeExpr}, (${
-      escapeName(
-          v.name)}: any, __i: any) => { let __save_$idx: any = __ctx.$idx; __ctx.$idx = __i; try { return [${
+      bindJsName(
+          v)}: any, __i: any) => { let __save_$idx: any = __ctx.$idx; __ctx.$idx = __i; try { return [${
       inner}]; } finally { __ctx.$idx = __save_$idx; } }))`;
 }
 
@@ -4008,7 +4089,7 @@ function buildNestedForStatements(
   }
 
   const v = vars[idx]!;
-  const vName = escapeName(v.name);
+  const vName = bindJsName(v);
   if (v.range.kind === 'range') {
     const start = compileExpr(v.range.start);
     const end = compileExpr(v.range.end);
@@ -4091,12 +4172,13 @@ function compileUserModuleCall(stmt: ModuleCallStmt): string {
     return 'Manifold.union([])';
   }
 
-  const name = `${escapeName(stmt.name)}$mod`;
-  const argList = compileArgList(name, stmt.args);
-  const {decls, geos} = stmt.child && stmt.child.kind !== 'empty' ?
+  const name = stmt.ref?.mod?.jsName ?? `${escapeName(stmt.name)}$mod`;
+  const argList = compileArgList(sigKey(stmt.name, 'mod'), stmt.args);
+  const {decls, geos, dollars} = stmt.child && stmt.child.kind !== 'empty' ?
       collectChildrenWithDecls(stmt, true) :
-      {decls: [], geos: []};
-  const result = buildWithChildrenCall(`${name}(${argList})`, geos, stmt.name);
+      {decls: [], geos: [], dollars: []};
+  const result = wrapDollarScope(
+      buildWithChildrenCall(`${name}(${argList})`, geos, stmt.name), dollars);
 
   if (decls.length > 0) {
     if (result.includes('await ')) {
@@ -4236,7 +4318,7 @@ function compileExpr(expr: Expr): string {
       // another.
       if (expr.name.startsWith('$')) return `__ctx.${expr.name}`;
       const en = escapeName(expr.name);
-      return activeShadowRenames.get(en) ?? en;
+      return expr.binding ? expr.binding.jsName : en;
     }
     case 'vector':
       return `[${expr.elements.map(compileExpr).join(', ')}]`;
@@ -4352,21 +4434,21 @@ function compileExpr(expr: Expr): string {
     case 'let': {
       const localAssignNames =
           expr.assignments.filter(a => !a.name.startsWith('$'))
-              .map(a => escapeName(a.name));
-      return withLocalScope(localAssignNames, () => {
+              .map(bindJsName);
+      return (() => {
         const bound: string[] = [];
         const vals = expr.assignments.map(a => {
           const selfRec = a.value.kind === 'lambda' && !a.name.startsWith('$');
-          const suppress = selfRec ? [...bound, escapeName(a.name)] : bound;
+          const suppress = selfRec ? [...bound, bindJsName(a)] : bound;
           const val =
-              withShadowSuppressed(suppress, () => compileExpr(a.value));
-          if (!a.name.startsWith('$')) bound.push(escapeName(a.name));
+              (compileExpr(a.value));
+          if (!a.name.startsWith('$')) bound.push(bindJsName(a));
           return val;
         });
-        let result = withShadowSuppressed(bound, () => compileExpr(expr.body));
+        let result = (compileExpr(expr.body));
         for (let i = expr.assignments.length - 1; i >= 0; i--) {
           const a = expr.assignments[i]!;
-          const name = escapeName(a.name);
+          const name = bindJsName(a);
           const val = vals[i]!;
           if (a.name.startsWith('$')) {
             const t = svTarget(name);
@@ -4380,7 +4462,7 @@ function compileExpr(expr: Expr): string {
           }
         }
         return result;
-      });
+      })();
     }
     case 'each': {
       // `each <generator>` must expand every yielded element, so wrap generator
@@ -4395,25 +4477,21 @@ function compileExpr(expr: Expr): string {
       return `...__each(${inner})`;
     }
     case 'lambda': {
-      const localParams = expr.params.map(p => escapeName(p.name));
-      // Params shadow any renamed outer locals for both defaults and body
-      // (defaults live in the emitted arrow's parameter scope)
-      return withShadowSuppressed(localParams, () => {
-        const params =
-            expr.params
-                .map(
-                    p => p.defaultValue ? `${escapeName(p.name)} = ${
-                                              compileExpr(p.defaultValue)}` :
-                                          escapeName(p.name))
-                .join(', ');
-        // Compile the body in tail position so tail calls through function
-        // values become `__tc` thunks the trampoline can drive iteratively
-        const bodyExpr =
-            withLocalScope(localParams, () => compileExprTail(expr.body));
+      const localParams = expr.params.map(bindJsName);
+      const params =
+          expr.params
+              .map(
+                  p => p.defaultValue ? `${bindJsName(p)} = ${
+                                            compileExpr(p.defaultValue)}` :
+                                        bindJsName(p))
+              .join(', ');
+      // Compile the body in tail position so tail calls through function
+      // values become `__tc` thunks the trampoline can drive iteratively
+      const bodyExpr =
+          (compileExprTail(expr.body));
 
-        return `__fnlit((${params}) => ${bodyExpr}, ${
-            JSON.stringify(oscadSource(expr))})`;
-      });
+      return `__fnlit((${params}) => ${bodyExpr}, ${
+          JSON.stringify(oscadSource(expr))})`;
     }
     case 'listComp': {
       return `...(${compileListComp(expr.generator)})`;
@@ -4550,22 +4628,22 @@ function compileExprTail(expr: Expr): string {
     case 'let': {
       const localAssignNames =
           expr.assignments.filter(a => !a.name.startsWith('$'))
-              .map(a => escapeName(a.name));
-      return withLocalScope(localAssignNames, () => {
+              .map(bindJsName);
+      return (() => {
         const bound: string[] = [];
         const vals = expr.assignments.map(a => {
           const selfRec = a.value.kind === 'lambda' && !a.name.startsWith('$');
-          const suppress = selfRec ? [...bound, escapeName(a.name)] : bound;
+          const suppress = selfRec ? [...bound, bindJsName(a)] : bound;
           const val =
-              withShadowSuppressed(suppress, () => compileExpr(a.value));
-          if (!a.name.startsWith('$')) bound.push(escapeName(a.name));
+              (compileExpr(a.value));
+          if (!a.name.startsWith('$')) bound.push(bindJsName(a));
           return val;
         });
         let result =
-            withShadowSuppressed(bound, () => compileExprTail(expr.body));
+            (compileExprTail(expr.body));
         for (let i = expr.assignments.length - 1; i >= 0; i--) {
           const a = expr.assignments[i]!;
-          const name = escapeName(a.name);
+          const name = bindJsName(a);
           const val = vals[i]!;
           if (a.name.startsWith('$')) {
             const t = svTarget(name);
@@ -4579,7 +4657,7 @@ function compileExprTail(expr: Expr): string {
           }
         }
         return result;
-      });
+      })();
     }
     case 'call':
       return compileCallExpr(expr, true);
@@ -4601,19 +4679,22 @@ function compileExprTail(expr: Expr): string {
 }
 
 function compileCallExpr(
-    expr: {kind: 'call'; name: string; args: Argument[]; loc?: ASTNode['loc']},
+    expr: {
+      kind: 'call'; name: string; args: Argument[]; loc?: ASTNode['loc'];
+      ref?: CallRef | undefined;
+    },
     tail = false): string {
   const escaped = escapeName(expr.name);
   const isKnownFunction =
-      BUILTIN_FUNCTIONS.has(expr.name) || signatures.has(`${escaped}_fn`);
+      BUILTIN_FUNCTIONS.has(expr.name) || signatures.has(sigKey(expr.name, 'fn'));
 
   // A call to a name that is not a builtin, a user/external function, a local
   // binding, or a variable that might hold a function literal is an unknown
   // function.
   const isSpecialVarCallee =
       expr.name.startsWith('$') && expr.name !== '$children';
-  const isCallableValue = isLocalName(escaped) || isOuterVarName(escaped) ||
-      externalFunctionNames.has(expr.name) || isSpecialVarCallee;
+  const callsValue = isLexicalVar(expr.ref?.value);
+  const isCallableValue = callsValue || isSpecialVarCallee;
   if (!isKnownFunction && !isCallableValue) {
     const line = expr.loc?.start.line;
     const where = line ? ` at line ${line}` : '';
@@ -4630,21 +4711,22 @@ function compileCallExpr(
   // OpenSCAD resolves variables and functions separately, so if both share a
   // name, dispatch at runtime: call the variable only if it's a function,
   // otherwise use the named function
-  const shadowingValue =
-      !isSpecialVarCallee && (isLocalName(escaped) || isOuterVarName(escaped));
+  const shadowingValue = !isSpecialVarCallee && callsValue;
   const dualDispatch = isKnownFunction && shadowingValue;
 
   // When the callee isn't a known function definition but resolves to a value
+  const fnName = expr.ref?.fn?.jsName ?? `${escaped}_fn`;
+  const valueName = expr.ref?.value?.jsName ?? escaped;
   const name = isSpecialVarCallee          ? svTarget(escaped) :
-      (shadowingValue && !isKnownFunction) ? escaped :
-                                             `${escaped}_fn`;
+      (shadowingValue && !isKnownFunction) ? valueName :
+                                             fnName;
 
   // A call through a function VALUE goes through the tail-call trampoline:
   // `__call` drives it from non-tail position, while a tail call returns a
   // `__tc` thunk so self-recursion through function values runs iteratively
-  const isValueCall = name !== `${escaped}_fn`;
+  const isValueCall = name !== fnName;
 
-  const sig = signatures.get(name);
+  const sig = signatures.get(sigKey(expr.name, 'fn'));
   const dollarArgs = expr.args.filter(
       a => a.name && a.name.startsWith('$') &&
           !(sig && sig.params.includes(a.name)));
@@ -4652,12 +4734,13 @@ function compileCallExpr(
       expr.args :
       expr.args.filter(a => !dollarArgs.includes(a));
 
-  const argList = compileArgList(name, positionalArgs);
+  const argList = compileArgList(sigKey(expr.name, 'fn'), positionalArgs);
   const call = dualDispatch ?
       (() => {
-        const valueArgList = compileArgList(escaped, positionalArgs);
-        return `(typeof ${escaped} === "function" ? ${
-            tail ? '__tc' : '__call'}(${escaped}${
+        // A call through a value has no declared signature to match against.
+        const valueArgList = compileArgList(sigKey(expr.name, 'var'), positionalArgs);
+        return `(typeof ${valueName} === "function" ? ${
+            tail ? '__tc' : '__call'}(${valueName}${
             valueArgList ? `, ${valueArgList}` : ''}) : ${name}(${argList}))`;
       })() :
       isValueCall ?
@@ -4693,22 +4776,20 @@ function compileListComp(gen: ListCompGenerator): string {
       // same name
       const bound: string[] = [];
       const ranges = gen.variables.map(v => {
-        const parts = withShadowSuppressed(
-            bound,
-            () => v.range.kind === 'range' ?
+        const parts = (v.range.kind === 'range' ?
                 [
                   compileExpr(v.range.start),
                   v.range.step ? compileExpr(v.range.step) : '1',
                   compileExpr(v.range.end)
                 ] :
                 [compileExpr(v.range)]);
-        bound.push(escapeName(v.name));
+        bound.push(bindJsName(v));
         return parts;
       });
-      let result = withShadowSuppressed(bound, () => compileListComp(gen.body));
+      let result = (compileListComp(gen.body));
       for (let i = gen.variables.length - 1; i >= 0; i--) {
         const v = gen.variables[i]!;
-        const vName = escapeName(v.name);
+        const vName = bindJsName(v);
         if (v.range.kind === 'range') {
           const [start, step, end] = ranges[i]!;
           result = `(() => { const __r = []; const __start: any = ${
@@ -4734,14 +4815,14 @@ function compileListComp(gen: ListCompGenerator): string {
       // every binding shadows any renamed outer local of the same name
       const bound: string[] = [];
       const vals = gen.assignments.map(a => {
-        const val = withShadowSuppressed(bound, () => compileExpr(a.value));
-        bound.push(escapeName(a.name));
+        const val = (compileExpr(a.value));
+        bound.push(bindJsName(a));
         return val;
       });
-      let result = withShadowSuppressed(bound, () => compileListComp(gen.body));
+      let result = (compileListComp(gen.body));
       for (let i = gen.assignments.length - 1; i >= 0; i--) {
         const a = gen.assignments[i]!;
-        result = `((${escapeName(a.name)}) => (${result}))(${vals[i]})`;
+        result = `((${bindJsName(a)}) => (${result}))(${vals[i]})`;
       }
       return result;
     }
@@ -4756,15 +4837,12 @@ function compileListComp(gen: ListCompGenerator): string {
       // Init values evaluate in the outer scope; the loop names shadow any
       // renamed outer locals for the condition, updates and body
       const inits =
-          gen.inits.map(a => `${escapeName(a.name)} = ${compileExpr(a.value)}`)
+          gen.inits.map(a => `${bindJsName(a)} = ${compileExpr(a.value)}`)
               .join(', ');
-      const loopNames = gen.inits.map(a => escapeName(a.name));
-      const [cond, updates, inner] = withShadowSuppressed(
-          loopNames,
-          () =>
-              [compileExpr(gen.condition),
+      const loopNames = gen.inits.map(bindJsName);
+      const [cond, updates, inner] = ([compileExpr(gen.condition),
                gen.updates
-                   .map(a => `${escapeName(a.name)} = ${compileExpr(a.value)}`)
+                   .map(a => `${bindJsName(a)} = ${compileExpr(a.value)}`)
                    .join(', '),
                compileListComp(gen.body),
       ]);

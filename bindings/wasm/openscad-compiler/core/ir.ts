@@ -1,4 +1,5 @@
 import type {Argument, ASTNode, Expr, ForVariable, Statement} from './ast.js';
+import type {CallRef} from './binder.js';
 
 export type PrimitiveKind =|'cube'|'sphere'|'cylinder'|'circle'|'square'|
     'polygon'|'polyhedron'|'text'|'surface';
@@ -41,6 +42,9 @@ export interface IRModuleCallNode extends IRBase {
   name: string;
   args: Argument[];
   children: IRNode[];
+  // Carried over from the statement this node was lowered from, so emission
+  // names the call from its binding rather than re-deriving it
+  ref?: CallRef|undefined;
 }
 
 export interface IRChildrenNode extends IRBase {

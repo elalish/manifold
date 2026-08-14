@@ -299,11 +299,17 @@ function resolveConsumerFile(
   return result;
 }
 
+export interface LibraryEdge {
+  rel: string;
+  mode: 'include'|'use';
+}
+
 export interface LibraryClosure {
   name: string;
   root: string;
   files: Map<string, Program>;
   deps: Map<string, string[]>;
+  edges: Map<string, LibraryEdge[]>;
   entryRels: string[];
 }
 
@@ -313,6 +319,7 @@ export function resolveLibraryClosure(
   const root = path.resolve(libraryRoot);
   const files = new Map<string, Program>();
   const deps = new Map<string, string[]>();
+  const edges = new Map<string, LibraryEdge[]>();
   const visited = new Set<string>();
 
   const relOf = (abs: string) => path.relative(root, abs).replace(/\\/g, '/');
@@ -335,6 +342,7 @@ export function resolveLibraryClosure(
     files.set(rel, program);
 
     const fileDeps: string[] = [];
+    const fileEdges: LibraryEdge[] = [];
     const fileDir = path.dirname(abs);
     for (const stmt of program.statements) {
       if (stmt.kind === 'include' || stmt.kind === 'use') {
@@ -342,11 +350,14 @@ export function resolveLibraryClosure(
         if (cls && underRoot(cls.resolved)) {
           const depRel = relOf(path.resolve(cls.resolved));
           if (!fileDeps.includes(depRel)) fileDeps.push(depRel);
+          if (!fileEdges.some(e => e.rel === depRel && e.mode === stmt.kind))
+            fileEdges.push({rel: depRel, mode: stmt.kind});
           walk(cls.resolved);
         }
       }
     }
     deps.set(rel, fileDeps);
+    edges.set(rel, fileEdges);
   };
 
   const entryRels: string[] = [];
@@ -354,5 +365,5 @@ export function resolveLibraryClosure(
     entryRels.push(relOf(path.resolve(entry)));
     walk(entry);
   }
-  return {name, root, files, deps, entryRels};
+  return {name, root, files, deps, edges, entryRels};
 }

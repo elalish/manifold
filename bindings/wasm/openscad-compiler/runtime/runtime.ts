@@ -15,23 +15,23 @@ const wasm = await Module();
 wasm.setup();
 const {Manifold, CrossSection} = wasm;
 
-function is_undef_fn(x: any) {
+function is_undef_fn(x: any): boolean | undefined {
   return arguments.length === 1 ? (x === undefined || x === null) : undefined;
 }
-function is_bool_fn(x: any) {
+function is_bool_fn(x: any): boolean | undefined {
   return arguments.length === 1 ? (typeof x === 'boolean') : undefined;
 }
-function is_num_fn(x: any) {
+function is_num_fn(x: any): boolean | undefined {
   return arguments.length === 1 ? (typeof x === 'number' && !Number.isNaN(x)) :
                                   undefined;
 }
-function is_string_fn(x: any) {
+function is_string_fn(x: any): boolean | undefined {
   return arguments.length === 1 ? (typeof x === 'string') : undefined;
 }
-function is_list_fn(x: any) {
+function is_list_fn(x: any): boolean | undefined {
   return arguments.length === 1 ? Array.isArray(x) : undefined;
 }
-function is_function_fn(x: any) {
+function is_function_fn(x: any): boolean | undefined {
   return arguments.length === 1 ? (typeof x === 'function') : undefined;
 }
 
@@ -49,17 +49,17 @@ const M_SQRT1_3 = 0.57735026918962573106;   // sqrt(3)/3
 const M_SQRT1_2 = 0.70710678118654752440;   // sqrt(1/2)
 const TRIG_HUGE_VAL = (1 << 26) * 360.0 * (1 << 26);
 
-function deg2rad(x: number) {
+function deg2rad(x: number): number {
   return x * M_DEG2RAD;
 }
-function rad2deg(x: number) {
+function rad2deg(x: number): number {
   return x * M_RAD2DEG;
 }
-function cround(x: number) {
+function cround(x: number): number {
   return x < 0 ? -Math.round(-x) : Math.round(x);
 }
 
-function sin_fn(x: any) {
+function sin_fn(x: number): number {
   if (x < 360.0 && x >= 0.0) {
     // already in range
   } else if (x < TRIG_HUGE_VAL && x > -TRIG_HUGE_VAL) {
@@ -85,7 +85,7 @@ function sin_fn(x: any) {
   return oppose ? -x : x;
 }
 
-function cos_fn(x: any) {
+function cos_fn(x:  number): number {
   if (x < 360.0 && x >= 0.0) {
     // already in range
   } else if (x < TRIG_HUGE_VAL && x > -TRIG_HUGE_VAL) {
@@ -114,7 +114,7 @@ function cos_fn(x: any) {
   return oppose ? -x : x;
 }
 
-function tan_fn(x: any) {
+function tan_fn(x: number): number {
   const cycles = Math.floor(x / 180.0);
   if (x < 180.0 && x >= 0.0) {
     // already in range
@@ -141,28 +141,28 @@ function tan_fn(x: any) {
   return oppose ? -x : x;
 }
 
-function asin_fn(x: any) {
+function asin_fn(x: number): number {
   const degs = rad2deg(Math.asin(x));
   const whole = cround(degs);
   if (sin_fn(whole) === x) return whole;
   return degs;
 }
 
-function acos_fn(x: any) {
+function acos_fn(x: number): number {
   const degs = rad2deg(Math.acos(x));
   const whole = cround(degs);
   if (cos_fn(whole) === x) return whole;
   return degs;
 }
 
-function atan_fn(x: any) {
+function atan_fn(x: number): number {
   const degs = rad2deg(Math.atan(x));
   const whole = cround(degs);
   if (tan_fn(whole) === x) return whole;
   return degs;
 }
 
-function atan2_fn(y: any, x: any) {
+function atan2_fn(y: number, x: number): number {
   const degs = rad2deg(Math.atan2(y, x));
   const whole = cround(degs);
   if (Math.abs(degs - whole) < 3.0e-14) return whole;
@@ -177,10 +177,10 @@ let ceil_fn = Math.ceil;
 let round_fn = Math.round;
 let sqrt_fn = Math.sqrt;
 let exp_fn = Math.exp;
-function ln_fn(x: any) {
+function ln_fn(x: number): number {
   return Math.log(x);
 }
-function log_fn(x: any) {
+function log_fn(x: number): number {
   return Math.log(x);
 }
 
@@ -2388,6 +2388,11 @@ function __canvasTextContours(
   return contours;
 }
 
+/* Base64 font data, keyed by sanitized font filename. One table shared by
+   every compiled file: the consumer fills it in at module init, and a `text()`
+   routed through a library's own module reads the same entries. */
+const __font_registry: Record<string, string> = {};
+
 function __text(
     text: string, size: number = 10, font: string, halign: string = 'left',
     valign: string = 'baseline', spacing: number = 1, direction: string = 'ltr',
@@ -2395,6 +2400,11 @@ function __text(
     fontBase64Data: string|Record<string, string>|undefined = undefined): any {
   if (!text || text.length === 0)
     return CrossSection.square([0.001, 0.001], false);
+
+  // OpenSCAD's default typeface. Calls compiled straight from `text()` get this
+  // filled in at compile time, but a call routed through a library's own `text`
+  // module arrives with whatever the caller left undefined.
+  font = font || 'Liberation Sans:style=Regular';
 
   void fn;
 
@@ -2723,7 +2733,7 @@ function __mirror(shape: any, v: any) {
   }
 }
 
-function __cube(size: any, center = false) {
+function __cube(size: any, center = false): InstanceType<typeof Manifold> {
   // Invalid or `undef` `size` uses the default (1,1,1), while only valid but
   // degenerate sizes produce empty geometry
   let v: number[] = [1, 1, 1];
@@ -2744,7 +2754,7 @@ function __cube(size: any, center = false) {
   return Manifold.cube(v as [number, number, number], center);
 }
 
-function __square(size: any, center = false) {
+function __square(size: any, center = false): InstanceType<typeof CrossSection> {
   // Invalid or `undef` `size` uses the default (1,1), while only valid but
   // degenerate sizes produce empty geometry
   let v: number[] = [1, 1];
@@ -2765,7 +2775,7 @@ function __square(size: any, center = false) {
   return CrossSection.square(v as [number, number], center);
 }
 
-function __sphere(radius: number, fn = 0, fa = 12, fs = 2) {
+function __sphere(radius: any, fn = 0, fa = 12, fs = 2): InstanceType<typeof Manifold> {
   // A non-finite (or non-positive) size produces no geometry instead of
   // crashing
   if (!Number.isFinite(radius) || radius <= 0) {
@@ -2848,7 +2858,7 @@ function __radius(dSpec: any, rSpec: any, dGen: any, rGen: any, dflt: any) {
 
 function __cylinder(
     height: number, radiusLow: number, radiusHigh = -1.0, fn = 0,
-    center = false, fa = 12, fs = 2) {
+    center = false, fa = 12, fs = 2): InstanceType<typeof Manifold> {
   // Non-finite dimensions produce no geometry
   if (!Number.isFinite(height) || !Number.isFinite(radiusLow) ||
       (radiusHigh >= 0 && !Number.isFinite(radiusHigh))) {
@@ -2868,7 +2878,7 @@ function __cylinder(
   return Manifold.cylinder(height, radiusLow, radiusHigh, segs, center);
 }
 
-function __circle(radius: number, fn = 0, fa = 12, fs = 2) {
+function __circle(radius: number, fn = 0, fa = 12, fs = 2): InstanceType<typeof CrossSection> {
   // Match OpenSCAD: a non-finite (or non-positive) radius produces no geometry.
   if (!Number.isFinite(radius) || radius <= 0) {
     return CrossSection.square(0);
@@ -2907,7 +2917,7 @@ function __forceWinding(
   return contour;
 }
 
-function __polygon(points: any, paths?: any) {
+function __polygon(points: any, paths?: any): InstanceType<typeof CrossSection> {
   if (!points || !Array.isArray(points) || points.length === 0) {
     return CrossSection.square(0);
   }
@@ -2954,7 +2964,7 @@ function __polygon(points: any, paths?: any) {
   return CrossSection.ofPolygons([ccwPoints]);
 }
 
-function __polyhedron(points: any, faces: any) {
+function __polyhedron(points: any, faces: any): InstanceType<typeof Manifold> {
   // A point with a non-finite coordinate yields no geometry
   if (Array.isArray(points) &&
       points.some(
@@ -3217,7 +3227,7 @@ function buildSurfaceMesh(
   }));
 }
 
-function pow_fn(base: any, exp: any) {
+function pow_fn(base: number, exp: number) {
   return Math.pow(base, exp);
 }
 
@@ -3335,6 +3345,7 @@ export {
   __echo,
   __oecho,
   __fnlit,
+  __font_registry,
   __tc,
   __call
 };
