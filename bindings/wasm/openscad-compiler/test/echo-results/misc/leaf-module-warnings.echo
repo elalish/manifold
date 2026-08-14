@@ -1,4 +1,0 @@
-WARNING: module children() does not support child modules in file leaf-module-warnings.scad, line 4
-WARNING: module import() does not support child modules in file leaf-module-warnings.scad, line 8
-WARNING: module surface() does not support child modules in file leaf-module-warnings.scad, line 10
-WARNING: module text() does not support child modules in file leaf-module-warnings.scad, line 12

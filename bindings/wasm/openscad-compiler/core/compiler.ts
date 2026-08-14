@@ -199,6 +199,130 @@ function paramUsesNoArg(p: Param): boolean {
       !nodeReferencesIdentifier(p.defaultValue, p.name);
 }
 
+// Module/function declarations of the program being compiled
+interface LocalDecl {
+  count: number;
+  params: Param[];
+}
+const localDecls = new Map<string, LocalDecl>();
+
+// Slots whose default moved out of the __NO_ARG prologue and into a plain JS
+// default parameter
+const noArgDemotions = new Map<string, boolean[]>();
+
+// Whether slot `i` of a declaration applies its default through the __NO_ARG
+// prologue, once the call-site analysis has had its say
+function slotUsesNoArg(key: string, p: Param, i: number): boolean {
+  return paramUsesNoArg(p) && !noArgDemotions.get(key)?.[i];
+}
+
+// Drops __NO_ARG prologues when call sites can't observe omitted vs `undef`. Only safe with whole-program knowledge; libraries keep the prologue.
+function analyzeNoArgSlots(stmts: Statement[]): void {
+  const open = new Map<string, boolean[]>();
+  for (const [key, decl] of localDecls) {
+    const sig = signatures.get(key);
+    if (decl.count !== 1 || sig?.params.length !== decl.params.length) continue;
+    // Duplicate parameter names shift slots between the signature and the
+    // deduplicated list the declaration is emitted from
+    if (new Set(decl.params.map(p => p.name)).size !== decl.params.length)
+      continue;
+    const slots = decl.params.map(
+        (p, i) => paramUsesNoArg(p) &&
+            // A default reading a parameter declared later still sees that
+            // parameter in the prologue, but would hit the temporal dead zone
+            // as a JS default
+            !decl.params.slice(i + 1).some(
+                q => nodeReferencesIdentifier(p.defaultValue, q.name)));
+    if (slots.some(Boolean)) open.set(key, slots);
+  }
+  if (open.size === 0) return;
+
+  const visit = (node: KindedNode): void => {
+    if (node.kind === 'call' || node.kind === 'moduleCall') {
+      const key = sigKey(node.name, node.kind === 'call' ? 'fn' : 'mod');
+      const slots = open.get(key);
+      if (slots) {
+        const supplied =
+            resolveArgsToParams(node.args, localDecls.get(key)!.params);
+        supplied.forEach((arg, i) => {
+          if (arg && !isDefinitelyDefined(arg, new Set())) slots[i] = false;
+        });
+      }
+    }
+    forEachChild(node, visit);
+  };
+  for (const s of stmts) visit(s);
+
+  for (const [key, slots] of open)
+    if (slots.some(Boolean)) noArgDemotions.set(key, slots);
+}
+
+// Variable kinds whose every write is visible in the program being compiled
+const ANALYZABLE_VAR_KINDS =
+    new Set<string>(['global', 'filePrivate', 'local', 'let']);
+
+// True when every declaration writing `b` assigns a value satisfying `pred`.
+// `seen` breaks reference cycles (`a = b; b = a;`) conservatively
+function everyDeclValue(
+    b: Binding|null|undefined, seen: Set<Binding>,
+    pred: (e: Expr, seen: Set<Binding>) => boolean): boolean {
+  if (!b || seen.has(b) || !ANALYZABLE_VAR_KINDS.has(b.kind)) return false;
+  if (b.decls.length === 0) return false;
+  seen.add(b);
+  return b.decls.every(d => {
+    // Anything but a plain assignment (a parameter, a loop variable) has no
+    // single value expression to inspect
+    const value = (d as {value?: Expr}).value;
+    return !!value && pred(value, seen);
+  });
+}
+
+// Expressions that compile to a value which is never `undefined`. Conservative:
+// anything not listed here is assumed to possibly be `undef`
+function isDefinitelyDefined(e: Expr, seen: Set<Binding>): boolean {
+  switch (e.kind) {
+    case 'number':
+    case 'string':
+    case 'boolean':
+    case 'vector':  // an array literal, whatever its elements hold
+    case 'range':   // __range always builds an array
+    case 'lambda':
+      return true;
+    case 'group':
+      return isDefinitelyDefined(e.expr, seen);
+    case 'ternary':
+      return isDefinitelyDefined(e.ifTrue, seen) &&
+          isDefinitelyDefined(e.ifFalse, seen);
+    case 'unary':
+      return e.op === '!' || isDefinitelyNumber(e, seen);
+    case 'binary':
+      return e.op === '==' || e.op === '!=' || isDefinitelyNumber(e, seen);
+    case 'identifier':
+      return everyDeclValue(e.binding, seen, isDefinitelyDefined);
+    default:
+      return false;
+  }
+}
+
+function isDefinitelyNumber(e: Expr, seen: Set<Binding>): boolean {
+  switch (e.kind) {
+    case 'number':
+      return true;
+    case 'group':
+      return isDefinitelyNumber(e.expr, seen);
+    case 'unary':
+      return (e.op === '-' || e.op === '+') &&
+          isDefinitelyNumber(e.operand, seen);
+    case 'binary':
+      return ['+', '-', '*', '/', '%', '^'].includes(e.op) &&
+          isDefinitelyNumber(e.left, seen) && isDefinitelyNumber(e.right, seen);
+    case 'identifier':
+      return everyDeclValue(e.binding, seen, isDefinitelyNumber);
+    default:
+      return false;
+  }
+}
+
 type ModuleDeclStmtType = Extract<Statement, {kind: 'moduleDecl'}>;
 
 interface IRLowerContext {
@@ -352,6 +476,13 @@ function collectSignatures(stmts: Statement[]) {
         defaults: stmt.params.map(p => p.defaultValue),
         noArg: stmt.params.map(paramUsesNoArg),
       });
+      const seenDecl = localDecls.get(name);
+      if (seenDecl) {
+        seenDecl.count++;
+        seenDecl.params = stmt.params;
+      } else {
+        localDecls.set(name, {count: 1, params: stmt.params});
+      }
       if (stmt.kind === 'moduleDecl' && stmt.body.kind === 'block') {
         collectSignatures(stmt.body.statements);
       }
@@ -435,8 +566,11 @@ function compileArgList(key: string, args: Argument[]): string {
   }
 
   // Missing arguments use a sentinel to apply defaults, while an explicit
-  // `undef` is kept as is and doesn't reapply the default
-  const fillFor = (i: number) => (sig.noArg?.[i] ? '__NO_ARG' : 'undefined');
+  // `undef` is kept as is and doesn't reapply the default. A demoted slot took
+  // a JS default instead, which `undefined` triggers on its own
+  const demoted = noArgDemotions.get(key);
+  const fillFor = (i: number) =>
+      (sig.noArg?.[i] && !demoted?.[i]) ? '__NO_ARG' : 'undefined';
   const compiledArgs: string[] =
       new Array(sig.params.length).fill('').map((_, i) => fillFor(i));
   const namedClaimed: boolean[] = new Array(sig.params.length).fill(false);
@@ -676,53 +810,18 @@ function collectStringLiterals(node: KindedNode, literals: Set<string>): void {
   forEachChild(node, child => collectStringLiterals(child, literals));
 }
 
-// Collect every identifier referenced as a value, and every name bound anywhere
-// in the program (variable/param/let/for/comprehension binding). A name that is
-// referenced but never bound is an undefined variable: OpenSCAD evaluates such
-// a reference to `undef` rather than erroring, so we declare these as
-// `undefined` to avoid a ReferenceError in the compiled code.
-interface IdentifierUsage {
-  referenced: Set<string>;
-  bound: Set<string>;
-}
-
-function collectIdentifierUsage(program: Program): IdentifierUsage {
-  const referenced = new Set<string>();
-  const bound = new Set<string>();
-
-  // Only the names a node binds are per-kind here; reaching the children is
-  // the visitor's job
+// Unresolved value reads evaluate to `undef` in OpenSCAD, so emit them as `undefined` to avoid ReferenceError. Resolved bindings are emitted by their declarations; unvisited nodes safely remain unresolved
+function collectUnresolvedIdentifiers(program: Program): Set<string> {
+  const unresolved = new Set<string>();
   const visit = (node: KindedNode): void => {
-    switch (node.kind) {
-      case 'identifier':
-        if (node.name !== '$children') referenced.add(bindJsName(node));
-        break;
-      case 'variableDecl':
-        bound.add(bindJsName(node));
-        break;
-      case 'lambda':
-      case 'functionDecl':
-      case 'moduleDecl':
-        node.params.forEach(p => bound.add(bindJsName(p)));
-        break;
-      case 'let':
-      case 'lcLet':
-        node.assignments.forEach(a => bound.add(bindJsName(a)));
-        break;
-      case 'for':
-      case 'lcFor':
-        node.variables.forEach(v => bound.add(bindJsName(v)));
-        break;
-      case 'lcCFor':
-        node.inits.forEach(a => bound.add(bindJsName(a)));
-        node.updates.forEach(a => bound.add(bindJsName(a)));
-        break;
+    if (node.kind === 'identifier' && node.name !== '$children' &&
+        !node.binding) {
+      unresolved.add(bindJsName(node));
     }
     forEachChild(node, visit);
   };
-
   program.statements.forEach(visit);
-  return {referenced, bound};
+  return unresolved;
 }
 
 function resolveCallArgs(
@@ -864,6 +963,8 @@ export function compile(program: Program, options?: CompileOptions): string {
   externalVariableNames = new Set();
   tailTempCounter = 0;
   signatures.clear();
+  localDecls.clear();
+  noArgDemotions.clear();
   for (const [k, v] of Object.entries(BUILTIN_SIGNATURES)) {
     signatures.set(
         sigKey(k.replace(/\$mod$/, ''), 'mod'),
@@ -906,6 +1007,9 @@ export function compile(program: Program, options?: CompileOptions): string {
   assignPrettyNames(
       bindResult, {reserved: reservedNames(), externalSymbols});
   currentScope = bindResult.global;
+
+  // Needs resolved bindings, so it runs after binding and before any emission
+  analyzeNoArgSlots(program.statements);
 
   // Reject top-level constant-argument calls to non-tail recursive functions
   // that provably never terminate
@@ -1213,7 +1317,7 @@ export function compile(program: Program, options?: CompileOptions): string {
     }
   }
 
-  const {referenced} = collectIdentifierUsage(program);
+  const referenced = collectUnresolvedIdentifiers(program);
   const moduleLevelDeclared = new Set<string>([
     ...alreadyDeclaredAtTop,
     ...dynamicScopeVars,
@@ -1295,6 +1399,9 @@ export function compileLibrary(
   globalVarDeclKeyword = 'var';
 
   signatures.clear();
+  localDecls.clear();
+  // A library never sees its consumers, so no slot can be demoted here
+  noArgDemotions.clear();
   for (const [k, v] of Object.entries(BUILTIN_SIGNATURES)) {
     signatures.set(
         sigKey(k.replace(/\$mod$/, ''), 'mod'),
@@ -1553,7 +1660,7 @@ function emitLibraryFile(
 
   // Undefined fallbacks: referenced identifiers that aren't local, imported, a
   // builtin const, or a $-special. OpenSCAD resolves unknown reads to undef
-  const {referenced} = collectIdentifierUsage(program);
+  const referenced = collectUnresolvedIdentifiers(program);
   // Names this file already declares, under the names it actually emits them with everything else that is referenced needs an `undefined` fallback
   const declaredHere = (names: Set<string>, ns: Namespace) =>
       [...names].map(n => globalJsName(n, ns));
@@ -1733,11 +1840,12 @@ function compileDeclaration(
 
     case 'moduleDecl': {
       const dedup = deduplicateParams(stmt.params);
+      const declKey = sigKey(stmt.name, 'mod');
       const isDyn = (n: string) => n.startsWith('$') && n !== '$children';
       const renamedParams: string[] = [];
       const params =
           dedup
-              .map(p => {
+              .map((p, i) => {
                 const base = bindJsName(p);
                 const selfRef = !!p.defaultValue &&
                     nodeReferencesIdentifier(p.defaultValue, p.name);
@@ -1750,13 +1858,13 @@ function compileDeclaration(
                 } else {
                   pname = base;
                 }
-                if (paramUsesNoArg(p)) return `${pname}: any`;
+                if (slotUsesNoArg(declKey, p, i)) return `${pname}: any`;
                 return p.defaultValue ?
                     `${pname}: any = ${compileExpr(p.defaultValue)}` :
                     `${pname}: any`;
               })
               .join(', ');
-      const defaultsPrologue = emitNoArgDefaults(dedup, '  ');
+      const defaultsPrologue = emitNoArgDefaults(declKey, dedup, '  ');
       if (!dedup.some(p => p.name === stmt.name) &&
           moduleAlwaysRecurses(stmt.body, stmt.name)) {
         const base = currentMainFilename ? path.basename(currentMainFilename) :
@@ -1775,10 +1883,11 @@ function compileDeclaration(
 
     case 'functionDecl': {
       const dedup = deduplicateParams(stmt.params);
+      const declKey = sigKey(stmt.name, 'fn');
       const renamedParams: string[] = [];
       const params =
           dedup
-              .map(p => {
+              .map((p, i) => {
                 const base = bindJsName(p);
                 const selfRef = !!p.defaultValue &&
                     nodeReferencesIdentifier(p.defaultValue, p.name);
@@ -1787,7 +1896,7 @@ function compileDeclaration(
                   pname = `${base}__arg`;
                   renamedParams.push(base);
                 }
-                if (paramUsesNoArg(p)) return `${pname}: any`;
+                if (slotUsesNoArg(declKey, p, i)) return `${pname}: any`;
                 return p.defaultValue ?
                     `${pname}: any = ${compileExpr(p.defaultValue)}` :
                     `${pname}: any`;
@@ -1796,7 +1905,7 @@ function compileDeclaration(
       const localParams = dedup.map(bindJsName);
       const rebinds =
           renamedParams.map(n => `  let ${n}: any = ${n}__arg;\n`).join('');
-      const defaultsPrologue = emitNoArgDefaults(dedup, '  ');
+      const defaultsPrologue = emitNoArgDefaults(declKey, dedup, '  ');
       // Tail-recursive functions are lowered into an iterative loop so deep
       // recursion doesn't overflow
       if (!dedup.some(p => p.name === stmt.name) &&
@@ -1829,10 +1938,11 @@ function compileDeclaration(
 
 // Apply OpenSCAD defaults: missing or sentinel-filled args use the default,
 // while an explicit `undef` stays `undef`
-function emitNoArgDefaults(params: Param[], indent: string): string {
+function emitNoArgDefaults(
+    key: string, params: Param[], indent: string): string {
   let out = '';
   params.forEach((p, i) => {
-    if (!paramUsesNoArg(p)) return;
+    if (!slotUsesNoArg(key, p, i)) return;
     const pname = bindJsName(p);
     out += `${indent}if (${pname} === __NO_ARG || arguments.length <= ${i}) ${
         pname} = ${compileExpr(p.defaultValue!)};\n`;
@@ -4837,15 +4947,19 @@ function compileListComp(gen: ListCompGenerator): string {
       // Init values evaluate in the outer scope; the loop names shadow any
       // renamed outer locals for the condition, updates and body
       const inits =
-          gen.inits.map(a => `${bindJsName(a)} = ${compileExpr(a.value)}`)
-              .join(', ');
-      const loopNames = gen.inits.map(bindJsName);
+          gen.inits.map(a => `${bindJsName(a)} = ${compileExpr(a.value)}`);
+      const loopNames = new Set(gen.inits.map(bindJsName));
       const [cond, updates, inner] = ([compileExpr(gen.condition),
                gen.updates
                    .map(a => `${bindJsName(a)} = ${compileExpr(a.value)}`)
                    .join(', '),
                compileListComp(gen.body),
       ]);
+      // An update clause may introduce a name the init clause never declared.
+      // It belongs to the loop, so declare it alongside the init names instead
+      // of letting the assignment land on an outer binding
+      for (const name of new Set(gen.updates.map(bindJsName)))
+        if (!loopNames.has(name)) inits.push(`${name} = undefined`);
       // Abort the loop once its counter exceeds the limit
       const base = currentMainFilename ? path.basename(currentMainFilename) :
                                          '<unknown>';
@@ -4854,7 +4968,7 @@ function compileListComp(gen: ListCompGenerator): string {
           JSON.stringify(`ERROR: For loop counter exceeded limit in file ${
               base}, line ${line}`);
       return `(() => { const __r = []; let __fc = 0; for (let ${
-          inits}; __truthy(${cond}); ${updates}) { if (__fc++ >= ${
+          inits.join(', ')}; __truthy(${cond}); ${updates}) { if (__fc++ >= ${
           MAX_FOR_ITERATIONS}) throw new Error(${errMsg}); __r.push(...(${
           inner})); } return __r; })()`;
     }

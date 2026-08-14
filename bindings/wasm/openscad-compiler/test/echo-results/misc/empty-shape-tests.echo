@@ -1,3 +1,0 @@
-WARNING: Unable to convert points = undef to a vector of coordinates in file empty-shape-tests.scad, line 4
-WARNING: Unable to convert points = undef to a vector of coordinates in file empty-shape-tests.scad, line 10
-WARNING: Unable to convert translate(undef) parameter to a vec3 or vec2 of numbers in file empty-shape-tests.scad, line 14

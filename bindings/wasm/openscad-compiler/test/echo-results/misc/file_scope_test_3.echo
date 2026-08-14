@@ -1,7 +1,0 @@
-WARNING: Ignoring unknown variable "$foo" in file test_lib.scad, line 3
-ECHO: undef
-ECHO: 10
-WARNING: Ignoring unknown variable "$foo" in file file_scope_test_3.scad, line 5
-ECHO: undef
-WARNING: Ignoring unknown variable "bar" in file file_scope_test_3.scad, line 6
-ECHO: undef

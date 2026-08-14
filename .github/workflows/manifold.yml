@@ -631,7 +631,7 @@ jobs:
       run: |
         cd bindings/wasm/openscad-compiler
         npm i
-        npm test
+        npm run unzip-and-run-test
 
   determinism_check:
     name: Cross-platform determinism check

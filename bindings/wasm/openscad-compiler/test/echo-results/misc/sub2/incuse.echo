@@ -1,4 +1,0 @@
-WARNING: Ignoring unknown module 'unknownIncuse' in file incuse.scad, line 2
-WARNING: Ignoring unknown variable "xyz" in file ../sub1/errors-warnings-incuse.scad, line 2
-ECHO: undef
-WARNING: Ignoring unknown function 'test' in file ../sub1/errors-warnings-incuse.scad, line 3

@@ -1,11 +1,6 @@
 /node_modules
 .env
 .env.local
-/test/out
-/test/output.3mf
-/test/output.echo
 /runtime/runtime.js
 /runtime/*/
-/test/source-location-single.test.ts
-/test/semantic-single.test.ts
-/test/geometry-single.test.ts
+/test/
