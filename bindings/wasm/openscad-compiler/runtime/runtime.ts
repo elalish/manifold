@@ -15,23 +15,23 @@ const wasm = await Module();
 wasm.setup();
 const {Manifold, CrossSection} = wasm;
 
-function is_undef_fn(x: any): boolean | undefined {
+function is_undef_fn(x: any): boolean|undefined {
   return arguments.length === 1 ? (x === undefined || x === null) : undefined;
 }
-function is_bool_fn(x: any): boolean | undefined {
+function is_bool_fn(x: any): boolean|undefined {
   return arguments.length === 1 ? (typeof x === 'boolean') : undefined;
 }
-function is_num_fn(x: any): boolean | undefined {
+function is_num_fn(x: any): boolean|undefined {
   return arguments.length === 1 ? (typeof x === 'number' && !Number.isNaN(x)) :
                                   undefined;
 }
-function is_string_fn(x: any): boolean | undefined {
+function is_string_fn(x: any): boolean|undefined {
   return arguments.length === 1 ? (typeof x === 'string') : undefined;
 }
-function is_list_fn(x: any): boolean | undefined {
+function is_list_fn(x: any): boolean|undefined {
   return arguments.length === 1 ? Array.isArray(x) : undefined;
 }
-function is_function_fn(x: any): boolean | undefined {
+function is_function_fn(x: any): boolean|undefined {
   return arguments.length === 1 ? (typeof x === 'function') : undefined;
 }
 
@@ -85,7 +85,7 @@ function sin_fn(x: number): number {
   return oppose ? -x : x;
 }
 
-function cos_fn(x:  number): number {
+function cos_fn(x: number): number {
   if (x < 360.0 && x >= 0.0) {
     // already in range
   } else if (x < TRIG_HUGE_VAL && x > -TRIG_HUGE_VAL) {
@@ -2754,7 +2754,8 @@ function __cube(size: any, center = false): InstanceType<typeof Manifold> {
   return Manifold.cube(v as [number, number, number], center);
 }
 
-function __square(size: any, center = false): InstanceType<typeof CrossSection> {
+function __square(
+    size: any, center = false): InstanceType<typeof CrossSection> {
   // Invalid or `undef` `size` uses the default (1,1), while only valid but
   // degenerate sizes produce empty geometry
   let v: number[] = [1, 1];
@@ -2775,7 +2776,8 @@ function __square(size: any, center = false): InstanceType<typeof CrossSection> 
   return CrossSection.square(v as [number, number], center);
 }
 
-function __sphere(radius: any, fn = 0, fa = 12, fs = 2): InstanceType<typeof Manifold> {
+function __sphere(
+    radius: any, fn = 0, fa = 12, fs = 2): InstanceType<typeof Manifold> {
   // A non-finite (or non-positive) size produces no geometry instead of
   // crashing
   if (!Number.isFinite(radius) || radius <= 0) {
@@ -2878,7 +2880,8 @@ function __cylinder(
   return Manifold.cylinder(height, radiusLow, radiusHigh, segs, center);
 }
 
-function __circle(radius: number, fn = 0, fa = 12, fs = 2): InstanceType<typeof CrossSection> {
+function __circle(radius: number, fn = 0, fa = 12, fs = 2):
+    InstanceType<typeof CrossSection> {
   // Match OpenSCAD: a non-finite (or non-positive) radius produces no geometry.
   if (!Number.isFinite(radius) || radius <= 0) {
     return CrossSection.square(0);
@@ -2917,7 +2920,8 @@ function __forceWinding(
   return contour;
 }
 
-function __polygon(points: any, paths?: any): InstanceType<typeof CrossSection> {
+function __polygon(
+    points: any, paths?: any): InstanceType<typeof CrossSection> {
   if (!points || !Array.isArray(points) || points.length === 0) {
     return CrossSection.square(0);
   }
@@ -3137,7 +3141,8 @@ function gridFromText(text: string): {
   return {width, height, Z, minVal};
 }
 
-// Text matrices are parsed here, and images arrive already decoded from the compiler
+// Text matrices are parsed here, and images arrive already decoded from the
+// compiler
 function __surface(source: string|SurfaceImage, opts: {
   center?: boolean;
   invert?: boolean;
