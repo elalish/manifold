@@ -29,13 +29,8 @@
 #pragma once
 #include <atomic>
 #include <cstdint>
-#include <cstring>
 #include <memory>
 #include <type_traits>
-
-#if defined(_MSC_VER) && !defined(__clang__)
-#include <intrin.h>
-#endif
 
 #include "manifold/optional_assert.h"
 
@@ -52,6 +47,47 @@ namespace details {
 
 #if defined(_MSC_VER) && !defined(__clang__)  // MSVC backend
 
+// 32-bit MSVC keeps the pre-#1153 behavior. The intrinsics below are not all
+// available there (_InterlockedExchange64 and _InterlockedExchangeAdd64 are
+// documented for ARM/x64/ARM64 only), and __iso_volatile_load64/store64 are
+// not atomic on a 32-bit target - the compiler may split them into two 32-bit
+// accesses. Writing the CAS-loop workarounds MSVC STL uses would mean carrying
+// code no CI lane can compile, so instead this target falls back to exactly
+// what the tree did before: the reinterpret_cast to std::atomic. That is still
+// the undefined behavior #1153 is about, but it is the status quo rather than
+// a regression, and refusing to build would take away a working configuration.
+#if defined(_M_IX86) || defined(_M_ARM)
+#pragma message( \
+    "manifold: 32-bit MSVC keeps the pre-#1153 reinterpret_cast for atomics; build x64/ARM64 or /std:c++20 for the checked path")
+
+template <typename T>
+struct AtomicBackend {
+  static std::atomic<T>& Ref(T* p) {
+    return reinterpret_cast<std::atomic<T>&>(*p);
+  }
+  static T Load(T* p, std::memory_order order) { return Ref(p).load(order); }
+  static void Store(T* p, T desired, std::memory_order order) {
+    Ref(p).store(desired, order);
+  }
+  static T Exchange(T* p, T desired, std::memory_order order) {
+    return Ref(p).exchange(desired, order);
+  }
+  static bool CompareExchange(T* p, T& expected, T desired,
+                              std::memory_order order, bool weak) {
+    return weak ? Ref(p).compare_exchange_weak(expected, desired, order)
+                : Ref(p).compare_exchange_strong(expected, desired, order);
+  }
+  static T FetchAdd(T* p, T arg, std::memory_order order) {
+    return Ref(p).fetch_add(arg, order);
+  }
+};
+
+#else  // 64-bit MSVC: real intrinsics
+
+#include <intrin.h>
+
+#include <cstring>
+
 // One integer width per object size, reached through memcpy so the same code
 // serves `double` as well as the integer types. The read-modify-write
 // intrinsics are all full barriers, so a weaker requested order is satisfied
@@ -62,9 +98,10 @@ struct MsvcAtomic;
 // On ARM this is a fence-based mapping (ldr + dmb) where MSVC's std::atomic
 // uses ldar/stlr. The two interoperate because MSVC's seq_cst store ends in a
 // full dmb, but nothing here relies on that: no AtomicRef operation needs to
-// share the seq_cst total order with a std::atomic one. The only std::atomic
-// beside AtomicRef data is HashTableD::used_, relaxed on every concurrent
-// path. Ordering the two would need checking against that mapping first.
+// share the seq_cst total order with a std::atomic one. HashTableD is the only
+// structure that mixes the two - its used_ counter sits beside AtomicRef-
+// accessed keys - and it reads used_ relaxed on every concurrent path.
+// Ordering the two would need checking against that mapping first.
 //
 // MSVC's own _Compiler_or_memory_barrier: on x86/x64 the hardware already
 // orders loads, so acquire and seq_cst need only a compiler barrier, and
@@ -170,6 +207,8 @@ struct AtomicBackend {
     return FromInt(MsvcAtomic<sizeof(T)>::Add(AsInt(p), ToInt(arg)));
   }
 };
+
+#endif  // 32-bit MSVC fallback
 
 #else  // GCC/Clang backend
 
@@ -278,8 +317,11 @@ struct AtomicBackend {
  * to it every access must go through one.
  *
  * Memory orders are honored exactly on GCC/Clang, matching what the C++20
- * alias does. MSVC's read-modify-write intrinsics are all full barriers, so
- * there a weaker request is satisfied by being stronger, never weaker.
+ * alias does. On MSVC the read-modify-write intrinsics are all full barriers,
+ * so a weaker request is satisfied by being stronger. `Load` is the exception:
+ * a plain load plus a trailing fence, exact on x86/x64, and on ARM64 an
+ * acquire load that serves as seq_cst only because the store side goes through
+ * the full-barrier _InterlockedExchange.
  */
 template <typename T>
 class AtomicRef {

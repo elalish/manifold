@@ -66,7 +66,8 @@ void Permute(std::vector<T>& inOut, const Vec<T1>& new2Old) {
 // Floating-point accumulation, since fetch_add takes integers only. The
 // relaxed seed and relaxed failure order are what libstdc++'s __fetch_add_flt
 // and libc++'s floating-point fetch_add both use: only the successful exchange
-// needs to synchronize.
+// needs to synchronize. The C++20 alias honors the failure order; the C++17
+// backend derives one from the success order instead, which is never weaker.
 template <typename T>
 T AtomicAdd(T& target, T add) {
   AtomicRef<T> tar(target);

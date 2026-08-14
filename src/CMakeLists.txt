@@ -44,6 +44,7 @@ set(
   MANIFOLD_PRIVATE_HDRS
   boolean2.h
   boolean2_diagnostics.h
+  atomic_compat.h
   boolean3.h
   collider.h
   csg_tree.h

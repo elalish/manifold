@@ -139,6 +139,7 @@ TEST(Utils, AtomicRefCompareExchangeReportsCurrentValue) {
 // exercise every width plus a non-integer type.
 template <typename T>
 void ExpectRoundTrip(T a, T b) {
+  SCOPED_TRACE(testing::Message() << "sizeof(T) = " << sizeof(T));
   T value = a;
   AtomicRef<T> ref(value);
   EXPECT_EQ(ref.load(), a);

@@ -14,6 +14,7 @@
 
 #include <algorithm>
 
+#include "atomic_compat.h"
 #include "boolean3.h"
 #include "csg_tree.h"
 #include "execution_impl.h"
