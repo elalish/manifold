@@ -4,9 +4,9 @@ import path from 'path';
 
 import {forEachChild} from './ast.js';
 import type {Argument, ASTNode, BlockStmt, Comment, Expr, ForStmt, ForVariable, IfStmt, KindedNode, ListCompGenerator, ModuleCallStmt, Program, ScopeStmt, Statement,} from './ast.js';
-import type {IRBooleanNode, IRChildrenNode, IRForNode, IRIfNode, IRModuleCallNode, IRNode, IRPrimitiveNode, IRSequenceNode, IRTransformNode,} from './ir.js';
 import {assignPrettyNames, bindLibrary, bindProgram, escapeName, isLexicalVar, lookup, shadowsOuterVar,} from './binder.js';
-import type {BindOptions, BindResult, Binding, CallRef, Namespace, Scope,} from './binder.js';
+import type {Binding, BindOptions, BindResult, CallRef, Namespace, Scope,} from './binder.js';
+import type {IRBooleanNode, IRChildrenNode, IRForNode, IRIfNode, IRModuleCallNode, IRNode, IRPrimitiveNode, IRSequenceNode, IRTransformNode,} from './ir.js';
 import {getFontPath} from './resolver.js';
 import type {LibraryClosure} from './resolver.js';
 
@@ -29,10 +29,10 @@ export interface LibraryManifest {
     variables: Record<string, string>;  // variable name -> owning source file
   };
   ambiguous: Record<string, string[]>;
-  // Emitted JS symbol for each export. Needed because a library picks its own names, and a consumer importing them cannot re-derive what it chose
+  // Emitted JS symbol for each export. Needed because a library picks its own
+  // names, and a consumer importing them cannot re-derive what it chose
   symbols?: {
-    modules: Record<string, string>;
-    functions: Record<string, string>;
+    modules: Record<string, string>; functions: Record<string, string>;
     variables: Record<string, string>;
   };
   signatures: Record<string, string[]>;
@@ -53,8 +53,7 @@ export interface CompileOptions {
   externalLibraries?: ResolvedExternalLib[];
 }
 
-const BUILTIN_CONSTANTS_CODE =
-    `let PI: number = __rt.PI;\n` +
+const BUILTIN_CONSTANTS_CODE = `let PI: number = __rt.PI;\n` +
     `let INF: number = __rt.INF;\n` +
     `let NAN: number = __rt.NAN;\n` +
     `let undef: undefined = __rt.undef;\n` +
@@ -216,7 +215,8 @@ function slotUsesNoArg(key: string, p: Param, i: number): boolean {
   return paramUsesNoArg(p) && !noArgDemotions.get(key)?.[i];
 }
 
-// Drops __NO_ARG prologues when call sites can't observe omitted vs `undef`. Only safe with whole-program knowledge; libraries keep the prologue.
+// Drops __NO_ARG prologues when call sites can't observe omitted vs `undef`.
+// Only safe with whole-program knowledge; libraries keep the prologue.
 function analyzeNoArgSlots(stmts: Statement[]): void {
   const open = new Map<string, boolean[]>();
   for (const [key, decl] of localDecls) {
@@ -384,8 +384,9 @@ function generateFontBase64(fontSpec: string, compilerDir: string): string|
     undefined {
   const fontDir = getFontPath();
   if (!fontDir) {
-    console.warn(`Warning: FONTPATH environment variable not set — cannot load font "${
-        fontSpec}". Text will render as empty cross-section.`);
+    console.warn(
+        `Warning: FONTPATH environment variable not set — cannot load font "${
+            fontSpec}". Text will render as empty cross-section.`);
     return undefined;
   }
 
@@ -469,8 +470,8 @@ const BUILTIN_SIGNATURES: Record<string, string[]> = {
 function collectSignatures(stmts: Statement[]) {
   for (const stmt of stmts) {
     if (stmt.kind === 'functionDecl' || stmt.kind === 'moduleDecl') {
-      const name = sigKey(
-          stmt.name, stmt.kind === 'functionDecl' ? 'fn' : 'mod');
+      const name =
+          sigKey(stmt.name, stmt.kind === 'functionDecl' ? 'fn' : 'mod');
       signatures.set(name, {
         params: stmt.params.map(p => p.name),
         defaults: stmt.params.map(p => p.defaultValue),
@@ -810,7 +811,9 @@ function collectStringLiterals(node: KindedNode, literals: Set<string>): void {
   forEachChild(node, child => collectStringLiterals(child, literals));
 }
 
-// Unresolved value reads evaluate to `undef` in OpenSCAD, so emit them as `undefined` to avoid ReferenceError. Resolved bindings are emitted by their declarations; unvisited nodes safely remain unresolved
+// Unresolved value reads evaluate to `undef` in OpenSCAD, so emit them as
+// `undefined` to avoid ReferenceError. Resolved bindings are emitted by their
+// declarations; unvisited nodes safely remain unresolved
 function collectUnresolvedIdentifiers(program: Program): Set<string> {
   const unresolved = new Set<string>();
   const visit = (node: KindedNode): void => {
@@ -861,8 +864,8 @@ function resolveCallArgs(
 
 function collectFontRelatedLiterals(program: Program): Set<string> {
   const modulesCallingText = new Set<string>(['text']);
-  const flatten = (stmts: Statement[]): Statement[] => stmts.flatMap(
-      s => s.kind === 'scope' ? flatten(s.statements) : [s]);
+  const flatten = (stmts: Statement[]): Statement[] =>
+      stmts.flatMap(s => s.kind === 'scope' ? flatten(s.statements) : [s]);
   const topLevel = flatten(program.statements);
 
   let changed = true;
@@ -1004,8 +1007,7 @@ export function compile(program: Program, options?: CompileOptions): string {
     for (const [n, sym] of Object.entries(syms.variables))
       externalSymbols.set(`var:${n}`, sym);
   }
-  assignPrettyNames(
-      bindResult, {reserved: reservedNames(), externalSymbols});
+  assignPrettyNames(bindResult, {reserved: reservedNames(), externalSymbols});
   currentScope = bindResult.global;
 
   // Needs resolved bindings, so it runs after binding and before any emission
@@ -1420,10 +1422,10 @@ export function compileLibrary(
   // library's own include/use graph
   const libBind = bindLibrary(
       sourceRels.map(rel => ({
-                      rel,
-                      program: closure.files.get(rel)!,
-                      edges: closure.edges.get(rel) ?? [],
-                    })),
+                       rel,
+                       program: closure.files.get(rel)!,
+                       edges: closure.edges.get(rel) ?? [],
+                     })),
       closure.entryRels, currentBindOptions());
   bindResult = libBind;
   assignPrettyNames(libBind, {reserved: reservedNames()});
@@ -1469,8 +1471,9 @@ export function compileLibrary(
         ambiguous[key].push(rel);
       }
       map.set(dk.name, rel);  // last-wins
-      const ns: Namespace =
-          dk.kind === 'module' ? 'mod' : dk.kind === 'function' ? 'fn' : 'var';
+      const ns: Namespace = dk.kind === 'module' ? 'mod' :
+          dk.kind === 'function'                 ? 'fn' :
+                                                   'var';
       manifestSymbols[dk.kind === 'module' ? 'modules' :
                           dk.kind === 'function' ? 'functions' :
                                                    'variables'][dk.name] =
@@ -1543,8 +1546,7 @@ function emitLibraryFile(
     outRel: string,
     program: Program,
     ctx: {
-      deps: string[];
-      outRelOf: (sourceRel: string) => string;
+      deps: string[]; outRelOf: (sourceRel: string) => string;
       runtimePath: string;
       scope?: Scope | undefined;
     },
@@ -1617,7 +1619,9 @@ function emitLibraryFile(
     set.add(sym);
   };
 
-  // A reference reaches another file only when it resolves, in this file's scope, to a binding that another file declares. A name resolving to a builtin or to nothing, is never imported
+  // A reference reaches another file only when it resolves, in this file's
+  // scope, to a binding that another file declares. A name resolving to a
+  // builtin or to nothing, is never imported
   const importIfForeign = (name: string, ns: Namespace): Binding|null => {
     const b = ctx.scope ? lookup(ctx.scope, name, ns) : null;
     if (!b || b.kind === 'builtin' || b.kind === 'external') return null;
@@ -1661,9 +1665,10 @@ function emitLibraryFile(
   // Undefined fallbacks: referenced identifiers that aren't local, imported, a
   // builtin const, or a $-special. OpenSCAD resolves unknown reads to undef
   const referenced = collectUnresolvedIdentifiers(program);
-  // Names this file already declares, under the names it actually emits them with everything else that is referenced needs an `undefined` fallback
-  const declaredHere = (names: Set<string>, ns: Namespace) =>
-      [...names].map(n => globalJsName(n, ns));
+  // Names this file already declares, under the names it actually emits them
+  // with everything else that is referenced needs an `undefined` fallback
+  const declaredHere = (names: Set<string>, ns: Namespace) => [...names].map(
+      n => globalJsName(n, ns));
   const localDeclared = new Set<string>([
     ...declaredHere(ownNames.variable, 'var'),
     ...declaredHere(ownNames.module, 'mod'),
@@ -1724,8 +1729,14 @@ const PRE_DECLARED_VARS = new Set([
   '$preview', '$color', '$idx', 'PI', 'INF', 'NAN', 'undef', '_EPSILON'
 ]);
 
-// Emit a `use`d file's scope as a JS scope of its own. The file's top-level variables become plain bindings inside an IIFE, so they keep their OpenSCAD names and are private by construction: the consumer has no way to reach them and no way to shadow them. The modules and functions declared alongside them close over those bindings and are returned, for the caller to publish under their global names.
-function compileUsedFileScope(scope: ScopeStmt, unitName: string): {code: string; exports: string[]} {
+// Emit a `use`d file's scope as a JS scope of its own. The file's top-level
+// variables become plain bindings inside an IIFE, so they keep their OpenSCAD
+// names and are private by construction: the consumer has no way to reach them
+// and no way to shadow them. The modules and functions declared alongside them
+// close over those bindings and are returned, for the caller to publish under
+// their global names.
+function compileUsedFileScope(
+    scope: ScopeStmt, unitName: string): {code: string; exports: string[]} {
   // `$` variables never reach here (they stay dynamically scoped) and the
   // pre-declared names refer to the program-wide bindings, so neither becomes
   // private to the file.
@@ -1770,8 +1781,8 @@ function compileUsedFileScope(scope: ScopeStmt, unitName: string): {code: string
 
     const lines = [`const ${unitName} = (() => {`];
     if (privateNames.length) {
-      lines.push(`  let ${
-          privateNames.map(n => `${n}: any = undef`).join(', ')};`);
+      lines.push(
+          `  let ${privateNames.map(n => `${n}: any = undef`).join(', ')};`);
     }
     for (const k of declOrder) {
       lines.push('  ' + declCode.get(k)!.split('\n').join('\n  '));
@@ -1788,13 +1799,15 @@ function legacyJsName(name: string, ns: Namespace): string {
   return ns === 'fn' ? `${base}_fn` : ns === 'mod' ? `${base}$mod` : base;
 }
 
-// The JS name of a bound parameter, let binding or loop variable. Comes from the binder
-function bindJsName(node: {name: string; binding?: Binding|null|undefined}):
+// The JS name of a bound parameter, let binding or loop variable. Comes from
+// the binder
+function bindJsName(node: {name: string; binding?: Binding | null | undefined}):
     string {
   return node.binding ? node.binding.jsName : escapeName(node.name);
 }
 
-// Scope that top-level names resolve in for the unit currently being emitted: the program's global scope, or the current file's scope inside a library.
+// Scope that top-level names resolve in for the unit currently being emitted:
+// the program's global scope, or the current file's scope inside a library.
 let currentScope: Scope|undefined;
 
 function globalJsName(name: string, ns: Namespace): string {
@@ -1803,7 +1816,7 @@ function globalJsName(name: string, ns: Namespace): string {
 }
 
 function declJsName(
-    stmt: {name: string; binding?: Binding|undefined},
+    stmt: {name: string; binding?: Binding | undefined},
     ns: Namespace): string {
   if (stmt.binding) return stmt.binding.jsName;
   const base = escapeName(stmt.name);
@@ -1919,12 +1932,11 @@ function compileDeclaration(
               stmt.name}' in file ${base}, line ${line}`);
         }
         const loopBody = (emitTailBody(stmt.body, stmt.name, dedup, '    '));
-        return withLeading(`function ${declJsName(stmt, 'fn')}(${
-            params}): any {\n${rebinds}${defaultsPrologue}  while (true) {\n${
-            loopBody}\n  }\n}`);
+        return withLeading(
+            `function ${declJsName(stmt, 'fn')}(${params}): any {\n${rebinds}${
+                defaultsPrologue}  while (true) {\n${loopBody}\n  }\n}`);
       }
-      const bodyExpr =
-          (compileExpr(stmt.body));
+      const bodyExpr = (compileExpr(stmt.body));
       return withLeading(
           `function ${declJsName(stmt, 'fn')}(${params}): any {\n${rebinds}${
               defaultsPrologue}  return ${bodyExpr};\n}`);
@@ -2152,7 +2164,7 @@ function detectDivergentCalls(stmts: Statement[]): void {
     }
     forEachChild(expr, child => visitExpr(child as Expr));
   };
-  
+
   const visitStmt = (s: Statement): void => {
     switch (s.kind) {
       case 'variableDecl':
@@ -2592,7 +2604,6 @@ const IR_TRANSFORMS = new Set([
 
 const IR_BOOLEANS =
     new Set(['union', 'difference', 'intersection', 'hull', 'minkowski']);
-
 
 
 
@@ -3260,8 +3271,7 @@ function compileGeometryDispatch(stmt: Statement): string {
 function compileModuleCall(stmt: ModuleCallStmt): string {
   const dollarArgs =
       stmt.args.filter(arg => arg.name && arg.name.startsWith('$'));
-  const userSig =
-      signatures.get(sigKey(stmt.name, 'mod'));
+  const userSig = signatures.get(sigKey(stmt.name, 'mod'));
   const extraArgs = (moduleDeclRegistry.has(stmt.name) && userSig) ?
       stmt.args.filter(
           a => a.name && !a.name.startsWith('$') &&
@@ -3618,9 +3628,8 @@ function compileText(args: Argument[]): string {
   const fnStr = fn ? compileExpr(fn.value) : `__ctx.$fn`;
 
   // Track font for base64 generation and resolve variable name.
-  const rawFontSpec = font && font.value.kind === 'string' ?
-      font.value.value :
-      DEFAULT_FONT_SPEC;
+  const rawFontSpec = font && font.value.kind === 'string' ? font.value.value :
+                                                             DEFAULT_FONT_SPEC;
   encounteredFonts.add(rawFontSpec);
   const filename = fontSpecToFilename(rawFontSpec);
   console.log('Font file name: ', filename);
@@ -3739,8 +3748,7 @@ function isSideEffectOnlyModule(s: Statement): boolean {
 
 function collectChildrenWithDecls(
     stmt: ModuleCallStmt, sideEffectsAsChildren = false):
-    {decls: string[]; geos: string[];
-     dollars: {name: string; code: string}[]} {
+    {decls: string[]; geos: string[]; dollars: {name: string; code: string}[]} {
   if (!stmt.child) return {decls: [], geos: [], dollars: []};
   if (stmt.child.kind === 'block') {
     return compileBlockStatementsWithDecls(
@@ -3757,8 +3765,7 @@ function collectChildrenWithDecls(
 
 function compileBlockStatementsWithDecls(
     stmts: Statement[], sideEffectsAsChildren = false):
-    {decls: string[]; geos: string[];
-     dollars: {name: string; code: string}[]} {
+    {decls: string[]; geos: string[]; dollars: {name: string; code: string}[]} {
   const varDecls = new Map < string, {
     code: string;
     order: number
@@ -3778,8 +3785,10 @@ function compileBlockStatementsWithDecls(
         if (s.name.startsWith('$') && s.name !== '$children') {
           const prior = dollars.findIndex(d => d.name === name);
           const entry = {name, code: compileExpr(s.value)};
-          if (prior >= 0) dollars[prior] = entry;
-          else dollars.push(entry);
+          if (prior >= 0)
+            dollars[prior] = entry;
+          else
+            dollars.push(entry);
           continue;
         }
         const code = `${leadingCommentLines(s).join('\n')}${
@@ -3820,8 +3829,8 @@ function wrapDollarScope(
     const t = svTarget(d.name);
     if (out.includes('await ')) {
       out = `await (async () => { let __save_${d.name}: any = ${t}; ${t} = ${
-          d.code}; try { return await ${
-          returnExpr(out, '  ')}; } finally { ${t} = __save_${d.name}; } })()`;
+          d.code}; try { return await ${returnExpr(out, '  ')}; } finally { ${
+          t} = __save_${d.name}; } })()`;
     } else {
       out = `(() => { let __save_${d.name}: any = ${t}; ${t} = ${
           d.code}; try { return ${returnExpr(out, '  ')}; } finally { ${
@@ -4339,10 +4348,11 @@ export function compileSurface(args: Argument[]): string {
   }
   const filenameStr = file.value.value;
 
-  // OpenSCAD resolves a surface() file relative to the .scad file that contains the call
+  // OpenSCAD resolves a surface() file relative to the .scad file that contains
+  // the call
   const sourceFile = currentSourceFilename || currentMainFilename;
-  const basePath = sourceFile ? path.dirname(path.resolve(sourceFile)) :
-                                process.cwd();
+  const basePath =
+      sourceFile ? path.dirname(path.resolve(sourceFile)) : process.cwd();
   const filePath = path.resolve(basePath, filenameStr);
   if (!fs.existsSync(filePath)) {
     console.warn(`Warning: surface("${filenameStr}"): can't open file "${
@@ -4383,7 +4393,7 @@ export function compileSurface(args: Argument[]): string {
         `// ${pixels.width}x${pixels.height}, base64 of 3 bytes (RGB) per ` +
         `pixel, row-major from the top-left\n` +
         `export const ${exportName} = { width: ${pixels.width}, height: ${
-            pixels.height}, rgb: "${pixels.rgb}" };\n`;
+                          pixels.height}, rgb: "${pixels.rgb}" };\n`;
 
     fs.writeFileSync(
         path.join(surfaceDataDir, `${stem}_data.ts`), tsContent, 'utf8');
@@ -4543,15 +4553,13 @@ function compileExpr(expr: Expr): string {
     }
     case 'let': {
       const localAssignNames =
-          expr.assignments.filter(a => !a.name.startsWith('$'))
-              .map(bindJsName);
+          expr.assignments.filter(a => !a.name.startsWith('$')).map(bindJsName);
       return (() => {
         const bound: string[] = [];
         const vals = expr.assignments.map(a => {
           const selfRec = a.value.kind === 'lambda' && !a.name.startsWith('$');
           const suppress = selfRec ? [...bound, bindJsName(a)] : bound;
-          const val =
-              (compileExpr(a.value));
+          const val = (compileExpr(a.value));
           if (!a.name.startsWith('$')) bound.push(bindJsName(a));
           return val;
         });
@@ -4591,14 +4599,13 @@ function compileExpr(expr: Expr): string {
       const params =
           expr.params
               .map(
-                  p => p.defaultValue ? `${bindJsName(p)} = ${
-                                            compileExpr(p.defaultValue)}` :
-                                        bindJsName(p))
+                  p => p.defaultValue ?
+                      `${bindJsName(p)} = ${compileExpr(p.defaultValue)}` :
+                      bindJsName(p))
               .join(', ');
       // Compile the body in tail position so tail calls through function
       // values become `__tc` thunks the trampoline can drive iteratively
-      const bodyExpr =
-          (compileExprTail(expr.body));
+      const bodyExpr = (compileExprTail(expr.body));
 
       return `__fnlit((${params}) => ${bodyExpr}, ${
           JSON.stringify(oscadSource(expr))})`;
@@ -4737,20 +4744,17 @@ function compileExprTail(expr: Expr): string {
     }
     case 'let': {
       const localAssignNames =
-          expr.assignments.filter(a => !a.name.startsWith('$'))
-              .map(bindJsName);
+          expr.assignments.filter(a => !a.name.startsWith('$')).map(bindJsName);
       return (() => {
         const bound: string[] = [];
         const vals = expr.assignments.map(a => {
           const selfRec = a.value.kind === 'lambda' && !a.name.startsWith('$');
           const suppress = selfRec ? [...bound, bindJsName(a)] : bound;
-          const val =
-              (compileExpr(a.value));
+          const val = (compileExpr(a.value));
           if (!a.name.startsWith('$')) bound.push(bindJsName(a));
           return val;
         });
-        let result =
-            (compileExprTail(expr.body));
+        let result = (compileExprTail(expr.body));
         for (let i = expr.assignments.length - 1; i >= 0; i--) {
           const a = expr.assignments[i]!;
           const name = bindJsName(a);
@@ -4790,13 +4794,14 @@ function compileExprTail(expr: Expr): string {
 
 function compileCallExpr(
     expr: {
-      kind: 'call'; name: string; args: Argument[]; loc?: ASTNode['loc'];
+      kind: 'call'; name: string; args: Argument[];
+      loc?: ASTNode['loc'];
       ref?: CallRef | undefined;
     },
     tail = false): string {
   const escaped = escapeName(expr.name);
-  const isKnownFunction =
-      BUILTIN_FUNCTIONS.has(expr.name) || signatures.has(sigKey(expr.name, 'fn'));
+  const isKnownFunction = BUILTIN_FUNCTIONS.has(expr.name) ||
+      signatures.has(sigKey(expr.name, 'fn'));
 
   // A call to a name that is not a builtin, a user/external function, a local
   // binding, or a variable that might hold a function literal is an unknown
@@ -4848,7 +4853,8 @@ function compileCallExpr(
   const call = dualDispatch ?
       (() => {
         // A call through a value has no declared signature to match against.
-        const valueArgList = compileArgList(sigKey(expr.name, 'var'), positionalArgs);
+        const valueArgList =
+            compileArgList(sigKey(expr.name, 'var'), positionalArgs);
         return `(typeof ${valueName} === "function" ? ${
             tail ? '__tc' : '__call'}(${valueName}${
             valueArgList ? `, ${valueArgList}` : ''}) : ${name}(${argList}))`;
@@ -4886,13 +4892,14 @@ function compileListComp(gen: ListCompGenerator): string {
       // same name
       const bound: string[] = [];
       const ranges = gen.variables.map(v => {
-        const parts = (v.range.kind === 'range' ?
-                [
-                  compileExpr(v.range.start),
-                  v.range.step ? compileExpr(v.range.step) : '1',
-                  compileExpr(v.range.end)
-                ] :
-                [compileExpr(v.range)]);
+        const parts =
+            (v.range.kind === 'range' ?
+                 [
+                   compileExpr(v.range.start),
+                   v.range.step ? compileExpr(v.range.step) : '1',
+                   compileExpr(v.range.end)
+                 ] :
+                 [compileExpr(v.range)]);
         bound.push(bindJsName(v));
         return parts;
       });
@@ -4949,11 +4956,11 @@ function compileListComp(gen: ListCompGenerator): string {
       const inits =
           gen.inits.map(a => `${bindJsName(a)} = ${compileExpr(a.value)}`);
       const loopNames = new Set(gen.inits.map(bindJsName));
-      const [cond, updates, inner] = ([compileExpr(gen.condition),
-               gen.updates
-                   .map(a => `${bindJsName(a)} = ${compileExpr(a.value)}`)
-                   .join(', '),
-               compileListComp(gen.body),
+      const [cond, updates, inner] = ([
+        compileExpr(gen.condition),
+        gen.updates.map(a => `${bindJsName(a)} = ${compileExpr(a.value)}`)
+            .join(', '),
+        compileListComp(gen.body),
       ]);
       // An update clause may introduce a name the init clause never declared.
       // It belongs to the loop, so declare it alongside the init names instead

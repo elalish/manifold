@@ -265,8 +265,8 @@ export type KindedNode = Expr|Statement|ListCompGenerator|Program;
 type NodeOfKind<K extends KindedNode['kind']> = Extract<KindedNode, {kind: K}>;
 
 // The child-bearing fields of each node kind.
-const CHILD_KEYS: {[K in KindedNode['kind']]: readonly(keyof NodeOfKind<K>)[]} =
-    {
+const CHILD_KEYS:
+    {[K in KindedNode['kind']]: readonly(keyof NodeOfKind<K>)[]} = {
       // Expressions
       number: [],
       string: [],
@@ -283,7 +283,7 @@ const CHILD_KEYS: {[K in KindedNode['kind']]: readonly(keyof NodeOfKind<K>)[]} =
       member: ['object'],
       group: ['expr'],
       echo: ['args', 'expr'],
-      let: ['assignments', 'body'],
+      let : ['assignments', 'body'],
       assert: ['args', 'expr'],
       listComp: ['generator'],
       each: ['expr'],

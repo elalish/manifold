@@ -62,38 +62,22 @@ export enum TokenType {
 // Operator and punctuation lexemes. This single table
 // drives both lexing (text -> TokenType) and printing (TokenType -> text)
 const OPERATOR_TABLE: ReadonlyArray<readonly[string, TokenType]> = [
-  ['(', TokenType.LParen],
-  [')', TokenType.RParen],
-  ['[', TokenType.LBracket],
-  [']', TokenType.RBracket],
-  ['{', TokenType.LBrace],
-  ['}', TokenType.RBrace],
-  [',', TokenType.Comma],
-  [';', TokenType.Semicolon],
-  [':', TokenType.Colon],
-  ['#', TokenType.Hash],
-  ['=', TokenType.Equals],
-  ['+', TokenType.Plus],
-  ['-', TokenType.Minus],
-  ['*', TokenType.Star],
-  ['/', TokenType.Slash],
-  ['%', TokenType.Percent],
-  ['^', TokenType.Caret],
-  ['<', TokenType.Lt],
-  ['>', TokenType.Gt],
-  ['<=', TokenType.LtEq],
-  ['>=', TokenType.GtEq],
-  ['==', TokenType.EqEq],
-  ['!=', TokenType.BangEq],
-  ['&&', TokenType.And],
-  ['||', TokenType.Or],
-  ['!', TokenType.Bang],
-  ['&', TokenType.Amp],
-  ['|', TokenType.Pipe],
-  ['~', TokenType.Tilde],
-  ['<<', TokenType.Shl],
-  ['>>', TokenType.Shr],
-  ['.', TokenType.Dot],
+  ['(', TokenType.LParen],   [')', TokenType.RParen],
+  ['[', TokenType.LBracket], [']', TokenType.RBracket],
+  ['{', TokenType.LBrace],   ['}', TokenType.RBrace],
+  [',', TokenType.Comma],    [';', TokenType.Semicolon],
+  [':', TokenType.Colon],    ['#', TokenType.Hash],
+  ['=', TokenType.Equals],   ['+', TokenType.Plus],
+  ['-', TokenType.Minus],    ['*', TokenType.Star],
+  ['/', TokenType.Slash],    ['%', TokenType.Percent],
+  ['^', TokenType.Caret],    ['<', TokenType.Lt],
+  ['>', TokenType.Gt],       ['<=', TokenType.LtEq],
+  ['>=', TokenType.GtEq],    ['==', TokenType.EqEq],
+  ['!=', TokenType.BangEq],  ['&&', TokenType.And],
+  ['||', TokenType.Or],      ['!', TokenType.Bang],
+  ['&', TokenType.Amp],      ['|', TokenType.Pipe],
+  ['~', TokenType.Tilde],    ['<<', TokenType.Shl],
+  ['>>', TokenType.Shr],     ['.', TokenType.Dot],
   ['?', TokenType.Question],
 ];
 
@@ -271,7 +255,8 @@ export class Lexer {
       return this.readString(start);
     }
 
-    // Prefer the two-character lexeme, then fall back to the single-character one.
+    // Prefer the two-character lexeme, then fall back to the single-character
+    // one.
     for (const lexeme of [ch + this.peekNext(), ch]) {
       const type = OPERATOR_TYPES.get(lexeme);
       if (type !== undefined) {

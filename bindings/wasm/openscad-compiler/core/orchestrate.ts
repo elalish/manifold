@@ -44,7 +44,10 @@ export function ensureLibraryCompiled(
     const relOf = (abs: string) =>
         path.relative(ref.root, abs).replace(/\\/g, '/');
     const missing = ref.entries.filter(e => !(relOf(e.file) in manifest.files));
-    // Emitted code is tied to the runtime it was compiled against, so a version change invalidates every cached file regardless of coverage. The manifest's own shape is versioned too, since its signature keys are read back by the consumer
+    // Emitted code is tied to the runtime it was compiled against, so a version
+    // change invalidates every cached file regardless of coverage. The
+    // manifest's own shape is versioned too, since its signature keys are read
+    // back by the consumer
     staleRuntime = manifest.runtimeVersion !== runtimeVersion ||
         (manifest.manifestVersion ?? 1) !== MANIFEST_VERSION;
     if (!staleRuntime && missing.length === 0) {
@@ -54,12 +57,12 @@ export function ensureLibraryCompiled(
     }
     priorFiles =
         Object.keys(manifest.files).map(rel => path.join(ref.root, rel));
-    log(staleRuntime ? `Library ${ref.name}: cached build targets runtime ${
-                           manifest.runtimeVersion ?? 'unknown'}, current is ${
-                           runtimeVersion}; recompiling...` :
-                       `Library ${ref.name}: cache is missing ${
-                           missing.map(e => relOf(e.file)).join(', ')
-                       }; recompiling...`);
+    log(staleRuntime ?
+            `Library ${ref.name}: cached build targets runtime ${
+                manifest.runtimeVersion ??
+                'unknown'}, current is ${runtimeVersion}; recompiling...` :
+            `Library ${ref.name}: cache is missing ${
+                missing.map(e => relOf(e.file)).join(', ')}; recompiling...`);
   } else {
     log(`Library ${ref.name}: compiling...`);
   }
@@ -76,7 +79,8 @@ export function ensureLibraryCompiled(
 
   const compiled = compileLibrary(closure, {runtimeVersion, runtimePathFor});
 
-  // Clear out any output the new build does not overwrite by name, so nothing emitted by the old version of compiler
+  // Clear out any output the new build does not overwrite by name, so nothing
+  // emitted by the old version of compiler
   if (staleRuntime) fs.rmSync(libDir, {recursive: true, force: true});
   fs.mkdirSync(libDir, {recursive: true});
   for (const f of compiled.files) {

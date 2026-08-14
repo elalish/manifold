@@ -23,14 +23,15 @@ function getAllScadFiles(dir: string, baseDir: string = dir): string[] {
 
 
 compileAllCommand.name('compile-all')
-    .description('Compile all OpenSCAD files in the given input directory to given output directory')
+    .description(
+        'Compile all OpenSCAD files in the given input directory to given output directory')
     .option('--input <input>', 'Input directory path')
     .option('--output <output>', 'Output directory path')
     .action((options) => {
       try {
         const inputDir = options.input || 'test/examples';
         const outputDir = options.output || 'test/out';
-        
+
         const allFiles = getAllScadFiles(inputDir);
         console.log('All files to compile:', allFiles);
 

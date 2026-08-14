@@ -44,7 +44,8 @@ export function getOpenSCADLibraryPaths(): string[] {
   return paths.filter(p => fs.existsSync(p));
 }
 
-// Keep only what a `use` imports. OpenSCAD compiles the used file separately and takes just its declarations, so its top-level actions never run
+// Keep only what a `use` imports. OpenSCAD compiles the used file separately
+// and takes just its declarations, so its top-level actions never run
 function importableDecls(stmts: Statement[]): Statement[] {
   return stmts.filter(
       s => s.kind === 'moduleDecl' || s.kind === 'functionDecl' ||
@@ -75,7 +76,9 @@ function parseFile(code: string, absPath: string): Program {
   }
 }
 
-// Parses an import with OpenSCAD rules: `include` errors propagate, while `use` errors discard the imported file but allow the current file to keep compiling.
+// Parses an import with OpenSCAD rules: `include` errors propagate, while `use`
+// errors discard the imported file but allow the current file to keep
+// compiling.
 function importAtBoundary(
     kind: 'include'|'use', load: () => Statement[]): Statement[] {
   if (kind === 'include') return load();
@@ -95,8 +98,8 @@ export function resolveProgram(
   const visited = new Set<string>();
   const entryAbsPath = path.resolve(entryFile);
 
-  const statements =
-      resolveFile(entryAbsPath, 'include', visited, resolvedFiles, libraryPaths);
+  const statements = resolveFile(
+      entryAbsPath, 'include', visited, resolvedFiles, libraryPaths);
 
   return {statements, resolvedFiles};
 }
@@ -124,7 +127,8 @@ function resolveFile(
   const code = fs.readFileSync(absPath, 'utf8');
   const program = parseFile(code, absPath);
   const result: Statement[] = [];
-  // Declarations forming THIS file's own scope (its own plus those of files it `include`s), collected in `use` mode so they can be wrapped as one scope.
+  // Declarations forming THIS file's own scope (its own plus those of files it
+  // `include`s), collected in `use` mode so they can be wrapped as one scope.
   const ownScope: Statement[] = [];
   const fileDir = path.dirname(absPath);
 

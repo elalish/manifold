@@ -1,4 +1,6 @@
-// Runs between resolve and emit. Walks the AST building a scope tree and creates one `Binding` object per declared name, then points every reference at the binding it resolves to
+// Runs between resolve and emit. Walks the AST building a scope tree and
+// creates one `Binding` object per declared name, then points every reference
+// at the binding it resolves to
 
 import type {Expr, ForVariable, LetAssignment, ListCompGenerator, Parameter, Program, ScopeStmt, Statement,} from './ast.js';
 
@@ -37,7 +39,7 @@ export interface Binding {
   // Library closures only: the file whose top level declares this binding,
   // relative to the library root
   file?: string;
-  jsName: string; // Assigned by the naming pass
+  jsName: string;  // Assigned by the naming pass
   reads: number;
 }
 
@@ -163,7 +165,7 @@ class Binder {
       kind,
       parent,
       children: [],
-      bindings: {var: new Map(), fn: new Map(), mod: new Map()},
+      bindings: {var : new Map(), fn: new Map(), mod: new Map()},
     };
     parent?.children.push(scope);
     this.scopes.push(scope);
@@ -180,7 +182,8 @@ class Binder {
     }
   }
 
-  // Declare `name` in the current scope, or return the existing binding if the name is already declared there
+  // Declare `name` in the current scope, or return the existing binding if the
+  // name is already declared there
   private declare(
       name: string, ns: Namespace, kind: BindingKind,
       decl?: Statement|Parameter|LetAssignment|ForVariable,
@@ -222,7 +225,9 @@ class Binder {
   }
 
 
-  // Hoist the declarations of a declarative scope (top level, module body, block). Every name gets its binding before any body is walked, so a declaration may refer to one that appears later in the file
+  // Hoist the declarations of a declarative scope (top level, module body,
+  // block). Every name gets its binding before any body is walked, so a
+  // declaration may refer to one that appears later in the file
   private hoist(stmts: Statement[], kind: BindingKind, flattenBlocks: boolean):
       void {
     for (const s of stmts) {
@@ -235,7 +240,8 @@ class Binder {
             s.binding = this.special(s.name);
             break;
           }
-          // A file-scope assignment to a name the runtime pre-declares (PI, _EPSILON, etc.) overwrites that variable
+          // A file-scope assignment to a name the runtime pre-declares (PI,
+          // _EPSILON, etc.) overwrites that variable
           const outer = this.current.bindings.var.get(s.name) ??
               lookup(this.current.parent, s.name, 'var');
           if ((kind === 'global' || kind === 'filePrivate') &&
@@ -283,8 +289,7 @@ class Binder {
       case 'moduleDecl':
         this.withScope('module', () => {
           this.params(s.params);
-          const body =
-              s.body.kind === 'block' ? s.body.statements : [s.body];
+          const body = s.body.kind === 'block' ? s.body.statements : [s.body];
           // The body block is the module's own scope; nested blocks are not.
           this.declarative(body, 'local', false);
         });
@@ -336,7 +341,8 @@ class Binder {
     }
   }
 
-  // A `use`d file is one scope. Its top-level variables stay private to it, its modules and functions are published to the enclosing scope
+  // A `use`d file is one scope. Its top-level variables stay private to it, its
+  // modules and functions are published to the enclosing scope
   private usedFileScope(s: ScopeStmt): void {
     const outer = this.current;
     this.withScope('file', () => {
@@ -395,7 +401,8 @@ class Binder {
   }
 
   // `let` is sequential: each value sees the bindings established before it
-  private letAssignments(assignments: LetAssignment[], kind: BindingKind): void {
+  private letAssignments(assignments: LetAssignment[], kind: BindingKind):
+      void {
     for (const a of assignments) {
       const selfRecursive = a.value.kind === 'lambda' && !isSpecial(a.name);
       if (selfRecursive) {
@@ -563,7 +570,7 @@ class Binder {
     contributes everything, transitively, while `use` contributes only what a
     used file publishes. A used file therefore does NOT see its user's
     declarations
-   
+
     `global` is left as an empty scope parented to the externals, so anything
     asking for "the library's globals" without naming a file resolves to the
     builtins rather than to an arbitrary file's declarations.
@@ -652,8 +659,7 @@ class Binder {
   }
 }
 
-export function bindProgram(
-    program: Program, opts: BindOptions): BindResult {
+export function bindProgram(program: Program, opts: BindOptions): BindResult {
   const binder = new Binder(opts);
   binder.bindProgram(program);
   return {
@@ -706,50 +712,57 @@ export interface PrettyNameOptions {
   externalSymbols?: Map<string, string>;
 }
 
-const NS_PRIORITY: Record<Namespace, number> = {var: 0, fn: 1, mod: 2};
+const NS_PRIORITY: Record<Namespace, number> = {
+  var : 0,
+  fn: 1,
+  mod: 2
+};
 
 
 export function assignPrettyNames(
     result: BindResult, opts: PrettyNameOptions): void {
   const reserved = new Set(opts.reserved);
   const visit =
-      (scope: Scope, ancestors: Set<string>, ancestorCallables: Set<string>) => {
-    // Names claimed in this scope; siblings must not collide with each other
-    const taken = new Set<string>();
+      (scope: Scope, ancestors: Set<string>,
+       ancestorCallables: Set<string>) => {
+        // Names claimed in this scope; siblings must not collide with each
+        // other
+        const taken = new Set<string>();
 
-    const own: Binding[] = [];
-    for (const ns of NAMESPACES)
-      for (const b of scope.bindings[ns].values())
-        if (b.scope === scope) own.push(b);
-    own.sort(
-        (a, b) => NS_PRIORITY[a.ns] - NS_PRIORITY[b.ns] || a.id - b.id);
+        const own: Binding[] = [];
+        for (const ns of NAMESPACES)
+          for (const b of scope.bindings[ns].values())
+            if (b.scope === scope) own.push(b);
+        own.sort(
+            (a, b) => NS_PRIORITY[a.ns] - NS_PRIORITY[b.ns] || a.id - b.id);
 
-    for (const b of own) {
-      if (b.kind === 'special') {
-        b.jsName = escapeName(b.name);
-        continue;
-      }
-      // Builtins and library exports already have names the emitter must
-      // match: the runtime's, or the ones the library chose for itself.
-      if (b.kind === 'builtin' || b.kind === 'external') {
-        b.jsName = fixedName(b, opts);
-        // Only names that actually appear in the output can be clashed with.
-        if (b.ns !== 'mod') taken.add(b.jsName);
-        continue;
-      }
-      b.jsName = pick(b, taken, ancestors, ancestorCallables, reserved);
-      taken.add(b.jsName);
-    }
+        for (const b of own) {
+          if (b.kind === 'special') {
+            b.jsName = escapeName(b.name);
+            continue;
+          }
+          // Builtins and library exports already have names the emitter must
+          // match: the runtime's, or the ones the library chose for itself.
+          if (b.kind === 'builtin' || b.kind === 'external') {
+            b.jsName = fixedName(b, opts);
+            // Only names that actually appear in the output can be clashed
+            // with.
+            if (b.ns !== 'mod') taken.add(b.jsName);
+            continue;
+          }
+          b.jsName = pick(b, taken, ancestors, ancestorCallables, reserved);
+          taken.add(b.jsName);
+        }
 
-    const below = new Set([...ancestors, ...taken]);
-    const callablesBelow = new Set(ancestorCallables);
-    for (const ns of NAMESPACES) {
-      if (ns === 'var') continue;
-      for (const b of scope.bindings[ns].values()) callablesBelow.add(b.jsName);
-    }
-    for (const child of scope.children)
-      visit(child, below, callablesBelow);
-  };
+        const below = new Set([...ancestors, ...taken]);
+        const callablesBelow = new Set(ancestorCallables);
+        for (const ns of NAMESPACES) {
+          if (ns === 'var') continue;
+          for (const b of scope.bindings[ns].values())
+            callablesBelow.add(b.jsName);
+        }
+        for (const child of scope.children) visit(child, below, callablesBelow);
+      };
   visit(result.root, new Set(), new Set());
 }
 
@@ -772,8 +785,8 @@ function pick(
   const blocked = (c: string) => taken.has(c) || ancestors.has(c) ||
       ancestorCallables.has(c) || reserved.has(c);
   const suffixed = b.ns === 'fn' ? `${base}_fn` :
-      b.ns === 'mod'             ? `${base}_mod` :
-                                   base;
+      b.ns === 'mod' ? `${base}_mod` :
+                       base;
   if (suffixed !== base && !blocked(suffixed)) return suffixed;
   for (let n = 2;; n++) {
     const c = `${suffixed}_${n}`;
@@ -784,7 +797,8 @@ function pick(
 export function assignLegacyNames(result: BindResult): void {
   for (const b of result.bindings) {
     const base = escapeName(b.name);
-    b.jsName = b.ns === 'fn' ? `${base}_fn` : b.ns === 'mod' ? `${base}$mod` :
-                                              base;
+    b.jsName = b.ns === 'fn' ? `${base}_fn` :
+        b.ns === 'mod' ? `${base}$mod` :
+                         base;
   }
 }
