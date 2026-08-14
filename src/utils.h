@@ -18,7 +18,7 @@
 #include <memory>
 #include <mutex>
 
-#include "atomic_ref.h"
+#include "atomic_compat.h"
 #include "manifold/common.h"
 #include "vec.h"
 

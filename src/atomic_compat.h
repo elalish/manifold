@@ -12,19 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 //
-// Atomic operations on an object that was not itself declared `std::atomic`.
+// C++17 stand-ins for atomic facilities the library would otherwise get from
+// C++20. Everything here is scaffolding for that gap, collected in one file so
+// it can be removed in one go once the baseline moves:
 //
-// This is `std::atomic_ref` (P0019R8), which manifold cannot use while it
-// targets C++17. The code it replaces reinterpret_cast a plain `T&` to
-// `std::atomic<T>&` - undefined behavior that happens to work on every ABI we
-// ship (elalish/manifold#1153). Everything here is scaffolding for that gap:
-// once the baseline moves to C++20 the whole file collapses to the alias at
-// the top, and every call site stays as it is.
+//   - `AtomicRef<T>` is `std::atomic_ref` (P0019R8). It replaces a
+//     reinterpret_cast of a plain `T&` to `std::atomic<T>&`, which was
+//     undefined behavior that happened to work on every ABI we ship
+//     (elalish/manifold#1153). At C++20 it becomes a plain alias.
+//   - `AtomicLoadShared` / `AtomicStoreShared` wrap the `std::atomic_load` and
+//     `std::atomic_store` shared_ptr overloads, which C++20 deprecates and
+//     C++26 removes (P2869). Their replacement is a member of type
+//     `std::atomic<std::shared_ptr<T>>`, which is C++20-only and would delete
+//     `Manifold`'s defaulted move operations, so it is a separate change.
 
 #pragma once
 #include <atomic>
 #include <cstdint>
 #include <cstring>
+#include <memory>
 #include <type_traits>
 
 #if defined(_MSC_VER) && !defined(__clang__)
@@ -354,5 +360,36 @@ class AtomicRef {
 };
 
 #endif  // std::atomic_ref vs the C++17 stand-in
+
+// Suppresses every deprecation inside its region, so keep the regions to a
+// single expression. Neither GCC nor Clang offers per-symbol suppression.
+#if defined(_MSC_VER) && !defined(__clang__)
+#define MANIFOLD_IGNORE_DEPRECATED_BEGIN \
+  __pragma(warning(push)) __pragma(warning(disable : 4996))
+#define MANIFOLD_IGNORE_DEPRECATED_END __pragma(warning(pop))
+#else
+#define MANIFOLD_IGNORE_DEPRECATED_BEGIN \
+  _Pragma("GCC diagnostic push")         \
+      _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")
+#define MANIFOLD_IGNORE_DEPRECATED_END _Pragma("GCC diagnostic pop")
+#endif
+
+// Atomic access to a plain `shared_ptr`, which C++17 can only express through
+// these overloads. There is no atomic_ref equivalent: atomic_ref requires a
+// trivially copyable type, so the C++20 replacement changes the member's type
+// rather than how it is accessed.
+template <typename T>
+std::shared_ptr<T> AtomicLoadShared(const std::shared_ptr<T>* ptr) {
+  MANIFOLD_IGNORE_DEPRECATED_BEGIN
+  return std::atomic_load(ptr);
+  MANIFOLD_IGNORE_DEPRECATED_END
+}
+
+template <typename T>
+void AtomicStoreShared(std::shared_ptr<T>* ptr, std::shared_ptr<T> value) {
+  MANIFOLD_IGNORE_DEPRECATED_BEGIN
+  std::atomic_store(ptr, std::move(value));
+  MANIFOLD_IGNORE_DEPRECATED_END
+}
 
 }  // namespace manifold

@@ -24,38 +24,6 @@
 namespace {
 using namespace manifold;
 
-// `ctx_` is a plain shared_ptr accessed atomically, which C++17 can only do
-// through std::atomic_load/atomic_store. Those are deprecated in C++20 and
-// removed in C++26 (P2869); the sanctioned replacement, a member of type
-// std::atomic<std::shared_ptr<T>>, is C++20-only and would also delete
-// Manifold's defaulted move operations, so it is a separate change. Until
-// then, funnel every use through these two so the suppression is here and
-// nowhere else - any other deprecation still fails the C++20 build.
-#if defined(_MSC_VER) && !defined(__clang__)
-#define MANIFOLD_IGNORE_DEPRECATED_BEGIN \
-  __pragma(warning(push)) __pragma(warning(disable : 4996))
-#define MANIFOLD_IGNORE_DEPRECATED_END __pragma(warning(pop))
-#else
-#define MANIFOLD_IGNORE_DEPRECATED_BEGIN \
-  _Pragma("GCC diagnostic push")         \
-      _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")
-#define MANIFOLD_IGNORE_DEPRECATED_END _Pragma("GCC diagnostic pop")
-#endif
-
-template <typename T>
-std::shared_ptr<T> AtomicLoadShared(const std::shared_ptr<T>* ptr) {
-  MANIFOLD_IGNORE_DEPRECATED_BEGIN
-  return std::atomic_load(ptr);
-  MANIFOLD_IGNORE_DEPRECATED_END
-}
-
-template <typename T>
-void AtomicStoreShared(std::shared_ptr<T>* ptr, std::shared_ptr<T> value) {
-  MANIFOLD_IGNORE_DEPRECATED_BEGIN
-  std::atomic_store(ptr, std::move(value));
-  MANIFOLD_IGNORE_DEPRECATED_END
-}
-
 ExecutionParams manifoldParams;
 
 Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {

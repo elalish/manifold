@@ -20,7 +20,7 @@
 #include <thread>
 #include <vector>
 
-#include "../src/atomic_ref.h"
+#include "../src/atomic_compat.h"
 #include "gtest/gtest.h"
 
 using namespace manifold;

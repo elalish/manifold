@@ -20,7 +20,7 @@
 #include <intrin.h>
 #endif
 
-#include "atomic_ref.h"
+#include "atomic_compat.h"
 #include "utils.h"
 #include "vec.h"
 
