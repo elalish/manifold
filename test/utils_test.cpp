@@ -51,6 +51,9 @@ void RunConcurrently(F body) {
 TEST(Utils, AtomicRefBackend) {
 #if defined(__cpp_lib_atomic_ref)
   const char* backend = "std::atomic_ref";
+#elif defined(_MSC_VER) && !defined(__clang__) && \
+    (defined(_M_IX86) || defined(_M_ARM))
+  const char* backend = "std::atomic reinterpret_cast (32-bit MSVC)";
 #elif defined(_MSC_VER) && !defined(__clang__)
   const char* backend = "_Interlocked* intrinsics";
 #else

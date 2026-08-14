@@ -19,7 +19,9 @@
 //   - `AtomicRef<T>` is `std::atomic_ref` (P0019R8). It replaces a
 //     reinterpret_cast of a plain `T&` to `std::atomic<T>&`, which was
 //     undefined behavior that happened to work on every ABI we ship
-//     (elalish/manifold#1153). At C++20 it becomes a plain alias.
+//     (elalish/manifold#1153). At C++20 it becomes a plain alias. 32-bit MSVC
+//     is the exception: it keeps the cast, since the intrinsics needed to
+//     avoid it are not all available there.
 //   - `AtomicLoadShared` / `AtomicStoreShared` wrap the `std::atomic_load` and
 //     `std::atomic_store` shared_ptr overloads, which C++20 deprecates and
 //     C++26 removes (P2869). Their replacement is a member of type
@@ -31,6 +33,16 @@
 #include <cstdint>
 #include <memory>
 #include <type_traits>
+
+// Only the 64-bit MSVC backend below needs these, and <intrin.h> is heavy, so
+// keep them out of every other configuration's include graph. They must stay
+// at file scope: an #include inside a namespace nests whatever it declares.
+#if defined(_MSC_VER) && !defined(__clang__) && !defined(_M_IX86) && \
+    !defined(_M_ARM) && !defined(__cpp_lib_atomic_ref)
+#include <intrin.h>
+
+#include <cstring>
+#endif
 
 #include "manifold/optional_assert.h"
 
@@ -77,16 +89,15 @@ struct AtomicBackend {
     return weak ? Ref(p).compare_exchange_weak(expected, desired, order)
                 : Ref(p).compare_exchange_strong(expected, desired, order);
   }
+  // std::atomic<double>::fetch_add does not exist in C++17. This compiles
+  // only because AtomicRef::fetch_add is SFINAE-gated on is_integral, so this
+  // body is never instantiated for a floating-point T. Keep that gate.
   static T FetchAdd(T* p, T arg, std::memory_order order) {
     return Ref(p).fetch_add(arg, order);
   }
 };
 
 #else  // 64-bit MSVC: real intrinsics
-
-#include <intrin.h>
-
-#include <cstring>
 
 // One integer width per object size, reached through memcpy so the same code
 // serves `double` as well as the integer types. The read-modify-write
@@ -321,7 +332,8 @@ struct AtomicBackend {
  * so a weaker request is satisfied by being stronger. `Load` is the exception:
  * a plain load plus a trailing fence, exact on x86/x64, and on ARM64 an
  * acquire load that serves as seq_cst only because the store side goes through
- * the full-barrier _InterlockedExchange.
+ * the full-barrier _InterlockedExchange. That describes the 64-bit MSVC
+ * backend; the 32-bit fallback defers to std::atomic and is exact throughout.
  */
 template <typename T>
 class AtomicRef {
