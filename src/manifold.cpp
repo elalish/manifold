@@ -374,7 +374,7 @@ Manifold Manifold::SetTolerance(double tolerance) const {
   if (tolerance > impl->tolerance_) {
     impl->tolerance_ = tolerance;
     impl->SetNormalsAndCoplanar();
-    impl->SimplifyTopology();
+    impl->SimplifyTopology2();
     impl->SortGeometry();
   } else {
     // for reducing tolerance, we need to make sure it is still at least
@@ -402,7 +402,7 @@ Manifold Manifold::Simplify(double tolerance) const {
     impl->tolerance_ = tolerance;
     impl->SetNormalsAndCoplanar();
   }
-  impl->SimplifyTopology();
+  impl->SimplifyTopology2();
   impl->SortGeometry();
   impl->tolerance_ = oldTolerance;
   return Manifold(impl);

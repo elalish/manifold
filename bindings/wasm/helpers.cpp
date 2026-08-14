@@ -119,6 +119,10 @@ CrossSection OfPolygons(std::vector<std::vector<vec2>> polygons) {
   return CrossSection(polygons);
 }
 
+CrossSection EvenOdd(std::vector<std::vector<vec2>> polygons) {
+  return CrossSection::EvenOdd(polygons);
+}
+
 CrossSection Union(const CrossSection& a, const CrossSection& b) {
   return a + b;
 }

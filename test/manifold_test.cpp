@@ -17,6 +17,7 @@
 #include <algorithm>
 
 #include "../src/execution_impl.h"
+#include "gtest/gtest.h"
 #include "manifold/cross_section.h"
 #include "test.h"
 
@@ -1051,8 +1052,8 @@ TEST(Manifold, Simplify) {
       CrossSection::Circle(1, 20).Translate({10, 0}).ToPolygons();
   Manifold torus = Manifold::Revolve(polyCircle, 100);
   Manifold simplified = torus.Simplify(0.4);
-  EXPECT_NEAR(torus.Volume(), simplified.Volume(), 25);
-  EXPECT_NEAR(torus.SurfaceArea(), simplified.SurfaceArea(), 10);
+  EXPECT_NEAR(torus.Volume(), simplified.Volume(), 5);
+  EXPECT_NEAR(torus.SurfaceArea(), simplified.SurfaceArea(), 12);
 
   if (options.exportModels) WriteTestOBJ("torus.obj", simplified);
 }
@@ -1228,6 +1229,7 @@ TEST(Manifold, MergeEmpty) {
   EXPECT_TRUE(shape.Merge());
   Manifold man(shape);
   EXPECT_EQ(man.Status(), Manifold::Error::NoError);
+  man = man.Simplify();
   EXPECT_TRUE(man.IsEmpty());
 }
 
@@ -1290,6 +1292,22 @@ TEST(Manifold, MirrorUnion2) {
   auto a = Manifold::Cube();
   auto result = Manifold::BatchBoolean({a.Mirror({1, 0, 0})}, OpType::Add);
   EXPECT_TRUE(result.MatchesTriNormals());
+}
+
+TEST(Manifold, MirroredNormals) {
+  // Issue #1781: Ensure that when a Manifold is mirrored the normals are
+  // mirrored along with it, so the resulting mesh vertices do not get
+  // duplicated. We check that the MeshGL vertex count remains the same, and
+  // that the mirrored normals remain outward-pointing.
+  const Manifold s = Manifold::Sphere(1.0, 32).CalculateNormals(0, 180);
+  const MeshGL mesh = s.GetMeshGL();
+  const MeshGL mirrored = s.Mirror({1, 0, 0}).GetMeshGL();
+  EXPECT_EQ(mesh.NumVert(), mirrored.NumVert());
+  EXPECT_TRUE(mirrored.HasNormals(0));
+  const auto [good, bad] = CountSphereNormalAlignment(
+      mirrored, 1.0, 3, [](vec3 pos) { return la::normalize(pos); });
+  EXPECT_EQ(bad, 0);
+  EXPECT_EQ(good, static_cast<int>(mirrored.NumVert()));
 }
 
 TEST(Manifold, Invalid) {

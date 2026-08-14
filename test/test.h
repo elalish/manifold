@@ -14,9 +14,6 @@
 
 #pragma once
 
-#include <cmath>
-
-#include "gtest/gtest.h"
 #include "manifold/common.h"
 #include "manifold/manifold.h"
 

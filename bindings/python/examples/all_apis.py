@@ -17,6 +17,7 @@ def all_cross_section():
     poly = [[0, 0], [1, 0], [1, 1]]
     c = CrossSection([np.array(poly)])
     c = CrossSection([poly])
+    c = CrossSection.even_odd([poly])
     c = CrossSection() + c
     a = c.area()
     c = CrossSection.batch_boolean(

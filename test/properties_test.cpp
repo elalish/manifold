@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "../src/utils.h"
+#include "gtest/gtest.h"
 #include "manifold/manifold.h"
 #include "test.h"
 
@@ -73,16 +74,38 @@ TEST(Properties, Tolerance) {
 }
 
 TEST(Properties, ToleranceSphere) {
-  const int n = 1000;
+  const int n = 500;
   Manifold sphere = Manifold::Sphere(1, 4 * n);
   EXPECT_EQ(sphere.NumTri(), 8 * n * n);
 
   Manifold sphere2 = sphere.SetTolerance(0.01);
-  EXPECT_LT(sphere2.NumTri(), 2500);
+  EXPECT_LT(sphere2.NumTri(), 1250);
   EXPECT_EQ(sphere2.Genus(), 0);
-  EXPECT_NEAR(sphere.Volume(), sphere2.Volume(), 0.05);
-  EXPECT_NEAR(sphere.SurfaceArea(), sphere2.SurfaceArea(), 0.06);
+  EXPECT_NEAR(sphere.Volume(), sphere2.Volume(), 0.002);
+  EXPECT_NEAR(sphere.SurfaceArea(), sphere2.SurfaceArea(), 0.015);
   if (options.exportModels) WriteTestOBJ("sphere.obj", sphere2);
+}
+
+TEST(Properties, ToleranceCylinder) {
+  const int n = 40;
+  Manifold cylinder = Manifold::Cylinder(2, 1, 1, 4 * n);
+  Manifold cylinder2 = cylinder.Simplify(0.01);
+  EXPECT_LT(cylinder2.NumTri(), 165);
+  EXPECT_EQ(cylinder2.Genus(), 0);
+  EXPECT_NEAR(cylinder.Volume(), cylinder2.Volume(), 0.011);
+  EXPECT_NEAR(cylinder.SurfaceArea(), cylinder2.SurfaceArea(), 0.02);
+  if (options.exportModels) WriteTestOBJ("cylinder.obj", cylinder2);
+}
+
+TEST(Properties, ToleranceCube) {
+  Manifold cube = Manifold::Cube().Refine(5);
+  EXPECT_EQ(cube.NumTri(), 300);
+  Manifold cube2 = cube.Simplify();
+  EXPECT_EQ(cube2.NumTri(), 12);
+  EXPECT_EQ(cube2.Genus(), 0);
+  EXPECT_DOUBLE_EQ(cube.Volume(), cube2.Volume());
+  EXPECT_DOUBLE_EQ(cube.SurfaceArea(), cube2.SurfaceArea());
+  if (options.exportModels) WriteTestOBJ("cube.obj", cube2);
 }
 
 /**

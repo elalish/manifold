@@ -102,9 +102,9 @@ export function resetToCircularDefaults(): void;
 export class CrossSection {
   /**
    * Create a 2d cross-section from a set of contours (complex polygons). A
-   * boolean union operation (with Positive filling rule by default) is
-   * performed to combine overlapping polygons and ensure the resulting
-   * CrossSection is free of intersections.
+   * boolean union operation (with the Positive filling rule) is performed to
+   * combine overlapping polygons and ensure the resulting CrossSection is free
+   * of intersections.
    *
    * @param contours A set of closed paths describing zero or more complex
    * polygons.
@@ -369,15 +369,29 @@ export class CrossSection {
 
   /**
    * Create a 2d cross-section from a set of contours (complex polygons). A
-   * boolean union operation (with Positive filling rule by default) is
-   * performed to combine overlapping polygons and ensure the resulting
-   * CrossSection is free of intersections.
+   * boolean union operation (with the Positive filling rule) is performed to
+   * combine overlapping polygons and ensure the resulting CrossSection is free
+   * of intersections.
    *
    * @param contours A set of closed paths describing zero or more complex
    * polygons.
    * @group Input & Output
    */
   static ofPolygons(contours: Polygons): CrossSection;
+
+  /**
+   * Create a 2d cross-section from a set of contours, reading them by the
+   * even-odd rule: a sub-region is filled when its winding number is odd, so
+   * overlapping an odd number of contours fills and overlapping an even number
+   * leaves a hole. Use this to take input authored for an even-odd tool such
+   * as OpenSCAD. The result is regularized like any other CrossSection, so
+   * every later operation behaves the same.
+   *
+   * @param contours A set of closed paths describing zero or more complex
+   * polygons.
+   * @group Input & Output
+   */
+  static evenOdd(contours: Polygons): CrossSection;
 
   /**
    * Return the contours of this CrossSection as a list of simple polygons.

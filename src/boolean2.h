@@ -168,6 +168,7 @@ struct Trace;
 enum class WindRule {
   Add,
   Intersect,
+  EvenOdd,
 };
 
 // Smith sweep-line arrangement + winding over the collapsed input edges: a
@@ -202,9 +203,13 @@ std::pair<std::vector<vec2>, std::vector<EdgeM>> PolygonsToInput(
 Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
                             const std::vector<OutEdge>& edges);
 
-// Regularize one polygon set under the Positive (Add) winding rule at
-// machine-scale eps. Fill-rule application, not tolerance decimation.
-Polygons ApplyFillRule(const Polygons& polys, double eps);
+// Regularize one polygon set at machine-scale eps under `rule`, which decides
+// how the input's own winding is read: Positive (Add) or EvenOdd. Either way
+// the output is normal-oriented and positive, so this is the only place the
+// rule is visible. No default: every caller states which rule it wants, since
+// only CrossSection construction has a reason to pick anything but Add.
+// Fill-rule application, not tolerance decimation.
+Polygons ApplyFillRule(const Polygons& polys, double eps, WindRule rule);
 Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op,
                    double eps = 0.0);
 

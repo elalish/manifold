@@ -1,6 +1,6 @@
 import {beforeAll, expect, suite, test} from 'vitest';
 
-import Module, {type ManifoldToplevel} from '../manifold'
+import Module, {type ManifoldToplevel, type Polygons} from '../manifold'
 
 let manifoldModule: ManifoldToplevel;
 
@@ -24,6 +24,20 @@ suite('CrossSection Bindings', () => {
     const cs = manifoldModule.Manifold.sphere(1).project();
     expect(cs.numContour()).toEqual(1);
     expect(cs.area()).to.be.greaterThan(0);
+  });
+
+  test('evenOdd fills by parity, not sign', () => {
+    const nested: Polygons = [
+      [[-2, -2], [2, -2], [2, 2], [-2, 2]],
+      [[-1, -1], [1, -1], [1, 1], [-1, 1]],
+    ];
+    // Positive fill leaves the nested pair solid; even-odd cuts the inner
+    // square out.
+    expect(manifoldModule.CrossSection.ofPolygons(nested).area())
+        .toBeCloseTo(16);
+    const evenOdd = manifoldModule.CrossSection.evenOdd(nested);
+    expect(evenOdd.numContour()).toEqual(2);
+    expect(evenOdd.area()).toBeCloseTo(12);
   });
 
   test('simplify argument is defaulted', () => {

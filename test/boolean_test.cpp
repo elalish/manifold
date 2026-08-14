@@ -17,6 +17,7 @@
 #include <thread>
 
 #include "../src/utils.h"
+#include "gtest/gtest.h"
 #include "manifold/common.h"
 #include "manifold/manifold.h"
 #include "test.h"
@@ -169,6 +170,19 @@ TEST(Boolean, Cubes) {
   if (options.exportModels) WriteTestOBJ("cubes.obj", result);
 }
 
+TEST(Boolean, Cubes2) {
+  Manifold cube = Manifold::Cube();
+
+  Manifold result = cube + cube.Rotate(0, 0, 45);
+
+  // has 14 verts instead of 12 because of symbolic perturbation making a jagged
+  // intersection, which is maintained to keep meshIDs separate. I don't love
+  // either of those behaviors by default...
+  ExpectMeshes(result, {{14, 24}});
+
+  if (options.exportModels) WriteTestOBJ("cubes2.obj", result);
+}
+
 TEST(Boolean, DeterminismSimpleSubtract) {
   const Manifold a = Manifold::Cube({1, 1, 1}, true);
   const Manifold b = Manifold::Cube({1, 1, 1}, true).Translate({0.5, 0, 0});
@@ -233,11 +247,11 @@ TEST(Boolean, Simplify) {
 
 TEST(Boolean, SimplifyCracks) {
   Manifold cylinder =
-      Manifold::Cylinder(2, 50, 50, 180)
+      WithPositionColors(Manifold::Cylinder(2, 50, 50, 180))
           .Rotate(
               -89.999999999999)  // Rotating by -90 makes the result too perfect
           .Translate(vec3(50, 0, 50));
-  Manifold cube = Manifold::Cube(vec3(100, 2, 50));
+  Manifold cube = WithPositionColors(Manifold::Cube(vec3(100, 2, 50)));
   Manifold refined = (cylinder + cube).RefineToLength(1);
   Manifold deformed =
       refined.Warp([](vec3& p) { p.y += p.x - (p.x * p.x) / 100.0; });
@@ -315,8 +329,14 @@ TEST(Boolean, TreeTransforms) {
   auto a = (Manifold::Cube({1, 1, 1}) + Manifold::Cube({1, 1, 1}))
                .Translate({1, 0, 0});
   auto b = (Manifold::Cube({1, 1, 1}) + Manifold::Cube({1, 1, 1}));
+  auto c = a + b;
 
-  EXPECT_FLOAT_EQ((a + b).Volume(), 2);
+  EXPECT_FLOAT_EQ(c.Volume(), 2);
+  EXPECT_EQ(c.NumDegenerateTris(), 0);
+  EXPECT_FLOAT_EQ(a.Volume(), 1);
+  EXPECT_EQ(a.NumDegenerateTris(), 0);
+  EXPECT_FLOAT_EQ(b.Volume(), 1);
+  EXPECT_EQ(b.NumDegenerateTris(), 0);
 }
 
 TEST(Boolean, CreatePropertiesSlow) {
@@ -501,7 +521,6 @@ TEST(Boolean, Perturb3) {
   EXPECT_NEAR(nastyGear.SurfaceArea(), expectedArea, 1e-4);
 
   if (options.exportModels) {
-    WriteTestOBJ("nastyGear.obj", nastyGear);
     WriteTestOBJ("perturb3_nastyGear.obj", nastyGear);
   }
 }
@@ -799,10 +818,12 @@ TEST(Boolean, Precision) {
   cube2 = cube2.Scale(vec3(scale)).Translate({distance, 0, 0});
 
   cube += cube2;
+  cube = cube.Simplify();
   ExpectMeshes(cube, {{8, 12}});
 
   cube3 = cube3.Scale(vec3(2 * scale)).Translate({distance, 0, 0});
   cube += cube3;
+  cube = cube.Simplify();
   ExpectMeshes(cube, {{8, 12}, {8, 12}});
 }
 
@@ -827,6 +848,8 @@ TEST(Boolean, SimpleCubeRegression) {
       Manifold::Cube() -
       Manifold::Cube().Rotate(-0.10000000000000001, -0.10000000000066571, -1.);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(result.NumDegenerateTris(), 0);
+  if (options.exportModels) WriteTestOBJ("simple_cube_regression.obj", result);
 }
 
 // Regression: Compose() in csg_tree.cpp used to read the global atomic

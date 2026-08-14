@@ -19,9 +19,9 @@
 //     MinGap is built on)
 
 #include "../src/tri_dist.h"
+#include "gtest/gtest.h"
 #include "manifold/manifold.h"
 #include "samples.h"
-#include "test.h"
 
 using namespace manifold;
 

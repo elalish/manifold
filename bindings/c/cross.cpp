@@ -40,6 +40,16 @@ ManifoldCrossSection* manifold_cross_section_of_polygons(void* mem,
   return to_c(new (mem) CrossSection(*from_c(p)));
 }
 
+ManifoldCrossSection* manifold_cross_section_even_odd_simple_polygon(
+    void* mem, ManifoldSimplePolygon* p) {
+  return to_c(new (mem) CrossSection(CrossSection::EvenOdd(*from_c(p))));
+}
+
+ManifoldCrossSection* manifold_cross_section_even_odd_polygons(
+    void* mem, ManifoldPolygons* p) {
+  return to_c(new (mem) CrossSection(CrossSection::EvenOdd(*from_c(p))));
+}
+
 ManifoldCrossSectionVec* manifold_cross_section_empty_vec(void* mem) {
   return to_c(new (mem) CrossSectionVec());
 }

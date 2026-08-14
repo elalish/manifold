@@ -3,8 +3,38 @@ import argparse
 import datetime
 import os
 import platform
+import re
 import subprocess
 from pathlib import Path
+
+CMAKE_SUMMARY_PATTERN = re.compile(r"^--\s+([A-Z0-9_]+):\s*(.*)$")
+
+
+def parse_cmake_configure_log(log_path: Path) -> dict:
+    if not log_path.exists():
+        return {}
+
+    values = {}
+    for line in log_path.read_text(encoding="utf-8", errors="ignore").splitlines():
+        match = CMAKE_SUMMARY_PATTERN.match(line.strip())
+        if match:
+            values[match.group(1)] = match.group(2).strip()
+
+    return {
+        "version": values.get("CMAKE_VERSION"),
+        "generator": values.get("CMAKE_GENERATOR"),
+        "build_type": values.get("CMAKE_BUILD_TYPE"),
+        "cxx_compiler_id": values.get("CMAKE_CXX_COMPILER_ID"),
+        "cxx_compiler_version": values.get("CMAKE_CXX_COMPILER_VERSION"),
+    }
+
+
+def cmake_compiler(cmake: dict) -> str | None:
+    compiler_id = cmake.get("cxx_compiler_id")
+    compiler_version = cmake.get("cxx_compiler_version")
+    if compiler_id and compiler_version:
+        return f"{compiler_id} {compiler_version}"
+    return compiler_id or compiler_version
 
 
 def detect_compiler() -> str | None:
@@ -50,6 +80,8 @@ def int_or_none(value: str | None) -> int | None:
 
 
 def default_cpu_model() -> str | None:
+    # /proc/cpuinfo gives a better CPU name than platform.processor()
+    # on GitHub-hosted Ubuntu runners.
     cpuinfo = Path("/proc/cpuinfo")
     if not cpuinfo.exists():
         return platform.processor() or None
@@ -94,14 +126,21 @@ def cpu_details() -> dict:
 def resolve_metadata(args: argparse.Namespace) -> dict:
     # resolve metadata from args first, then GitHub env vars
     timestamp = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    suite_dir = getattr(args, "suite_dir", None)
+    cmake = parse_cmake_configure_log(suite_dir / "cmake_configure.log") if suite_dir else {}
     cpu = cpu_details()
+    cpu_count = getattr(args, "cpu_count", None) or cpu["logical_count"]
     return {
-        "commit_sha": args.commit_sha or os.getenv("GITHUB_SHA"),
-        "workflow": args.workflow or os.getenv("GITHUB_WORKFLOW"),
-        "runner": args.runner or os.getenv("RUNNER_NAME"),
-        "os": args.os_name or os.getenv("RUNNER_OS"),
-        "compiler": args.compiler or detect_compiler(),
-        "cpu_model": cpu["model"],
+        "commit_sha": getattr(args, "commit_sha", None) or os.getenv("GITHUB_SHA"),
+        "workflow": getattr(args, "workflow", None) or os.getenv("GITHUB_WORKFLOW"),
+        "runner": getattr(args, "runner", None) or os.getenv("RUNNER_NAME"),
+        "os": getattr(args, "os_name", None) or os.getenv("RUNNER_OS"),
+        "compiler": getattr(args, "compiler", None)
+        or cmake_compiler(cmake)
+        or detect_compiler(),
+        "cmake": cmake,
+        "cpu_model": getattr(args, "cpu_model", None) or cpu["model"],
+        "cpu_count": cpu_count,
         "cpu_brand": cpu["brand"],
         "cpu_model_identifier": cpu["model_identifier"],
         "cpu_arch": cpu["arch"],
