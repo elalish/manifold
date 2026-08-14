@@ -24,6 +24,38 @@
 namespace {
 using namespace manifold;
 
+// `ctx_` is a plain shared_ptr accessed atomically, which C++17 can only do
+// through std::atomic_load/atomic_store. Those are deprecated in C++20 and
+// removed in C++26 (P2869); the sanctioned replacement, a member of type
+// std::atomic<std::shared_ptr<T>>, is C++20-only and would also delete
+// Manifold's defaulted move operations, so it is a separate change. Until
+// then, funnel every use through these two so the suppression is here and
+// nowhere else - any other deprecation still fails the C++20 build.
+#if defined(_MSC_VER) && !defined(__clang__)
+#define MANIFOLD_IGNORE_DEPRECATED_BEGIN \
+  __pragma(warning(push)) __pragma(warning(disable : 4996))
+#define MANIFOLD_IGNORE_DEPRECATED_END __pragma(warning(pop))
+#else
+#define MANIFOLD_IGNORE_DEPRECATED_BEGIN \
+  _Pragma("GCC diagnostic push")         \
+      _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")
+#define MANIFOLD_IGNORE_DEPRECATED_END _Pragma("GCC diagnostic pop")
+#endif
+
+template <typename T>
+std::shared_ptr<T> AtomicLoadShared(const std::shared_ptr<T>* ptr) {
+  MANIFOLD_IGNORE_DEPRECATED_BEGIN
+  return std::atomic_load(ptr);
+  MANIFOLD_IGNORE_DEPRECATED_END
+}
+
+template <typename T>
+void AtomicStoreShared(std::shared_ptr<T>* ptr, std::shared_ptr<T> value) {
+  MANIFOLD_IGNORE_DEPRECATED_BEGIN
+  std::atomic_store(ptr, std::move(value));
+  MANIFOLD_IGNORE_DEPRECATED_END
+}
+
 ExecutionParams manifoldParams;
 
 Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
@@ -128,7 +160,7 @@ Manifold& Manifold::operator=(Manifold&&) noexcept = default;
 Manifold::Manifold(const Manifold& other) {
   std::lock_guard<std::mutex> lock(*other.pNodeMutex_);
   pNode_ = other.pNode_;
-  std::atomic_store(&ctx_, std::atomic_load(&other.ctx_));
+  AtomicStoreShared(&ctx_, AtomicLoadShared(&other.ctx_));
 }
 
 Manifold::Manifold(std::shared_ptr<CsgNode> pNode) : pNode_(pNode) {}
@@ -156,7 +188,7 @@ Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
     std::scoped_lock lock(*pNodeMutex_, *other.pNodeMutex_);
     pNode_ = other.pNode_;
-    std::atomic_store(&ctx_, std::atomic_load(&other.ctx_));
+    AtomicStoreShared(&ctx_, AtomicLoadShared(&other.ctx_));
   }
   return *this;
 }
@@ -170,7 +202,7 @@ Manifold& Manifold::operator=(const Manifold& other) {
  */
 Manifold Manifold::WithContext(const ExecutionContext& ctx) const {
   Manifold result = *this;
-  std::atomic_store(&result.ctx_, ctx.impl_);
+  AtomicStoreShared(&result.ctx_, ctx.impl_);
   return result;
 }
 
@@ -305,7 +337,7 @@ Manifold::Error Manifold::Status() const {
   // expression -- through the lazy eval inside GetCsgLeafNode -- so a
   // concurrent op= reseating ctx_ on this Manifold can't free the Impl out
   // from under us.
-  return GetCsgLeafNode(std::atomic_load(&ctx_).get()).GetImpl()->status_;
+  return GetCsgLeafNode(AtomicLoadShared(&ctx_).get()).GetImpl()->status_;
 }
 /**
  * The number of vertices in the Manifold.
@@ -788,7 +820,7 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
  * @param n The number of pieces to split every edge into. Must be > 1.
  */
 Manifold Manifold::Refine(int n) const {
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
@@ -813,7 +845,7 @@ Manifold Manifold::Refine(int n) const {
  */
 Manifold Manifold::RefineToLength(double length) const {
   length = std::abs(length);
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
@@ -842,7 +874,7 @@ Manifold Manifold::RefineToLength(double length) const {
  */
 Manifold Manifold::RefineToTolerance(double tolerance) const {
   tolerance = std::abs(tolerance);
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
@@ -1011,7 +1043,7 @@ Manifold Manifold::TrimByPlane(vec3 normal, double originOffset) const {
  * @param other The other manifold to minkowski sum to this one.
  */
 Manifold Manifold::MinkowskiSum(const Manifold& other) const {
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto aImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (aImpl->status_ != Error::NoError) return PropagateStatus(aImpl->status_);
   auto bImpl = other.GetCsgLeafNode(ctx.get()).GetImpl();
@@ -1029,7 +1061,7 @@ Manifold Manifold::MinkowskiSum(const Manifold& other) const {
  * @param other The other manifold to minkowski subtract from this one.
  */
 Manifold Manifold::MinkowskiDifference(const Manifold& other) const {
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto aImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (aImpl->status_ != Error::NoError) return PropagateStatus(aImpl->status_);
   auto bImpl = other.GetCsgLeafNode(ctx.get()).GetImpl();
@@ -1076,7 +1108,7 @@ Manifold Manifold::Hull(const std::vector<vec3>& pts) {
  * Compute the convex hull of this manifold.
  */
 Manifold Manifold::Hull() const {
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto srcImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (srcImpl->status_ != Error::NoError)
     return PropagateStatus(srcImpl->status_);
