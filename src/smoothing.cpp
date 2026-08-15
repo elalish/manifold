@@ -310,16 +310,12 @@ corner angles. A rectangle has zero cost, as does a symmetric trapezoid, while a
 parallelogram has positive cost. Two equilateral triangles have cost == 2.0,
 so we only allow a quad when cost < 1.0.
 */
-void Manifold::Impl::MarkQuads() {
+void Manifold::Impl::MarkQuads(const Vec<bool>& fixedHalfedge) {
   ZoneScoped;
-  halfedgeTangent_.resize(halfedge_.size(), vec4(0.));
   Vec<vec3> edgeDir(halfedge_.size());
   for_each_n(autoPolicy(edgeDir.size(), 1e5), countAt(0), edgeDir.size(),
              [this, &edgeDir](int edge) {
-               if (!halfedge_.IsForward(edge)) return;
-               edgeDir[edge] = SafeNormalize(vertPos_[halfedge_.End(edge)] -
-                                             vertPos_[halfedge_.Start(edge)]);
-               edgeDir[halfedge_.Pair(edge)] = -edgeDir[edge];
+               edgeDir[edge] = SafeNormalize(halfedgeTangent_[edge].xyz());
              });
 
   struct EdgeInfo {
@@ -329,19 +325,29 @@ void Manifold::Impl::MarkQuads() {
   Vec<EdgeInfo> edgeInfo(halfedge_.size(),
                          {-1, std::numeric_limits<double>::infinity()});
   for_each_n(autoPolicy(edgeInfo.size(), 1e5), countAt(0), edgeInfo.size(),
-             [this, &edgeInfo, &edgeDir](int edge) {
+             [this, &edgeInfo, &edgeDir, &fixedHalfedge](int edge) {
                if (!halfedge_.IsForward(edge)) return;
                const int pair = halfedge_.Pair(edge);
+               if (fixedHalfedge[edge] || fixedHalfedge[pair]) return;
                const ivec4 quad = {NextHalfedge(edge), PrevHalfedge(edge),
                                    NextHalfedge(pair), PrevHalfedge(pair)};
-               const double cost =
-                   std::abs(la::dot(edgeDir[quad[0]], edgeDir[quad[1]]) +
-                            la::dot(edgeDir[quad[2]], edgeDir[quad[3]])) +
-                   std::abs(la::dot(edgeDir[quad[0]], edgeDir[quad[3]]) +
-                            la::dot(edgeDir[quad[2]], edgeDir[quad[1]]));
-               if (cost < 1) edgeInfo[edge] = {edge, cost};
+               const vec4 points = {
+                   la::dot(edgeDir[halfedge_.Pair(quad[0])], edgeDir[quad[1]]),
+                   la::dot(edgeDir[halfedge_.Pair(quad[2])], edgeDir[quad[3]]),
+                   la::dot(edgeDir[quad[0]], edgeDir[halfedge_.Pair(quad[3])]),
+                   la::dot(edgeDir[quad[2]], edgeDir[halfedge_.Pair(quad[1])])};
+               const double cost = std::abs(points[0] + points[1]) +
+                                   std::abs(points[2] + points[3]);
+               if (cost < 1 && la::maxelem(la::abs(points)) < sqrt(3) / 2) {
+                 edgeInfo[edge] = {edge, cost};
+               }
              });
 
+  edgeInfo.resize(
+      remove_if(autoPolicy(edgeInfo.size(), 1e5), edgeInfo.begin(),
+                edgeInfo.end(),
+                [](const EdgeInfo& info) { return info.halfedge < 0; }) -
+      edgeInfo.begin());
   stable_sort(
       edgeInfo.begin(), edgeInfo.end(),
       [](const EdgeInfo& a, const EdgeInfo& b) { return a.cost < b.cost; });
@@ -811,7 +817,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
   const int numVert = NumVert();
   const int numHalfedge = halfedge_.size();
   Vec<bool> fixedHalfedge(numHalfedge, false);
-  MarkQuads();
+  halfedgeTangent_.resize(numHalfedge, vec4(0.));
 
   Vec<int> vertHalfedge = VertHalfedge();
   for_each_n(
@@ -946,6 +952,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
       });
 
   DistributeTangents(fixedHalfedge);
+  MarkQuads(fixedHalfedge);
 }
 
 /**
@@ -961,6 +968,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges,
                                     ExecutionContext::Impl* ctx) {
   ZoneScoped;
   const int numHalfedge = halfedge_.size();
+  halfedgeTangent_.resize(numHalfedge, vec4(0.));
   Vec<bool> fixedHalfedge(numHalfedge, false);
 
   Vec<int> vertHalfedge = VertHalfedge();
@@ -974,13 +982,10 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges,
   }
   ADVANCE_PHASE_OR_RETURN(ctx);
 
-  MarkQuads();
-
   for_each_n(autoPolicy(numHalfedge, 1e4), countAt(0), numHalfedge, ctx,
              [&vertNormal, this](const int edgeIdx) {
-               if (!IsMarkedInsideQuad(edgeIdx))
-                 halfedgeTangent_[edgeIdx] = TangentFromNormal(
-                     vertNormal[halfedge_.Start(edgeIdx)], edgeIdx);
+               halfedgeTangent_[edgeIdx] = TangentFromNormal(
+                   vertNormal[halfedge_.Start(edgeIdx)], edgeIdx);
              });
 
   ADVANCE_PHASE_OR_RETURN(ctx);
@@ -1075,13 +1080,11 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges,
 
           ForVert(vert[0].first.halfedge,
                   [this, &triIsFlatFace, smoothness](int current) {
-                    if (!IsMarkedInsideQuad(current)) {
-                      const int pair = halfedge_.Pair(current);
-                      SharpenTangent(current, triIsFlatFace[current / 3] ||
-                                                      triIsFlatFace[pair / 3]
-                                                  ? 0
-                                                  : smoothness);
-                    }
+                    const int pair = halfedge_.Pair(current);
+                    SharpenTangent(current, triIsFlatFace[current / 3] ||
+                                                    triIsFlatFace[pair / 3]
+                                                ? 0
+                                                : smoothness);
                   });
         }
       });
@@ -1092,6 +1095,8 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges,
 
   DistributeTangents(fixedHalfedge);
   ADVANCE_PHASE_OR_RETURN(ctx);
+
+  MarkQuads(fixedHalfedge);
 }
 
 bool Manifold::Impl::ValidTangents() const {

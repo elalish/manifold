@@ -45,7 +45,7 @@ TEST(Smooth, RefineQuads) {
   Manifold cylinder = WithPositionColors(Manifold::Cylinder(2, 1, -1, 12))
                           .SmoothOut()
                           .RefineToLength(0.05);
-  EXPECT_EQ(cylinder.NumTri(), 17044);
+  EXPECT_EQ(cylinder.NumTri(), 16924);
   EXPECT_NEAR(cylinder.Volume(), 2 * kPi, 0.003);
   EXPECT_NEAR(cylinder.SurfaceArea(), 6 * kPi, 0.004);
   const MeshGL out = cylinder.GetMeshGL();
@@ -85,6 +85,7 @@ TEST(Smooth, ToLength) {
       CrossSection::Circle(10, 10).Translate({10, 0}).ToPolygons(), 2, 0, 0,
       {0, 0});
   cone += cone.Scale({1, 1, -5});
+  EXPECT_EQ(cone.NumVert(), 12);
   Manifold smooth =
       cone.AsOriginal().Simplify().SmoothOut(180).RefineToLength(0.1);
   ExpectMeshes(smooth, {{85250, 170496}});
@@ -241,8 +242,8 @@ TEST(Smooth, Fillet) {
   EXPECT_EQ(chamfered.NumTri(), 56);
   Manifold fillet = chamfered.SmoothByNormals(0).RefineToTolerance(0.01);
   EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);
-  EXPECT_NEAR(fillet.Volume(), 7745, 1);
-  EXPECT_NEAR(fillet.SurfaceArea(), 2622, 1);
+  EXPECT_NEAR(fillet.Volume(), 12797, 1);
+  EXPECT_NEAR(fillet.SurfaceArea(), 3453, 1);
   if (options.exportModels) WriteTestOBJ("fillet.obj", fillet);
 }
 
@@ -303,8 +304,8 @@ TEST(Smooth, Csaszar) {
   Manifold csaszar = Manifold::Smooth(Csaszar());
   csaszar = csaszar.Refine(100);
   ExpectMeshes(csaszar, {{70000, 140000}});
-  EXPECT_NEAR(csaszar.Volume(), 78760, 10);
-  EXPECT_NEAR(csaszar.SurfaceArea(), 11935, 10);
+  EXPECT_NEAR(csaszar.Volume(), 81294, 10);
+  EXPECT_NEAR(csaszar.SurfaceArea(), 11748, 10);
 
   if (options.exportModels) WriteTestOBJ("smoothCsaszar.obj", csaszar);
 }
