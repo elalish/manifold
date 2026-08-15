@@ -33,10 +33,16 @@
 #include <memory>
 #include <type_traits>
 
-// Only the 64-bit MSVC backend below needs these, and <intrin.h> is heavy, so
-// keep them out of every other configuration's include graph. They must stay
-// at file scope: an #include inside a namespace nests whatever it declares.
+// One definition of "this build uses the hand-written MSVC atomic backend", so
+// the include guard, the backend selection and the test cannot drift apart.
 #if defined(_MSC_VER) && !defined(__clang__) && !defined(__cpp_lib_atomic_ref)
+#define MANIFOLD_MSVC_ATOMIC_INTRINSICS 1
+#endif
+
+// <intrin.h> is heavy, so keep it off every other configuration's include
+// graph. These must stay at file scope: an #include inside a namespace nests
+// whatever it declares.
+#ifdef MANIFOLD_MSVC_ATOMIC_INTRINSICS
 #include <intrin.h>
 
 #include <cstring>
@@ -55,7 +61,7 @@ using AtomicRef = std::atomic_ref<T>;
 
 namespace details {
 
-#if defined(_MSC_VER) && !defined(__clang__)  // MSVC backend
+#ifdef MANIFOLD_MSVC_ATOMIC_INTRINSICS  // MSVC backend
 
 // The intrinsics below need a 64-bit target: _InterlockedExchange64 and
 // _InterlockedExchangeAdd64 are documented for ARM/x64/ARM64 only, and

@@ -51,7 +51,7 @@ void RunConcurrently(F body) {
 TEST(Utils, AtomicRefBackend) {
 #if defined(__cpp_lib_atomic_ref)
   const char* backend = "std::atomic_ref";
-#elif defined(_MSC_VER) && !defined(__clang__)
+#elif defined(MANIFOLD_MSVC_ATOMIC_INTRINSICS)
   const char* backend = "_Interlocked* intrinsics";
 #else
   const char* backend = "__atomic builtins";
