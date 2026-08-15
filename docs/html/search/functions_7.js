@@ -1,0 +1,5 @@
+var searchData=
+[
+  ['hasnormals_0',['HasNormals',['../structmanifold_1_1_mesh_g_l_p.html#a9db29f4256cf903c09bfa209d76b65a1',1,'manifold::MeshGLP']]],
+  ['hull_1',['Hull',['../classmanifold_1_1_manifold.html#a9dc9e00112e2b063cfa6fe8482b1afe8',1,'manifold::Manifold::Hull() const'],['../classmanifold_1_1_manifold.html#a0b45afc24015963e82745f1f83f3f310',1,'manifold::Manifold::Hull(const std::vector&lt; Manifold &gt; &amp;manifolds)'],['../classmanifold_1_1_manifold.html#ab0a6fa5c97e3e47118ee69b741e64ad0',1,'manifold::Manifold::Hull(const std::vector&lt; vec3 &gt; &amp;pts)'],['../classmanifold_1_1_cross_section.html#aa5ea1caf54ddac72d939a00d13763ace',1,'manifold::CrossSection::Hull() const'],['../classmanifold_1_1_cross_section.html#a49d6309921d09ab4e9874f1987f3b487',1,'manifold::CrossSection::Hull(const std::vector&lt; CrossSection &gt; &amp;crossSections)'],['../classmanifold_1_1_cross_section.html#a6ec1373529032fdb3cea51c496cac2e4',1,'manifold::CrossSection::Hull(const SimplePolygon &amp;pts)'],['../classmanifold_1_1_cross_section.html#a5865c2f6a986e043ca8e91bfb0f284d1',1,'manifold::CrossSection::Hull(const Polygons &amp;polys)']]]
+];

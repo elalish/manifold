@@ -1,0 +1,116 @@
+body.container {
+  max-width: 1800px;
+  margin: 0 auto;
+  padding: 28px 64px;
+  color: #222;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+a {
+  color: #2563c9;
+}
+
+.top-nav {
+  margin-bottom: 14px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 14px;
+}
+
+h1 {
+  margin: 10px 0 16px;
+  font-size: 26px;
+}
+
+h2 {
+  margin-top: 18px;
+}
+
+details {
+  margin-bottom: 12px;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.controls,
+#scale-select-form {
+  margin: 8px 0 12px;
+}
+
+#scale-select-form label,
+.controls label {
+  margin-right: 14px;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.data-source,
+#page-latest,
+#status-line {
+  margin: 8px 0;
+}
+
+#page-latest p {
+  margin: 3px 0;
+}
+
+.top-nav a.active {
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+}
+
+.graphs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px 30px;
+  margin-top: 8px;
+}
+
+.chart-box {
+  min-width: 0;
+  min-height: 420px;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 8px;
+}
+
+th,
+td {
+  border-bottom: 1px solid #ddd;
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+
+th {
+  font-weight: 600;
+}
+
+#error-box {
+  padding: 10px;
+  border: 1px solid #c44;
+  background: #fff5f5;
+  color: #8a1f1f;
+  white-space: pre-wrap;
+}
+
+@media screen and (max-width: 900px) {
+  body.container {
+    padding: 18px;
+  }
+
+  .graphs {
+    grid-template-columns: 1fr;
+  }
+}
