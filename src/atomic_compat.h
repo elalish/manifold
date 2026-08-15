@@ -13,19 +13,19 @@
 // limitations under the License.
 //
 // C++17 stand-ins for atomic facilities the library would otherwise get from
-// C++20. Everything here is scaffolding for that gap, collected in one file so
-// it can be removed in one go once the baseline moves:
+// C++20. The two halves have different lifetimes:
 //
-//   - `AtomicRef<T>` is `std::atomic_ref` (P0019R8). It replaces a
-//     reinterpret_cast of a plain `T&` to `std::atomic<T>&`, which was
-//     undefined behavior that happened to work on every ABI we ship
-//     (elalish/manifold#1153). At C++20 it becomes a plain alias. 32-bit
-//     MSVC has no C++17 path here and is rejected outright.
+//   - `AtomicRef<T>` is `std::atomic_ref` (P0019R8), replacing a
+//     reinterpret_cast of `T&` to `std::atomic<T>&` that was undefined
+//     behavior. At C++20 it becomes a plain alias and goes away. 32-bit MSVC
+//     has no C++17 path and is rejected outright.
 //   - `AtomicLoadShared` / `AtomicStoreShared` wrap the `std::atomic_load` and
 //     `std::atomic_store` shared_ptr overloads, which C++20 deprecates and
-//     C++26 removes (P2869). Their replacement is a member of type
-//     `std::atomic<std::shared_ptr<T>>`, which is C++20-only and would delete
-//     `Manifold`'s defaulted move operations, so it is a separate change.
+//     C++26 removes (P2869). These do not go away at C++20: the replacement
+//     changes the member's type to `std::atomic<std::shared_ptr<T>>` rather
+//     than how it is accessed, and libc++ still leaves
+//     `__cpp_lib_atomic_shared_ptr` undefined. Revisit when the baseline moves
+//     and libc++ ships it.
 
 #pragma once
 #include <atomic>
