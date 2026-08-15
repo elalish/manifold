@@ -19,9 +19,8 @@
 //   - `AtomicRef<T>` is `std::atomic_ref` (P0019R8). It replaces a
 //     reinterpret_cast of a plain `T&` to `std::atomic<T>&`, which was
 //     undefined behavior that happened to work on every ABI we ship
-//     (elalish/manifold#1153). At C++20 it becomes a plain alias. 32-bit MSVC
-//     is the exception: it keeps the cast, since the intrinsics needed to
-//     avoid it are not all available there.
+//     (elalish/manifold#1153). At C++20 it becomes a plain alias. 32-bit
+//     MSVC has no C++17 path here and is rejected outright.
 //   - `AtomicLoadShared` / `AtomicStoreShared` wrap the `std::atomic_load` and
 //     `std::atomic_store` shared_ptr overloads, which C++20 deprecates and
 //     C++26 removes (P2869). Their replacement is a member of type
@@ -37,8 +36,7 @@
 // Only the 64-bit MSVC backend below needs these, and <intrin.h> is heavy, so
 // keep them out of every other configuration's include graph. They must stay
 // at file scope: an #include inside a namespace nests whatever it declares.
-#if defined(_MSC_VER) && !defined(__clang__) && !defined(_M_IX86) && \
-    !defined(_M_ARM) && !defined(__cpp_lib_atomic_ref)
+#if defined(_MSC_VER) && !defined(__clang__) && !defined(__cpp_lib_atomic_ref)
 #include <intrin.h>
 
 #include <cstring>
@@ -59,45 +57,16 @@ namespace details {
 
 #if defined(_MSC_VER) && !defined(__clang__)  // MSVC backend
 
-// 32-bit MSVC keeps the pre-#1153 behavior. The intrinsics below are not all
-// available there (_InterlockedExchange64 and _InterlockedExchangeAdd64 are
-// documented for ARM/x64/ARM64 only), and __iso_volatile_load64/store64 are
-// not atomic on a 32-bit target - the compiler may split them into two 32-bit
-// accesses. Writing the CAS-loop workarounds MSVC STL uses would mean carrying
-// code no CI lane can compile, so instead this target falls back to exactly
-// what the tree did before: the reinterpret_cast to std::atomic. That is still
-// the undefined behavior #1153 is about, but it is the status quo rather than
-// a regression, and refusing to build would take away a working configuration.
+// The intrinsics below need a 64-bit target: _InterlockedExchange64 and
+// _InterlockedExchangeAdd64 are documented for ARM/x64/ARM64 only, and
+// __iso_volatile_load64/store64 are not atomic on a 32-bit target, where the
+// compiler may split them into two 32-bit accesses. Rather than carry the
+// CAS-loop workarounds MSVC STL uses for code no CI lane can compile, say so.
+// This is 32-bit x86 and ARMv7; ARM64 and ARM64EC are 64-bit and unaffected.
 #if defined(_M_IX86) || defined(_M_ARM)
-#pragma message( \
-    "manifold: 32-bit MSVC keeps the pre-#1153 reinterpret_cast for atomics; build x64/ARM64 or /std:c++20 for the checked path")
-
-template <typename T>
-struct AtomicBackend {
-  static std::atomic<T>& Ref(T* p) {
-    return reinterpret_cast<std::atomic<T>&>(*p);
-  }
-  static T Load(T* p, std::memory_order order) { return Ref(p).load(order); }
-  static void Store(T* p, T desired, std::memory_order order) {
-    Ref(p).store(desired, order);
-  }
-  static T Exchange(T* p, T desired, std::memory_order order) {
-    return Ref(p).exchange(desired, order);
-  }
-  static bool CompareExchange(T* p, T& expected, T desired,
-                              std::memory_order order, bool weak) {
-    return weak ? Ref(p).compare_exchange_weak(expected, desired, order)
-                : Ref(p).compare_exchange_strong(expected, desired, order);
-  }
-  // std::atomic<double>::fetch_add does not exist in C++17. This compiles
-  // only because AtomicRef::fetch_add is SFINAE-gated on is_integral, so this
-  // body is never instantiated for a floating-point T. Keep that gate.
-  static T FetchAdd(T* p, T arg, std::memory_order order) {
-    return Ref(p).fetch_add(arg, order);
-  }
-};
-
-#else  // 64-bit MSVC: real intrinsics
+#error \
+    "manifold does not support 32-bit MSVC: the 64-bit atomics it needs are unavailable there. Build for x64/ARM64, or with /std:c++20."
+#endif
 
 // One integer width per object size, reached through memcpy so the same code
 // serves `double` as well as the integer types. The read-modify-write
@@ -119,7 +88,7 @@ struct MsvcAtomic;
 // std::atomic_thread_fence would instead emit a locked _InterlockedIncrement.
 // ARM is weakly ordered and needs the real dmb.
 inline void PostLoadBarrier(std::memory_order order) {
-#if defined(_M_ARM) || defined(_M_ARM64) || defined(_M_ARM64EC)
+#if defined(_M_ARM64) || defined(_M_ARM64EC)
   std::atomic_thread_fence(order);
 #else
   std::atomic_signal_fence(order);
@@ -157,6 +126,9 @@ inline void PostLoadBarrier(std::memory_order order) {
     static Int Cas(volatile Int* p, Int expected, Int desired) {            \
       return _InterlockedCompareExchange##Suffix(p, desired, expected);     \
     }                                                                       \
+    /* Integral only. A floating-point T would compile here and silently    \
+       integer-add the memcpy'd bit pattern; AtomicRef::fetch_add is        \
+       enable_if'd to integral for exactly that reason. Keep that gate. */  \
     static Int Add(volatile Int* p, Int v) {                                \
       return _InterlockedExchangeAdd##Suffix(p, v);                         \
     }                                                                       \
@@ -218,8 +190,6 @@ struct AtomicBackend {
     return FromInt(MsvcAtomic<sizeof(T)>::Add(AsInt(p), ToInt(arg)));
   }
 };
-
-#endif  // 32-bit MSVC fallback
 
 #else  // GCC/Clang backend
 
@@ -332,8 +302,7 @@ struct AtomicBackend {
  * so a weaker request is satisfied by being stronger. `Load` is the exception:
  * a plain load plus a trailing fence, exact on x86/x64, and on ARM64 an
  * acquire load that serves as seq_cst only because the store side goes through
- * the full-barrier _InterlockedExchange. That describes the 64-bit MSVC
- * backend; the 32-bit fallback defers to std::atomic and is exact throughout.
+ * the full-barrier _InterlockedExchange.
  */
 template <typename T>
 class AtomicRef {
@@ -400,9 +369,10 @@ class AtomicRef {
                                     /*weak=*/false);
   }
 
-  // Integral only: __atomic_fetch_add and _InterlockedExchangeAdd are both
-  // defined for integers and pointers. Floating-point accumulation goes
-  // through the compare_exchange_weak loop in AtomicAdd.
+  // Integral only. GCC rejects a floating-point __atomic_fetch_add outright,
+  // but Clang accepts it and the MSVC backend would silently integer-add the
+  // bit pattern, so this gate is what keeps `double` on AtomicAdd's
+  // compare_exchange_weak loop instead. Keep it.
   template <typename U = T>
   std::enable_if_t<std::is_integral<U>::value, T> fetch_add(
       T arg, std::memory_order order = std::memory_order_seq_cst) {

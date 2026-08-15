@@ -91,24 +91,41 @@ jobs:
         name: meshes-windows
         path: meshes-windows/
   build:
-    name: GCC ${{matrix.gcc}} (TBB:${{matrix.parallelization}}${{matrix.std == 20 && ', C++20' || ''}})
+    name: ${{matrix.name}}
     timeout-minutes: 45
     strategy:
-      fail-fast: false
       matrix:
-        parallelization: [OFF, ON]
-        os: [ubuntu-24.04]
-        gcc: [13, 14]
-        std: [17]
         include:
-          - parallelization: ON
-            os: ubuntu-22.04
+          - name: GCC 11 (TBB:ON)
             gcc: 11
+            parallelization: ON
+            os: ubuntu-22.04
+            std: 17
+          - name: GCC 13 (TBB:OFF)
+            gcc: 13
+            parallelization: OFF
+            os: ubuntu-24.04
+            std: 17
+          - name: GCC 13 (TBB:ON)
+            gcc: 13
+            parallelization: ON
+            os: ubuntu-24.04
+            std: 17
+          - name: GCC 14 (TBB:OFF)
+            gcc: 14
+            parallelization: OFF
+            os: ubuntu-24.04
+            std: 17
+          - name: GCC 14 (TBB:ON)
+            gcc: 14
+            parallelization: ON
+            os: ubuntu-24.04
             std: 17
           # One strict lane at C++20, to catch what it deprecates or redefines.
-          - parallelization: ON
-            os: ubuntu-24.04
+          - name: GCC 14 (TBB:ON, C++20)
             gcc: 14
+            parallelization: ON
+            os: ubuntu-24.04
             std: 20
     runs-on: ${{ matrix.os }}
     env:
