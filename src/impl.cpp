@@ -820,7 +820,8 @@ static std::ostream& WriteOBJWithEpsilon(std::ostream& stream,
 static std::pair<MeshGL64, std::optional<double>> ReadOBJWithEpsilon(
     std::istream& stream) {
   static const std::string FLOAT_PATTERN =
-      "(-?\\d+(?:\\.\\d*)?(?:[eE][+\\-]?\\d+)?)";
+      "(-?(?:0[xX][0-9a-fA-F]+(?:\\.[0-9a-fA-F]*)?[pP][+\\-]?\\d+|\\d+(?:\\."
+      "\\d*)?(?:[eE][+\\-]?\\d+)?))";
   static const std::string FACE_ELEMENT = "(\\d+)(?:\\S+)?";
   static const std::string TRAILING_SPACES = "(?:\\s*)";
   static const std::string SEPARATOR = "\\s+";
