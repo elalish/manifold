@@ -442,7 +442,7 @@ void Manifold::Impl::SimplifyTopology2() {
     //           << ", swapped: " << numSwapped
     //           << ", edges left: " << (end - edges.begin()) << ", "
     //           << itr - edges.begin() << std::endl;
-    totalCollapsed += numCollapsed;
+    // totalCollapsed += numCollapsed;
     if (numCollapsed == 0 && numSwapped == 0) break;
 
     for_each_n(autoPolicy(NumTri(), 1e4), countAt(0), NumTri(), [&](int tri) {

@@ -338,7 +338,8 @@ void Manifold::Impl::MarkQuads(const Vec<bool>& fixedHalfedge) {
                    la::dot(edgeDir[quad[2]], edgeDir[halfedge_.Pair(quad[1])])};
                const double cost = std::abs(points[0] + points[1]) +
                                    std::abs(points[2] + points[3]);
-               if (cost < 1 && la::maxelem(la::abs(points)) < sqrt(3) / 2) {
+               if (cost < std::sqrt(3) &&
+                   la::maxelem(la::abs(points)) < std::sqrt(3) / 2) {
                  edgeInfo[edge] = {edge, cost};
                }
              });
@@ -861,8 +862,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 } else {  // both missing
                   if (startHalfedge < 0) startHalfedge = -2;
                 }
-                if (halfedgeTangent_[halfedge].w != kInsideQuad)
-                  halfedgeTangent_[halfedge].w = kMissingNormal;
+                halfedgeTangent_[halfedge].w = kMissingNormal;
               }
 
               if (halfedgeTangent_[halfedge].w < 0) {
@@ -893,8 +893,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
           // Use vert pseudo normal if no normals are present at all.
           const vec3 normal = vertNormal_[halfedge_.Start(e)];
           ForVert(e, [&](int halfedge) {
-            if (halfedgeTangent_[halfedge].w != kInsideQuad)
-              halfedgeTangent_[halfedge] = TangentFromNormal(normal, halfedge);
+            halfedgeTangent_[halfedge] = TangentFromNormal(normal, halfedge);
           });
           return;
         }
