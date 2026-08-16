@@ -51,10 +51,8 @@ void RunConcurrently(F body) {
 TEST(Utils, AtomicRefBackend) {
 #if defined(__cpp_lib_atomic_ref)
   const char* backend = "std::atomic_ref";
-#elif defined(MANIFOLD_MSVC_ATOMIC_INTRINSICS)
-  const char* backend = "_Interlocked* intrinsics";
 #else
-  const char* backend = "__atomic builtins";
+  const char* backend = "C++17 cast";
 #endif
   RecordProperty("backend", backend);
   std::cout << "AtomicRef backend: " << backend << std::endl;
@@ -72,8 +70,8 @@ TEST(Utils, AtomicRefFetchAddLosesNothing) {
 }
 
 // AtomicAdd's generic overload accumulates through a compare_exchange_weak
-// loop, because neither __atomic_fetch_add nor _InterlockedExchangeAdd take
-// floating point. Sum 1.0 so the result is exactly representable.
+// loop, because C++17's std::atomic has no floating-point fetch_add. Sum 1.0
+// so the result is exactly representable.
 TEST(Utils, AtomicAddAccumulatesDoubles) {
   double total = 0.0;
   RunConcurrently([&total](int) {
@@ -134,9 +132,8 @@ TEST(Utils, AtomicRefCompareExchangeReportsCurrentValue) {
   EXPECT_EQ(value, 9);
 }
 
-// The MSVC backend is specialized per object width with a different intrinsic
-// family each time, and those lanes are the only place it compiles, so
-// exercise every width plus a non-integer type.
+// std::atomic's layout and lock-freedom are asserted per width, and the cast
+// relies on both, so exercise every width plus a non-integer type.
 template <typename T>
 void ExpectRoundTrip(T a, T b) {
   SCOPED_TRACE(testing::Message() << "sizeof(T) = " << sizeof(T));
@@ -168,8 +165,7 @@ TEST(Utils, AtomicRefRoundTripsEveryWidth) {
   ExpectRoundTrip<double>(-2.5, 1e300);
 }
 
-// fetch_add across the integer widths, which on MSVC is a fourth intrinsic
-// family again.
+// fetch_add across the integer widths.
 TEST(Utils, AtomicRefFetchAddEveryWidth) {
   uint8_t u8 = 250;
   EXPECT_EQ(AtomicRef<uint8_t>(u8).fetch_add(3), 250);
@@ -210,4 +206,19 @@ TEST(Utils, AtomicRefLoadStoreRoundTrip) {
   EXPECT_EQ(AtomicRef<int>(const_cast<int&>(constValue))
                 .load(std::memory_order_acquire),
             3);
+}
+
+// std::atomic_ref's mutators are const - it is a handle, so constness of the
+// handle says nothing about the referent. The C++17 stand-in has to match, or
+// code written against one standard fails to build on the other.
+TEST(Utils, AtomicRefMutatorsAreConst) {
+  int value = 0;
+  const AtomicRef<int> ref(value);
+  ref.store(4);
+  EXPECT_EQ(ref.load(), 4);
+  EXPECT_EQ(ref.exchange(5), 4);
+  int expected = 5;
+  EXPECT_TRUE(ref.compare_exchange_strong(expected, 6));
+  EXPECT_EQ(ref.fetch_add(1), 6);
+  EXPECT_EQ(value, 7);
 }
