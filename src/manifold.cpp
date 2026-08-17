@@ -435,7 +435,10 @@ double Manifold::Volume() const {
 /**
  * If this mesh is an original, this returns its meshID that can be referenced
  * by product manifolds' MeshRelation. If this manifold is a product, this
- * returns -1.
+ * returns -1. The ID 0 is special, indicating this ID is not unique to this
+ * object. ID 0 is the default, allowing maximum simplification of coplanar
+ * faces, but does not support properties. When tracking materials and
+ * properties on objects, be sure to call AsOriginal() and record its unique ID.
  */
 int Manifold::OriginalID() const {
   return GetCsgLeafNode().GetImpl()->meshRelation_.originalID;
@@ -447,14 +450,22 @@ int Manifold::OriginalID() const {
  * - these don't get joined at boundaries where originalID changes, so the
  * reset may allow triangles of flat faces to be further collapsed with
  * Simplify().
+ *
+ * @param id The ID to assign to this manifold. If negative (the default), a new
+ * ID is assigned. Use zero to match all default-constructed manifolds, thus not
+ * keeping track of the joints between input manifolds. Ensure separate IDs are
+ * used for mesh inputs containing properties, generally by calling this
+ * function without arguments just after construction.
  */
-Manifold Manifold::AsOriginal() const {
+Manifold Manifold::AsOriginal(int id) const {
   auto oldImpl = GetCsgLeafNode().GetImpl();
   if (oldImpl->status_ != Error::NoError)
     return PropagateStatus(oldImpl->status_);
   auto newImpl = std::make_shared<Impl>(*oldImpl);
-  newImpl->InitializeOriginal();
+  newImpl->InitializeOriginal(id);
+  id = newImpl->meshRelation_.originalID;
   newImpl->SetNormalsAndCoplanar();
+  newImpl->InitializeOriginal(id, true);
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
 

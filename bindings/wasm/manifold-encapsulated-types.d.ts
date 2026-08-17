@@ -1227,12 +1227,13 @@ export class Manifold {
   // ID Management
 
   /**
-   * If you copy a manifold, but you want this new copy to have new properties
-   * (e.g. a different UV mapping), you can reset its IDs to a new original,
-   * meaning it will now be referenced by its descendants instead of the meshes
-   * it was built from, allowing you to differentiate the copies when applying
-   * your properties to the final result.
+   * This removes all relations (originalID, faceID, transform) to ancestor
+   * meshes and this new Manifold is marked an original. It also recreates faces
+   * - these don't get joined at boundaries where originalID changes, so the
+   * reset may allow triangles of flat faces to be further collapsed with
+   * Simplify().
    *
+<<<<<<< HEAD
    * This function also condenses all coplanar faces in the relation, and
    * collapses those edges. If you want to have inconsistent properties across
    * these faces, meaning you want to preserve some of these edges, you should
@@ -1240,8 +1241,16 @@ export class Manifold {
    * construct a new manifold.
    *
    * @group Mesh ID
+=======
+   * @param id The ID to assign to this manifold. If negative (the default), a
+   *     new ID is assigned. Use zero to match all default-constructed
+   *     manifolds, thus not keeping track of the joints between input
+   *     manifolds. Ensure separate IDs are used for mesh inputs containing
+   *     properties, generally by calling this function without arguments just
+   *     after construction.
+>>>>>>> c15c7025 (switch meshID tracking to opt-in)
    */
-  asOriginal(): Manifold;
+  asOriginal(id?: number): Manifold;
 
   /**
    * If this mesh is an original, this returns its ID that can be referenced
