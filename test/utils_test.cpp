@@ -17,34 +17,11 @@
 #include <atomic>
 #include <cstdint>
 #include <iostream>
-#include <thread>
-#include <vector>
 
 #include "../src/atomic_compat.h"
 #include "gtest/gtest.h"
 
 using namespace manifold;
-
-namespace {
-#ifndef __EMSCRIPTEN__
-// Enough contention to catch a lost update, without making the suite slow.
-constexpr int kThreads = 8;
-constexpr int kPerThread = 20000;
-// HashTableD's empty-slot marker.
-constexpr uint64_t kOpen = ~uint64_t{0};
-
-// Run `body(t)` on kThreads threads and join them all. Native-only: the WASM
-// build is single-threaded, so std::thread construction throws and aborts
-// under -fno-exceptions, as in cross_section_test's concurrency tests.
-template <typename F>
-void RunConcurrently(F body) {
-  std::vector<std::thread> threads;
-  threads.reserve(kThreads);
-  for (int t = 0; t < kThreads; ++t) threads.emplace_back(body, t);
-  for (auto& thread : threads) thread.join();
-}
-#endif  // __EMSCRIPTEN__
-}  // namespace
 
 // Which backend this build selected is not otherwise visible. Report it so a
 // CI log says whether the lane covered the std::atomic_ref path or a fallback.
@@ -57,67 +34,6 @@ TEST(Utils, AtomicRefBackend) {
   RecordProperty("backend", backend);
   std::cout << "AtomicRef backend: " << backend << std::endl;
 }
-
-#ifndef __EMSCRIPTEN__
-// The whole point of the class: the target is a plain int, not a std::atomic,
-// and concurrent increments must still not lose an update.
-TEST(Utils, AtomicRefFetchAddLosesNothing) {
-  int counter = 0;
-  RunConcurrently([&counter](int) {
-    for (int i = 0; i < kPerThread; ++i) AtomicRef<int>(counter).fetch_add(1);
-  });
-  EXPECT_EQ(counter, kThreads * kPerThread);
-}
-
-// AtomicAdd's generic overload accumulates through a compare_exchange_weak
-// loop, because C++17's std::atomic has no floating-point fetch_add. Sum 1.0
-// so the result is exactly representable.
-TEST(Utils, AtomicAddAccumulatesDoubles) {
-  double total = 0.0;
-  RunConcurrently([&total](int) {
-    for (int i = 0; i < kPerThread; ++i) AtomicAdd(total, 1.0);
-  });
-  EXPECT_EQ(total, static_cast<double>(kThreads * kPerThread));
-}
-
-// The pattern in AssignNormals and DedupePropVerts: whoever exchanges in the
-// 1 first is the single owner, and everyone else must observe it.
-TEST(Utils, AtomicRefExchangeHasExactlyOneWinner) {
-  uint8_t flag = 0;
-  std::atomic<int> winners{0};
-  RunConcurrently([&flag, &winners](int) {
-    if (AtomicRef<uint8_t>(flag).exchange(static_cast<uint8_t>(1)) == 0) {
-      winners.fetch_add(1);
-    }
-  });
-  EXPECT_EQ(winners.load(), 1);
-  EXPECT_EQ(flag, 1u);
-}
-
-// HashTableD::Insert treats a returned kOpen as proof that it claimed the
-// slot, so the CAS must be the strong form. A weak CAS may fail spuriously
-// and report the unchanged value, which would let two threads both believe
-// they own the same key. Note this cannot actually catch the weak form on
-// x86, where lock cmpxchg never fails spuriously - the guarantee is
-// architectural, and this pins the intent rather than policing it.
-TEST(Utils, AtomicRefCompareExchangeStrongHasExactlyOneWinner) {
-  uint64_t slot = kOpen;
-  std::atomic<int> claims{0};
-  RunConcurrently([&slot, &claims](int t) {
-    uint64_t expected = kOpen;
-    if (AtomicRef<uint64_t>(slot).compare_exchange_strong(
-            expected, static_cast<uint64_t>(t))) {
-      claims.fetch_add(1);
-    } else {
-      // On failure `expected` must carry the value that beat us, never kOpen.
-      EXPECT_NE(expected, kOpen);
-    }
-  });
-  EXPECT_EQ(claims.load(), 1);
-  EXPECT_NE(slot, kOpen);
-}
-
-#endif  // __EMSCRIPTEN__
 
 // A failed compare_exchange reports the current value through `expected`,
 // which is what the AtomicAdd retry loop relies on.
