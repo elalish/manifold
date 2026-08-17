@@ -719,7 +719,8 @@ void Manifold::Impl::LinearizeFlatTangents() {
  * edges. This avoids folding the output shape and gives smoother results. There
  * must be at least one fixed halfedge on a vertex for that vertex to be
  * operated on. If there is only one, then that halfedge is not treated as
- * fixed, but the whole circle is turned to an average orientation.
+ * fixed, but the whole circle is turned to an average orientation, and this
+ * halfedge is unmarked as fixed so it doesn't affect MarkQuads().
  */
 void Manifold::Impl::DistributeTangents(Vec<bool>& fixedHalfedges) {
   const int numHalfedge = fixedHalfedges.size();
@@ -833,6 +834,25 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
         int startHalfedge = -1;
         vec3 lastNormal(0.0);
 
+        auto calculateTangent = [&](int halfedge, vec3 prevNormal,
+                                    vec3 nextNormal) {
+          if (EqualNormals(nextNormal, prevNormal)) {
+            halfedgeTangent_[halfedge] =
+                TangentFromNormal(prevNormal, halfedge);
+          } else {
+            // tangents at the intersection of two normals are fixed.
+            fixedHalfedge[halfedge] = true;
+            // Override the flat face logic if more than one normal.
+            faceEdges[0] = -2;
+
+            const vec3 edgeVec = vertPos_[halfedge_.End(halfedge)] -
+                                 vertPos_[halfedge_.Start(halfedge)];
+            const vec3 dir = la::cross(prevNormal, nextNormal);
+            halfedgeTangent_[halfedge] = CircularTangent(
+                (la::dot(dir, edgeVec) < 0 ? -1.0 : 1.0) * dir, edgeVec);
+          }
+        };
+
         ForVert<FlatNormal>(
             e,
             [normalIdx, this](int halfedge) {
@@ -871,22 +891,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 return;
               }
 
-              // calculate tangents
-              if (EqualNormals(next.normal, here.normal)) {
-                halfedgeTangent_[halfedge] =
-                    TangentFromNormal(here.normal, halfedge);
-              } else {
-                // tangents at the intersection of two normals are fixed.
-                fixedHalfedge[halfedge] = true;
-                // Override the flat face logic if more than one normal.
-                faceEdges[0] = -2;
-
-                const vec3 edgeVec = vertPos_[halfedge_.End(halfedge)] -
-                                     vertPos_[halfedge_.Start(halfedge)];
-                const vec3 dir = la::cross(here.normal, next.normal);
-                halfedgeTangent_[halfedge] = CircularTangent(
-                    (la::dot(dir, edgeVec) < 0 ? -1.0 : 1.0) * dir, edgeVec);
-              }
+              calculateTangent(halfedge, here.normal, next.normal);
             });
 
         if (startHalfedge != -1 && lastNormal == vec3(0.)) {
@@ -913,20 +918,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 nextNormal = lastNormal;
               }
 
-              if (EqualNormals(prevNormal, nextNormal)) {
-                halfedgeTangent_[current] =
-                    TangentFromNormal(prevNormal, current);
-              } else {
-                // tangents at the intersection of two normals are fixed.
-                fixedHalfedge[current] = true;
-                // Override the flat face logic if more than one normal.
-                faceEdges[0] = -2;
-                const vec3 dir = la::cross(prevNormal, nextNormal);
-                const vec3 edgeVec = vertPos_[halfedge_.End(current)] -
-                                     vertPos_[halfedge_.Start(current)];
-                halfedgeTangent_[current] = CircularTangent(
-                    (la::dot(dir, edgeVec) < 0 ? -1.0 : 1.0) * dir, edgeVec);
-              }
+              calculateTangent(current, prevNormal, nextNormal);
             }
             vec3 currentNormal = GetNormal(current, normalIdx);
             if (currentNormal != vec3(0.)) {
