@@ -259,7 +259,7 @@ struct Manifold::Impl {
   void SharpenTangent(int halfedge, double smoothness);
   void SetNormals(int normalIdx, double minSharpAngle);
   void LinearizeFlatTangents();
-  void DistributeTangents(const Vec<bool>& fixedHalfedges);
+  void DistributeTangents(Vec<bool>& fixedHalfedges);
   void CreateTangents(int normalIdx);
   void CreateTangents(std::vector<Smoothness>,
                       ExecutionContext::Impl* ctx = nullptr);

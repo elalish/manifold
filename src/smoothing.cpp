@@ -721,12 +721,12 @@ void Manifold::Impl::LinearizeFlatTangents() {
  * operated on. If there is only one, then that halfedge is not treated as
  * fixed, but the whole circle is turned to an average orientation.
  */
-void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
+void Manifold::Impl::DistributeTangents(Vec<bool>& fixedHalfedges) {
   const int numHalfedge = fixedHalfedges.size();
   for_each_n(
       autoPolicy(numHalfedge, 1e4), countAt(0), numHalfedge,
       [this, &fixedHalfedges](int halfedge) {
-        if (!fixedHalfedges[halfedge] || IsMarkedInsideQuad(halfedge)) return;
+        if (!fixedHalfedges[halfedge]) return;
 
         vec3 normal(0.0);
         Vec<double> currentAngle;
@@ -742,7 +742,6 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
         int current = halfedge;
         do {
           current = NextHalfedge(halfedge_.Pair(current));
-          if (IsMarkedInsideQuad(current)) continue;
           const vec3 thisEdgeVec =
               SafeNormalize(vertPos_[halfedge_.End(current)] - center);
           const vec3 thisTangent =
@@ -769,11 +768,13 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
 
         const double scale = currentAngle.back() / desiredAngle.back();
         double offset = 0;
+        bool unmarkFixed = false;
         if (current == halfedge) {  // only one - find average offset
           for (size_t i = 0; i < currentAngle.size(); ++i) {
             offset += Wrap(currentAngle[i] - scale * desiredAngle[i]);
           }
           offset /= currentAngle.size();
+          unmarkFixed = true;
         }
 
         current = halfedge;
@@ -781,7 +782,6 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
         do {
           current = NextHalfedge(halfedge_.Pair(current));
           if (current != halfedge && fixedHalfedges[current]) break;
-          if (IsMarkedInsideQuad(current)) continue;
           desiredAngle[i] *= scale;
           const double lastAngle = i > 0 ? desiredAngle[i - 1] : 0;
           // shrink obtuse angles
@@ -800,6 +800,7 @@ void Manifold::Impl::DistributeTangents(const Vec<bool>& fixedHalfedges) {
           }
           ++i;
         } while (!fixedHalfedges[current]);
+        if (unmarkFixed) fixedHalfedges[halfedge] = false;
       });
 }
 
@@ -916,6 +917,10 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 halfedgeTangent_[current] =
                     TangentFromNormal(prevNormal, current);
               } else {
+                // tangents at the intersection of two normals are fixed.
+                fixedHalfedge[current] = true;
+                // Override the flat face logic if more than one normal.
+                faceEdges[0] = -2;
                 const vec3 dir = la::cross(prevNormal, nextNormal);
                 const vec3 edgeVec = vertPos_[halfedge_.End(current)] -
                                      vertPos_[halfedge_.Start(current)];

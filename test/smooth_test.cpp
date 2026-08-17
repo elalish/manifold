@@ -304,8 +304,8 @@ TEST(Smooth, Csaszar) {
   Manifold csaszar = Manifold::Smooth(Csaszar());
   csaszar = csaszar.Refine(100);
   ExpectMeshes(csaszar, {{70000, 140000}});
-  EXPECT_NEAR(csaszar.Volume(), 81294, 10);
-  EXPECT_NEAR(csaszar.SurfaceArea(), 11748, 10);
+  EXPECT_NEAR(csaszar.Volume(), 74757, 10);
+  EXPECT_NEAR(csaszar.SurfaceArea(), 11313, 10);
 
   if (options.exportModels) WriteTestOBJ("smoothCsaszar.obj", csaszar);
 }
