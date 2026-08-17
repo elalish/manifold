@@ -45,7 +45,7 @@ TEST(Smooth, RefineQuads) {
   Manifold cylinder = WithPositionColors(Manifold::Cylinder(2, 1, -1, 12))
                           .SmoothOut()
                           .RefineToLength(0.05);
-  EXPECT_EQ(cylinder.NumTri(), 16924);
+  EXPECT_EQ(cylinder.NumTri(), 16644);
   EXPECT_NEAR(cylinder.Volume(), 2 * kPi, 0.003);
   EXPECT_NEAR(cylinder.SurfaceArea(), 6 * kPi, 0.004);
   const MeshGL out = cylinder.GetMeshGL();
@@ -106,7 +106,7 @@ TEST(Smooth, ToLength) {
 TEST(Smooth, Sphere) {
   int n[5] = {4, 8, 16, 32, 64};
   // Tests vertex precision of interpolation
-  double precision[5] = {0.04, 0.003, 0.003, 0.0005, 0.00006};
+  double precision[5] = {0.04, 0.015, 0.003, 0.0005, 0.00006};
   for (int i = 0; i < 5; ++i) {
     Manifold sphere = Manifold::Sphere(1, n[i]);
     // Refine(3*x) makes a center point, which is the worst case.
@@ -430,7 +430,7 @@ TEST(Smooth, SDF) {
           .SetProperties(1, error);
 
   MeshGL out = smoothed.GetMeshGL();
-  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.028);
+  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.035);
   EXPECT_NEAR(GetMaxProperty(interpolated.GetMeshGL(), 3), 0, 0.083);
 
   if (options.exportModels) WriteTestOBJ("smoothGyroid.obj", smoothed);

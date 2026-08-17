@@ -836,8 +836,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
             e,
             [normalIdx, this](int halfedge) {
               const vec3 normal = GetNormal(halfedge, normalIdx);
-              return FlatNormal(
-                  {EqualNormals(normal, faceNormal_[halfedge / 3]), normal});
+              return FlatNormal({normal == faceNormal_[halfedge / 3], normal});
             },
             [&](int halfedge, const FlatNormal& here, const FlatNormal& next) {
               // Tangents not known at first are used as temporary storage for
@@ -1093,9 +1092,8 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges,
   ADVANCE_PHASE_OR_RETURN(ctx);
 
   DistributeTangents(fixedHalfedge);
-  ADVANCE_PHASE_OR_RETURN(ctx);
-
   MarkQuads(fixedHalfedge);
+  ADVANCE_PHASE_OR_RETURN(ctx);
 }
 
 bool Manifold::Impl::ValidTangents() const {
