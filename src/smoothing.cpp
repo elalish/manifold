@@ -372,7 +372,8 @@ void Manifold::Impl::MarkQuads(const Vec<bool>& fixedHalfedge) {
  * halfedge tangent having negative weight.
  */
 bool Manifold::Impl::IsMarkedInsideQuad(int halfedge) const {
-  return halfedgeTangent_.size() > 0 && halfedgeTangent_[halfedge].w < 0;
+  return halfedgeTangent_.size() > 0 &&
+         halfedgeTangent_[halfedge].w == kInsideQuad;
 }
 
 // sharpenedEdges are referenced to the input Mesh, but the triangles have
@@ -1058,7 +1059,7 @@ void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges,
             if (current == second) {
               smoothness =
                   (vert[1].second.smoothness + vert[0].first.smoothness) / 2;
-            } else if (current != first && !IsMarkedInsideQuad(current)) {
+            } else if (current != first) {
               SharpenTangent(current, smoothness);
             }
           });
