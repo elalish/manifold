@@ -477,6 +477,18 @@ bool Manifold::MatchesTriNormals() const {
 }
 
 /**
+ * Returns true if properties are shared everywhere except across mesh
+ * boundaries. This is not true in general, but only because an input mesh may
+ * have property discontinuities. For simple input meshes where properties are
+ * 1:1 with verts, this HasSimpleProps condition should still be true after any
+ * combination of boolean operations and simplifications. CalculateNormals()
+ * will cause this to be false anytime the mesh contains a sharp edge.
+ */
+bool Manifold::HasSimpleProps() const {
+  return GetCsgLeafNode().GetImpl()->HasSimpleProps();
+}
+
+/**
  * The number of triangles that are colinear within Precision(). This library
  * attempts to remove all of these, but it cannot always remove all of them
  * without changing the mesh by too much.

@@ -52,10 +52,6 @@ double AngleBetween(vec3 a, vec3 b) {
   return dot >= 1 ? 0 : (dot <= -1 ? kPi : math::acos(dot));
 }
 
-bool EqualNormals(vec3 a, vec3 b) {
-  return la::dot(SafeNormalize(a), SafeNormalize(b)) > 0.9999;
-}
-
 // Calculate a tangent vector in the form of a weighted cubic Bezier taking as
 // input the desired tangent direction (length doesn't matter) and the edge
 // vector to the neighboring vertex. In a symmetric situation where the tangents
@@ -837,7 +833,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
 
         auto calculateTangent = [&](int halfedge, vec3 prevNormal,
                                     vec3 nextNormal) {
-          if (EqualNormals(nextNormal, prevNormal)) {
+          if (nextNormal == prevNormal) {
             halfedgeTangent_[halfedge] =
                 TangentFromNormal(prevNormal, halfedge);
           } else {

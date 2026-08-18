@@ -247,7 +247,8 @@ int Manifold::Impl::NumDegenerateTris() const {
  * boundaries. This is not true in general, but only because an input mesh may
  * have property discontinuities. For simple input meshes where properties are
  * 1:1 with verts, this HasSimpleProps condition should still be true after any
- * combination of boolean operations and simplifications.
+ * combination of boolean operations and simplifications. CalculateNormals()
+ * will cause this to be false anytime the mesh contains a sharp edge.
  */
 bool Manifold::Impl::HasSimpleProps() const {
   if (halfedge_.size() == 0 || NumProp() == 0) return true;

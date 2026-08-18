@@ -876,20 +876,20 @@ bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges, double tol,
   vertPos_[startVert] = vec3(NAN);
   CollapseTri(tri1edge);
 
+  const int startProp0 = halfedge_.Prop(tri0edge[0]);
+  const int endProp0 = halfedge_.Prop(tri0edge[1]);
+  const int startProp1 = halfedge_.Prop(tri1edge[1]);
+  const int endProp1 = halfedge_.Prop(tri1edge[0]);
   // Orbit startVert
-  const int tri0 = edge / 3;
-  const int tri1 = pair / 3;
   current = start;
   while (current != tri0edge[2]) {
     current = NextHalfedge(current);
 
     if (NumProp() > 0) {
-      // Update the shifted triangles to the vertBary of endVert
-      const int tri = current / 3;
-      if (triRef[tri].SameFace(triRef[tri0])) {
-        halfedge_.SetProp(current, halfedge_.Prop(NextHalfedge(edge)));
-      } else if (triRef[tri].SameFace(triRef[tri1])) {
-        halfedge_.SetProp(current, halfedge_.Prop(pair));
+      if (halfedge_.Prop(current) == startProp0) {
+        halfedge_.SetProp(current, endProp0);
+      } else if (halfedge_.Prop(current) == startProp1) {
+        halfedge_.SetProp(current, endProp1);
       }
     }
 
@@ -1065,62 +1065,14 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
     v[i] = projection * vertPos_[halfedge_.Start(tri0edge[i])];
   v[3] = projection * vertPos_[halfedge_.Start(tri1edge[2])];
 
-  auto SwapEdge = [&]() {
-    // The 0-verts are swapped to the opposite 2-verts.
-    const int v0 = halfedge_.Start(tri0edge[2]);
-    const int v1 = halfedge_.Start(tri1edge[2]);
-    halfedge_.SetStart(tri0edge[0], v1);
-    halfedge_.SetEnd(tri0edge[2], v1);
-    halfedge_.SetStart(tri1edge[0], v0);
-    halfedge_.SetEnd(tri1edge[2], v0);
-    PairUp(tri0edge[0], halfedge_.Pair(tri1edge[2]));
-    PairUp(tri1edge[0], halfedge_.Pair(tri0edge[2]));
-    PairUp(tri0edge[2], tri1edge[2]);
-    // Both triangles are now subsets of the neighboring triangle.
-    const int tri0 = tri0edge[0] / 3;
-    const int tri1 = tri1edge[0] / 3;
-    faceNormal_[tri0] = faceNormal_[tri1];
-    triRef[tri0] = triRef[tri1];
-    const double l01 = la::length(v[1] - v[0]);
-    const double l02 = la::length(v[2] - v[0]);
-    const double a = std::max(0.0, std::min(1.0, l02 / l01));
-    // Update properties if applicable
-    if (properties_.size() > 0) {
-      Vec<double>& prop = properties_;
-      halfedge_.SetProp(tri0edge[1], halfedge_.Prop(tri1edge[0]));
-      halfedge_.SetProp(tri0edge[0], halfedge_.Prop(tri1edge[2]));
-      halfedge_.SetProp(tri0edge[2], halfedge_.Prop(tri1edge[2]));
-      const int numProp = NumProp();
-      const int newProp = prop.size() / numProp;
-      const int propIdx0 = halfedge_.Prop(tri1edge[0]);
-      const int propIdx1 = halfedge_.Prop(tri1edge[1]);
-      for (int p = 0; p < numProp; ++p) {
-        prop.push_back(a * prop[numProp * propIdx0 + p] +
-                       (1 - a) * prop[numProp * propIdx1 + p]);
-      }
-      halfedge_.SetProp(tri1edge[0], newProp);
-      halfedge_.SetProp(tri0edge[2], newProp);
-    }
-
-    // if the new edge already exists, duplicate the verts and split the mesh.
-    int current = halfedge_.Pair(tri1edge[0]);
-    const int endVert = halfedge_.End(tri1edge[1]);
-    while (current != tri0edge[1]) {
-      current = NextHalfedge(current);
-      if (halfedge_.End(current) == endVert) {
-        FormLoop(tri0edge[2], current);
-        RemoveIfFolded(tri0edge[2]);
-        return;
-      }
-      current = halfedge_.Pair(current);
-    }
-  };
-
+  const double l01 = la::length(v[1] - v[0]);
+  const double l02 = la::length(v[2] - v[0]);
+  const double a = std::max(0.0, std::min(1.0, l02 / l01));
   // Only operate if the other triangles are not degenerate.
   if (CCW(v[1], v[0], v[3], tolerance_) <= 0) {
     if (!Is01Longest(v[1], v[0], v[3])) return;
     // Two facing, long-edge degenerates can swap.
-    SwapEdge();
+    SwapEdge(edge, a);
     const vec2 e23 = v[3] - v[2];
     if (la::dot(e23, e23) < tolerance_ * tolerance_) {
       tag++;
@@ -1138,7 +1090,7 @@ void Manifold::Impl::RecursiveEdgeSwap(const int edge, int& tag,
     return;
   }
   // Normal path
-  SwapEdge();
+  SwapEdge(edge, a);
   visited[edge] = tag;
   visited[pair] = tag;
   for (auto edge : {halfedge_.Pair(tri1edge[0]), halfedge_.Pair(tri0edge[1])})
