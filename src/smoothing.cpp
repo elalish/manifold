@@ -854,7 +854,10 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
             e,
             [normalIdx, this](int halfedge) {
               const vec3 normal = GetNormal(halfedge, normalIdx);
-              return FlatNormal({normal == faceNormal_[halfedge / 3], normal});
+              return FlatNormal(
+                  {la::maxelem(la::abs(normal - faceNormal_[halfedge / 3])) <
+                       std::numeric_limits<double>::epsilon(),
+                   normal});
             },
             [&](int halfedge, const FlatNormal& here, const FlatNormal& next) {
               // Tangents not known at first are used as temporary storage for

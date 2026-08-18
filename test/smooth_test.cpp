@@ -247,6 +247,33 @@ TEST(Smooth, Fillet) {
   if (options.exportModels) WriteTestOBJ("fillet.obj", fillet);
 }
 
+TEST(Smooth, Fillet2) {
+  float depth = 3;
+  float radius = 10;
+  float filletScale = 1 + depth / radius;
+  Manifold cylinder = Manifold::Cylinder(40, radius, radius, 6, true)
+                          .Rotate(0, 30)
+                          .CalculateNormals(0, 80);
+  CrossSection section = cylinder.Slice(0);
+
+  Manifold chamfer = Manifold::Extrude(section.Simplify().ToPolygons(), depth,
+                                       0, 0, vec2(1.3, 1.2))
+                         .Mirror({0, 0, 1});
+  EXPECT_EQ(chamfer.NumDegenerateTris(), 0);
+  EXPECT_EQ(chamfer.NumTri(), 20);
+  Manifold base = Manifold::Cube(vec3(40), true)
+                      .Translate({0, 0, -20 - depth})
+                      .CalculateNormals();
+  Manifold chamfered = cylinder + chamfer + base;
+  EXPECT_EQ(chamfered.NumDegenerateTris(), 0);
+  EXPECT_EQ(chamfered.NumTri(), 48);
+  Manifold fillet = chamfered.SmoothByNormals(0).RefineToTolerance(0.01);
+  EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);
+  EXPECT_NEAR(fillet.Volume(), 71369, 1);
+  EXPECT_NEAR(fillet.SurfaceArea(), 10928, 1);
+  if (options.exportModels) WriteTestOBJ("fillet2.obj", fillet);
+}
+
 TEST(Smooth, Manual) {
   // Unit Octahedron
   const auto oct = Manifold::Sphere(1, 4).GetMeshGL();
