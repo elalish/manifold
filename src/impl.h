@@ -244,7 +244,7 @@ struct Manifold::Impl {
                              bool = false);
 
   // smoothing.cpp
-  bool IsInsideQuad(int halfedge) const;
+  void MarkQuads(const Vec<bool>& fixedHalfedge);
   bool IsMarkedInsideQuad(int halfedge) const;
   vec3 GetNormal(int halfedge, int normalIdx) const;
   vec4 TangentFromNormal(const vec3& normal, int halfedge) const;
@@ -259,7 +259,7 @@ struct Manifold::Impl {
   void SharpenTangent(int halfedge, double smoothness);
   void SetNormals(int normalIdx, double minSharpAngle);
   void LinearizeFlatTangents();
-  void DistributeTangents(const Vec<bool>& fixedHalfedges);
+  void DistributeTangents(Vec<bool>& fixedHalfedges);
   void CreateTangents(int normalIdx);
   void CreateTangents(std::vector<Smoothness>,
                       ExecutionContext::Impl* ctx = nullptr);

@@ -349,6 +349,18 @@ TEST(Boolean, CreatePropertiesSlow) {
   EXPECT_EQ(result.NumProp(), 3);
 }
 
+TEST(Boolean, SimpleProperties) {
+  Manifold cube = Manifold::Cube(vec3(2), true).CalculateNormals(0, 180);
+  EXPECT_TRUE(cube.HasSimpleProps());
+  Manifold flange = Manifold::Extrude(cube.Slice(), 2, 0, 0, vec2(2));
+  EXPECT_TRUE(flange.HasSimpleProps());
+  Manifold result = cube + flange;
+  EXPECT_EQ(result.NumProp(), 3);
+  EXPECT_NEAR(result.Volume(), 22.6666, 0.0001);
+  EXPECT_EQ(result.NumVert(), 16);
+  EXPECT_TRUE(result.HasSimpleProps());
+}
+
 /**
  * These tests check Boolean operations on coplanar faces.
  */

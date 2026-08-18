@@ -320,6 +320,7 @@ class Manifold {
    */
   ///@{
   bool MatchesTriNormals() const;
+  bool HasSimpleProps() const;
   size_t NumDegenerateTris() const;
   double GetEpsilon() const;
   ///@}
