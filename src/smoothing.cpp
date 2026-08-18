@@ -822,14 +822,19 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
   Vec<int> vertHalfedge = VertHalfedge();
   for_each_n(
       autoPolicy(numVert, 1e4), vertHalfedge.begin(), numVert, [&](int e) {
-        struct FlatNormal {
-          bool isFlatFace;
-          vec3 normal;
-        };
-
         ivec2 faceEdges(-1, -1);
         int startHalfedge = -1;
         vec3 lastNormal(0.0);
+
+        auto markToAlign = [&](int halfedge) {
+          if (faceEdges[0] == -1) {
+            faceEdges[0] = halfedge;
+          } else if (faceEdges[1] == -1) {
+            faceEdges[1] = halfedge;
+          } else {
+            faceEdges[0] = -2;
+          }
+        };
 
         auto calculateTangent = [&](int halfedge, vec3 prevNormal,
                                     vec3 nextNormal) {
@@ -850,48 +855,32 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
           }
         };
 
-        ForVert<FlatNormal>(
+        ForVert<vec3>(
             e,
             [normalIdx, this](int halfedge) {
-              const vec3 normal = GetNormal(halfedge, normalIdx);
-              return FlatNormal(
-                  {la::maxelem(la::abs(normal - faceNormal_[halfedge / 3])) <
-                       std::numeric_limits<double>::epsilon(),
-                   normal});
+              return GetNormal(halfedge, normalIdx);
             },
-            [&](int halfedge, const FlatNormal& here, const FlatNormal& next) {
+            [&](int halfedge, const vec3& here, const vec3& next) {
               // Tangents not known at first are used as temporary storage for
               // normals and w is set to a negative flag value. This starts with
               // the flag clear.
-              if (here.isFlatFace != next.isFlatFace) {
-                // Record the two halfedges that border a single flat face.
-                if (faceEdges[0] == -1) {
-                  faceEdges[0] = halfedge;
-                } else if (faceEdges[1] == -1) {
-                  faceEdges[1] = halfedge;
-                } else {
-                  faceEdges[0] = -2;
-                }
-              }
-
-              if (next.normal == vec3(0.) || here.normal == vec3(0.)) {
-                if (here.normal != vec3(0.)) {  // next missing
-                  lastNormal = here.normal;
-                } else if (next.normal != vec3(0.)) {  // here missing
+              if (next == vec3(0.) || here == vec3(0.)) {
+                if (here != vec3(0.)) {  // next missing
+                  markToAlign(halfedge);
+                  lastNormal = here;
+                } else if (next != vec3(0.)) {  // here missing
+                  markToAlign(halfedge);
                   if (startHalfedge < 0) startHalfedge = halfedge;
                 } else {  // both missing
                   if (startHalfedge < 0) startHalfedge = -2;
                 }
                 halfedgeTangent_[halfedge].w = kMissingNormal;
-              }
-
-              if (halfedgeTangent_[halfedge].w < 0) {
                 for (const int i : {0, 1, 2})
                   halfedgeTangent_[halfedge][i] = lastNormal[i];
                 return;
               }
 
-              calculateTangent(halfedge, here.normal, next.normal);
+              calculateTangent(halfedge, here, next);
             });
 
         if (startHalfedge != -1 && lastNormal == vec3(0.)) {

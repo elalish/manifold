@@ -211,11 +211,12 @@ TEST(Smooth, MissingNormals) {
 }
 
 TEST(Smooth, MissingNormalsCone) {
-  Manifold cone = Manifold::Cylinder(10, 10, 4, 6).CalculateNormals(0, 60);
-  Manifold diff = cone - Manifold::Cube(vec3(20), true).Translate({0, 0, 15});
-  Manifold out = diff.SmoothByNormals(0).Refine(20);
-  EXPECT_NEAR(out.Volume(), 1467, 1);
-  EXPECT_NEAR(out.SurfaceArea(), 825, 1);
+  Manifold cone = Manifold::Cylinder(5, 10, 7, 6).CalculateNormals(0, 60);
+  Manifold peak = Manifold::Cylinder(4, 7, 0, 6);
+  Manifold biCone = cone + peak.Translate({0, 0, 5});
+  Manifold out = biCone.SmoothByNormals(0).RefineToTolerance(0.01);
+  EXPECT_NEAR(out.Volume(), 1480, 1);
+  EXPECT_NEAR(out.SurfaceArea(), 828, 1);
   if (options.exportModels) WriteTestOBJ("missingNormalsCone.obj", out);
 }
 
@@ -242,8 +243,8 @@ TEST(Smooth, Fillet) {
   EXPECT_EQ(chamfered.NumTri(), 56);
   Manifold fillet = chamfered.SmoothByNormals(0).RefineToTolerance(0.01);
   EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);
-  EXPECT_NEAR(fillet.Volume(), 12797, 1);
-  EXPECT_NEAR(fillet.SurfaceArea(), 3453, 1);
+  EXPECT_NEAR(fillet.Volume(), 12805, 1);
+  EXPECT_NEAR(fillet.SurfaceArea(), 3452, 1);
   if (options.exportModels) WriteTestOBJ("fillet.obj", fillet);
 }
 
@@ -269,8 +270,8 @@ TEST(Smooth, Fillet2) {
   EXPECT_EQ(chamfered.NumTri(), 48);
   Manifold fillet = chamfered.SmoothByNormals(0).RefineToTolerance(0.01);
   EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);
-  EXPECT_NEAR(fillet.Volume(), 71369, 1);
-  EXPECT_NEAR(fillet.SurfaceArea(), 10928, 1);
+  EXPECT_NEAR(fillet.Volume(), 71507, 1);
+  EXPECT_NEAR(fillet.SurfaceArea(), 10936, 1);
   if (options.exportModels) WriteTestOBJ("fillet2.obj", fillet);
 }
 
