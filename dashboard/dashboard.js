@@ -47,7 +47,7 @@ const state = {
   branchRoot: '',
   index: null,
   records: [],
-  scale: 'linear',
+  scale: 'log',
 };
 
 function qs(id) {
@@ -152,7 +152,7 @@ function statKey(stat, suffix = '') {
 }
 
 function currentStat() {
-  return qs('stat-select')?.value || 'median';
+  return qs('stat-select')?.value || 'min';
 }
 
 function metricItems(record, metricId, stat) {
