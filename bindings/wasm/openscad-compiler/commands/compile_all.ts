@@ -2,6 +2,7 @@ import {Command} from 'commander';
 import fs from 'fs';
 import path from 'path';
 
+import {formatWritten} from '../core/format.js';
 import {compileConsumer} from '../core/orchestrate.js';
 import {getOpenSCADLibraryPaths} from '../core/resolver.js';
 
@@ -63,6 +64,7 @@ compileAllCommand.name('compile-all')
                 `Generated TypeScript (${js.length.toLocaleString()} chars)`);
             fs.mkdirSync(path.dirname(outputFile), {recursive: true});
             fs.writeFileSync(outputFile, js);
+            formatWritten(outputFile);
             console.log(`Output written to ${outputFile}`);
           } catch (err) {
             const message = (err as Error).message;

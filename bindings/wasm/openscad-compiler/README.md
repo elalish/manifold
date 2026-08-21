@@ -16,20 +16,25 @@ translate([1, 2, 3]) cube(5);
 compiles to
 
 ```ts
-import * as __rt from '../../runtime/runtime.js';
-const {__cube, __translate, __union2d3d, __applyRoot, /* ... */} = __rt;
+import * as rt from '../../runtime/runtime.js';
+const {Manifold, CrossSection, cube, translate, ctx, union, applyRoot, font_registry} = rt;
+Object.assign(font_registry, {});
 
-const __result_items: any[] = [];
-__result_items.push(__translate(__cube(5, false), [1, 2, 3]));
-export const result = __union2d3d(__applyRoot(__result_items));
-export const background = __union2d3d(__applyRoot(__background_items, true));
-export const __viewport = {vpr: __ctx.$vpr, vpt: __ctx.$vpt, vpd: __ctx.$vpd, vpf: __ctx.$vpf};
+const result_items: InstanceType<typeof Manifold | typeof CrossSection>[] = [];
+const background_items: InstanceType<typeof Manifold | typeof CrossSection>[] = [];
+
+// test/examples/cube.scad
+// Simple translated cube
+result_items.push(translate(cube(5, false), [1, 2, 3]));
+export const result = union(applyRoot(result_items));
+export const background = union(applyRoot(background_items, true));
+export const viewport = {vpr: ctx.$vpr, vpt: ctx.$vpt, vpd: ctx.$vpd, vpf: ctx.$vpf};
 ```
 
 ## Architecture
 
 ```
-.scad --> lexer --> parser --> AST --> resolver --> IR --> emitter --> .ts --> runtime --> Manifold
+.scad --> lexer --> parser --> AST --> resolver --> binder --> naming --> emitter --> .ts --> runtime --> Manifold
 ```
 
 | Path | Role |
@@ -37,10 +42,13 @@ export const __viewport = {vpr: __ctx.$vpr, vpt: __ctx.$vpt, vpd: __ctx.$vpd, vp
 | `core/lexer.ts` | Tokenizer; every token carries a `SourceRange` (offset/line/column). |
 | `core/parser.ts` | Recursive-descent parser producing the AST in `core/ast.ts`. |
 | `core/resolver.ts` | Resolves `include <>` / `use <>`, walks the file closure, applies `use`-scope privatization, and finds library roots from `OPENSCADPATH`. |
-| `core/ir.ts` | Small intermediate representation for geometry nodes. |
-| `core/compiler.ts` | Emitter: name mangling, scoping, module/function lowering, tail-call elimination, font and surface-data embedding. |
+| `core/binder.ts` | Lexical binding pass: builds the scope tree, creates one `Binding` per declared name in the `var` / `fn` / `mod` namespaces, and points every reference at the binding it resolves to. |
+| `core/naming.ts` | Chooses the JavaScript identifier for each binding, once resolution and the runtime's own names are known. |
+| `core/compiler.ts` | Emitter: a single whole-program scan feeds module/function lowering, tail-call elimination, numeric type inference, the no-arg calling convention, and font/surface-data embedding. |
+| `core/types.ts` | Types shared across the phases: source ranges and tokens, bindings and scopes, library manifests. |
+| `core/format.ts` | Runs Prettier over each generated file at the point it is written. |
 | `core/orchestrate.ts` | Drives consumer + external-library compilation and the library cache. |
-| `runtime/runtime.ts` | The runtime every compiled file imports: primitives, transforms, booleans, extrusions, OpenSCAD value semantics (`__add`, `__eq`, `__index`, …), `echo`, `rands`, `text`, `surface`. |
+| `runtime/runtime.ts` | The runtime every compiled file imports: primitives, transforms, booleans, extrusions, OpenSCAD value semantics (`add`, `eq`, `index`, …), `echo`, `rands`, `text`, `surface`. |
 | `commands/` | `commander` subcommands (`compile`, `compile-all`). |
 | `index.ts` | CLI entry point (`openscad-to-manifold`). |
 | `viewer.html` | Three.js viewer that loads a compiled `.ts` module in the browser. |
@@ -54,8 +62,9 @@ verifies.
 `include <BOSL2/std.scad>` does *not* get inlined into your output. Libraries found on the
 search path are compiled **once** into `runtime/libraries/<name-lowercased>/`, alongside a
 `.manifest.json`, and the consumer file imports from there. The cache is reused on
-subsequent builds and recompiled when the manifest is missing entries the current program
-needs.
+subsequent builds, and recompiled when the manifest is missing entries the current program
+needs, when the manifest format changes, or when the runtime version it was built against
+no longer matches.
 
 > On change of compiler version or deletion of `runtime/libraries/` the cached library output is regenerated with the new codegen.
 
@@ -121,14 +130,16 @@ openscad-to-manifold compile path/to/model.scad --output out/model.ts
 `test/out/<basename>.ts`. The command reports the resolved file count, any external
 libraries used, and the size of the generated code.
 
-### Compile the whole example corpus
+### Compile a directory tree
 
 ```bash
-npm run compile-all
+npm run compile-all                                    # test/examples -> test/out
+npx tsx index.ts compile-all --input src --output out
 ```
 
-Walks `test/examples/**` recursively and mirrors the tree into `test/out/`, reporting a
-list of failures and exiting non-zero if any file fails.
+Walks the input directory recursively and mirrors the tree into the output directory,
+reporting a list of failures and exiting non-zero if any file fails. The defaults expect
+the test corpus to be unpacked — see [Testing](#testing).
 
 ### Run compiled output
 
@@ -150,7 +161,7 @@ Named exports:
 | --- | --- |
 | `result` | The model geometry (`Manifold` for 3D, `CrossSection` for 2D). |
 | `background` | Geometry under the `%` modifier. |
-| `__viewport` | `$vpr` / `$vpt` / `$vpd` / `$vpf` at end of evaluation. |
+| `viewport` | `$vpr` / `$vpt` / `$vpd` / `$vpf` at end of evaluation. |
 
 ### View in the browser
 
@@ -210,7 +221,7 @@ expression modifiers)
 | `$fn`, `$fa`, `$fs` | `0`, `12`, `2` | Mesh resolution. |
 | `$t` | `0` | Animation time, `0`–`1`. |
 | `$preview` | `false` | Preview-mode flag. |
-| `$vpr`, `$vpt`, `$vpd`, `$vpf` | `[0,0,0]`, `[0,0,0]`, `500`, `22.5` | Viewport; re-exported as `__viewport`. |
+| `$vpr`, `$vpt`, `$vpd`, `$vpf` | `[0,0,0]`, `[0,0,0]`, `500`, `22.5` | Viewport; re-exported as `viewport`. |
 | `$children` | — | Child count inside a module. |
 | `$parent_modules` | `0` | Depth of the module call stack. |
 | `$idx` | — | Index within `for`-generated children. |
@@ -220,28 +231,41 @@ To animate a compiled model, assign `$t` before `result` is evaluated.
 
 ### Not supported yet
 
-- `import()` of external geometry (STL/OFF/3MF/DXF/SVG)
+- `import()` of external geometry (STL/OFF/3MF/DXF/SVG) — the call parses, but there is no
+  runtime implementation behind it
 - 2D `minkowski()` — throws at runtime if any operand is 2D
 - `is_object()` and other experimental/opt-in builtins
 
 ## Testing
+
+The test corpus is not checked out directly: it ships as `test_zip.zip`, and `test/` is
+gitignored. Unpack it and run everything with
+
+```bash
+npm run unzip-and-run-test
+```
+
+which replaces `test/` with the contents of the zip, reinstalls dependencies, and runs
+`npm test`. This is exactly what CI does. Once `test/` exists, the ordinary commands work
+directly:
 
 ```bash
 npm test
 ```
 
 `pretest` builds, links, and runs `compile-all` first, so the suites always test freshly
-generated output. The three suites can also be run individually:
+generated output. The four suites can also be run individually:
 
 | Command | What it checks |
 | --- | --- |
 | `npm run test:geometry` | Volume and surface area of every compiled model against an OpenSCAD baseline, within 0.1% relative tolerance. Each model runs in a forked worker with a 60s timeout. |
 | `npm run test:semantic` | `echo()` output of compiled models against pre-recorded OpenSCAD output in `test/echo-results/`. |
 | `npm run test:source-location` | Structural invariants on every AST node's `SourceRange` (non-negative, well-ordered, nested inside its parent, slices back to real source). |
+| `cd test && npx vitest run parse-errors.test.ts` | Fixtures in `test/fixtures/parse-errors/` that must fail to resolve — with the error blamed on the right file — or must still resolve despite a bad `use`, checked through both resolver entry points. |
 
 ### Test corpus
 
-`test/examples/` holds 308 `.scad` files: the OpenSCAD regression suite
+`test/examples/` holds 309 `.scad` files: the OpenSCAD regression suite
 (`OpenScad/Openscad-Tests/`, plus `Basics`, `Advanced`, `Functions`, `Parametric`,
 `Old`), BOSL2-heavy models (`bosl2/`), and 135 echo-semantics files (`echo/`).
 
@@ -272,7 +296,7 @@ Both need `openscad` on `PATH` for the comparison numbers; `benchmark-phases` ac
 
 The `OpenSCAD Compiler` job in `.github/workflows/manifold.yml` clones BOSL2 and MCAD into
 a scratch directory, points `OPENSCADPATH`/`FONTPATH` at them and at `bundle/`, and runs
-`npm test`. The main WASM job explicitly excludes
+`npm run unzip-and-run-test`. The main WASM job explicitly excludes
 `openscad-compiler/**` so the two never run together.
 
 ## See also

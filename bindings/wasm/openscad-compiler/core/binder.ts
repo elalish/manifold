@@ -3,120 +3,12 @@
 // at the binding it resolves to
 
 import type {Expr, ForVariable, LetAssignment, ListCompGenerator, Parameter, Program, ScopeStmt, Statement,} from './ast.js';
-
-export type Namespace = 'var'|'fn'|'mod';
-
-export type BindingKind =
-    // Provided by the runtime
-    'builtin'|
-    // Exported by a separately compiled library and imported
-    'external'|
-    // Top-level declaration of the program being compiled
-    'global'|
-    // Top-level variable of a `use`d file, private to that file's scope
-    'filePrivate'|
-    // Module/function/lambda parameter
-    'param'|
-    // Variable declared inside a module body or a block
-    'local'|
-    // `let` binding
-    'let'|
-    // for loop variable
-    'loop'|
-    // Dynamically scoped `$` variable
-    'special';
-
-export interface Binding {
-  id: number;
-  name: string;
-  ns: Namespace;
-  kind: BindingKind;
-  scope: Scope;
-  // Every declaration site that writes this binding. OpenSCAD scopes are
-  // declarative and last-wins, so one name can have several declarations but
-  // is still a single binding
-  decls: (Statement|Parameter|LetAssignment|ForVariable)[];
-  // Library closures only: the file whose top level declares this binding,
-  // relative to the library root
-  file?: string;
-  jsName: string;  // Assigned by the naming pass
-  reads: number;
-}
-
-export type ScopeKind = 'root'|'external'|'global'|'file'|'module'|'function'|
-    'lambda'|'let'|'for'|'block'|'comprehension';
-
-export interface Scope {
-  id: number;
-  kind: ScopeKind;
-  parent: Scope|null;
-  children: Scope[];
-  bindings: Record<Namespace, Map<string, Binding>>;
-}
-
-// a call site resolves to a CallRef
-export interface CallRef {
-  fn: Binding|null;
-  value: Binding|null;
-  mod: Binding|null;
-}
-
-export interface BindOptions {
-  builtinFunctions: Iterable<string>;
-  builtinModules: Iterable<string>;
-  builtinConstants: Iterable<string>;
-  externalFunctions?: Iterable<string>;
-  externalModules?: Iterable<string>;
-  externalVariables?: Iterable<string>;
-}
+import type {Binding, BindingKind, BindOptions, BindResult, LibraryBindResult, LibraryFileInput, Namespace, Scope, ScopeKind,} from './types.js';
 
 export const NAMESPACES: readonly Namespace[] = ['var', 'fn', 'mod'];
 
-// One file of a library closure, with the directives that pull other files in
-export interface LibraryFileInput {
-  rel: string;
-  program: Program;
-  edges: {rel: string; mode: 'include' | 'use'}[];
-}
-
-export interface BindResult {
-  root: Scope;
-  global: Scope;
-  bindings: Binding[];
-  scopes: Scope[];
-}
-
-export interface LibraryBindResult extends BindResult {
-  // Resolution scope for each file of the closure, keyed by its path relative
-  // to the library root
-  fileScopes: Map<string, Scope>;
-}
-
 function isSpecial(name: string): boolean {
   return name.startsWith('$');
-}
-
-// JavaScript reserved words
-const JS_RESERVED = new Set([
-  'abstract',     'arguments', 'await',    'boolean',    'break',
-  'byte',         'case',      'catch',    'char',       'class',
-  'const',        'continue',  'debugger', 'default',    'delete',
-  'do',           'double',    'else',     'enum',       'eval',
-  'export',       'extends',   'false',    'final',      'finally',
-  'float',        'for',       'function', 'goto',       'if',
-  'implements',   'import',    'in',       'instanceof', 'int',
-  'interface',    'let',       'long',     'native',     'new',
-  'null',         'package',   'private',  'protected',  'public',
-  'return',       'short',     'static',   'super',      'switch',
-  'synchronized', 'this',      'throw',    'throws',     'transient',
-  'true',         'try',       'typeof',   'var',        'void',
-  'volatile',     'while',     'with',     'yield',
-]);
-
-export function escapeName(name: string): string {
-  if (JS_RESERVED.has(name)) return `${name}_`;
-  if (/^[0-9]/.test(name)) return `_${name}`;
-  return name;
 }
 
 export function lookup(scope: Scope|null, name: string, ns: Namespace): Binding|
@@ -296,9 +188,8 @@ class Binder {
         break;
 
       case 'block':
-        // At the declarative top level a block was already hoisted into the
-        // enclosing scope, so only walk its statements. Anywhere else it is
-        // emitted as a JS scope of its own.
+        // Top-level blocks are hoisted; elsewhere they create their own JS
+        // scope
         if (flattenBlocks) {
           for (const inner of s.statements) this.stmt(inner, flattenBlocks);
         } else {
@@ -352,8 +243,8 @@ class Binder {
             if (isSpecial(inner.name)) {
               inner.binding = this.special(inner.name);
             } else if (lookup(outer, inner.name, 'var')?.kind === 'builtin') {
-              // Pre-declared names refer to the program-wide binding, so they
-              // never become private to the file.
+              // Pre-declared names use the program-wide binding, not a
+              // file-local one
               inner.binding = this.resolve(inner.name, 'var')!;
             } else {
               inner.binding =
@@ -523,8 +414,8 @@ class Binder {
         break;
 
       case 'lcCFor':
-        // Init values evaluate in the outer scope; the loop names cover the
-        // condition, the updates and the body.
+        // Init values use the outer scope; loop names apply to the condition,
+        // updates, and body
         this.withScope('comprehension', () => {
           this.letAssignments(gen.inits, 'loop');
           this.expr(gen.condition);
@@ -565,16 +456,9 @@ class Binder {
     this.current = this.root;
   }
 
-  /* Bind a library closure. Each file gets a scope of its own holding its own
-    top-level declarations, then borrows from the files it pulls in: `include`
-    contributes everything, transitively, while `use` contributes only what a
-    used file publishes. A used file therefore does NOT see its user's
-    declarations
-
-    `global` is left as an empty scope parented to the externals, so anything
-    asking for "the library's globals" without naming a file resolves to the
-    builtins rather than to an arbitrary file's declarations.
-   */
+  // Bind a library closure: each file has its own scope and borrows
+  // declarations from `include`/`use` dependencies. `global` points only to the
+  // builtins
   bindLibraryClosure(files: LibraryFileInput[], entryRels: string[]):
       Map<string, Scope> {
     this.global = this.newScope('global', this.externals);
@@ -610,7 +494,7 @@ class Binder {
       unitScopes.set(r, this.newScope('file', this.externals));
 
     // A file belongs to the unit it roots if someone `use`s it, otherwise to
-    // the entry unit.
+    // the entry unit
     const unitOf = (rel: string) => useRoots.has(rel) ? rel : ENTRY;
 
     // Own declarations of each unit's members, last-wins across the unit
@@ -703,102 +587,4 @@ export function isLexicalVar(b: Binding|null|undefined): boolean {
 // checks if a local share its name with a variable of an enclosing scope
 export function shadowsOuterVar(b: Binding): boolean {
   return isLexicalVar(lookup(b.scope.parent, b.name, 'var'));
-}
-
-export interface PrettyNameOptions {
-  // Runtime symbols and other fixed names no binding may take
-  reserved: Iterable<string>;
-  // `<ns>:<name>` -> the symbol a separately compiled library exported it as
-  externalSymbols?: Map<string, string>;
-}
-
-const NS_PRIORITY: Record<Namespace, number> = {
-  var : 0,
-  fn: 1,
-  mod: 2
-};
-
-
-export function assignPrettyNames(
-    result: BindResult, opts: PrettyNameOptions): void {
-  const reserved = new Set(opts.reserved);
-  const visit =
-      (scope: Scope, ancestors: Set<string>,
-       ancestorCallables: Set<string>) => {
-        // Names claimed in this scope; siblings must not collide with each
-        // other
-        const taken = new Set<string>();
-
-        const own: Binding[] = [];
-        for (const ns of NAMESPACES)
-          for (const b of scope.bindings[ns].values())
-            if (b.scope === scope) own.push(b);
-        own.sort(
-            (a, b) => NS_PRIORITY[a.ns] - NS_PRIORITY[b.ns] || a.id - b.id);
-
-        for (const b of own) {
-          if (b.kind === 'special') {
-            b.jsName = escapeName(b.name);
-            continue;
-          }
-          // Builtins and library exports already have names the emitter must
-          // match: the runtime's, or the ones the library chose for itself.
-          if (b.kind === 'builtin' || b.kind === 'external') {
-            b.jsName = fixedName(b, opts);
-            // Only names that actually appear in the output can be clashed
-            // with.
-            if (b.ns !== 'mod') taken.add(b.jsName);
-            continue;
-          }
-          b.jsName = pick(b, taken, ancestors, ancestorCallables, reserved);
-          taken.add(b.jsName);
-        }
-
-        const below = new Set([...ancestors, ...taken]);
-        const callablesBelow = new Set(ancestorCallables);
-        for (const ns of NAMESPACES) {
-          if (ns === 'var') continue;
-          for (const b of scope.bindings[ns].values())
-            callablesBelow.add(b.jsName);
-        }
-        for (const child of scope.children) visit(child, below, callablesBelow);
-      };
-  visit(result.root, new Set(), new Set());
-}
-
-function fixedName(b: Binding, opts: PrettyNameOptions): string {
-  const fromLib = opts.externalSymbols?.get(`${b.ns}:${b.name}`);
-  if (fromLib) return fromLib;
-  const base = escapeName(b.name);
-  return b.ns === 'fn' ? `${base}_fn` : b.ns === 'mod' ? `${base}$mod` : base;
-}
-
-function pick(
-    b: Binding, taken: Set<string>, ancestors: Set<string>,
-    ancestorCallables: Set<string>, reserved: Set<string>): string {
-  const base = escapeName(b.name);
-  // The name the source used may shadow an enclosing *variable*, but never an
-  // enclosing function or module.
-  if (!taken.has(base) && !reserved.has(base) && !ancestorCallables.has(base))
-    return base;
-
-  const blocked = (c: string) => taken.has(c) || ancestors.has(c) ||
-      ancestorCallables.has(c) || reserved.has(c);
-  const suffixed = b.ns === 'fn' ? `${base}_fn` :
-      b.ns === 'mod' ? `${base}_mod` :
-                       base;
-  if (suffixed !== base && !blocked(suffixed)) return suffixed;
-  for (let n = 2;; n++) {
-    const c = `${suffixed}_${n}`;
-    if (!blocked(c)) return c;
-  }
-}
-
-export function assignLegacyNames(result: BindResult): void {
-  for (const b of result.bindings) {
-    const base = escapeName(b.name);
-    b.jsName = b.ns === 'fn' ? `${base}_fn` :
-        b.ns === 'mod' ? `${base}$mod` :
-                         base;
-  }
 }

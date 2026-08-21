@@ -1,6 +1,6 @@
 import type {Argument, ASTNode, BlockStmt, Comment, Expr, ForVariable, LetAssignment, ListCompGenerator, ModuleCallStmt, Parameter, Program, Statement,} from './ast.js';
 import {fmtLoc, Lexer, TokenType, tokenTypeToString} from './lexer.js';
-import type {SourceLocation, SourceRange, Token} from './lexer.js';
+import type {SourceLocation, SourceRange, Token} from './types.js';
 
 export class Parser {
   private tokens: Token[] = [];

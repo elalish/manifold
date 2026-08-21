@@ -15,28 +15,28 @@ const wasm = await Module();
 wasm.setup();
 const {Manifold, CrossSection} = wasm;
 
-function is_undef_fn(x: any): boolean|undefined {
+function is_undef(x: any): boolean|undefined {
   return arguments.length === 1 ? (x === undefined || x === null) : undefined;
 }
-function is_bool_fn(x: any): boolean|undefined {
+function is_bool(x: any): boolean|undefined {
   return arguments.length === 1 ? (typeof x === 'boolean') : undefined;
 }
-function is_num_fn(x: any): boolean|undefined {
+function is_num(x: any): boolean|undefined {
   return arguments.length === 1 ? (typeof x === 'number' && !Number.isNaN(x)) :
                                   undefined;
 }
-function is_string_fn(x: any): boolean|undefined {
+function is_string(x: any): boolean|undefined {
   return arguments.length === 1 ? (typeof x === 'string') : undefined;
 }
-function is_list_fn(x: any): boolean|undefined {
+function is_list(x: any): boolean|undefined {
   return arguments.length === 1 ? Array.isArray(x) : undefined;
 }
-function is_function_fn(x: any): boolean|undefined {
+function is_function(x: any): boolean|undefined {
   return arguments.length === 1 ? (typeof x === 'function') : undefined;
 }
 
 // unknown/undefined function or disabled experimental builting function calls
-function __unknown_fn(_name: string, ..._args: any[]): undefined {
+function unknown_fn(_name: string, ..._args: any[]): undefined {
   return undefined;
 }
 
@@ -59,7 +59,7 @@ function cround(x: number): number {
   return x < 0 ? -Math.round(-x) : Math.round(x);
 }
 
-function sin_fn(x: number): number {
+function sin(x: number): number {
   if (x < 360.0 && x >= 0.0) {
     // already in range
   } else if (x < TRIG_HUGE_VAL && x > -TRIG_HUGE_VAL) {
@@ -85,7 +85,7 @@ function sin_fn(x: number): number {
   return oppose ? -x : x;
 }
 
-function cos_fn(x: number): number {
+function cos(x: number): number {
   if (x < 360.0 && x >= 0.0) {
     // already in range
   } else if (x < TRIG_HUGE_VAL && x > -TRIG_HUGE_VAL) {
@@ -114,7 +114,7 @@ function cos_fn(x: number): number {
   return oppose ? -x : x;
 }
 
-function tan_fn(x: number): number {
+function tan(x: number): number {
   const cycles = Math.floor(x / 180.0);
   if (x < 180.0 && x >= 0.0) {
     // already in range
@@ -141,28 +141,28 @@ function tan_fn(x: number): number {
   return oppose ? -x : x;
 }
 
-function asin_fn(x: number): number {
+function asin(x: number): number {
   const degs = rad2deg(Math.asin(x));
   const whole = cround(degs);
-  if (sin_fn(whole) === x) return whole;
+  if (sin(whole) === x) return whole;
   return degs;
 }
 
-function acos_fn(x: number): number {
+function acos(x: number): number {
   const degs = rad2deg(Math.acos(x));
   const whole = cround(degs);
-  if (cos_fn(whole) === x) return whole;
+  if (cos(whole) === x) return whole;
   return degs;
 }
 
-function atan_fn(x: number): number {
+function atan(x: number): number {
   const degs = rad2deg(Math.atan(x));
   const whole = cround(degs);
-  if (tan_fn(whole) === x) return whole;
+  if (tan(whole) === x) return whole;
   return degs;
 }
 
-function atan2_fn(y: number, x: number): number {
+function atan2(y: number, x: number): number {
   const degs = rad2deg(Math.atan2(y, x));
   const whole = cround(degs);
   if (Math.abs(degs - whole) < 3.0e-14) return whole;
@@ -170,21 +170,35 @@ function atan2_fn(y: number, x: number): number {
 }
 
 // Math (OpenSCAD built-ins)
-let abs_fn = Math.abs;
-let sign_fn = Math.sign;
-let floor_fn = Math.floor;
-let ceil_fn = Math.ceil;
-let round_fn = Math.round;
-let sqrt_fn = Math.sqrt;
-let exp_fn = Math.exp;
-function ln_fn(x: number): number {
-  return Math.log(x);
+let abs = Math.abs;
+let sign = Math.sign;
+let floor = Math.floor;
+let ceil = Math.ceil;
+// OpenSCAD's round() is C's round(): ties go away from zero. Math.round breaks
+// ties towards +Infinity, so it disagrees on every negative half-integer
+// (round(-0.5) is -1, not -0; round(-1.5) is -2, not -1).
+function round(x: number): number {
+  return x < 0 ? -Math.round(-x) : Math.round(x);
 }
-function log_fn(x: number): number {
+let sqrt = Math.sqrt;
+let exp = Math.exp;
+// ln() is the natural log and takes exactly one argument
+function ln(x: any) {
+  if (arguments.length !== 1) return undefined;
   return Math.log(x);
 }
 
-function __minmax(reduce: (a: number, b: number) => number, a: any[]) {
+/* log() is base 10 with one argument. With two, the FIRST argument is the base,
+  so log(b, x) is log_b(x) - note the order, which is the reverse of how most
+  languages spell it. Any other arity is undef.
+*/
+function log(base: any, x?: any) {
+  if (arguments.length === 1) return Math.log10(base);
+  if (arguments.length === 2) return Math.log(x) / Math.log(base);
+  return undefined;
+}
+
+function minmax(reduce: (a: number, b: number) => number, a: any[]) {
   const vals = a.length === 1 && Array.isArray(a[0]) ? a[0] : a;
   if (vals.length === 0) return undefined;
   let acc: number|undefined = undefined;
@@ -195,15 +209,15 @@ function __minmax(reduce: (a: number, b: number) => number, a: any[]) {
   return acc;
 }
 
-function min_fn(...a: any[]) {
-  return __minmax(Math.min, a);
+function min(...a: any[]) {
+  return minmax(Math.min, a);
 }
-function max_fn(...a: any[]) {
-  return __minmax(Math.max, a);
+function max(...a: any[]) {
+  return minmax(Math.max, a);
 }
 
-function norm_fn(...args: any[]) {
-  if (args.length !== 1 || !__isVec(args[0])) return undefined;
+function norm(...args: any[]) {
+  if (args.length !== 1 || !isVec(args[0])) return undefined;
   let sum = 0;
   for (const x of args[0]) {
     if (typeof x !== 'number') return undefined;
@@ -212,7 +226,7 @@ function norm_fn(...args: any[]) {
   return Math.sqrt(sum);
 }
 
-function cross_fn(a: any, b: any) {
+function cross(a: any, b: any) {
   if (!Array.isArray(a) || !Array.isArray(b)) return undefined;
   if ((a.length !== 2 || b.length !== 2) &&
       (a.length !== 3 || b.length !== 3)) {
@@ -234,7 +248,7 @@ function cross_fn(a: any, b: any) {
 }
 
 // String & list (OpenSCAD built-ins)
-function len_fn(x: any) {
+function len(x: any) {
   // returns undef when called with the wrong number of arguments
   if (arguments.length !== 1) return undefined;
   if (typeof x === 'string') return Array.from(x).length;
@@ -245,17 +259,17 @@ function len_fn(x: any) {
   return undefined;
 }
 
-function __ostr(x: any): string {
+function ostr(x: any): string {
   if (x === undefined || x === null) return 'undef';
   if (typeof x === 'boolean') return x ? 'true' : 'false';
   if (typeof x === 'string') return x;
-  if (Array.isArray(x)) return '[' + x.map(__ostrInner).join(', ') + ']';
+  if (Array.isArray(x)) return '[' + x.map(ostrInner).join(', ') + ']';
   if (typeof x === 'function') return x.__oscadSrc ?? String(x);
   return String(x);
 }
 
 // prints `function(args) body` like OpenSCAD
-function __fnlit(fn: any, src: string) {
+function fnlit(fn: any, src: string) {
   try {
     fn.__oscadSrc = src;
   } catch {
@@ -263,10 +277,10 @@ function __fnlit(fn: any, src: string) {
   return fn;
 }
 
-// Trampolines tail calls made via function values by wrapping them in `__TC`
-// thunks that `__call` iterates instead of recursing, keeping self-recursion
+// Trampolines tail calls made via function values by wrapping them in `TC`
+// thunks that `call` iterates instead of recursing, keeping self-recursion
 // through function values off the JS call stack
-class __TC {
+class TC {
   fn: any;
   args: any[];
   constructor(fn: any, args: any[]) {
@@ -274,28 +288,28 @@ class __TC {
     this.args = args;
   }
 }
-function __tc(fn: any, ...args: any[]): any {
-  return new __TC(fn, args);
+function tc(fn: any, ...args: any[]): any {
+  return new TC(fn, args);
 }
-function __call(fn: any, ...args: any[]): any {
+function call(fn: any, ...args: any[]): any {
   // Calling a non-function evaluates to undef in OpenSCAD
   if (typeof fn !== 'function') return undefined;
   let r: any = fn(...args);
-  while (r instanceof __TC) {
+  while (r instanceof TC) {
     if (typeof r.fn !== 'function') return undefined;
     r = r.fn(...r.args);
   }
   return r;
 }
-function __ostrInner(x: any): string {
-  return typeof x === 'string' ? `"${x}"` : __ostr(x);
+function ostrInner(x: any): string {
+  return typeof x === 'string' ? `"${x}"` : ostr(x);
 }
-function str_fn(...a: any[]) {
-  return a.map(__ostr).join('');
+function str(...a: any[]) {
+  return a.map(ostr).join('');
 }
 
 // OpenSCAD echo formatting
-function __echoEscape(s: string): string {
+function echoEscape(s: string): string {
   let r = '';
   for (let i = 0; i < s.length; i++) {
     const ch = s[i];
@@ -315,17 +329,17 @@ function __echoEscape(s: string): string {
   return r;
 }
 
-function __oecho(x: any): string {
-  if (typeof x === 'string') return '"' + __echoEscape(x) + '"';
-  if (Array.isArray(x)) return '[' + x.map(__oecho).join(', ') + ']';
-  return __ostr(x);
+function oecho(x: any): string {
+  if (typeof x === 'string') return '"' + echoEscape(x) + '"';
+  if (Array.isArray(x)) return '[' + x.map(oecho).join(', ') + ']';
+  return ostr(x);
 }
 
-function __echo(...parts: string[]) {
+function echo(...parts: string[]) {
   console.log(parts.join(', '));
 }
 
-function __chrOne(c: any): string {
+function chrOne(c: any): string {
   const n = Math.trunc(c);
   if (!Number.isFinite(n) || n < 1 || n > 0x10FFFF ||
       (n >= 0xD800 && n <= 0xDFFF))
@@ -334,26 +348,26 @@ function __chrOne(c: any): string {
 }
 
 
-function __chrCollect(x: any, out: string[]) {
+function chrCollect(x: any, out: string[]) {
   if (Array.isArray(x)) {
-    for (const e of x) __chrCollect(e, out);
+    for (const e of x) chrCollect(e, out);
     return;
   }
   if (typeof x === 'number') {
-    const c = __chrOne(x);
+    const c = chrOne(x);
     if (c) out.push(c);
   }
 }
 
 // OpenSCAD chr()
-function chr_fn(...args: any[]) {
+function chr(...args: any[]) {
   const out: string[] = [];
-  for (const a of args) __chrCollect(a, out);
+  for (const a of args) chrCollect(a, out);
   return out.join('');
 }
 
 // OpenSCAD ord()
-function ord_fn(...args: any[]) {
+function ord(...args: any[]) {
   if (args.length !== 1) return undefined;
   const s = args[0];
   if (typeof s !== 'string' || s.length === 0) return undefined;
@@ -361,10 +375,10 @@ function ord_fn(...args: any[]) {
 }
 
 // OpenSCAD's concat
-function concat_fn(...a: any[]) {
+function concat(...a: any[]) {
   const out: any[] = [];
   for (const x of a) {
-    if (__isVec(x))
+    if (isVec(x))
       out.push(...x);
     else
       out.push(x);
@@ -373,7 +387,7 @@ function concat_fn(...a: any[]) {
 }
 
 // OpenSCAD rands()
-class __MT19937 {
+class MT19937 {
   private mt = new Uint32Array(624);
   private idx = 624;
   constructor(seed: number) {
@@ -409,9 +423,9 @@ class __MT19937 {
   }
 }
 
-const __rng = new __MT19937((Date.now() ^ (Math.random() * 0x100000000)) >>> 0);
+const rng = new MT19937((Date.now() ^ (Math.random() * 0x100000000)) >>> 0);
 
-function __hashFloatingPoint(v: number): number {
+function hashFloatingPoint(v: number): number {
   const PyHASH_BITS = 31n;
   const MOD = (1n << 31n) - 1n;
   if (!Number.isFinite(v)) {
@@ -453,16 +467,16 @@ function __hashFloatingPoint(v: number): number {
   return Number(BigInt.asIntN(32, x));
 }
 
-function __generateCanonical(): number {
+function generateCanonical(): number {
   const R = 2 ** 32;
-  const u0 = __rng.next();
-  const u1 = __rng.next();
+  const u0 = rng.next();
+  const u1 = rng.next();
   let ret = (u0 + u1 * R) / (R * R);
   if (ret >= 1) ret = 1 - Number.EPSILON / 2;
   return ret;
 }
 
-function rands_fn(...args: any[]) {
+function rands(...args: any[]) {
   // Requires 3 or 4 numeric arguments; any other shape warns and yields undef.
   if (args.length < 3 || args.length > 4) return undefined;
   for (const a of args) {
@@ -482,39 +496,39 @@ function rands_fn(...args: any[]) {
   if (!Number.isFinite(numresultsd)) numresultsd = 1;
   const numresults = Math.trunc(numresultsd);
   if (args.length > 3) {
-    __rng.seed(__hashFloatingPoint(args[3]) >>> 0);
+    rng.seed(hashFloatingPoint(args[3]) >>> 0);
   }
   const out: number[] = [];
   if (min >= max) {
     for (let i = 0; i < numresults; i++) out.push(min);
   } else {
     for (let i = 0; i < numresults; i++)
-      out.push(__generateCanonical() * (max - min) + min);
+      out.push(generateCanonical() * (max - min) + min);
   }
   return out;
 }
 
-function __search_match(needle: any, entry: any, idx_col: any) {
+function search_match(needle: any, entry: any, idx_col: any) {
   const col = idx_col !== undefined ? idx_col : 0;
-  if (col === 0 && __eq(entry, needle)) return true;
-  return Array.isArray(entry) && col < entry.length && __eq(entry[col], needle);
+  if (col === 0 && eq(entry, needle)) return true;
+  return Array.isArray(entry) && col < entry.length && eq(entry[col], needle);
 }
 
-function search_fn(needle: any, haystack: any, num_returns: any, idx_col: any) {
+function search(needle: any, haystack: any, num_returns: any, idx_col: any) {
   if (needle === undefined || haystack === undefined) {
     console.warn(
         `WARNING: search() needs to be called with at least 2 arguments`);
     return undefined;
   }
-  if (!is_list_fn(needle) && !is_string_fn(needle)) {
+  if (!is_list(needle) && !is_string(needle)) {
     const indices: any[] = [];
     for (let i = 0; i < haystack.length; i++) {
-      if (__search_match(needle, haystack[i], idx_col)) indices.push(i);
+      if (search_match(needle, haystack[i], idx_col)) indices.push(i);
     }
     if (num_returns === 0) return indices;
     return indices.slice(0, num_returns === undefined ? 1 : num_returns);
   }
-  if (is_string_fn(needle) && is_string_fn(haystack)) {
+  if (is_string(needle) && is_string(haystack)) {
     let result: any[] = [];
     const hs = [...haystack];
     for (let ch of needle) {
@@ -531,17 +545,17 @@ function search_fn(needle: any, haystack: any, num_returns: any, idx_col: any) {
     }
     return result;
   }
-  if (is_list_fn(haystack) && is_list_fn(needle)) {
+  if (is_list(haystack) && is_list(needle)) {
     return needle.map(function(n: any) {
       let indices = [];
       for (let i = 0; i < haystack.length; i++) {
-        if (__search_match(n, haystack[i], idx_col)) indices.push(i);
+        if (search_match(n, haystack[i], idx_col)) indices.push(i);
       }
       return num_returns === 0 ? indices :
                                  (indices.length > 0 ? indices[0] : []);
     });
   }
-  if (is_string_fn(needle) && is_list_fn(haystack)) {
+  if (is_string(needle) && is_list(haystack)) {
     const col = idx_col !== undefined ? idx_col : 0;
     const result: any[] = [];
     for (const n of needle) {
@@ -554,7 +568,7 @@ function search_fn(needle: any, haystack: any, num_returns: any, idx_col: any) {
               col + 1}. Invalid entry: ${entry}`);
           return [];
         }
-        if (__eq(entry[col], n)) indices.push(i);
+        if (eq(entry[col], n)) indices.push(i);
       }
       if (num_returns === 0)
         result.push(indices);
@@ -571,7 +585,7 @@ function search_fn(needle: any, haystack: any, num_returns: any, idx_col: any) {
   return undefined;
 }
 
-function lookup_fn(key: any, table: any, ...rest: any[]) {
+function lookup(key: any, table: any, ...rest: any[]) {
   // OpenSCAD's lookup() takes exactly 2 parameters and a numeric key. Any other
   // shape is warned about yields undef
   if (rest.length > 0) {
@@ -616,7 +630,7 @@ function lookup_fn(key: any, table: any, ...rest: any[]) {
   return low_v + (high_v - low_v) * (key - low_p) / (high_p - low_p);
 }
 
-function __truthy(x: any) {
+function truthy(x: any) {
   if (x === undefined || x === null || x === false) return false;
   if (typeof x === 'number') return x !== 0;
   if (typeof x === 'string' || Array.isArray(x)) return x.length > 0;
@@ -624,26 +638,26 @@ function __truthy(x: any) {
 }
 
 // Control
-function openscad_assert_fn(cond: any, msg: any) {
-  if (!__truthy(cond)) {
+function assert(cond: any, msg: any) {
+  if (!truthy(cond)) {
     console.trace('Assertion failed:', msg);
     throw new Error(msg || 'Assertion failed');
   }
 }
 
-function __eq(a: any, b: any) {
+function eq(a: any, b: any) {
   if (a === b) return true;
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false;
     for (let i = 0; i < a.length; i++) {
-      if (!__eq(a[i], b[i])) return false;
+      if (!eq(a[i], b[i])) return false;
     }
     return true;
   }
   return false;
 }
 
-function __cmpCat(x: any): string {
+function cmpCat(x: any): string {
   const t = typeof x;
   if (t === 'number') return 'n';
   if (t === 'boolean') return 'b';
@@ -651,7 +665,7 @@ function __cmpCat(x: any): string {
   if (Array.isArray(x)) return (x as any).__isRange ? 'r' : 'v';
   return 'u';
 }
-function __veccmp(a: any[], b: any[]): number {
+function veccmp(a: any[], b: any[]): number {
   const n = Math.min(a.length, b.length);
   for (let i = 0; i < n; i++) {
     if (a[i] < b[i]) return -1;
@@ -659,60 +673,60 @@ function __veccmp(a: any[], b: any[]): number {
   }
   return Math.sign(a.length - b.length);
 }
-function __lt(a: any, b: any): any {
-  const ca = __cmpCat(a);
-  if (ca !== __cmpCat(b) || ca === 'u') return undefined;
-  return (ca === 'v' || ca === 'r') ? __veccmp(a, b) < 0 : a < b;
+function lt(a: any, b: any): any {
+  const ca = cmpCat(a);
+  if (ca !== cmpCat(b) || ca === 'u') return undefined;
+  return (ca === 'v' || ca === 'r') ? veccmp(a, b) < 0 : a < b;
 }
-function __gt(a: any, b: any): any {
-  const ca = __cmpCat(a);
-  if (ca !== __cmpCat(b) || ca === 'u') return undefined;
-  return (ca === 'v' || ca === 'r') ? __veccmp(a, b) > 0 : a > b;
+function gt(a: any, b: any): any {
+  const ca = cmpCat(a);
+  if (ca !== cmpCat(b) || ca === 'u') return undefined;
+  return (ca === 'v' || ca === 'r') ? veccmp(a, b) > 0 : a > b;
 }
-function __le(a: any, b: any): any {
-  const ca = __cmpCat(a);
-  if (ca !== __cmpCat(b) || ca === 'u') return undefined;
-  return (ca === 'v' || ca === 'r') ? __veccmp(a, b) <= 0 : a <= b;
+function le(a: any, b: any): any {
+  const ca = cmpCat(a);
+  if (ca !== cmpCat(b) || ca === 'u') return undefined;
+  return (ca === 'v' || ca === 'r') ? veccmp(a, b) <= 0 : a <= b;
 }
-function __ge(a: any, b: any): any {
-  const ca = __cmpCat(a);
-  if (ca !== __cmpCat(b) || ca === 'u') return undefined;
-  return (ca === 'v' || ca === 'r') ? __veccmp(a, b) >= 0 : a >= b;
+function ge(a: any, b: any): any {
+  const ca = cmpCat(a);
+  if (ca !== cmpCat(b) || ca === 'u') return undefined;
+  return (ca === 'v' || ca === 'r') ? veccmp(a, b) >= 0 : a >= b;
 }
-function __isNum(x: any): boolean {
+function isNum(x: any): boolean {
   return typeof x === 'number';
 }
-function __isVec(x: any): boolean {
+function isVec(x: any): boolean {
   return Array.isArray(x) && !(x as any).__isRange;
 }
 
-function __add(a: any, b: any): any {
-  if (__isNum(a) && __isNum(b)) return a + b;
-  if (__isVec(a) && __isVec(b)) {
+function add(a: any, b: any): any {
+  if (isNum(a) && isNum(b)) return a + b;
+  if (isVec(a) && isVec(b)) {
     let n = Math.min(a.length, b.length), r: any[] = [];
-    for (let i = 0; i < n; i++) r.push(__add(a[i], b[i]));
+    for (let i = 0; i < n; i++) r.push(add(a[i], b[i]));
     return r;
   }
   return undefined;
 }
-function __sub(a: any, b: any): any {
-  if (__isNum(a) && __isNum(b)) return a - b;
-  if (__isVec(a) && __isVec(b)) {
+function sub(a: any, b: any): any {
+  if (isNum(a) && isNum(b)) return a - b;
+  if (isVec(a) && isVec(b)) {
     let n = Math.min(a.length, b.length), r: any[] = [];
-    for (let i = 0; i < n; i++) r.push(__sub(a[i], b[i]));
+    for (let i = 0; i < n; i++) r.push(sub(a[i], b[i]));
     return r;
   }
   return undefined;
 }
-function __mul(a: any, b: any): any {
-  if (__isNum(a) && __isNum(b)) return a * b;
-  if (__isNum(a) && __isVec(b))
-    return b.map((x: any): any => __mul(a, x));  // scalar * vector
-  if (__isVec(a) && __isNum(b))
-    return a.map((x: any): any => __mul(x, b));  // vector * scalar
-  if (__isVec(a) && __isVec(b)) {
-    const aMat = a.length > 0 && __isVec(a[0]);
-    const bMat = b.length > 0 && __isVec(b[0]);
+function mul(a: any, b: any): any {
+  if (isNum(a) && isNum(b)) return a * b;
+  if (isNum(a) && isVec(b))
+    return b.map((x: any): any => mul(a, x));  // scalar * vector
+  if (isVec(a) && isNum(b))
+    return a.map((x: any): any => mul(x, b));  // vector * scalar
+  if (isVec(a) && isVec(b)) {
+    const aMat = a.length > 0 && isVec(a[0]);
+    const bMat = b.length > 0 && isVec(b[0]);
     if (aMat && bMat) {  // matrix * matrix
       const aCols = a[0].length, bRows = b.length;
       if (aCols !== bRows) {
@@ -722,7 +736,7 @@ function __mul(a: any, b: any): any {
         return undefined;
       }
       for (let i = 0; i < a.length; i++) {
-        const rowLen = __isVec(a[i]) ? a[i].length : 0;
+        const rowLen = isVec(a[i]) ? a[i].length : 0;
         if (rowLen !== bRows) {
           console.warn(
               `WARNING: matrix*matrix left operand row length does not match right operand row count (${
@@ -752,7 +766,7 @@ function __mul(a: any, b: any): any {
       const res: any[] = [];
       for (let i = 0; i < a.length; i++) {
         const row = a[i];
-        const rowLen = __isVec(row) ? row.length : 0;
+        const rowLen = isVec(row) ? row.length : 0;
         if (rowLen !== b.length) {
           console.warn(
               `WARNING: matrix*vector left operand row length does not match vector length (${
@@ -791,69 +805,69 @@ function __mul(a: any, b: any): any {
   }
   return undefined;
 }
-function __div(a: any, b: any): any {
-  if (__isNum(a) && __isNum(b)) return a / b;
-  if (__isVec(a) && __isNum(b))
-    return a.map((x: any): any => __div(x, b));  // vector / scalar
-  if (__isNum(a) && __isVec(b))
-    return b.map((x: any): any => __div(a, x));  // scalar / vector
-  if (__isVec(a) && __isVec(b)) {
+function div(a: any, b: any): any {
+  if (isNum(a) && isNum(b)) return a / b;
+  if (isVec(a) && isNum(b))
+    return a.map((x: any): any => div(x, b));  // vector / scalar
+  if (isNum(a) && isVec(b))
+    return b.map((x: any): any => div(a, x));  // scalar / vector
+  if (isVec(a) && isVec(b)) {
     let n = Math.min(a.length, b.length), r: any[] = [];
-    for (let i = 0; i < n; i++) r.push(__div(a[i], b[i]));
+    for (let i = 0; i < n; i++) r.push(div(a[i], b[i]));
     return r;
   }
   return undefined;
 }
-function __mod(a: any, b: any): any {
-  if (__isNum(a) && __isNum(b)) return a % b;
+function mod(a: any, b: any): any {
+  if (isNum(a) && isNum(b)) return a % b;
   return undefined;
 }
 
 // Bitwise operators
-function __toI64(x: any): bigint|undefined {
+function toI64(x: any): bigint|undefined {
   if (typeof x !== 'number' || !isFinite(x)) return undefined;
   return BigInt.asIntN(64, BigInt(Math.trunc(x)));
 }
-function __band(a: any, b: any): any {
-  const ia = __toI64(a), ib = __toI64(b);
+function band(a: any, b: any): any {
+  const ia = toI64(a), ib = toI64(b);
   if (ia === undefined || ib === undefined) return undefined;
   return Number(BigInt.asIntN(64, ia & ib));
 }
-function __bor(a: any, b: any): any {
-  const ia = __toI64(a), ib = __toI64(b);
+function bor(a: any, b: any): any {
+  const ia = toI64(a), ib = toI64(b);
   if (ia === undefined || ib === undefined) return undefined;
   return Number(BigInt.asIntN(64, ia | ib));
 }
-function __bnot(a: any): any {
-  const ia = __toI64(a);
+function bnot(a: any): any {
+  const ia = toI64(a);
   if (ia === undefined) return undefined;
   return Number(BigInt.asIntN(64, ~ia));
 }
-function __shl(a: any, b: any): any {
-  const ia = __toI64(a), ib = __toI64(b);
+function shl(a: any, b: any): any {
+  const ia = toI64(a), ib = toI64(b);
   if (ia === undefined || ib === undefined) return undefined;
   if (ib < 0n || ib >= 64n) return undefined;  // shifts of 64+ bits are undef
   return Number(BigInt.asIntN(64, ia << ib));
 }
-function __shr(a: any, b: any): any {
-  const ia = __toI64(a), ib = __toI64(b);
+function shr(a: any, b: any): any {
+  const ia = toI64(a), ib = toI64(b);
   if (ia === undefined || ib === undefined) return undefined;
   if (ib < 0n || ib >= 64n) return undefined;
   return Number(BigInt.asIntN(64, ia >> ib));
 }
-function __neg(a: any): any {
-  if (__isNum(a)) return -a;
-  if (__isVec(a)) return a.map(__neg);
+function neg(a: any): any {
+  if (isNum(a)) return -a;
+  if (isVec(a)) return a.map(neg);
   return undefined;
 }
-function __pos(a: any): any {
-  if (__isNum(a)) return +a;
-  if (__isVec(a)) return a.map(__pos);
+function pos(a: any): any {
+  if (isNum(a)) return +a;
+  if (isVec(a)) return a.map(pos);
   return undefined;
 }
 
 
-function __index(obj: any, idx: any): any {
+function index(obj: any, idx: any): any {
   if (typeof idx !== 'number' || obj == null) return undefined;
   if (typeof obj === 'string') {
     const cps = Array.from(obj);
@@ -865,10 +879,10 @@ function __index(obj: any, idx: any): any {
 }
 
 // OpenSCAD version
-function version_fn() {
+function version() {
   return [2019, 5, 0];
 }
-function version_num_fn() {
+function version_num() {
   return 20190500;
 }
 
@@ -880,7 +894,7 @@ let undef = undefined;
 let _EPSILON = 1e-9;
 
 // Special-variable context
-const __ctx: Record<string, any> = {
+const ctx: Record<string, any> = {
   $fn: 0,
   $fa: 12,
   $fs: 2,
@@ -895,33 +909,33 @@ const __ctx: Record<string, any> = {
   $idx: undefined,
 };
 
-function __withSpecials(overrides: Record<string, any>, body: () => any) {
+function withSpecials(overrides: Record<string, any>, body: () => any) {
   const saved: Record<string, any> = {};
   for (const k in overrides) {
-    saved[k] = __ctx[k];
-    __ctx[k] = overrides[k];
+    saved[k] = ctx[k];
+    ctx[k] = overrides[k];
   }
   try {
     return body();
   } finally {
-    Object.assign(__ctx, saved);
+    Object.assign(ctx, saved);
   }
 }
 
 // Children stack for module calls
-let __children_stack: any[] = [];
-const __color_prop_layout = new WeakMap();
-function __with_children(fn: any, count: any, call: any, name?: string) {
-  __children_stack.push({fn: fn, count: count, name: name});
+let children_stack: any[] = [];
+const color_prop_layout = new WeakMap();
+function with_children(fn: any, count: any, call: any, name?: string) {
+  children_stack.push({fn: fn, count: count, name: name});
   try {
     return call();
   } finally {
-    __children_stack.pop();
+    children_stack.pop();
   }
 }
 
 // Resolve a children() selector into the ordered list of child fns to invoke
-function __pick_children(childFns: any[], i: any): any[] {
+function pick_children(childFns: any[], i: any): any[] {
   if (i === undefined) return childFns;
   if (Array.isArray(i)) {
     const out: any[] = [];
@@ -936,15 +950,15 @@ function __pick_children(childFns: any[], i: any): any[] {
   return [];
 }
 
-function parent_module_fn(d: any = 1) {
+function parent_module(d: any = 1) {
   const depth = Number(d);
   if (!Number.isInteger(depth) || depth < 0) return '';
-  const idx = __children_stack.length - 1 - depth;
-  if (idx < 0 || idx >= __children_stack.length) return '';
-  return __children_stack[idx].name || '';
+  const idx = children_stack.length - 1 - depth;
+  if (idx < 0 || idx >= children_stack.length) return '';
+  return children_stack[idx].name || '';
 }
 
-function __is_finite_matrix4(m: any) {
+function is_finite_matrix4(m: any) {
   return Array.isArray(m) && m.length === 4 &&
       m.every(
           (row: any) => Array.isArray(row) && row.length === 4 &&
@@ -954,7 +968,7 @@ function __is_finite_matrix4(m: any) {
 
 // Pad smaller matrices to 4×4 with identity, then normalize by the bottom-right
 // value before applying the affine transform
-function __normalize_matrix4(m: any) {
+function normalize_matrix4(m: number[][]) {
   if (!Array.isArray(m) || m.length < 3) return undefined;
   const out = [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
   for (let row = 0; row < 3; row++) {
@@ -978,8 +992,8 @@ function __normalize_matrix4(m: any) {
 }
 
 // Manifold expects a flat 4x4 matrix in column-major order.
-function __to_manifold_mat4(m: any) {
-  const n = __normalize_matrix4(m);
+function to_manifold_mat4(m: number[][]) {
+  const n = normalize_matrix4(m);
   if (!n) return undefined;
   const out = new Array(16);
   for (let row = 0; row < 4; row++) {
@@ -990,14 +1004,14 @@ function __to_manifold_mat4(m: any) {
   return out;
 }
 
-function __to_manifold_mat3(m: any) {
-  const n = __normalize_matrix4(m);
+function to_manifold_mat3(m: number[][]) {
+  const n = normalize_matrix4(m);
   if (!n) return undefined;
   return [n[0]![0], n[1]![0], 0, n[0]![1], n[1]![1], 0, n[0]![3], n[1]![3], 1];
 }
 
-function __safe_transform(shape: any, m: any) {
-  const mm = __is2D(shape) ? __to_manifold_mat3(m) : __to_manifold_mat4(m);
+function transform(shape: any, m: number[][]) {
+  const mm = is2D(shape) ? to_manifold_mat3(m) : to_manifold_mat4(m);
   if (!mm) return shape;
   try {
     return shape.transform(mm);
@@ -1006,18 +1020,18 @@ function __safe_transform(shape: any, m: any) {
   }
 }
 
-function __identity4() {
+function identity4() {
   return [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
 }
 
 // 2D helpers used by offset()/projection() fallbacks
-function __safe_offset2d(
+function offset(
     shape: any, delta: any, joinType = 'Round', miterLimit = 2,
     circularSegments = 0, fa = 12, fs = 2) {
   try {
     if (shape && typeof shape.offset === 'function') {
       if (circularSegments <= 0) {
-        __sync_quality(fa, fs);
+        sync_quality(fa, fs);
       }
       return shape.offset(delta, joinType, miterLimit, circularSegments);
     }
@@ -1026,7 +1040,7 @@ function __safe_offset2d(
   return shape;
 }
 
-function __safe_project3d(shape: any, cut = false) {
+function projection(shape: any, cut = false) {
   try {
     if (shape) {
       if (cut && typeof shape.slice === 'function') {
@@ -1042,7 +1056,7 @@ function __safe_project3d(shape: any, cut = false) {
 }
 
 // Common OpenSCAD/CSS color names mapped to linearized [0, 1] RGB.
-const __named_colors: Record<string, number[]> = {
+const named_colors: Record<string, number[]> = {
   aqua: [0, 1, 1],
   beige: [0.9608, 0.9608, 0.8627],
   black: [0, 0, 0],
@@ -1078,7 +1092,7 @@ const __named_colors: Record<string, number[]> = {
   yellow: [1, 1, 0],
 };
 
-function __clamp01(v: any) {
+function clamp01(v: any) {
   const n = Number(v);
   if (!Number.isFinite(n)) return 0;
   if (n <= 0) return 0;
@@ -1086,7 +1100,7 @@ function __clamp01(v: any) {
   return n;
 }
 
-function __parse_hex_color(s: any) {
+function parse_hex_color(s: any) {
   if (!s.startsWith('#')) return undefined;
   const h = s.slice(1);
   if (h.length === 3 || h.length === 4) {
@@ -1108,7 +1122,7 @@ function __parse_hex_color(s: any) {
   return undefined;
 }
 
-function __parse_color_value(c: any) {
+function parse_color_value(c: any) {
   if (Array.isArray(c)) {
     if (c.length < 3) return undefined;
     let r = Number(c[0]);
@@ -1131,24 +1145,24 @@ function __parse_color_value(c: any) {
   if (typeof c === 'string') {
     const key = c.trim().toLowerCase();
     if (key === '' || key === 'default') return undefined;
-    const named = __named_colors[key];
+    const named = named_colors[key];
     if (named) {
       return named.length === 4 ? named : [named[0], named[1], named[2], 1];
     }
-    return __parse_hex_color(key);
+    return parse_hex_color(key);
   }
 
   return undefined;
 }
 
 // Apply OpenSCAD color() by appending custom RGBA + marker channels.
-function __apply_color(shape: any, c: any, alpha: any) {
+function color(shape: any, c: any, alpha: any) {
   if (!shape || typeof shape.setProperties !== 'function' ||
       typeof shape.numProp !== 'function') {
     return shape;
   }
 
-  let base = __parse_color_value(c);
+  let base = parse_color_value(c);
   if (!base) {
     // Allow color(alpha = x) form by assuming white base if alpha is provided.
     if (alpha === undefined || alpha === null) return shape;
@@ -1161,14 +1175,14 @@ function __apply_color(shape: any, c: any, alpha: any) {
   }
 
   const rgba = [
-    __clamp01(base[0]),
-    __clamp01(base[1]),
-    __clamp01(base[2]),
-    __clamp01(outAlpha),
+    clamp01(base[0]),
+    clamp01(base[1]),
+    clamp01(base[2]),
+    clamp01(outAlpha),
   ];
 
   const oldNumProp = Math.max(0, Number(shape.numProp()) || 0);
-  const trackedLayout = __color_prop_layout.get(shape);
+  const trackedLayout = color_prop_layout.get(shape);
   let colorOffset = Math.max(3, oldNumProp);
   let markerOffset = colorOffset + 4;
   let newNumProp = markerOffset + 1;
@@ -1205,38 +1219,38 @@ function __apply_color(shape: any, c: any, alpha: any) {
           // manifold built-in properties.
           newProp[markerOffset] = 1;
         });
-    __color_prop_layout.set(painted, {colorOffset, markerOffset});
+    color_prop_layout.set(painted, {colorOffset, markerOffset});
     return painted;
   } catch {
     return shape;
   }
 }
 
-function __each(v: any) {
+function each(v: any) {
   if (v === undefined || v === null) return [];
   if (Array.isArray(v)) return v;
   if (typeof v === 'string') return Array.from(v);
   return [v];
 }
 
-function __flat_map_iter(v: any, fn: any) {
+function flat_map_iter(v: any, fn: any) {
   if (v === undefined || v === null) return [];
   if (Array.isArray(v)) return v.flatMap((item, i) => fn(item, i));
   if (typeof v === 'string') return Array.from(v).flatMap(fn);
   return [v].flatMap(fn);
 }
 
-const __UINT32_MAX = 4294967295;
-const __rc_f64 = new Float64Array(1);
-const __rc_u64 = new BigUint64Array(__rc_f64.buffer);
-function __nextUp(x: number): number {
-  __rc_f64[0] = x;
-  __rc_u64[0] = __rc_u64[0]! + 1n;
-  return __rc_f64[0]!;
+const UINT32_MAX = 4294967295;
+const rc_f64 = new Float64Array(1);
+const rc_u64 = new BigUint64Array(rc_f64.buffer);
+function nextUp(x: number): number {
+  rc_f64[0] = x;
+  rc_u64[0] = rc_u64[0]! + 1n;
+  return rc_f64[0]!;
 }
 
 // max uint32_t if step is 0 or range is infinite
-function __rangeNumValues(start: number, step: number, end: number): number {
+function rangeNumValues(start: number, step: number, end: number): number {
   if (Number.isNaN(start) || Number.isNaN(step) || Number.isNaN(end)) return 0;
   if (step < 0) {
     if (start < end) return 0;
@@ -1245,16 +1259,16 @@ function __rangeNumValues(start: number, step: number, end: number): number {
   }
   if (start === end || !Number.isFinite(step)) return 1;
   if (!Number.isFinite(start) || !Number.isFinite(end) || step === 0)
-    return __UINT32_MAX;
-  const numSteps = Math.floor(__nextUp((end - start) / step));
-  return numSteps >= __UINT32_MAX ? __UINT32_MAX : numSteps + 1;
+    return UINT32_MAX;
+  const numSteps = Math.floor(nextUp((end - start) / step));
+  return numSteps >= UINT32_MAX ? UINT32_MAX : numSteps + 1;
 }
 
-function __rangeCount(start: any, step: any, end: any): number {
+function rangeCount(start: any, step: any, end: any): number {
   if (typeof start !== 'number' || typeof step !== 'number' ||
       typeof end !== 'number')
     return 0;
-  const n = __rangeNumValues(start, step, end);
+  const n = rangeNumValues(start, step, end);
   if (n >= 1000000) {
     console.warn(
         `WARNING: Bad range parameter in for statement: too many elements (${
@@ -1266,9 +1280,9 @@ function __rangeCount(start: any, step: any, end: any): number {
   return n;
 }
 
-function __range(start: any, step: any, end: any) {
+function range(start: any, step: any, end: any) {
   let result: any[] = [];
-  let n = __rangeCount(start, step, end);
+  let n = rangeCount(start, step, end);
   // Yield begin_val itself first, so an infinite step still yields start
   for (let i = 0; i < n; i++) result.push(i === 0 ? start : start + i * step);
   Object.defineProperty(result, '__isRange', {
@@ -1281,12 +1295,12 @@ function __range(start: any, step: any, end: any) {
 }
 
 // Detect CrossSection (2D) vs Manifold (3D) for dispatch
-function __is2D(x: any) {
+function is2D(x: any) {
   return x != null && typeof x.offset === 'function' &&
       typeof x.toPolygons === 'function';
 }
 
-function __isEmpty(x: any) {
+function isEmpty(x: any) {
   if (!x) return true;
   if (typeof x.isEmpty === 'function' && x.isEmpty()) return true;
   if (typeof x.numTri === 'function' && x.numTri() === 0) return true;
@@ -1294,8 +1308,8 @@ function __isEmpty(x: any) {
   return false;
 }
 
-const __TOL_FACTOR = Math.pow(2, -24);
-function __maxBBoxDim3d(items: any[]): number {
+const TOL_FACTOR = Math.pow(2, -24);
+function maxBBoxDim3d(items: any[]): number {
   let lo = [Infinity, Infinity, Infinity];
   let hi = [-Infinity, -Infinity, -Infinity];
   for (const it of items) {
@@ -1314,10 +1328,10 @@ function __maxBBoxDim3d(items: any[]): number {
   }
   return maxDim;
 }
-function __withTol3d(items: any[]): any[] {
-  const maxDim = __maxBBoxDim3d(items);
+function withTol3d(items: any[]): any[] {
+  const maxDim = maxBBoxDim3d(items);
   if (!(maxDim > 0)) return items;
-  const tol = maxDim * __TOL_FACTOR;
+  const tol = maxDim * TOL_FACTOR;
   return items.map(it => {
     if (it && typeof it.setTolerance === 'function' &&
         typeof it.tolerance === 'function') {
@@ -1329,149 +1343,70 @@ function __withTol3d(items: any[]): any[] {
 
 // OpenSCAD cannot mix 2D and 3D in a boolean op - it keeps the dimension of the
 // first child and ignores (with a warning) any children of the other dimension.
-function __sameDim(items: any[], ref2D: boolean): any[] {
-  return items.filter(x => __is2D(x) === ref2D);
+function sameDim(items: any[], ref2D: boolean): any[] {
+  return items.filter(x => is2D(x) === ref2D);
 }
 
 // Root modifier (!): the first geometry evaluated under a `!` statement becomes
 // the design root - OpenSCAD renders only that subtree and ignores the rest of
 // the design
-let __root_item: any = null;
-function __rootMod(g: any): any {
-  if (__root_item === null && g !== null && g !== undefined) __root_item = g;
+let root_item: any = null;
+function rootMod(g: any): any {
+  if (root_item === null && g !== null && g !== undefined) root_item = g;
   return g;
 }
-function __applyRoot(items: any[], isBackground = false): any[] {
-  if (__root_item === null) return items;
-  return isBackground ? [] : [__root_item];
+function applyRoot(items: any[], isBackground = false): any[] {
+  if (root_item === null) return items;
+  return isBackground ? [] : [root_item];
 }
 
 // Boolean ops: use CrossSection for 2D, Manifold for 3D
-function __union2d3d(items: any[]) {
-  const valid = items.filter(x => !__isEmpty(x));
+function union(items: any[]) {
+  const valid = items.filter(x => !isEmpty(x));
   if (valid.length === 0) return Manifold.union([]);
-  const is2D = __is2D(valid[0]);
-  const same = __sameDim(valid, is2D);
-  return is2D ? CrossSection.union(same) : Manifold.union(__withTol3d(same));
+  const flat = is2D(valid[0]);
+  const same = sameDim(valid, flat);
+  return flat ? CrossSection.union(same) : Manifold.union(withTol3d(same));
 }
-function __difference2d3d(first: any, rest: any[]) {
-  if (__isEmpty(first)) return first;
-  const is2D = __is2D(first);
-  const validRest = __sameDim(rest.filter(x => !__isEmpty(x)), is2D);
+function difference(first: any, rest: any[]) {
+  if (isEmpty(first)) return first;
+  const flat = is2D(first);
+  const validRest = sameDim(rest.filter(x => !isEmpty(x)), flat);
   if (validRest.length === 0) return first;
-  if (is2D) return CrossSection.difference([first, ...validRest]);
-  const [tf, ...tr] = __withTol3d([first, ...validRest]);
+  if (flat) return CrossSection.difference([first, ...validRest]);
+  const [tf, ...tr] = withTol3d([first, ...validRest]);
   return tr.length === 1 ? tf.subtract(tr[0]) : tf.subtract(Manifold.union(tr));
 }
-function __intersection2d3d(items: any[]) {
+function intersection(items: any[]) {
   if (items.length === 0) return Manifold.union([]);
-  const valid = items.filter(x => !__isEmpty(x));
+  const valid = items.filter(x => !isEmpty(x));
   if (valid.length < items.length) {
-    const firstValid2D = valid.find(__is2D);
+    const firstValid2D = valid.find(is2D);
     return firstValid2D ? CrossSection.union([]) : Manifold.union([]);
   }
-  const is2D = __is2D(valid[0]);
-  const same = __sameDim(valid, is2D);
+  const flat = is2D(valid[0]);
+  const same = sameDim(valid, flat);
   // Intersecting across dimensions (e.g. a 3D solid with a 2D shape) has no
   // common volume, so OpenSCAD yields an empty result.
   if (same.length < valid.length)
-    return is2D ? CrossSection.union([]) : Manifold.union([]);
-  return is2D ? CrossSection.intersection(same) :
-                Manifold.intersection(__withTol3d(same));
+    return flat ? CrossSection.union([]) : Manifold.union([]);
+  return flat ? CrossSection.intersection(same) :
+                Manifold.intersection(withTol3d(same));
 }
-function __hull2d3d(items: any[]) {
-  const valid = items.filter(x => !__isEmpty(x));
+function hull(items: any[]) {
+  const valid = items.filter(x => !isEmpty(x));
   if (valid.length === 0) return Manifold.union([]);
-  return __is2D(valid[0]) ? CrossSection.hull(valid) : Manifold.hull(valid);
+  return is2D(valid[0]) ? CrossSection.hull(valid) : Manifold.hull(valid);
 }
 
-function __mesh_points3d(manifold: any, maxPoints = 192) {
-  if (!manifold || typeof manifold.getMesh !== 'function') return [];
-  const mesh = manifold.getMesh();
-  const numProp =
-      (mesh && typeof mesh.numProp === 'number' && mesh.numProp >= 3) ?
-      mesh.numProp :
-      3;
-  const vertProps = mesh && mesh.vertProperties;
-  if (!vertProps || vertProps.length < 3) return [];
-
-  const count = Math.floor(vertProps.length / numProp);
-  if (count <= 0) return [];
-
-  const step = Math.max(1, Math.ceil(count / maxPoints));
-  const points = [];
-  const seen = new Set();
-
-  for (let i = 0; i < count; i += step) {
-    const base = i * numProp;
-    const x = vertProps[base];
-    const y = vertProps[base + 1];
-    const z = vertProps[base + 2];
-    const key = `${x},${y},${z}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    points.push([x, y, z]);
-  }
-
-  // Include the final vertex to reduce directional sampling bias.
-  const tail = (count - 1) * numProp;
-  const tx = vertProps[tail];
-  const ty = vertProps[tail + 1];
-  const tz = vertProps[tail + 2];
-  const tailKey = `${tx},${ty},${tz}`;
-  if (!seen.has(tailKey)) points.push([tx, ty, tz]);
-
-  return points;
-}
-
-function __is_likely_convex3d(manifold: any) {
-  if (!manifold || typeof manifold.hull !== 'function' ||
-      typeof manifold.volume !== 'function')
-    return false;
-  if (typeof manifold.isEmpty === 'function' && manifold.isEmpty()) return true;
-  try {
-    const volume = manifold.volume();
-    const hullVolume = manifold.hull().volume();
-    if (!Number.isFinite(volume) || !Number.isFinite(hullVolume)) return false;
-    const eps = Math.max(1e-6, Math.abs(hullVolume) * 1e-4);
-    return Math.abs(hullVolume - volume) <= eps;
-  } catch (_err) {
-    return false;
-  }
-}
-
-function __minkowski_convex_pair3d(a: any, b: any) {
-  const pointsA = __mesh_points3d(a);
-  const pointsB = __mesh_points3d(b);
-  if (pointsA.length === 0 || pointsB.length === 0) return Manifold.union([]);
-
-  const sums = [];
-  for (let i = 0; i < pointsA.length; i++) {
-    const pa = pointsA[i]!;
-    for (let j = 0; j < pointsB.length; j++) {
-      const pb = pointsB[j]!;
-      sums.push([pa[0] + pb[0], pa[1] + pb[1], pa[2] + pb[2]]);
-    }
-  }
-  return Manifold.hull(sums as any);
-}
-
-function __minkowski_convex_chain3d(items: any[]) {
-  let acc = items[0];
-  for (let i = 1; i < items.length; i++) {
-    acc = __minkowski_convex_pair3d(acc, items[i]);
-  }
-  return acc;
-}
-
-function __minkowski2d3d(items: any[]) {
-  const valid = items.filter(x => !__isEmpty(x));
+function minkowski(items: any[]) {
+  const valid = items.filter(x => !isEmpty(x));
   if (valid.length === 0) return Manifold.union([]);
   if (valid.length === 1) return valid[0];
 
   // Check ALL items upfront
   for (const item of valid) {
-    if (__is2D(item)) throw new Error('2D minkowski not implemented');
+    if (is2D(item)) throw new Error('2D minkowski not implemented');
     if (typeof item.minkowskiSum !== 'function')
       throw new Error('Your manifold-3d build does not expose minkowskiSum');
   }
@@ -1484,11 +1419,11 @@ function __minkowski2d3d(items: any[]) {
 }
 
 // Returns `x` when it is a finite number, otherwise `dflt`
-function __finiteOr(x: any, dflt: number): number {
+function finiteOr(x: any, dflt: number): number {
   return (typeof x === 'number' && Number.isFinite(x)) ? x : dflt;
 }
 
-function __normalizeScale(scale: number|number[]|undefined): [number, number]|
+function normalizeScale(scale: number|number[]|undefined): [number, number]|
     undefined {
   if (scale === undefined || scale === null) return undefined;
   // OpenSCAD accepts only a finite scalar or a 2-element finite vector for
@@ -1508,12 +1443,12 @@ function __normalizeScale(scale: number|number[]|undefined): [number, number]|
 }
 
 // Arc length of an Archimedes spiral r = a*theta
-function __archimedesLength(a: number, theta: number): number {
+function archimedesLength(a: number, theta: number): number {
   return 0.5 * a * (theta * Math.sqrt(1 + theta * theta) + Math.asinh(theta));
 }
 
 // Slice calculation logic for curves, helices, and conical helices
-function __computeExtrudeDivisions(shape: any, height: number, options: {
+function computeExtrudeDivisions(shape: any, height: number, options: {
   twist?: number;
   scale?: number | number[] | undefined;
   fn?: number;
@@ -1526,7 +1461,7 @@ function __computeExtrudeDivisions(shape: any, height: number, options: {
     return Math.max(1, options.slices);
   }
 
-  const twist = Math.abs(__finiteOr(options.twist, 0));
+  const twist = Math.abs(finiteOr(options.twist, 0));
   const fn = options.fn ?? 0;
   const fa = options.fa ?? 12;
   const fs = options.fs ?? 2;
@@ -1536,7 +1471,7 @@ function __computeExtrudeDivisions(shape: any, height: number, options: {
       0;
   const GRID_FINE = 0.00000095367431640625;
 
-  const normScale = __normalizeScale(options.scale);
+  const normScale = normalizeScale(options.scale);
   const sx = normScale?.[0] ?? 1;
   const sy = normScale?.[1] ?? 1;
 
@@ -1609,7 +1544,7 @@ function __computeExtrudeDivisions(shape: any, height: number, options: {
   const angleStart = angleEnd - twistRad;
   const a = r / angleEnd;
   const spiralLength =
-      __archimedesLength(a, angleEnd) - __archimedesLength(a, angleStart);
+      archimedesLength(a, angleEnd) - archimedesLength(a, angleStart);
   const totalLength = Math.sqrt(spiralLength * spiralLength + height * height);
   const fsSlices = Math.ceil(totalLength / fs);
   const faSlices = Math.ceil(twist / fa);
@@ -1617,7 +1552,7 @@ function __computeExtrudeDivisions(shape: any, height: number, options: {
 }
 
 // Interpolate points along v0->v1, excluding the endpoint v1
-function __addSegmentedEdge(
+function addSegmentedEdge(
     out: [number, number][], v0: [number, number], v1: [number, number],
     segs: number) {
   for (let j = 0; j < segs; j++) {
@@ -1626,7 +1561,7 @@ function __addSegmentedEdge(
   }
 }
 
-function __maxEdgeLen(
+function maxEdgeLen(
     v0: [number, number], v1: [number, number], twist: number, sx: number,
     sy: number, slices: number): number {
   if (sx === sy) {
@@ -1649,27 +1584,27 @@ function __maxEdgeLen(
 }
 
 // Split each edge into ceil(maxEdgeLen / fs) segments.
-function __splitOutlineByFs(
+function splitOutlineByFs(
     o: [number, number][], twist: number, sx: number, sy: number, fs: number,
     slices: number): [number, number][] {
   const n = o.length;
   const out: [number, number][] = [];
   for (let i = 1; i <= n; i++) {
     const v0 = o[i - 1]!, v1 = o[i % n]!;
-    const segs = Math.max(
-        1, Math.ceil(__maxEdgeLen(v0, v1, twist, sx, sy, slices) / fs));
-    __addSegmentedEdge(out, v0, v1, segs);
+    const segs =
+        Math.max(1, Math.ceil(maxEdgeLen(v0, v1, twist, sx, sy, slices) / fs));
+    addSegmentedEdge(out, v0, v1, segs);
   }
   return out;
 }
 
-function __splitOutlineByFn(
+function splitOutlineByFn(
     o: [number, number][], twist: number, sx: number, sy: number,
     target: number, slices: number): [number, number][] {
   const n = o.length;
   const maxLen: number[] = [];
   for (let i = 1; i <= n; i++) {
-    maxLen.push(__maxEdgeLen(o[i - 1]!, o[i % n]!, twist, sx, sy, slices));
+    maxLen.push(maxEdgeLen(o[i - 1]!, o[i % n]!, twist, sx, sy, slices));
   }
   const segCount = new Array(n).fill(1);
   const metric = (k: number) => maxLen[k]! / (segCount[k] + 0.5);
@@ -1693,13 +1628,13 @@ function __splitOutlineByFn(
   }
   const out: [number, number][] = [];
   for (let i = 1; i <= n; i++)
-    __addSegmentedEdge(out, o[i - 1]!, o[i % n]!, segCount[i - 1]);
+    addSegmentedEdge(out, o[i - 1]!, o[i % n]!, segCount[i - 1]);
   return out;
 }
 
 // Refine a single outline for a non-linear (twisted/non-uniformly-scaled)
 // extrude
-function __splitOutline(
+function splitOutline(
     o: [number, number][], twist: number, sx: number, sy: number,
     slices: number, fn: number, fa: number, fs: number,
     segments: number): [number, number][] {
@@ -1707,19 +1642,19 @@ function __splitOutline(
     const minVerts = segments > 0 ? segments : Math.max(fn, 3);
     return o.length >= minVerts ?
         o :
-        __splitOutlineByFn(o, twist, sx, sy, minVerts, slices);
+        splitOutlineByFn(o, twist, sx, sy, minVerts, slices);
   }
   const faSegs = Math.ceil(360.0 / fa);
   if (o.length >= faSegs) return o;
-  const fsOutline = __splitOutlineByFs(o, twist, sx, sy, fs, slices);
+  const fsOutline = splitOutlineByFs(o, twist, sx, sy, fs, slices);
   return fsOutline.length >= faSegs ?
-      __splitOutlineByFn(o, twist, sx, sy, faSegs, slices) :
+      splitOutlineByFn(o, twist, sx, sy, faSegs, slices) :
       fsOutline;
 }
 
 // OpenSCAD removes duplicate and collinear outline vertices before extrusion,
 // so do the same to match its mesh output
-function __dropCollinear(poly: [number, number][]): [number, number][] {
+function dropCollinear(poly: [number, number][]): [number, number][] {
   const n = poly.length;
   if (n < 4) return poly;
   const out: [number, number][] = [];
@@ -1736,12 +1671,11 @@ function __dropCollinear(poly: [number, number][]): [number, number][] {
   return out.length >= 3 ? out : poly;
 }
 
-function __extrudeTwisted(
+function extrudeTwisted(
     shape: any, height: number, twistDeg: number, slices: number,
     scaleVec: [number, number]|undefined, center: boolean|undefined, fn: number,
     fa: number, fs: number, segments?: number): any {
-  const rawPolys: [number, number][][] =
-      shape.toPolygons().map(__dropCollinear);
+  const rawPolys: [number, number][][] = shape.toPolygons().map(dropCollinear);
   if (!rawPolys.length) return Manifold.union([]);
 
   const sx = scaleVec ? scaleVec[0] : 1;
@@ -1752,7 +1686,7 @@ function __extrudeTwisted(
   const polys = segments === 0 ?
       rawPolys :
       rawPolys.map(
-          c => __splitOutline(
+          c => splitOutline(
               c, twistDeg, sx, sy, slices, fn, fa, fs, segments ?? 0));
 
   // Flatten all contours, keeping per-contour boundary order for the walls and
@@ -1899,7 +1833,7 @@ function __extrudeTwisted(
       any);
 }
 
-function __extrude(shape: any, height?: number, options: {
+function linear_extrude(shape: any, height?: number, options: {
   twist?: number;
   scale?: number | number[] | undefined;
   center?: boolean;
@@ -1911,12 +1845,12 @@ function __extrude(shape: any, height?: number, options: {
   slices?: number;
   segments?: number;
 } = {}) {
-  if (__isEmpty(shape)) {
+  if (isEmpty(shape)) {
     return Manifold.union([]);
   }
 
   // OpenSCAD ignores 3D children of 2D operations
-  if (!__is2D(shape)) {
+  if (!is2D(shape)) {
     return Manifold.union([]);
   }
 
@@ -1942,7 +1876,7 @@ function __extrude(shape: any, height?: number, options: {
     height = vec[2];
   } else {
     // An invalid height defaults to OpenSCAD's linear_extrude default of 100
-    height = __finiteOr(height, 100);
+    height = finiteOr(height, 100);
   }
   // OpenSCAD clamps a non-positive z extent to 0, which yields no geometry
   if (height <= 0) {
@@ -1950,11 +1884,11 @@ function __extrude(shape: any, height?: number, options: {
   }
 
   // An invalid twist means "no twist"
-  const twist = __finiteOr(options.twist, 0);
-  const normScale = __normalizeScale(options.scale);
+  const twist = finiteOr(options.twist, 0);
+  const normScale = normalizeScale(options.scale);
 
   const nDivisions =
-      __computeExtrudeDivisions(shape, height, {...options, scale: normScale});
+      computeExtrudeDivisions(shape, height, {...options, scale: normScale});
 
   // OpenSCAD validates segments as a non-negative integer, ignoring anything
   // else
@@ -1969,7 +1903,7 @@ function __extrude(shape: any, height?: number, options: {
       (normScale !== undefined && normScale[0] !== normScale[1])) {
     // Even without twist, non-uniform scaling uses the manual mesh builder to
     // match OpenSCAD's sliced walls and consistent quad triangulation
-    result = __extrudeTwisted(
+    result = extrudeTwisted(
         shape,
         height,
         twist,
@@ -1999,11 +1933,11 @@ function __extrude(shape: any, height?: number, options: {
   return result;
 }
 
-function __revolve(shape: any, fn = 0, fa = 12, fs = 2, angle = 360) {
-  if (__isEmpty(shape)) {
+function rotate_extrude(shape: any, fn = 0, fa = 12, fs = 2, angle = 360) {
+  if (isEmpty(shape)) {
     return Manifold.union([]);
   }
-  if (__is2D(shape)) {
+  if (is2D(shape)) {
     // NaN, ±Infinity and anything beyond ±360 all mean a full revolution
     if (typeof angle !== 'number' || !isFinite(angle) ||
         Math.abs(angle) > 360) {
@@ -2042,8 +1976,8 @@ function __revolve(shape: any, fn = 0, fa = 12, fs = 2, angle = 360) {
       const arc = absAngle * Math.PI / 180;
       revolved = shape.extrude(1, num_sections - 1).warp((v: number[]) => {
         const phi = (1 - v[2]!) * arc;
-        const x = v[0];
-        const y = v[1];
+        const x = v[0]!;
+        const y = v[1]!;
         v[0] = x * Math.cos(phi);
         v[1] = x * Math.sin(phi);
         v[2] = y;
@@ -2059,7 +1993,7 @@ function __revolve(shape: any, fn = 0, fa = 12, fs = 2, angle = 360) {
   return Manifold.union([]);
 }
 
-function __sampleQuadratic(
+function sampleQuadratic(
     x0: number, y0: number, x1: number, y1: number, x2: number, y2: number,
     steps: number): [number, number][] {
   const pts: [number, number][] = [];
@@ -2073,7 +2007,7 @@ function __sampleQuadratic(
   return pts;
 }
 
-function __sampleCubic(
+function sampleCubic(
     x0: number, y0: number, x1: number, y1: number, x2: number, y2: number,
     x3: number, y3: number, steps: number): [number, number][] {
   const pts: [number, number][] = [];
@@ -2089,7 +2023,7 @@ function __sampleCubic(
   return pts;
 }
 
-function __pathToContours(commands: any[], fn: number): [number, number][][] {
+function pathToContours(commands: any[], fn: number): [number, number][][] {
   const steps = Math.max(2, fn > 0 ? Math.round(fn / 4) : 4);
   const contours: [number, number][][] = [];
   let current: [number, number][]|null = null;
@@ -2108,7 +2042,7 @@ function __pathToContours(commands: any[], fn: number): [number, number][][] {
       case 'Q': {  // Quadratic bezier
         if (!current) break;
         const prev = current[current.length - 1]!;
-        const pts = __sampleQuadratic(
+        const pts = sampleQuadratic(
             prev[0], prev[1], cmd.x1, cmd.y1, cmd.x, cmd.y, steps);
         for (const [px, py] of pts) current.push([px, py]);
         break;
@@ -2117,7 +2051,7 @@ function __pathToContours(commands: any[], fn: number): [number, number][][] {
       case 'C': {  // Cubic bezier
         if (!current) break;
         const prev = current[current.length - 1]!;
-        const pts = __sampleCubic(
+        const pts = sampleCubic(
             prev[0], prev[1], cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x, cmd.y,
             steps);
         for (const [px, py] of pts) current.push([px, py]);
@@ -2134,7 +2068,7 @@ function __pathToContours(commands: any[], fn: number): [number, number][][] {
   return contours.map(c => c.map(([x, y]): [number, number] => [x, -y]));
 }
 
-function __fontSpecToFilename(fontSpec: string): string {
+function fontSpecToFilename(fontSpec: string): string {
   const cleaned = fontSpec.replace(/"/g, '').trim();
   const parts = cleaned.split(':');
   const family = (parts[0] || 'Liberation Sans').trim().replace(/\s+/g, '');
@@ -2152,10 +2086,10 @@ function __fontSpecToFilename(fontSpec: string): string {
   return `${family}-${style}`;
 }
 
-const __opentypeFontCache = new Map<string, any>();
+const opentypeFontCache = new Map<string, any>();
 
-function __getOpentypeFont(base64DataUrl: string): any|undefined {
-  const cached = __opentypeFontCache.get(base64DataUrl);
+function getOpentypeFont(base64DataUrl: string): any|undefined {
+  const cached = opentypeFontCache.get(base64DataUrl);
   if (cached) return cached;
 
   try {
@@ -2166,7 +2100,7 @@ function __getOpentypeFont(base64DataUrl: string): any|undefined {
       bytes[i] = binaryStr.charCodeAt(i);
     }
     const font = opentypeParse(bytes.buffer as ArrayBuffer);
-    __opentypeFontCache.set(base64DataUrl, font);
+    opentypeFontCache.set(base64DataUrl, font);
     return font;
   } catch (e) {
     console.log('err: ', e);
@@ -2174,9 +2108,8 @@ function __getOpentypeFont(base64DataUrl: string): any|undefined {
   }
 }
 
-function __opentypeGlyphContours(
-    ch: string, font: any, size: number,
-    fn: number): {contours: [number, number][][]; width: number}|undefined {
+function opentypeGlyphContours(ch: string, font: any, size: number, fn: number):
+    {contours: [number, number][][]; width: number}|undefined {
   const fontSize = size * 100 / 72;
 
   if (ch === ' ') {
@@ -2208,15 +2141,15 @@ function __opentypeGlyphContours(
     return {contours: [], width: advance};
   }
 
-  const contours = __pathToContours(commands, fn);
+  const contours = pathToContours(commands, fn);
 
   return {contours, width: advance};
 }
 
-function __opentypeTextContours(
+function opentypeTextContours(
     chars: string[], size: number, spacing: number, direction: string,
     fontBase64: string, fn: number): [number, number][][]|undefined {
-  const font = __getOpentypeFont(fontBase64);
+  const font = getOpentypeFont(fontBase64);
 
   if (!font) return undefined;
 
@@ -2227,7 +2160,7 @@ function __opentypeTextContours(
     const ySign = direction === 'ttb' ? -1 : 1;
     let cursorY = 0;
     for (const ch of chars) {
-      const glyph = __opentypeGlyphContours(ch, font, size, fn);
+      const glyph = opentypeGlyphContours(ch, font, size, fn);
       if (!glyph) return undefined;
       const xOffset = -glyph.width / 2;
       for (const contour of glyph.contours) {
@@ -2239,7 +2172,7 @@ function __opentypeTextContours(
   } else {
     let cursorX = 0;
     for (const ch of chars) {
-      const glyph = __opentypeGlyphContours(ch, font, size, fn);
+      const glyph = opentypeGlyphContours(ch, font, size, fn);
       if (!glyph) return undefined;
       for (const contour of glyph.contours) {
         contours.push(
@@ -2252,10 +2185,10 @@ function __opentypeTextContours(
   return contours;
 }
 
-const __canvasGlyphCache =
+const canvasGlyphCache =
     new Map<string, {contours: [number, number][][], width: number}>();
 
-function __fontToCss(font: string, px: number): string {
+function fontToCss(font: string, px: number): string {
   const spec = String(font || 'Liberation Sans');
   const family = (spec.split(':')[0] || 'Liberation Sans').replace(/"/g, '');
   const styleSpec = spec.toLowerCase();
@@ -2264,7 +2197,7 @@ function __fontToCss(font: string, px: number): string {
   return `${style} ${weight} ${px}px "${family}", Arial, sans-serif`;
 }
 
-function __canvasForText(): any {
+function canvasForText(): any {
   if (typeof document !== 'undefined' &&
       typeof document.createElement === 'function') {
     return document.createElement('canvas');
@@ -2275,21 +2208,21 @@ function __canvasForText(): any {
   return undefined;
 }
 
-function __canvasGlyphContours(ch: string, font: string, size: number):
+function canvasGlyphContours(ch: string, font: string, size: number):
     {contours: [number, number][][], width: number}|undefined {
   if (ch === ' ') return {contours: [], width: size * 0.35};
 
   const px = 128;
   const cacheKey = `${font}|${ch}|${px}`;
-  const cached = __canvasGlyphCache.get(cacheKey);
+  const cached = canvasGlyphCache.get(cacheKey);
   if (cached) return cached;
 
-  const canvas = __canvasForText();
+  const canvas = canvasForText();
   const ctx =
       canvas?.getContext('2d', {willReadFrequently: true} as any) as any;
   if (!canvas || !ctx) return undefined;
 
-  ctx.font = __fontToCss(font, px);
+  ctx.font = fontToCss(font, px);
   const metrics = ctx.measureText(ch);
   const ascent = Math.ceil(metrics.actualBoundingBoxAscent || px * 0.8);
   const descent = Math.ceil(metrics.actualBoundingBoxDescent || px * 0.25);
@@ -2303,7 +2236,7 @@ function __canvasGlyphContours(ch: string, font: string, size: number):
   canvas.width = widthPx;
   canvas.height = heightPx;
   ctx.clearRect(0, 0, widthPx, heightPx);
-  ctx.font = __fontToCss(font, px);
+  ctx.font = fontToCss(font, px);
   ctx.fillStyle = '#fff';
   ctx.textBaseline = 'alphabetic';
   ctx.fillText(ch, pad + leftBearing, pad + ascent);
@@ -2327,7 +2260,7 @@ function __canvasGlyphContours(ch: string, font: string, size: number):
     width: Math.max(1, metrics.width) * scale
   };
   if (maxX < minX || maxY < minY) {
-    __canvasGlyphCache.set(cacheKey, result);
+    canvasGlyphCache.set(cacheKey, result);
     return result;
   }
 
@@ -2347,11 +2280,11 @@ function __canvasGlyphContours(ch: string, font: string, size: number):
     }
   }
 
-  __canvasGlyphCache.set(cacheKey, result);
+  canvasGlyphCache.set(cacheKey, result);
   return result;
 }
 
-function __canvasTextContours(
+function canvasTextContours(
     chars: string[], size: number, spacing: number, direction: string,
     font: string): [number, number][][]|undefined {
   if (typeof document === 'undefined' && typeof OffscreenCanvas === 'undefined')
@@ -2363,7 +2296,7 @@ function __canvasTextContours(
     const ySign = direction === 'ttb' ? -1 : 1;
     let cursorY = 0;
     for (const ch of chars) {
-      const glyph = __canvasGlyphContours(ch, font, size);
+      const glyph = canvasGlyphContours(ch, font, size);
       if (!glyph) return undefined;
       const xOffset = -glyph.width / 2;
       for (const contour of glyph.contours) {
@@ -2375,7 +2308,7 @@ function __canvasTextContours(
   } else {
     let cursorX = 0;
     for (const ch of chars) {
-      const glyph = __canvasGlyphContours(ch, font, size);
+      const glyph = canvasGlyphContours(ch, font, size);
       if (!glyph) return undefined;
       for (const contour of glyph.contours) {
         contours.push(
@@ -2391,9 +2324,28 @@ function __canvasTextContours(
 /* Base64 font data, keyed by sanitized font filename. One table shared by
    every compiled file: the consumer fills it in at module init, and a `text()`
    routed through a library's own module reads the same entries. */
-const __font_registry: Record<string, string> = {};
+const font_registry: Record<string, string> = {};
 
-function __text(
+// Faces are registered under the filename they were embedded from, which
+// fontconfig matches without regard to case — `style=bold` and `style=Bold`
+// name the same face. A face that still does not match renders as nothing:
+// substituting an arbitrary registered face instead would quietly draw the
+// wrong typeface, which reads as slightly-off geometry rather than as a
+// missing font.
+function lookupFontFace(registry: Record<string, string>, font: string): string|
+    undefined {
+  const wanted = fontSpecToFilename(font);
+  const exact = registry[wanted];
+  if (exact) return exact;
+
+  const lowered = wanted.toLowerCase();
+  for (const key of Object.keys(registry))
+    if (key.toLowerCase() === lowered) return registry[key];
+
+  return undefined;
+}
+
+function text(
     text: string, size: number = 10, font: string, halign: string = 'left',
     valign: string = 'baseline', spacing: number = 1, direction: string = 'ltr',
     fn: number = 0,
@@ -2413,24 +2365,17 @@ function __text(
 
   let contours: [number, number][][]|undefined;
 
-  contours = __canvasTextContours(chars, size, spacing, dir, font);
+  contours = canvasTextContours(chars, size, spacing, dir, font);
 
   if (!contours && fontBase64Data) {
     let base64: string|undefined;
     if (typeof fontBase64Data === 'string') {
       base64 = fontBase64Data;
     } else if (typeof fontBase64Data === 'object' && fontBase64Data !== null) {
-      const filename = __fontSpecToFilename(font);
-      base64 = fontBase64Data[filename];
-      if (!base64) {
-        const keys = Object.keys(fontBase64Data);
-        if (keys.length > 0) {
-          base64 = fontBase64Data[keys[0]!];
-        }
-      }
+      base64 = lookupFontFace(fontBase64Data, font);
     }
     if (base64) {
-      contours = __opentypeTextContours(chars, size, spacing, dir, base64, fn);
+      contours = opentypeTextContours(chars, size, spacing, dir, base64, fn);
     }
   }
   if (!contours || contours.length === 0) {
@@ -2468,7 +2413,7 @@ function __text(
   return CrossSection.ofPolygons(shifted, 'EvenOdd');
 }
 
-function __sync_quality(fa: any, fs: any) {
+function sync_quality(fa: any, fs: any) {
   if (typeof wasm.setMinCircularAngle === 'function') {
     if (typeof fa === 'number' && fa > 0) {
       wasm.setMinCircularAngle(fa);
@@ -2483,20 +2428,20 @@ function __sync_quality(fa: any, fs: any) {
 
 // Only accepts actual finite numbers here; strings like "45", undef, bools,
 // etc. silently become 0
-function __rot_angle(x: any): number {
+function rot_angle(x: any): number {
   return (typeof x === 'number' && isFinite(x)) ? x : 0;
 }
 
-function __rotate(shape: any, a: any, v?: any) {
+function rotate(shape: any, a: any, v?: any) {
   if (!shape) return shape;
 
   // Vector angle: XYZ euler rotation. OpenSCAD ignores 'v' entirely, uses only
   // the first three elements, and treats invalid ones as 0
   if (Array.isArray(a)) {
-    const ex = __rot_angle(a[0]);
-    const ey = __rot_angle(a[1]);
-    const ez = __rot_angle(a[2]);
-    if (__is2D(shape)) {
+    const ex = rot_angle(a[0]);
+    const ey = rot_angle(a[1]);
+    const ez = rot_angle(a[2]);
+    if (is2D(shape)) {
       return shape.rotate(ez);
     }
     return shape.rotate([ex, ey, ez]);
@@ -2504,7 +2449,7 @@ function __rotate(shape: any, a: any, v?: any) {
 
   // Scalar angle: rotate about axis 'v'. Defaults to Z and keeps that default
   // when 'v' is not a valid 2/3-element numeric vector
-  const angle = __rot_angle(a);
+  const angle = rot_angle(a);
   let vx = 0, vy = 0, vz = 1;
   if (Array.isArray(v) && (v.length === 2 || v.length === 3) &&
       v.every((c: any) => typeof c === 'number' && isFinite(c))) {
@@ -2522,7 +2467,7 @@ function __rotate(shape: any, a: any, v?: any) {
   const len = Math.sqrt(vx * vx + vy * vy + vz * vz);
   if (len < 1e-9) return shape;
 
-  if (__is2D(shape)) {
+  if (is2D(shape)) {
     if (Math.abs(vz) > 1e-9) {
       return shape.rotate(angle * Math.sign(vz));
     }
@@ -2558,12 +2503,12 @@ function __rotate(shape: any, a: any, v?: any) {
     [0, 0, 0, 1]
   ];
 
-  return __safe_transform(shape, R);
+  return transform(shape, R);
 }
 
-function __translate(shape: any, v: any) {
+function translate(shape: any, v: any) {
   if (!shape) return shape;
-  if (__is2D(shape)) {
+  if (is2D(shape)) {
     let x = 0, y = 0;
     if (Array.isArray(v)) {
       x = Number(v[0]) || 0;
@@ -2592,9 +2537,9 @@ function __translate(shape: any, v: any) {
   }
 }
 
-function __scale(shape: any, v: any) {
+function scale(shape: any, v: any) {
   if (!shape) return shape;
-  if (__is2D(shape)) {
+  if (is2D(shape)) {
     let x = 1, y = 1;
     if (Array.isArray(v)) {
       x = v[0] !== undefined && v[0] !== null ? Number(v[0]) : 1;
@@ -2636,11 +2581,11 @@ function __scale(shape: any, v: any) {
 // Scale about the origin to fit `newsize`, preserving zero-sized axes unless
 // `auto` is enabled, with the auto scale taken from the largest requested
 // dimension
-function __resize(shape: any, newsizeRaw: any, autoRaw: any) {
-  if (!shape || __isEmpty(shape)) return shape;
+function resize(shape: any, newsizeRaw: any, autoRaw: any) {
+  if (!shape || isEmpty(shape)) return shape;
 
   const newsize = [0, 0, 0];
-  if (is_list_fn(newsizeRaw)) {
+  if (is_list(newsizeRaw)) {
     for (let i = 0; i < 3 && i < newsizeRaw.length; i++) {
       const n = Number(newsizeRaw[i]);
       if (Number.isFinite(n)) newsize[i] = n;
@@ -2648,16 +2593,16 @@ function __resize(shape: any, newsizeRaw: any, autoRaw: any) {
   }
 
   const autosize = [false, false, false];
-  if (is_list_fn(autoRaw)) {
+  if (is_list(autoRaw)) {
     for (let i = 0; i < 3 && i < autoRaw.length; i++)
-      autosize[i] = __truthy(autoRaw[i]);
+      autosize[i] = truthy(autoRaw[i]);
   } else if (typeof autoRaw === 'boolean') {
     autosize[0] = autosize[1] = autosize[2] = autoRaw;
   }
 
-  const is2D = __is2D(shape);
-  const dim = is2D ? 2 : 3;
-  const bb = is2D ? shape.bounds() : shape.boundingBox();
+  const flat = is2D(shape);
+  const dim = flat ? 2 : 3;
+  const bb = flat ? shape.bounds() : shape.boundingBox();
   const bboxSize = [0, 0, 0];
   for (let i = 0; i < dim; i++) bboxSize[i] = bb.max[i] - bb.min[i];
 
@@ -2683,14 +2628,14 @@ function __resize(shape: any, newsizeRaw: any, autoRaw: any) {
     if (autosize[i] && !(newsize[i]! > 0)) scale[i] = autoscale;
   }
 
-  return is2D ? shape.scale([scale[0], scale[1]]) : shape.scale(scale);
+  return flat ? shape.scale([scale[0], scale[1]]) : shape.scale(scale);
 }
 
 // Build the reflection matrix to avoid rounding artifacts, and treat a
 // zero-length normal as an identity transform
-function __mirror(shape: any, v: any) {
+function mirror(shape: any, v: any) {
   if (!shape) return shape;
-  if (__is2D(shape)) {
+  if (is2D(shape)) {
     let x = 0, y = 0;
     if (Array.isArray(v)) {
       x = Number(v[0]) || 0;
@@ -2704,7 +2649,7 @@ function __mirror(shape: any, v: any) {
     const normSq = x * x + y * y;
     if (normSq === 0) return shape;
     const d = 2 / normSq;
-    return __safe_transform(shape, [
+    return transform(shape, [
       [1 - d * x * x, -d * x * y, 0, 0],
       [-d * x * y, 1 - d * y * y, 0, 0],
       [0, 0, 1, 0],
@@ -2725,7 +2670,7 @@ function __mirror(shape: any, v: any) {
     const normSq = x * x + y * y + z * z;
     if (normSq === 0) return shape;
     const d = 2 / normSq;
-    return __safe_transform(shape, [
+    return transform(shape, [
       [1 - d * x * x, -d * x * y, -d * x * z, 0],
       [-d * x * y, 1 - d * y * y, -d * y * z, 0],
       [-d * x * z, -d * y * z, 1 - d * z * z, 0],
@@ -2733,7 +2678,7 @@ function __mirror(shape: any, v: any) {
   }
 }
 
-function __cube(size: any, center = false): InstanceType<typeof Manifold> {
+function cube(size: any, center = false): InstanceType<typeof Manifold> {
   // Invalid or `undef` `size` uses the default (1,1,1), while only valid but
   // degenerate sizes produce empty geometry
   let v: number[] = [1, 1, 1];
@@ -2741,7 +2686,7 @@ function __cube(size: any, center = false): InstanceType<typeof Manifold> {
     if (typeof size === 'number') {
       v = [size, size, size];
     } else if (
-        is_list_fn(size) && size.length === 3 &&
+        is_list(size) && size.length === 3 &&
         size.every((x: any) => typeof x === 'number')) {
       v = [size[0], size[1], size[2]];
     }
@@ -2754,8 +2699,7 @@ function __cube(size: any, center = false): InstanceType<typeof Manifold> {
   return Manifold.cube(v as [number, number, number], center);
 }
 
-function __square(
-    size: any, center = false): InstanceType<typeof CrossSection> {
+function square(size: any, center = false): InstanceType<typeof CrossSection> {
   // Invalid or `undef` `size` uses the default (1,1), while only valid but
   // degenerate sizes produce empty geometry
   let v: number[] = [1, 1];
@@ -2763,7 +2707,7 @@ function __square(
     if (typeof size === 'number') {
       v = [size, size];
     } else if (
-        is_list_fn(size) && size.length === 2 &&
+        is_list(size) && size.length === 2 &&
         size.every((x: any) => typeof x === 'number')) {
       v = [size[0], size[1]];
     }
@@ -2776,7 +2720,7 @@ function __square(
   return CrossSection.square(v as [number, number], center);
 }
 
-function __sphere(
+function sphere(
     radius: any, fn = 0, fa = 12, fs = 2): InstanceType<typeof Manifold> {
   // A non-finite (or non-positive) size produces no geometry instead of
   // crashing
@@ -2848,7 +2792,7 @@ function __sphere(
   return sphere;
 }
 
-function __radius(dSpec: any, rSpec: any, dGen: any, rGen: any, dflt: any) {
+function radius(dSpec: any, rSpec: any, dGen: any, rGen: any, dflt: any) {
   const def = (x: any) => x !== undefined && x !== null &&
       !(typeof x === 'number' && Number.isNaN(x));
   if (def(dSpec)) return dSpec / 2;
@@ -2858,7 +2802,7 @@ function __radius(dSpec: any, rSpec: any, dGen: any, rGen: any, dflt: any) {
   return dflt;
 }
 
-function __cylinder(
+function cylinder(
     height: number, radiusLow: number, radiusHigh = -1.0, fn = 0,
     center = false, fa = 12, fs = 2): InstanceType<typeof Manifold> {
   // Non-finite dimensions produce no geometry
@@ -2880,7 +2824,7 @@ function __cylinder(
   return Manifold.cylinder(height, radiusLow, radiusHigh, segs, center);
 }
 
-function __circle(radius: number, fn = 0, fa = 12, fs = 2):
+function circle(radius: number, fn = 0, fa = 12, fs = 2):
     InstanceType<typeof CrossSection> {
   // Match OpenSCAD: a non-finite (or non-positive) radius produces no geometry.
   if (!Number.isFinite(radius) || radius <= 0) {
@@ -2898,7 +2842,7 @@ function __circle(radius: number, fn = 0, fa = 12, fs = 2):
   return CrossSection.circle(radius, N);
 }
 
-function __getSignedArea(contour: [number, number][]): number {
+function getSignedArea(contour: [number, number][]): number {
   let area = 0;
   const n = contour.length;
   for (let i = 0; i < n; i++) {
@@ -2909,9 +2853,9 @@ function __getSignedArea(contour: [number, number][]): number {
   return area / 2;
 }
 
-function __forceWinding(
+function forceWinding(
     contour: [number, number][], ccw: boolean): [number, number][] {
-  const area = __getSignedArea(contour);
+  const area = getSignedArea(contour);
   if (ccw && area < 0) {
     contour.reverse();
   } else if (!ccw && area > 0) {
@@ -2920,8 +2864,7 @@ function __forceWinding(
   return contour;
 }
 
-function __polygon(
-    points: any, paths?: any): InstanceType<typeof CrossSection> {
+function polygon(points: any, paths?: any): InstanceType<typeof CrossSection> {
   if (!points || !Array.isArray(points) || points.length === 0) {
     return CrossSection.square(0);
   }
@@ -2934,14 +2877,14 @@ function __polygon(
   }
 
   if (paths === undefined || paths === null) {
-    const ccwPoints = __forceWinding([...points], true);
+    const ccwPoints = forceWinding([...points], true);
     return CrossSection.ofPolygons([ccwPoints]);
   }
 
   if (Array.isArray(paths) && paths.length > 0 && !Array.isArray(paths[0])) {
     const contour =
         paths.map((idx: any) => points[Number(idx) || 0]).filter(Boolean);
-    const ccwContour = __forceWinding(contour, true);
+    const ccwContour = forceWinding(contour, true);
     return CrossSection.ofPolygons([ccwContour]);
   }
 
@@ -2964,11 +2907,11 @@ function __polygon(
     return CrossSection.ofPolygons(contours, 'EvenOdd');
   }
 
-  const ccwPoints = __forceWinding([...points], true);
+  const ccwPoints = forceWinding([...points], true);
   return CrossSection.ofPolygons([ccwPoints]);
 }
 
-function __polyhedron(points: any, faces: any): InstanceType<typeof Manifold> {
+function polyhedron(points: any, faces: any): InstanceType<typeof Manifold> {
   // A point with a non-finite coordinate yields no geometry
   if (Array.isArray(points) &&
       points.some(
@@ -3066,8 +3009,8 @@ function __polyhedron(points: any, faces: any): InstanceType<typeof Manifold> {
   }
 }
 
-function __parse_color_for_scope(c: any, alpha: any): any {
-  const base = __parse_color_value(c);
+function parse_color_for_scope(c: any, alpha: any): any {
+  const base = parse_color_value(c);
   if (!base) return undefined;
   const a = (alpha !== undefined && alpha !== null &&
              Number.isFinite(Number(alpha))) ?
@@ -3084,7 +3027,7 @@ export interface SurfaceImage {
   rgb: string;
 }
 
-function __b64ToBytes(b64: string): Uint8Array {
+function b64ToBytes(b64: string): Uint8Array {
   if (typeof Buffer !== 'undefined') {
     return new Uint8Array(Buffer.from(b64, 'base64'));
   }
@@ -3099,7 +3042,7 @@ function gridFromImage(image: SurfaceImage, invert: boolean): {
   minVal: number
 } {
   const {width, height} = image;
-  const data = __b64ToBytes(image.rgb);
+  const data = b64ToBytes(image.rgb);
   // Flip the image vertically and apply `invert` as `1 - pixel`, even if it
   // produces negative values
   const Z = (x: number, y: number): number => {
@@ -3132,7 +3075,7 @@ function gridFromText(text: string): {
       for (const v of vals) minVal = Math.min(minVal, v);
     }
   }
-  if (rows.length === 0) throw new Error('__surface: empty data file');
+  if (rows.length === 0) throw new Error('surface: empty data file');
   const height = rows.length;
   const width = Math.max(...rows.map(r => r.length));
   // Reads row 0 as the first data row; row index -> Y, column index -> X. Value
@@ -3143,7 +3086,7 @@ function gridFromText(text: string): {
 
 // Text matrices are parsed here, and images arrive already decoded from the
 // compiler
-function __surface(source: string|SurfaceImage, opts: {
+function surface(source: string|SurfaceImage, opts: {
   center?: boolean;
   invert?: boolean;
   kind?: 'image' | 'text';
@@ -3232,7 +3175,7 @@ function buildSurfaceMesh(
   }));
 }
 
-function pow_fn(base: number, exp: number) {
+function pow(base: number, exp: number) {
   return Math.pow(base, exp);
 }
 
@@ -3241,116 +3184,116 @@ export {
   Manifold,
   CrossSection,
   wasm,
-  __cube,
-  __square,
-  __sphere,
-  __cylinder,
-  __circle,
-  __radius,
-  __rotate,
-  __polygon,
-  __polyhedron,
-  __translate,
-  __scale,
-  __mirror,
-  __resize,
-  is_undef_fn,
-  is_bool_fn,
-  is_num_fn,
-  is_string_fn,
-  is_list_fn,
-  is_function_fn,
-  __unknown_fn,
-  sin_fn,
-  cos_fn,
-  tan_fn,
-  asin_fn,
-  acos_fn,
-  atan_fn,
-  atan2_fn,
-  abs_fn,
-  sign_fn,
-  floor_fn,
-  ceil_fn,
-  round_fn,
-  sqrt_fn,
-  exp_fn,
-  ln_fn,
-  log_fn,
-  pow_fn,
-  min_fn,
-  max_fn,
-  norm_fn,
-  cross_fn,
-  len_fn,
-  str_fn,
-  chr_fn,
-  ord_fn,
-  concat_fn,
-  search_fn,
-  lookup_fn,
-  rands_fn,
-  openscad_assert_fn,
-  __truthy,
-  __eq,
-  __lt,
-  __gt,
-  __le,
-  __ge,
-  __add,
-  __sub,
-  __mul,
-  __div,
-  __mod,
-  __band,
-  __bor,
-  __shl,
-  __shr,
-  __bnot,
-  __neg,
-  __pos,
-  __index,
-  version_fn,
-  version_num_fn,
+  cube,
+  square,
+  sphere,
+  cylinder,
+  circle,
+  radius,
+  rotate,
+  polygon,
+  polyhedron,
+  translate,
+  scale,
+  mirror,
+  resize,
+  is_undef,
+  is_bool,
+  is_num,
+  is_string,
+  is_list,
+  is_function,
+  unknown_fn,
+  sin,
+  cos,
+  tan,
+  asin,
+  acos,
+  atan,
+  atan2,
+  abs,
+  sign,
+  floor,
+  ceil,
+  round,
+  sqrt,
+  exp,
+  ln,
+  log,
+  pow,
+  min,
+  max,
+  norm,
+  cross,
+  len,
+  str,
+  chr,
+  ord,
+  concat,
+  search,
+  lookup,
+  rands,
+  assert,
+  truthy,
+  eq,
+  lt,
+  gt,
+  le,
+  ge,
+  add,
+  sub,
+  mul,
+  div,
+  mod,
+  band,
+  bor,
+  shl,
+  shr,
+  bnot,
+  neg,
+  pos,
+  index,
+  version,
+  version_num,
   PI,
   INF,
   NAN,
   undef,
   _EPSILON,
-  __ctx,
-  __withSpecials,
-  __children_stack,
-  __with_children,
-  __pick_children,
-  parent_module_fn,
-  __is_finite_matrix4,
-  __to_manifold_mat4,
-  __safe_transform,
-  __identity4,
-  __safe_offset2d,
-  __safe_project3d,
-  __apply_color,
-  __each,
-  __flat_map_iter,
-  __range,
-  __rangeCount,
-  __is2D,
-  __union2d3d,
-  __difference2d3d,
-  __intersection2d3d,
-  __hull2d3d,
-  __minkowski2d3d,
-  __rootMod,
-  __applyRoot,
-  __extrude,
-  __revolve,
-  __text,
-  __parse_color_for_scope,
-  __surface,
-  __echo,
-  __oecho,
-  __fnlit,
-  __font_registry,
-  __tc,
-  __call
+  ctx,
+  withSpecials,
+  children_stack,
+  with_children,
+  pick_children,
+  parent_module,
+  is_finite_matrix4,
+  to_manifold_mat4,
+  transform,
+  identity4,
+  offset,
+  projection,
+  color,
+  each,
+  flat_map_iter,
+  range,
+  rangeCount,
+  is2D,
+  union,
+  difference,
+  intersection,
+  hull,
+  minkowski,
+  rootMod,
+  applyRoot,
+  linear_extrude,
+  rotate_extrude,
+  text,
+  parse_color_for_scope,
+  surface,
+  echo,
+  oecho,
+  fnlit,
+  font_registry,
+  tc,
+  call
 };

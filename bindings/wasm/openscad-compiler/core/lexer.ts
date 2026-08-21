@@ -1,3 +1,5 @@
+import type {SourceLocation, SourceRange, Token} from './types.js';
+
 export enum TokenType {
   // Literals
   Identifier,
@@ -84,25 +86,6 @@ const OPERATOR_TABLE: ReadonlyArray<readonly[string, TokenType]> = [
 const OPERATOR_TYPES = new Map<string, TokenType>(OPERATOR_TABLE);
 const OPERATOR_LEXEMES = new Map<TokenType, string>(
     OPERATOR_TABLE.map(([text, type]) => [type, text]));
-
-// Position in the source code
-export interface SourceLocation {
-  line: number;
-  column: number;
-  offset: number;
-}
-
-// A range in the source code (start and end locations)
-export interface SourceRange {
-  start: SourceLocation;
-  end: SourceLocation;
-}
-
-export interface Token {
-  type: TokenType;
-  value?: string;
-  range: SourceRange;
-}
 
 // Format a source location for display in error messages
 export function fmtLoc(loc: SourceLocation, filename: string): string {

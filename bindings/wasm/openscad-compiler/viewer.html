@@ -133,21 +133,21 @@
         return res.text();
       });
 
-      const runtimeMatch = tsCode.match(/^\s*import\s+\*\s+as\s+__rt\s+from\s+['"]([^'"]+)['"]\s*;/m);
+      const runtimeMatch = tsCode.match(/^\s*import\s+\*\s+as\s+(?:__)?rt\s+from\s+['"]([^'"]+)['"]\s*;/m);
       if (!runtimeMatch) {
         throw new Error(`The file '${filename}' does not import runtime.js in the expected format.`);
       }
 
       const runtimeUrl = new URL(runtimeMatch[1], sourceUrl);
       runtimeUrl.searchParams.set('t', Date.now());
-      const __rt = await import(runtimeUrl.href);
+      const rt = await import(runtimeUrl.href);
 
-      let jsCode = tsCode.replace(runtimeMatch[0], '').replace(/export\s+const\s+result\s*=/, 'const result =').replace(/export\s+const\s+__viewport\s*=/, 'const __viewport =');
+      let jsCode = tsCode.replace(runtimeMatch[0], '').replace(/export\s+const\s+result\s*=/, 'const result =').replace(/export\s+const\s+viewport\s*=/, 'const viewport =');
       jsCode = stripGeneratedTypeScript(jsCode);
 
       const AsyncFunction = async function () {}.constructor;
-      const evaluate = new AsyncFunction('__rt', `${jsCode}\nreturn { result, __viewport };`);
-      return evaluate(__rt);
+      const evaluate = new AsyncFunction('rt', `${jsCode}\nreturn { result, viewport };`);
+      return evaluate(rt);
     }
 
     async function loadMesh(filename) {
@@ -296,7 +296,7 @@
         const radius = geometry.boundingSphere.radius;
 
         // Apply viewport variables exported by the compiled module
-        const vp = module.__viewport;
+        const vp = module.viewport;
         const hasExplicitViewport = vp && (
           vp.vpd !== 500 ||
           vp.vpr[0] !== 0 || vp.vpr[1] !== 0 || vp.vpr[2] !== 0 ||

@@ -1,5 +1,4 @@
-import type {Binding, CallRef} from './binder.js';
-import type {SourceRange} from './lexer.js';
+import type {Binding, CallRef, SourceRange} from './types.js';
 
 export interface Comment {
   kind: 'line'|'block';
@@ -335,4 +334,28 @@ export function forEachChild(
   if (!keys) return;
   for (const key of keys)
     visitChildValue((node as unknown as Record<string, unknown>)[key], visit);
+}
+
+// Pre-order traversal: returning false skips a node's children. `exit` runs
+// after children for tracking nested scopes
+export function walk(
+    node: KindedNode, visit: (n: KindedNode) => boolean | void,
+    exit?: (n: KindedNode) => void): void {
+  if (visit(node) === false) return;
+  forEachChild(node, child => walk(child, visit, exit));
+  exit?.(node);
+}
+
+// True if `node` or a descendant matches `pred`, `skip` prunes subtrees. Stops
+// descending after the first match
+export function someNode(
+    node: KindedNode|undefined, pred: (n: KindedNode) => boolean,
+    skip?: (n: KindedNode) => boolean): boolean {
+  if (!node || skip?.(node)) return false;
+  if (pred(node)) return true;
+  let found = false;
+  forEachChild(node, child => {
+    if (!found) found = someNode(child, pred, skip);
+  });
+  return found;
 }

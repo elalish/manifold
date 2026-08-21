@@ -2,8 +2,9 @@ import fs from 'fs';
 import path from 'path';
 
 import {compile, compileLibrary, MANIFEST_VERSION} from './compiler.js';
-import type {LibraryManifest, ResolvedExternalLib} from './compiler.js';
-import {type ExternalLibraryRef, resolveLibraryClosure, resolveProgramWithLibraries,} from './resolver.js';
+import {formatWritten} from './format.js';
+import {resolveLibraryClosure, resolveProgramWithLibraries,} from './resolver.js';
+import type {ExternalLibraryRef, LibraryManifest, ResolvedExternalLib,} from './types.js';
 
 function getRuntimeVersion(cwd: string): string {
   try {
@@ -87,6 +88,7 @@ export function ensureLibraryCompiled(
     const outPath = path.join(libDir, f.outRel);
     fs.mkdirSync(path.dirname(outPath), {recursive: true});
     fs.writeFileSync(outPath, f.code);
+    formatWritten(outPath);
   }
   // Manifest written LAST so its presence marks a complete build
   fs.writeFileSync(manifestPath, JSON.stringify(compiled.manifest, null, 2));

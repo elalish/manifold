@@ -5,19 +5,12 @@ import path from 'path';
 import type {Program, Statement} from './ast.js';
 import {Lexer} from './lexer.js';
 import {Parser} from './parser.js';
+import type {ExternalLibraryRef, LibraryClosure, LibraryEdge, ResolvedProgram, ResolvedProgramWithLibraries,} from './types.js';
 
 // FONTPATH as set in the user's shell/OS environment
 export function getFontPath(): string|undefined {
   const fp = process.env['FONTPATH'];
   return fp && fp.trim() !== '' ? fp.trim() : undefined;
-}
-
-// Resolves and recursively parses OpenSCAD include/use directives
-export interface ResolvedProgram {
-  // All statements from included files + the main file, in order
-  statements: Statement[];
-  // Paths of all files that were resolved (for debugging/caching)
-  resolvedFiles: string[];
 }
 
 export function getOpenSCADLibraryPaths(): string[] {
@@ -204,16 +197,6 @@ function classifyIncludePath(
   return undefined;
 }
 
-export interface ExternalLibraryRef {
-  name: string;
-  root: string;
-  entries: {file: string; mode: 'include' | 'use'}[];
-}
-
-export interface ResolvedProgramWithLibraries extends ResolvedProgram {
-  externalLibraries: Map<string, ExternalLibraryRef>;
-}
-
 export function resolveProgramWithLibraries(
     entryFile: string,
     libraryPaths: string[] = []): ResolvedProgramWithLibraries {
@@ -301,20 +284,6 @@ function resolveConsumerFile(
   if (mode === 'use') result.push(...usedFileScope(ownScope));
 
   return result;
-}
-
-export interface LibraryEdge {
-  rel: string;
-  mode: 'include'|'use';
-}
-
-export interface LibraryClosure {
-  name: string;
-  root: string;
-  files: Map<string, Program>;
-  deps: Map<string, string[]>;
-  edges: Map<string, LibraryEdge[]>;
-  entryRels: string[];
 }
 
 export function resolveLibraryClosure(
