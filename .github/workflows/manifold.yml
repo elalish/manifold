@@ -356,7 +356,7 @@ jobs:
         cd bindings/wasm
         npm ci
         npm run build
-        npm test
+        npm test -- --exclude "openscad-compiler/**"
     - name: Isolated npm smoke test
       if: matrix.parallelization == 'OFF'
       run: |
@@ -595,6 +595,34 @@ jobs:
     - uses: DeterminateSystems/nix-installer-action@main
     - uses: DeterminateSystems/magic-nix-cache-action@main
     - run: nix build -L '.?submodules=1#${{matrix.variant}}'
+
+  build_openscad_compiler:
+    name: OpenSCAD Compiler
+    timeout-minutes: 60
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v6
+
+    - uses: actions/setup-node@v6
+      with:
+        node-version: 25
+        cache: 'npm'
+        cache-dependency-path: bindings/wasm/openscad-compiler/package-lock.json
+
+    - name: Clone external OpenSCAD libraries
+      run: |
+        mkdir -p ${{ github.workspace }}/external_libraries
+        git clone --depth 1 https://github.com/BelfrySCAD/BOSL2.git ${{ github.workspace }}/external_libraries/BOSL2
+        git clone --depth 1 https://github.com/openscad/MCAD.git ${{ github.workspace }}/external_libraries/MCAD
+
+    - name: Install dependencies and run tests
+      env:
+        OPENSCADPATH: ${{ github.workspace }}/external_libraries
+        FONTPATH: ${{ github.workspace }}/bindings/wasm/openscad-compiler/bundle/fonts
+      run: |
+        cd bindings/wasm/openscad-compiler
+        npm i
+        npm run unzip-and-run-test
 
   determinism_check:
     name: Cross-platform determinism check
