@@ -1,22 +1,21 @@
-import {createCanvas, Image} from 'canvas';
 import path from 'path';
 
 import type {Argument} from './ast.js';
 import {compileExpr, findArg} from './expr.js';
 import {T} from './naming.js';
 import type {SurfaceAsset} from './state.js';
-import {encounteredSurfaceData, globalFileResolver, RT} from './state.js';
+import {encounteredSurfaceData, globalCanvasResolver, globalFileResolver, RT} from './state.js';
 
 // Decodes an image to raw pixels at compile time so the runtime never has to
 async function decodeImagePixels(filePath: string):
     Promise<{width: number, height: number, rgb: string}|undefined> {
-  const img = new Image();
+  const img = globalCanvasResolver?.image();
   // A Buffer src decodes in place; the typings only admit a string
   (img as {src: unknown}).src = await globalFileResolver?.readBinary(filePath);
   const {width, height} = img;
   if (!width || !height) return undefined;
 
-  const canvas = createCanvas(width, height);
+  const canvas = globalCanvasResolver?.create(width, height);
   const ctx = canvas.getContext('2d');
   ctx.drawImage(img, 0, 0);
   const {data} = ctx.getImageData(0, 0, width, height);
@@ -96,11 +95,13 @@ export async function compileSurface(
   }
   const filenameStr = file.value.value;
 
-  // `surface()` resolves files relative to the calling `.scad` file
+  // surface() resolves files relative to the calling .scad; otherwise, the
+  // host's base directory is used.
+  const base = await globalFileResolver?.baseDir() ?? '';
   const basePath =
-      sourceFile ? path.dirname(path.resolve(sourceFile)) : process.cwd();
+      sourceFile ? path.dirname(path.resolve(base, sourceFile)) : base;
 
-  // `emitSurfaceData` warns and returns `undefined` if the file is missing or
+  // emitSurfaceData warns and returns undefined if the file is missing or
   // invalid
   const asset = await emitSurfaceData(filenameStr, basePath);
   if (!asset) return 'Manifold.union([])';

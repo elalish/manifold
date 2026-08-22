@@ -922,10 +922,15 @@ function withSpecials(overrides: Record<string, any>, body: () => any) {
   }
 }
 
-// Children stack for module calls
-let children_stack: any[] = [];
+interface ChildrenFrame {
+  fn: ((i?: any) => any)|undefined;
+  count: number;
+  name?: string|undefined;
+}
+let children_stack: ChildrenFrame[] = [];
 const color_prop_layout = new WeakMap();
-function with_children(fn: any, count: any, call: any, name?: string) {
+function with_children(
+    fn: ChildrenFrame['fn'], count: number, call: () => any, name?: string) {
   children_stack.push({fn: fn, count: count, name: name});
   try {
     return call();
@@ -955,7 +960,7 @@ function parent_module(d: any = 1) {
   if (!Number.isInteger(depth) || depth < 0) return '';
   const idx = children_stack.length - 1 - depth;
   if (idx < 0 || idx >= children_stack.length) return '';
-  return children_stack[idx].name || '';
+  return children_stack[idx]?.name || '';
 }
 
 function is_finite_matrix4(m: any) {

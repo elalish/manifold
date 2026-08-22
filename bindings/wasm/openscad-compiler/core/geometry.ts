@@ -3,7 +3,7 @@ import path from 'path';
 import type {Argument, ASTNode, BlockStmt, Expr, ForStmt, ForVariable, IfStmt, ModuleCallStmt, Parameter, Statement} from './ast.js';
 import {shadowsOuterVar} from './binder.js';
 import {BUILTIN_VAR_CONSTANTS} from './builtins.js';
-import {compileArgList, compileExpr, findArg, inferDeclaredType, locTag, namesNeedingPredeclaration} from './expr.js';
+import {compileArgList, compileExpr, findArg, inferDeclaredType, isIndexRange, locTag, namesNeedingPredeclaration, numericTypeOf} from './expr.js';
 import {DEFAULT_FONT_SPEC} from './fonts.js';
 import {bindJsName, declJsName, escapeName, svTarget, T,} from './naming.js';
 import {nodeReferencesIdentifier, slotUsesNoArg} from './scan.js';
@@ -326,10 +326,11 @@ export async function compileModuleBody(
         RT.children_stack}[${
         RT.children_stack}.length - 1] : { fn: undefined, count: 0 };`);
   }
-  if (usesChildrenCount) lines.push(`  let $children: any = ${T('c')}.count;`);
+  if (usesChildrenCount)
+    lines.push(`  let $children: number = ${T('c')}.count;`);
   if (usesChildrenFn) {
-    lines.push(`  function children(i: any): any { return ${T('c')}.fn ? ${
-        T('c')}.fn(i) : Manifold.union([]); }`);
+    lines.push(`  function children(i: any): ${GEOMETRY_TYPE} { return ${
+        T('c')}.fn ? ${T('c')}.fn(i) : Manifold.union([]); }`);
   }
   if (usesParentModules) {
     lines.push(
@@ -1367,29 +1368,55 @@ async function buildNestedForStatements(
     const start = compileExpr(v.range.start);
     const end = compileExpr(v.range.end);
     const step = v.range.step ? compileExpr(v.range.step) : '1';
-    const stepName = `${T(`step_${idx}`)}`;
+    // [0:end] counts up by one from zero, so the loop variable already is the
+    // counter; no separate temporaries are needed
+    if (isIndexRange(v.range)) {
+      const cntName = T('cnt');
+      return [
+        `${indent}{`,
+        `${indent}  const ${cntName}: number = ${RT.rangeCount}(0, 1, ${end});`,
+        `${indent}  for (let ${vName} = 0; ${vName} < ${cntName}; ${
+            vName}++) {`,
+        ...await buildNestedForStatements(vars, idx + 1, body, indentLevel + 2),
+        `${indent}  }`,
+        `${indent}}`,
+      ];
+    }
+    const startType = numericTypeOf(v.range.start);
+    const stepType = v.range.step ? numericTypeOf(v.range.step) : 'number';
+    const endType = numericTypeOf(v.range.end);
+    // The loop value is start + i * step, so it is a number exactly when both
+    // of those bounds are
+    const valueType =
+        startType === 'number' && stepType === 'number' ? 'number' : 'any';
+
+    // Each level has its own block, so plain names shadow outer ones.
+    const startName = T('start');
+    const stepName = T('step');
+    const endName = T('end');
+    const cntName = T('cnt');
+    const nName = T('n');
     return [
       `${indent}{`,
-      `${indent}  const ${T(`start_${idx}`)}: any = ${start}, ${
-          stepName}: any = ${step}, ${T(`end_${idx}`)}: any = ${end};`,
-      `${indent}  const ${T(`cnt_${idx}`)}: any = ${RT.rangeCount}(${
-          T(`start_${idx}`)}, ${stepName}, ${T(`end_${idx}`)});`,
-      `${indent}  for (let ${T(`i_${idx}`)} = 0; ${T(`i_${idx}`)} < ${
-          T(`cnt_${idx}`)}; ${T(`i_${idx}`)}++) {`,
-      `${indent}    const ${vName}: any = ${T(`i_${idx}`)} === 0 ? ${
-          T(`start_${idx}`)} : ${T(`start_${idx}`)} + ${T(`i_${idx}`)} * ${
-          stepName};`,
+      `${indent}  const ${startName}: ${startType} = ${start}, ${stepName}: ${
+          stepType} = ${step}, ${endName}: ${endType} = ${end};`,
+      `${indent}  const ${cntName}: number = ${RT.rangeCount}(${startName}, ${
+          stepName}, ${endName});`,
+      `${indent}  for (let ${nName} = 0; ${nName} < ${cntName}; ${nName}++) {`,
+      `${indent}    const ${vName}: ${valueType} = ${nName} === 0 ? ${
+          startName} : ${startName} + ${nName} * ${stepName};`,
       ...await buildNestedForStatements(vars, idx + 1, body, indentLevel + 2),
       `${indent}  }`,
       `${indent}}`,
     ];
   }
 
-  const iterName = `${T(`iter_${idx}`)}`;
-  const idxName = `${T(`idx_${idx}`)}`;
+  const iterName = T('iter');
+  const idxName = T('idx');
   return [
     `${indent}{`,
-    `${indent}  const ${iterName}: any = ${RT.each}(${compileExpr(v.range)});`,
+    `${indent}  const ${iterName}: any[] = ${RT.each}(${
+        compileExpr(v.range)});`,
     `${indent}  for (let ${idxName} = 0; ${idxName} < ${iterName}.length; ${
         idxName}++) {`,
     `${indent}    const ${vName}: any = ${iterName}[${idxName}];`,

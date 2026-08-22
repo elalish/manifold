@@ -12,6 +12,12 @@ export interface FileResolver {
   exists(filePath: string): Promise<boolean>;
   libraryPaths(): Promise<string[]>;
   fontPath(): Promise<string|undefined>;
+  baseDir(): Promise<string>;
+}
+
+export interface CanvasResolver {
+  create(width: number, height: number): any;
+  image(): any;
 }
 
 // Lexing

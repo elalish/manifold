@@ -58,7 +58,7 @@ export function formatCode(code: string): string {
   const hasTrailingComment = (from: number) => {
     while (from < code.length && /[ \t]/.test(code[from]!)) from++;
     return code[from] === '/' &&
-      (code[from + 1] === '/' || code[from + 1] === '*');
+        (code[from + 1] === '/' || code[from + 1] === '*');
   };
 
   const isStructuralSeparator = (c: string) => {
@@ -144,11 +144,7 @@ export function formatCode(code: string): string {
       const object = !BLOCK_BRACE.test(line.trimEnd());
 
       put('{');
-      stack.push({
-        ch: '{',
-        line: lineNo,
-        object
-      });
+      stack.push({ch: '{', line: lineNo, object});
 
       flush();
       i++;
@@ -158,11 +154,7 @@ export function formatCode(code: string): string {
     // Other opening brackets.
     if (c === '(' || c === '[') {
       put(c);
-      stack.push({
-        ch: c,
-        line: lineNo,
-        object: false
-      });
+      stack.push({ch: c, line: lineNo, object: false});
       i++;
       continue;
     }

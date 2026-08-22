@@ -17,6 +17,14 @@ import {reportDivergentCalls} from './tailcall.js';
 import type {CompileOptions, ModuleDeclStmtType} from './types.js';
 
 
+// Path used in emitted `// <source>` comments, anchored to the entry file so
+// output stays consistent regardless of the working directory
+function sourceComment(filename: string): string {
+  const base = currentMainFilename ? path.dirname(currentMainFilename) : '';
+  const rel = base ? path.relative(base, filename) : filename;
+  return rel.replace(/\\/g, '/');
+}
+
 function collectSlots(
     list: Statement[], slotOrder: string[], slotExpr: Map<string, Expr>): void {
   for (const s of list) {
@@ -93,9 +101,7 @@ async function processStmt(
     if (geo) {
       const filename = stmt.filename;
       if (filename && filename !== lastGeoFilename) {
-        const relativePath =
-            path.relative(process.cwd(), filename).replace(/\\/g, '/');
-        geometryLines.push(`\n// ${relativePath}`);
+        geometryLines.push(`\n// ${sourceComment(filename)}`);
         lastGeoFilename = filename;
       }
 
@@ -266,9 +272,7 @@ export async function compile(
     const entry = declMap.get(k)!;
     const filename = entry.stmt.filename;
     if (filename && filename !== lastFilename) {
-      const relativePath =
-          path.relative(process.cwd(), filename).replace(/\\/g, '/');
-      declarations.push(`\n// ${relativePath}`);
+      declarations.push(`\n// ${sourceComment(filename)}`);
       lastFilename = filename;
     }
     declarations.push(entry.code);
@@ -422,7 +426,7 @@ export async function compile(
   // Unbound OpenSCAD names read as undef, and a top-level initializer may
   // reference one before its later let declaration
   for (const name of undefinedNames) {
-    output += `let ${name}: any = undefined;\n`;
+    output += `let ${name}: undefined = undefined;\n`;
   }
 
   if (declarations.length) {
@@ -432,8 +436,8 @@ export async function compile(
   // children() used outside a module's scope - warns and yields nothing. The
   // children stack is empty at top level, so this resolves to empty geometry
   if (scan.topLevelChildren) {
-    output += `function children(i?: any): any { const ${T('c')}: any = ${
-        RT.children_stack}.length > 0 ? ${RT.children_stack}[${
+    output += `function children(i?: any): ${GEOMETRY_TYPE} { const ${
+        T('c')}: any = ${RT.children_stack}.length > 0 ? ${RT.children_stack}[${
         RT.children_stack}.length - 1] : { fn: undefined, count: 0 }; return ${
         T('c')}.fn ? ${T('c')}.fn(i) : Manifold.union([]); }\n`;
   }

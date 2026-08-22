@@ -4,7 +4,8 @@ import path from 'path';
 
 import {compileConsumer} from '../core/orchestrate.js';
 import {getOpenSCADLibraryPaths} from '../core/resolver.js';
-import {nodeFileResolver} from '../host/node.js';
+import {setGlobalCanvasResolver} from '../core/state.js';
+import {nodeCanvasResolver, nodeFileResolver} from '../host/node.js';
 
 const compileSingleFileCommand = new Command();
 
@@ -41,6 +42,7 @@ compileSingleFileCommand.name('compile')
               path.join(
                   'test/out', path.basename(file, path.extname(file)) + '.ts');
 
+          setGlobalCanvasResolver(nodeCanvasResolver);
           const {code: js, externalLibraries, resolvedFiles} =
               await compileConsumer(
                   absFile, outputFile, libraryPaths, process.cwd(),

@@ -335,7 +335,8 @@ async function emitLibraryFile(
           .sort();
 
   let body = '';
-  for (const name of undefinedNames) body += `let ${name}: any = undefined;\n`;
+  for (const name of undefinedNames)
+    body += `let ${name}: undefined = undefined;\n`;
   body += '\n';
   if (declarations.length) body += declarations.join('\n') + '\n';
   if (exportedSymbols.length)

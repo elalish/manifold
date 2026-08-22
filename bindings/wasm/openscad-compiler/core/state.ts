@@ -1,6 +1,6 @@
 import type {Expr, FunctionDeclStmt, Parameter} from './ast.js';
 import {BUILTIN_FUNCTIONS, BUILTIN_MODULES, BUILTIN_VAR_CONSTANTS, RUNTIME_SYMBOLS,} from './builtins.js';
-import type {BindOptions, BindResult, FileResolver, ModuleDeclStmtType, Scope,} from './types.js';
+import type {BindOptions, BindResult, CanvasResolver, FileResolver, ModuleDeclStmtType, Scope,} from './types.js';
 
 // Signatures
 export interface Signature {
@@ -23,6 +23,7 @@ export interface SurfaceAsset {
 }
 
 export let globalFileResolver: FileResolver|undefined;
+export let globalCanvasResolver: CanvasResolver|undefined;
 
 export const signatures = new Map<string, Signature>();
 export const localDecls = new Map<string, LocalDecl>();
@@ -84,6 +85,10 @@ export const currentBindOptions: BindOptions = {
 
 export function setGlobalFileResolver(fileResolver: FileResolver): void {
   globalFileResolver = fileResolver;
+}
+
+export function setGlobalCanvasResolver(canvasResolver: CanvasResolver): void {
+  globalCanvasResolver = canvasResolver;
 }
 
 export function setModuleDecls(decls: Map<string, ModuleDeclStmtType>): void {

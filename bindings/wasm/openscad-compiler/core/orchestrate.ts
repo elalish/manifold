@@ -96,8 +96,8 @@ export async function ensureLibraryCompiled(
 }
 
 export async function compileConsumer(
-    entryFile: string, outputFile: string, libraryPaths: string[],
-    cwd: string = process.cwd(), log: (msg: string) => void = () => {}):
+    entryFile: string, outputFile: string, libraryPaths: string[], cwd: string,
+    log: (msg: string) => void = () => {}):
     Promise<
         {code: string; externalLibraries: string[]; resolvedFiles: string[]}> {
   const entryAbs = path.resolve(entryFile);

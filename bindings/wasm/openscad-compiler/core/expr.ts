@@ -10,7 +10,7 @@ import type {Binding, CallRef} from './types.js';
 
 // Type for folded initializers; use a specific type only when certain,
 // otherwise `any`
-type DeclaredType = 'number'|'string'|'boolean'|'any';
+type DeclaredType = 'number'|'string'|'boolean'|'any'|`${string}[]`;
 
 interface SlotUse {
   reads: Set<string>;
@@ -142,6 +142,19 @@ function isNumericExpr(expr: Expr): boolean {
   }
 }
 
+// number when the expression provably yields a number, otherwise any
+export function numericTypeOf(expr: Expr): DeclaredType {
+  return isNumericExpr(expr) ? 'number' : 'any';
+}
+
+export function isIndexRange(range: {start: Expr; step?: Expr | undefined}):
+    boolean {
+  const isLiteral = (e: Expr|undefined, n: number) =>
+      e !== undefined && e.kind === 'number' && e.value === n;
+  return isLiteral(range.start, 0) &&
+      (range.step === undefined || isLiteral(range.step, 1));
+}
+
 // Add parentheses only when JS precedence would change the grouping
 function parenthesizeIfNeeded(
     code: string, prec: number, parentPrec: number, isRight: boolean): string {
@@ -209,6 +222,21 @@ export function inferDeclaredType(expr: Expr): DeclaredType {
         return 'boolean';
       }
       return 'any';
+    case 'vector': {
+      // each and list comprehensions have unknown length and element types
+      if (expr.elements.some(e => e.kind === 'each' || e.kind === 'listComp'))
+        return 'any[]';
+      const elements = expr.elements.map(inferDeclaredType);
+      const first = elements[0];
+      if (first === undefined || first === 'any' ||
+          elements.some(t => t !== first))
+        return 'any[]';
+      return `${first}[]`;
+    }
+    // Both lower to a JS array; the element types are not knowable here
+    case 'listComp':
+    case 'range':
+      return 'any[]';
     default:
       return 'any';
   }
@@ -763,14 +791,31 @@ function compileListComp(gen: ListCompGenerator): string {
       for (let i = gen.variables.length - 1; i >= 0; i--) {
         const v = gen.variables[i]!;
         const vName = bindJsName(v);
-        if (v.range.kind === 'range') {
+        if (v.range.kind === 'range' && isIndexRange(v.range)) {
+          // `[0:end]` counts up by one from zero, so the loop variable already
+          // is the counter
+          const [, , end] = ranges[i]!;
+          result = `(() => { const ${T('r')} = []; const ${
+              T('cnt')}: number = ${RT.rangeCount}(0, 1, ${end}); for (let ${
+              vName} = 0; ${vName} < ${T('cnt')}; ${vName}++) { ${
+              T('r')}.push(...(${result})); } return ${T('r')}; })()`;
+        } else if (v.range.kind === 'range') {
           const [start, step, end] = ranges[i]!;
-          result = `(() => { const ${T('r')} = []; const ${T('start')}: any = ${
-              start}, ${T('step')}: any = ${step}, ${T('end')}: any = ${
-              end}; const ${T('cnt')}: any = ${RT.rangeCount}(${T('start')}, ${
-              T('step')}, ${T('end')}); for (let ${T('i')} = 0; ${T('i')} < ${
-              T('cnt')}; ${T('i')}++) { const ${vName}: any = ${
-              T('i')} === 0 ? ${T('start')} : ${T('start')} + ${T('i')} * ${
+          const startType = numericTypeOf(v.range.start);
+          const stepType =
+              v.range.step ? numericTypeOf(v.range.step) : 'number';
+          // The loop value is `start + i * step`, so it is a number exactly
+          // when both of those bounds are
+          const valueType = startType === 'number' && stepType === 'number' ?
+              'number' :
+              'any';
+          result = `(() => { const ${T('r')} = []; const ${T('start')}: ${
+              startType} = ${start}, ${T('step')}: ${stepType} = ${step}, ${
+              T('end')}: ${numericTypeOf(v.range.end)} = ${end}; const ${
+              T('cnt')}: number = ${RT.rangeCount}(${T('start')}, ${
+              T('step')}, ${T('end')}); for (let ${T('n')} = 0; ${T('n')} < ${
+              T('cnt')}; ${T('n')}++) { const ${vName}: ${valueType} = ${
+              T('n')} === 0 ? ${T('start')} : ${T('start')} + ${T('n')} * ${
               T('step')}; ${T('r')}.push(...(${result})); } return ${
               T('r')}; })()`;
         } else {

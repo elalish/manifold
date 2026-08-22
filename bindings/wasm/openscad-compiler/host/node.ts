@@ -1,7 +1,8 @@
+import {Canvas, createCanvas, Image} from 'canvas';
 import fs from 'fs';
 import path from 'path';
 
-import type {FileResolver} from '../core/types.js';
+import type {CanvasResolver, FileResolver} from '../core/types.js';
 
 
 export const nodeFileResolver: FileResolver = {
@@ -67,4 +68,16 @@ export const nodeFileResolver: FileResolver = {
   fontPath() {
     return Promise.resolve(process.env.FONTPATH);
   },
+  baseDir() {
+    return Promise.resolve(process.cwd());
+  },
+}
+
+export const nodeCanvasResolver: CanvasResolver = {
+  create(width: number, height: number): Canvas {
+    return createCanvas(width, height);
+  },
+  image(): Image {
+    return new Image();
+  }
 }
