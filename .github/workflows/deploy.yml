@@ -3,8 +3,10 @@ name: Deploy documentation
 on:
   release:
     types: [published]
-  schedule:
-    - cron: '0 6 * * *'
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [master]
   workflow_dispatch:
     inputs:
       ref:
@@ -17,11 +19,13 @@ on:
 jobs:
   deploy_github_pages:
     runs-on: ubuntu-latest
+    # Skip when the CI run that triggered us failed.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
     - uses: actions/checkout@v6
       with:
-        ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.ref) || (github.event_name == 'schedule' && 'master') || github.ref }}
+        ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.ref) || (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || github.ref }}
 
     - name: Doxygen Action
       uses: mattnotmitt/doxygen-action@edge
@@ -39,15 +43,15 @@ jobs:
       with:
         workflow: manifold.yml
         workflow_conclusion: success
-        # On a schedule take the newest successful master build
-        commit: ${{ (github.event_name != 'schedule' && github.sha) || '' }}
-        branch: ${{ (github.event_name == 'schedule' && 'master') || '' }}
+        # Pin to the artifact from the CI run that triggered us
+        commit: ${{ (github.event_name != 'workflow_run' && github.sha) || '' }}
+        run_id: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.id) || '' }}
         check_artifacts: true
         name: wasmpublic
         path: ./public
 
     - name: Deploy master to master/
-      if: github.event_name == 'schedule'
+      if: github.event_name == 'workflow_run'
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
@@ -56,7 +60,7 @@ jobs:
         destination_dir: master
 
     - name: Deploy to vX.Y.Z/
-      if: github.event_name != 'schedule'
+      if: github.event_name != 'workflow_run'
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
