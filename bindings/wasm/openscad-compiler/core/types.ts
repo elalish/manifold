@@ -2,6 +2,18 @@ import type {Argument, Expr, ForVariable, FunctionCallExpr, LetAssignment, Param
 import type {TokenType} from './lexer.js';
 
 
+export interface FileResolver {
+  readText(filePath: string): Promise<string|null>;
+  readBinary(filePath: string): Promise<Uint8Array|null>;
+  writeText(filePath: string, content: string): Promise<void>;
+  removeDir(path: string): Promise<void>;
+  makeDir(path: string): Promise<void>;
+  readDir(path: string): Promise<string[]>;
+  exists(filePath: string): Promise<boolean>;
+  libraryPaths(): Promise<string[]>;
+  fontPath(): Promise<string|undefined>;
+}
+
 // Lexing
 
 // Position in the source code

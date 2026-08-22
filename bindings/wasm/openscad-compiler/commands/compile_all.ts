@@ -2,9 +2,9 @@ import {Command} from 'commander';
 import fs from 'fs';
 import path from 'path';
 
-import {formatWritten} from '../core/format.js';
 import {compileConsumer} from '../core/orchestrate.js';
 import {getOpenSCADLibraryPaths} from '../core/resolver.js';
+import {nodeFileResolver} from '../host/node.js'
 
 const compileAllCommand = new Command();
 
@@ -28,7 +28,7 @@ compileAllCommand.name('compile-all')
         'Compile all OpenSCAD files in the given input directory to given output directory')
     .option('--input <input>', 'Input directory path')
     .option('--output <output>', 'Output directory path')
-    .action((options) => {
+    .action(async (options) => {
       try {
         const inputDir = options.input || 'test/examples';
         const outputDir = options.output || 'test/out';
@@ -46,14 +46,14 @@ compileAllCommand.name('compile-all')
             const libraryPaths = [
               path.dirname(absFile),
               process.cwd(),
-              ...getOpenSCADLibraryPaths(),
+              ...await getOpenSCADLibraryPaths(nodeFileResolver),
             ];
 
             const basename = path.basename(file, path.extname(file));
             const outputFile =
                 path.join(outputDir, path.dirname(file), basename + '.ts');
 
-            const {code: js, externalLibraries} = compileConsumer(
+            const {code: js, externalLibraries} = await compileConsumer(
                 absFile, outputFile, libraryPaths, process.cwd(),
                 msg => console.log(`  ${msg}`));
             if (externalLibraries.length > 0) {
@@ -64,7 +64,6 @@ compileAllCommand.name('compile-all')
                 `Generated TypeScript (${js.length.toLocaleString()} chars)`);
             fs.mkdirSync(path.dirname(outputFile), {recursive: true});
             fs.writeFileSync(outputFile, js);
-            formatWritten(outputFile);
             console.log(`Output written to ${outputFile}`);
           } catch (err) {
             const message = (err as Error).message;

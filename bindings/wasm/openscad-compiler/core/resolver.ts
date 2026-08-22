@@ -1,40 +1,25 @@
-import fs from 'fs';
-import os from 'os';
 import path from 'path';
 
 import type {Program, Statement} from './ast.js';
 import {Lexer} from './lexer.js';
 import {Parser} from './parser.js';
-import type {ExternalLibraryRef, LibraryClosure, LibraryEdge, ResolvedProgram, ResolvedProgramWithLibraries,} from './types.js';
+import {globalFileResolver, setGlobalFileResolver} from './state.js';
+import type {ExternalLibraryRef, FileResolver, LibraryClosure, LibraryEdge, ResolvedProgram, ResolvedProgramWithLibraries} from './types.js';
 
 // FONTPATH as set in the user's shell/OS environment
-export function getFontPath(): string|undefined {
-  const fp = process.env['FONTPATH'];
+export async function getFontPath(): Promise<string|undefined> {
+  const fp = await globalFileResolver?.fontPath();
   return fp && fp.trim() !== '' ? fp.trim() : undefined;
 }
 
-export function getOpenSCADLibraryPaths(): string[] {
-  const paths: string[] = [];
-
-  if (process.env.OPENSCADPATH) {
-    paths.push(...process.env.OPENSCADPATH.split(path.delimiter));
-  }
-
-  // User library paths by OS
-  const home = os.homedir();
-  if (process.platform === 'win32') {
-    paths.push(path.join(home, 'Documents', 'OpenSCAD', 'libraries'));
-    paths.push(
-        path.join(home, 'OneDrive', 'Documents', 'OpenSCAD', 'libraries'));
-  } else if (process.platform === 'darwin') {
-    paths.push(path.join(home, 'Documents', 'OpenSCAD', 'libraries'));
-  } else {
-    // Linux and others
-    paths.push(path.join(home, '.local', 'share', 'OpenSCAD', 'libraries'));
-  }
+export async function getOpenSCADLibraryPaths(fileResolver: FileResolver):
+    Promise<string[]> {
+  setGlobalFileResolver(fileResolver);
+  const paths = await fileResolver.libraryPaths();
 
   // Filter to keep only those that actually exist
-  return paths.filter(p => fs.existsSync(p));
+  const present = await Promise.all(paths.map(p => fileResolver.exists(p)));
+  return paths.filter((_, i) => present[i]);
 }
 
 // Keep only what a `use` imports. OpenSCAD compiles the used file separately
@@ -72,53 +57,54 @@ function parseFile(code: string, absPath: string): Program {
 // Parses an import with OpenSCAD rules: `include` errors propagate, while `use`
 // errors discard the imported file but allow the current file to keep
 // compiling.
-function importAtBoundary(
-    kind: 'include'|'use', load: () => Statement[]): Statement[] {
-  if (kind === 'include') return load();
+async function importAtBoundary(
+    kind: 'include'|'use',
+    load: () => Promise<Statement[]>): Promise<Statement[]> {
+  if (kind === 'include') return await load();
   try {
-    return load();
+    return await load();
   } catch (err) {
     console.warn(`Warning: ignoring use'd file: ${(err as Error).message}`);
     return [];
   }
 }
 
-export function resolveProgram(
+export async function resolveProgram(
     entryFile: string,
     libraryPaths: string[] = [],
-    ): ResolvedProgram {
+    ): Promise<ResolvedProgram> {
   const resolvedFiles: string[] = [];
   const visited = new Set<string>();
   const entryAbsPath = path.resolve(entryFile);
 
-  const statements = resolveFile(
+  const statements = await resolveFile(
       entryAbsPath, 'include', visited, resolvedFiles, libraryPaths);
 
   return {statements, resolvedFiles};
 }
 
-function resolveFile(
+async function resolveFile(
     filePath: string,
     mode: 'include'|'use',
     visited: Set<string>,
     resolvedFiles: string[],
     libraryPaths: string[],
-    ): Statement[] {
+    ): Promise<Statement[]> {
   const absPath = path.resolve(filePath);
 
   // Prevent circular includes
   if (visited.has(absPath)) return [];
   visited.add(absPath);
 
-  if (!fs.existsSync(absPath)) {
+  if (!await globalFileResolver?.exists(absPath)) {
     console.warn(`Warning: could not find file: ${filePath}`);
     return [];
   }
 
   resolvedFiles.push(absPath);
 
-  const code = fs.readFileSync(absPath, 'utf8');
-  const program = parseFile(code, absPath);
+  const code = await globalFileResolver?.readText(absPath)!;
+  const program = parseFile(code as string, absPath);
   const result: Statement[] = [];
   // Declarations forming THIS file's own scope (its own plus those of files it
   // `include`s), collected in `use` mode so they can be wrapped as one scope.
@@ -127,9 +113,10 @@ function resolveFile(
 
   for (const stmt of program.statements) {
     if (stmt.kind === 'include' || stmt.kind === 'use') {
-      const resolvedPath = resolveIncludePath(stmt.path, fileDir, libraryPaths);
+      const resolvedPath =
+          await resolveIncludePath(stmt.path, fileDir, libraryPaths);
       if (resolvedPath) {
-        const imported = importAtBoundary(
+        const imported = await importAtBoundary(
             stmt.kind,
             () => resolveFile(
                 resolvedPath, stmt.kind, visited, resolvedFiles, libraryPaths));
@@ -158,12 +145,13 @@ function resolveFile(
   return result;
 }
 
-function resolveIncludePath(
+async function resolveIncludePath(
     includePath: string,
     currentDir: string,
     libraryPaths: string[],
-    ): string|undefined {
-  return classifyIncludePath(includePath, currentDir, libraryPaths)?.resolved;
+    ): Promise<string|undefined> {
+  return (await classifyIncludePath(includePath, currentDir, libraryPaths))
+      ?.resolved;
 }
 
 interface IncludeClassification {
@@ -172,17 +160,17 @@ interface IncludeClassification {
   libraryRoot?: string;
 }
 
-function classifyIncludePath(
+async function classifyIncludePath(
     includePath: string, currentDir: string,
-    libraryPaths: string[]): IncludeClassification|undefined {
+    libraryPaths: string[]): Promise<IncludeClassification|undefined> {
   // Relative to the current file always takes precedence and is never external.
   const relative = path.resolve(currentDir, includePath);
-  if (fs.existsSync(relative)) return {resolved: relative};
+  if (await globalFileResolver?.exists(relative)) return {resolved: relative};
 
   const firstSegment = includePath.replace(/\\/g, '/').split('/')[0] || '';
   for (const libPath of libraryPaths) {
     const candidate = path.resolve(libPath, includePath);
-    if (fs.existsSync(candidate)) {
+    if (await globalFileResolver?.exists(candidate)) {
       if (firstSegment && firstSegment !== '.' && firstSegment !== '..') {
         return {
           resolved: candidate,
@@ -197,15 +185,15 @@ function classifyIncludePath(
   return undefined;
 }
 
-export function resolveProgramWithLibraries(
+export async function resolveProgramWithLibraries(
     entryFile: string,
-    libraryPaths: string[] = []): ResolvedProgramWithLibraries {
+    libraryPaths: string[] = []): Promise<ResolvedProgramWithLibraries> {
   const resolvedFiles: string[] = [];
   const visited = new Set<string>();
   const externalLibraries = new Map<string, ExternalLibraryRef>();
   const entryAbsPath = path.resolve(entryFile);
 
-  const statements = resolveConsumerFile(
+  const statements = await resolveConsumerFile(
       entryAbsPath, 'include', visited, resolvedFiles, libraryPaths,
       externalLibraries);
 
@@ -226,22 +214,22 @@ function recordExternalLibrary(
   }
 }
 
-function resolveConsumerFile(
+async function resolveConsumerFile(
     filePath: string, mode: 'include'|'use', visited: Set<string>,
     resolvedFiles: string[], libraryPaths: string[],
-    externalLibraries: Map<string, ExternalLibraryRef>): Statement[] {
+    externalLibraries: Map<string, ExternalLibraryRef>): Promise<Statement[]> {
   const absPath = path.resolve(filePath);
   if (visited.has(absPath)) return [];
   visited.add(absPath);
 
-  if (!fs.existsSync(absPath)) {
+  if (!await globalFileResolver?.exists(absPath)) {
     console.warn(`Warning: could not find file: ${filePath}`);
     return [];
   }
   resolvedFiles.push(absPath);
 
-  const code = fs.readFileSync(absPath, 'utf8');
-  const program = parseFile(code, absPath);
+  const code = await globalFileResolver?.readText(absPath)!;
+  const program = parseFile(code as string, absPath);
 
   const result: Statement[] = [];
   const ownScope: Statement[] = [];
@@ -249,7 +237,7 @@ function resolveConsumerFile(
 
   for (const stmt of program.statements) {
     if (stmt.kind === 'include' || stmt.kind === 'use') {
-      const cls = classifyIncludePath(stmt.path, fileDir, libraryPaths);
+      const cls = await classifyIncludePath(stmt.path, fileDir, libraryPaths);
       if (!cls) {
         console.warn(`Warning: could not resolve ${stmt.kind} <${
             stmt.path}> from ${filePath}`);
@@ -260,7 +248,7 @@ function resolveConsumerFile(
         recordExternalLibrary(externalLibraries, cls, stmt.kind);
       } else {
         // Local file: inline
-        const sub = importAtBoundary(
+        const sub = await importAtBoundary(
             stmt.kind,
             () => resolveConsumerFile(
                 cls.resolved, stmt.kind, visited, resolvedFiles, libraryPaths,
@@ -286,9 +274,9 @@ function resolveConsumerFile(
   return result;
 }
 
-export function resolveLibraryClosure(
+export async function resolveLibraryClosure(
     name: string, libraryRoot: string, entryFiles: string[],
-    libraryPaths: string[]): LibraryClosure {
+    libraryPaths: string[]): Promise<LibraryClosure> {
   const root = path.resolve(libraryRoot);
   const files = new Map<string, Program>();
   const deps = new Map<string, string[]>();
@@ -301,17 +289,17 @@ export function resolveLibraryClosure(
     return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
   };
 
-  const walk = (absPath: string) => {
+  const walk = async (absPath: string) => {
     const abs = path.resolve(absPath);
     const rel = relOf(abs);
     if (visited.has(abs)) return;
     visited.add(abs);
-    if (!fs.existsSync(abs)) {
+    if (!await globalFileResolver?.exists(abs)) {
       console.warn(`Warning: library file not found: ${abs}`);
       return;
     }
-    const code = fs.readFileSync(abs, 'utf8');
-    const program = parseFile(code, abs);
+    const code = await globalFileResolver?.readText(abs)!;
+    const program = parseFile(code as string, abs);
     files.set(rel, program);
 
     const fileDeps: string[] = [];
@@ -319,13 +307,13 @@ export function resolveLibraryClosure(
     const fileDir = path.dirname(abs);
     for (const stmt of program.statements) {
       if (stmt.kind === 'include' || stmt.kind === 'use') {
-        const cls = classifyIncludePath(stmt.path, fileDir, libraryPaths);
+        const cls = await classifyIncludePath(stmt.path, fileDir, libraryPaths);
         if (cls && underRoot(cls.resolved)) {
           const depRel = relOf(path.resolve(cls.resolved));
           if (!fileDeps.includes(depRel)) fileDeps.push(depRel);
           if (!fileEdges.some(e => e.rel === depRel && e.mode === stmt.kind))
             fileEdges.push({rel: depRel, mode: stmt.kind});
-          walk(cls.resolved);
+          await walk(cls.resolved);
         }
       }
     }
@@ -336,7 +324,7 @@ export function resolveLibraryClosure(
   const entryRels: string[] = [];
   for (const entry of entryFiles) {
     entryRels.push(relOf(path.resolve(entry)));
-    walk(entry);
+    await walk(entry);
   }
   return {name, root, files, deps, edges, entryRels};
 }

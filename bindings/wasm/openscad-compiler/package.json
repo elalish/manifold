@@ -29,8 +29,7 @@
     "commander": "^14.0.3",
     "dxf-parser": "^1.1.2",
     "manifold-3d": "^3.5.1",
-    "opentype.js": "^2.0.0",
-    "prettier": "^3.9.6"
+    "opentype.js": "^2.0.0"
   },
   "devDependencies": {
     "@types/node": "^25.8.0",

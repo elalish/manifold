@@ -2,9 +2,9 @@ import {Command} from 'commander';
 import fs from 'fs';
 import path from 'path';
 
-import {formatWritten} from '../core/format.js';
 import {compileConsumer} from '../core/orchestrate.js';
 import {getOpenSCADLibraryPaths} from '../core/resolver.js';
+import {nodeFileResolver} from '../host/node.js';
 
 const compileSingleFileCommand = new Command();
 
@@ -12,7 +12,7 @@ compileSingleFileCommand.name('compile')
     .description('Compile OpenSCAD files to manifold mesh files')
     .argument('<input>', 'Input file path')
     .option('--output <output>', 'Output file path')
-    .action((input, options) => {
+    .action(async (input, options) => {
       try {
         if (!input) {
           console.log('Error: Input file path is required');
@@ -34,16 +34,17 @@ compileSingleFileCommand.name('compile')
           const libraryPaths = [
             path.dirname(absFile),
             process.cwd(),
-            ...getOpenSCADLibraryPaths(),
+            ...await getOpenSCADLibraryPaths(nodeFileResolver),
           ];
 
           const outputFile = userGivenOutPutPath ||
               path.join(
                   'test/out', path.basename(file, path.extname(file)) + '.ts');
 
-          const {code: js, externalLibraries, resolvedFiles} = compileConsumer(
-              absFile, outputFile, libraryPaths, process.cwd(),
-              msg => console.log(`  ${msg}`));
+          const {code: js, externalLibraries, resolvedFiles} =
+              await compileConsumer(
+                  absFile, outputFile, libraryPaths, process.cwd(),
+                  msg => console.log(`  ${msg}`));
           if (resolvedFiles.length > 1) {
             console.log(`Resolved ${resolvedFiles.length} local files`);
           }
@@ -54,7 +55,6 @@ compileSingleFileCommand.name('compile')
               `Generated TypeScript (${js.length.toLocaleString()} chars)`);
           fs.mkdirSync(path.dirname(outputFile), {recursive: true});
           fs.writeFileSync(outputFile, js);
-          formatWritten(outputFile);
           console.log(`Output written to ${outputFile}`);
         } catch (err) {
           console.error(`Error: ${(err as Error).message}`);

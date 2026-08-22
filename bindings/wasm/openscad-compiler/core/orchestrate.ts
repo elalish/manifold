@@ -1,15 +1,16 @@
-import fs from 'fs';
 import path from 'path';
 
-import {compile, compileLibrary, MANIFEST_VERSION} from './compiler.js';
-import {formatWritten} from './format.js';
+import {compile} from './compiler.js';
+import {compileLibrary, MANIFEST_VERSION} from './library.js';
 import {resolveLibraryClosure, resolveProgramWithLibraries,} from './resolver.js';
-import type {ExternalLibraryRef, LibraryManifest, ResolvedExternalLib,} from './types.js';
+import {globalFileResolver} from './state.js';
+import type {ExternalLibraryRef, LibraryManifest, ResolvedExternalLib} from './types.js';
 
-function getRuntimeVersion(cwd: string): string {
+async function getRuntimeVersion(cwd: string): Promise<string> {
   try {
-    const pkg =
-        JSON.parse(fs.readFileSync(path.join(cwd, 'package.json'), 'utf8'));
+    const pkg = JSON.parse(
+        await globalFileResolver?.readText(path.join(cwd, 'package.json')) as
+        string);
     return String(pkg.version ?? '0.0.0');
   } catch {
     return '0.0.0';
@@ -22,26 +23,23 @@ function toPosixSpecifier(p: string): string {
   return rel;
 }
 
-// Directory a library is compiled into: runtime/libraries/<lowercased name>
-function libraryDir(cwd: string, libName: string): string {
-  return path.join(cwd, 'runtime', 'libraries', libName.toLowerCase());
-}
-
-export function ensureLibraryCompiled(
+export async function ensureLibraryCompiled(
     ref: ExternalLibraryRef, libraryPaths: string[], cwd: string,
     log: (msg: string) => void =
-        () => {}): {manifest: LibraryManifest; libDir: string} {
-  const libDir = libraryDir(cwd, ref.name);
+        () => {}): Promise<{manifest: LibraryManifest; libDir: string}> {
+  const libDir = path.join(cwd, 'runtime', 'libraries', ref.name.toLowerCase());
   const manifestPath = path.join(libDir, '.manifest.json');
-  const runtimeVersion = getRuntimeVersion(cwd);
+  const runtimeVersion = await getRuntimeVersion(cwd);
 
   // Carry over files from the previous build so existing references keep
   // working across the full set during recompilation
   let priorFiles: string[] = [];
   let staleRuntime = false;
-  if (fs.existsSync(libDir) && fs.existsSync(manifestPath)) {
-    const manifest =
-        JSON.parse(fs.readFileSync(manifestPath, 'utf8')) as LibraryManifest;
+  if (await globalFileResolver?.exists(libDir) &&
+      await globalFileResolver?.exists(manifestPath)) {
+    const manifest = JSON.parse(
+                         await globalFileResolver?.readText(manifestPath) as
+                         string) as LibraryManifest;
     const relOf = (abs: string) =>
         path.relative(ref.root, abs).replace(/\\/g, '/');
     const missing = ref.entries.filter(e => !(relOf(e.file) in manifest.files));
@@ -73,42 +71,44 @@ export function ensureLibraryCompiled(
     if (!entryFiles.includes(e.file)) entryFiles.push(e.file);
   }
   const closure =
-      resolveLibraryClosure(ref.name, ref.root, entryFiles, libraryPaths);
+      await resolveLibraryClosure(ref.name, ref.root, entryFiles, libraryPaths);
   const runtimeJsAbs = path.join(cwd, 'runtime', 'runtime.js');
   const runtimePathFor = (outRel: string) => toPosixSpecifier(
       path.relative(path.dirname(path.join(libDir, outRel)), runtimeJsAbs));
 
-  const compiled = compileLibrary(closure, {runtimeVersion, runtimePathFor});
+  const compiled =
+      await compileLibrary(closure, {runtimeVersion, runtimePathFor});
 
   // Clear out any output the new build does not overwrite by name, so nothing
   // emitted by the old version of compiler
-  if (staleRuntime) fs.rmSync(libDir, {recursive: true, force: true});
-  fs.mkdirSync(libDir, {recursive: true});
+  if (staleRuntime) await globalFileResolver?.removeDir(libDir);
+  await globalFileResolver?.makeDir(libDir);
   for (const f of compiled.files) {
     const outPath = path.join(libDir, f.outRel);
-    fs.mkdirSync(path.dirname(outPath), {recursive: true});
-    fs.writeFileSync(outPath, f.code);
-    formatWritten(outPath);
+    await globalFileResolver?.makeDir(path.dirname(outPath));
+    await globalFileResolver?.writeText(outPath, f.code);
   }
   // Manifest written LAST so its presence marks a complete build
-  fs.writeFileSync(manifestPath, JSON.stringify(compiled.manifest, null, 2));
+  await globalFileResolver?.writeText(
+      manifestPath, JSON.stringify(compiled.manifest, null, 2));
   log(`Library ${ref.name}: compiled ${compiled.files.length} files`);
   return {manifest: compiled.manifest, libDir};
 }
 
-export function compileConsumer(
+export async function compileConsumer(
     entryFile: string, outputFile: string, libraryPaths: string[],
     cwd: string = process.cwd(), log: (msg: string) => void = () => {}):
-    {code: string; externalLibraries: string[]; resolvedFiles: string[]} {
+    Promise<
+        {code: string; externalLibraries: string[]; resolvedFiles: string[]}> {
   const entryAbs = path.resolve(entryFile);
-  const resolved = resolveProgramWithLibraries(entryAbs, libraryPaths);
+  const resolved = await resolveProgramWithLibraries(entryAbs, libraryPaths);
 
   const outDir = path.dirname(path.resolve(outputFile));
   const externalLibraries: ResolvedExternalLib[] = [];
 
   for (const [name, ref] of resolved.externalLibraries) {
-    const {manifest} = ensureLibraryCompiled(ref, libraryPaths, cwd, log);
-    const libDir = libraryDir(cwd, name);
+    const {manifest} = await ensureLibraryCompiled(ref, libraryPaths, cwd, log);
+    const libDir = path.join(cwd, 'runtime', 'libraries', name.toLowerCase())
 
     const importSpecifierFor = (sourceRel: string): string => {
       const out = manifest.files[sourceRel]?.out ??
@@ -139,7 +139,8 @@ export function compileConsumer(
     statements: resolved.statements,
     filename: entryAbs
   };
-  const code = compile(ast, {runtimePath: runtimeJSPath, externalLibraries});
+  const code =
+      await compile(ast, {runtimePath: runtimeJSPath, externalLibraries});
 
   return {
     code,
