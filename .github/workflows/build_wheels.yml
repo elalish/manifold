@@ -1,6 +1,7 @@
 name: build_wheels
 
 on:
+  pull_request:
   release:
     types: [published]
   workflow_dispatch:
@@ -13,13 +14,18 @@ jobs:
       matrix:
         # macos-15-intel: x86-64
         # macos-15: arm64
-        os: [ubuntu-22.04, ubuntu-22.04-arm, windows-2025, macos-15-intel, macos-15]
+        os: [ubuntu-22.04, ubuntu-22.04-arm, windows-2025, windows-11-arm, macos-15-intel, macos-15]
     steps:
       - run: |
           git config --global submodule.fetchJobs 8
           git config --global core.longpaths true
       - if: matrix.os == 'macos-15'
         run: echo "CIBW_ARCHS=arm64 universal2" >> "$GITHUB_ENV"
+      - if: matrix.os == 'windows-11-arm'
+        shell: pwsh
+        run: |
+          "CIBW_ARCHS=ARM64" >> $env:GITHUB_ENV
+          "CIBW_BUILD=cp311-* cp312-* cp313-* cp314-*" >> $env:GITHUB_ENV
       - uses: actions/checkout@v6
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.4.0
