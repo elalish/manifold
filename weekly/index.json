@@ -1,6 +1,6 @@
 {
-  "generated_at": "2026-08-16T03:17:53Z",
-  "latest_run_id": "31923441902",
+  "generated_at": "2026-08-23T03:22:26Z",
+  "latest_run_id": "32614642377",
   "runs": [
     {
       "commit_sha": "ff42ddc885e2287faa176873e38e795572e95992",
@@ -45,6 +45,29 @@
       },
       "summary_path": "weekly/2026/08/16/31923441902/summary.md",
       "timestamp": "2026-08-16T03:17:52Z",
+      "trigger": "weekly",
+      "workflow": "Weekly Benchmarks"
+    },
+    {
+      "commit_sha": "15224126a430dbfaf8ffc4a18d07935cdc5c48ec",
+      "compiler": "AppleClang 17.0.0.17000013",
+      "cpu_count": 3,
+      "cpu_model": "Apple M1 (Virtual)",
+      "date": "2026-08-23",
+      "github_run_url": "https://github.com/elalish/manifold/actions/runs/32614642377",
+      "os": "macOS",
+      "result_path": "weekly/2026/08/23/32614642377/result.json",
+      "run_id": "32614642377",
+      "runner": "GitHub Actions 1000062496",
+      "sanitizer": {
+        "build_result": "success",
+        "os": "Linux",
+        "runner": "ubuntu-24.04",
+        "subset": "extended",
+        "test_result": "success"
+      },
+      "summary_path": "weekly/2026/08/23/32614642377/summary.md",
+      "timestamp": "2026-08-23T03:22:25Z",
       "trigger": "weekly",
       "workflow": "Weekly Benchmarks"
     }
