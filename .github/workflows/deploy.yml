@@ -3,6 +3,10 @@ name: Deploy documentation
 on:
   release:
     types: [published]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [master]
   workflow_dispatch:
     inputs:
       ref:
@@ -15,11 +19,13 @@ on:
 jobs:
   deploy_github_pages:
     runs-on: ubuntu-latest
+    # Skip when the CI run that triggered us failed.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
     - uses: actions/checkout@v6
       with:
-        ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.ref) || github.ref }}
+        ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.ref) || (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || github.ref }}
 
     - name: Doxygen Action
       uses: mattnotmitt/doxygen-action@edge
@@ -37,19 +43,30 @@ jobs:
       with:
         workflow: manifold.yml
         workflow_conclusion: success
-        commit: ${{ github.sha }}
+        # Pin to the artifact from the CI run that triggered us
+        commit: ${{ (github.event_name != 'workflow_run' && github.sha) || '' }}
+        run_id: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.id) || '' }}
         check_artifacts: true
         name: wasmpublic
         path: ./public
 
+    - name: Deploy master to master/
+      if: github.event_name == 'workflow_run'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_branch: gh-pages
+        publish_dir: ./public
+        destination_dir: master
+
     - name: Deploy to vX.Y.Z/
+      if: github.event_name != 'workflow_run'
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_branch: gh-pages
         publish_dir: ./public
         destination_dir: ${{ (github.event_name == 'release' && github.ref_name) || inputs.destination_dir }}
-        keep_files: true
 
     - name: Deploy to latest/
       if: github.event_name == 'release'
@@ -59,7 +76,6 @@ jobs:
         publish_branch: gh-pages
         publish_dir: ./public
         destination_dir: latest
-        keep_files: true
 
     - name: Write CNAME to gh-pages root
       if: github.event_name == 'release'
