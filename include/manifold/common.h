@@ -109,9 +109,8 @@ constexpr double smoothstep(double edge0, double edge1, double a) {
 inline double sind(double x) {
   if (!la::isfinite(x)) return NAN;
   if (x < 0.0) return -sind(-x);
-  x = std::fmod(x, 360.0);
-  const int quo = static_cast<int>(std::floor(x / 90.0 + 0.5));
-  x -= quo * 90.0;
+  int quo;
+  x = std::remquo(std::fabs(x), 90.0, &quo);
   const double xr = radians(x);
   switch (quo % 4) {
     case 0:
