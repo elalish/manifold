@@ -4,7 +4,7 @@ import {defineConfig} from 'vite'
 
 export default defineConfig({
   worker: {format: 'es'},
-  // Relative so a build works from any path. 
+  // Relative so a build works from any path.
   base: './',
   build: {
     target: 'esnext',
