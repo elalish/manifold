@@ -6,6 +6,8 @@ import {viteStaticCopy} from 'vite-plugin-static-copy'
 
 export default defineConfig({
   worker: {format: 'es'},
+  // Relative so a build works from any path.
+  base: './',
   server: {
     // `npm run dev`
     headers: {
