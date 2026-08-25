@@ -50,14 +50,15 @@ jobs:
         name: wasmpublic
         path: ./public
 
-    - name: Deploy master to master/
+    # unreleased build for testing, not a version anyone should pin to.
+    - name: Deploy master to alpha/
       if: github.event_name == 'workflow_run'
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_branch: gh-pages
         publish_dir: ./public
-        destination_dir: master
+        destination_dir: alpha
 
     - name: Deploy to vX.Y.Z/
       if: github.event_name != 'workflow_run'
