@@ -69,24 +69,18 @@ jobs:
         publish_dir: ./public
         destination_dir: ${{ (github.event_name == 'release' && github.ref_name) || inputs.destination_dir }}
 
-    - name: Deploy to latest/
+    # A release also publishes to the site root, so manifoldcad.org always
+    # serves the current release without a redirect.(it is the latest release)
+    #
+    # keep_files is load-bearing here and must not be removed. With no
+    # destination_dir the action's cleanup runs at the branch root, so
+    # without this it would delete alpha/ and every vX.Y.Z/ directory.
+    - name: Deploy to gh-pages root
       if: github.event_name == 'release'
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_branch: gh-pages
         publish_dir: ./public
-        destination_dir: latest
-
-    - name: Write CNAME to gh-pages root
-      if: github.event_name == 'release'
-      run: mkdir cname_only
-
-    - uses: peaceiris/actions-gh-pages@v3
-      if: github.event_name == 'release'
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_branch: gh-pages
-        publish_dir: ./cname_only
         keep_files: true
         cname: manifoldcad.org

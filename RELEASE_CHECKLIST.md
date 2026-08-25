@@ -21,13 +21,18 @@ builds side by side:
 
 | Path | Updated | Contents |
 | --- | --- | --- |
+| `/` (root) | each published release | the current release, served at manifoldcad.org |
 | `alpha/` | every master commit that passes CI | unreleased build, for testing |
-| `latest/` | each published release | the newest release |
 | `vX.Y.Z/` | once, when that release is published | a frozen snapshot of that version |
 
-Each directory is a complete copy of the site: the ManifoldCAD editor, the
-examples, the benchmark dashboard, and both the C++ and TypeScript docs.
-Deploying to one never touches the others.
+Each is a complete copy of the site: the ManifoldCAD editor, the examples,
+the benchmark dashboard, and both the C++ and TypeScript docs. A release
+publishes twice, once to its own `vX.Y.Z/` directory and once to the root,
+so manifoldcad.org always serves the current release directly.
+
+Subdirectory deploys erase their target before writing, so each holds exactly
+one build. The root deploy cannot, because clearing it would take the
+subdirectories with it, so there it overwrites in place instead.
 
 ## Deploying manually
 
