@@ -21,7 +21,7 @@ jobs:
       - if: matrix.os == 'macos-15'
         run: echo "CIBW_ARCHS=arm64 universal2" >> "$GITHUB_ENV"
       - if: matrix.os == 'windows-11-arm'
-        run: echo "CIBW_BUILD=cp311-* cp312-* cp313-* cp314-*" >> "$GITHUB_ENV"
+        run: echo "CIBW_BUILD=cp311-* cp312-* cp313-* cp314-*" >> $env:GITHUB_ENV
       - uses: actions/checkout@v6
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.4.0
