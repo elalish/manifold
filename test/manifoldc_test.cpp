@@ -724,7 +724,9 @@ TEST(CBIND, run_flag_accessors) {
   // gets backside set. Exercise the C accessors for both bits.
   ManifoldManifold* cube =
       manifold_cube(alloc_manifold_buffer(), 2.0, 2.0, 2.0, 1);
-  ManifoldManifold* sphere = manifold_sphere(alloc_manifold_buffer(), 1.0, 32);
+  ManifoldManifold* sphere =
+      manifold_as_original(alloc_manifold_buffer(),
+                           manifold_sphere(alloc_manifold_buffer(), 1.0, 32));
   ManifoldManifold* cut =
       manifold_difference(alloc_manifold_buffer(), cube, sphere);
   ManifoldManifold* with_normals =

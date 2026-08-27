@@ -177,10 +177,7 @@ TEST(Boolean, Cubes2) {
 
   Manifold result = cube + cube.Rotate(0, 0, 45);
 
-  // has 14 verts instead of 12 because of symbolic perturbation making a jagged
-  // intersection, which is maintained to keep meshIDs separate. I don't love
-  // either of those behaviors by default...
-  ExpectMeshes(result, {{14, 24}});
+  ExpectMeshes(result, {{12, 20}});
 
   if (options.exportModels) WriteTestOBJ("cubes2.obj", result);
 }
@@ -227,8 +224,6 @@ TEST(Boolean, DeterminismSimpleIntersect) {
 TEST(Boolean, CubeUnion) {
   Manifold cube = Manifold::Cube();
   Manifold result = cube + cube.Translate({1, 0, 0});
-  EXPECT_EQ(result.NumTri(), 14);
-  result = result.Simplify();
   EXPECT_EQ(result.NumTri(), 12);
 }
 
@@ -360,7 +355,8 @@ TEST(Boolean, CreatePropertiesSlow) {
 TEST(Boolean, SimpleProperties) {
   Manifold cube = Manifold::Cube(vec3(2), true).CalculateNormals(0, 180);
   EXPECT_TRUE(cube.HasSimpleProps());
-  Manifold flange = Manifold::Extrude(cube.Slice(), 2, 0, 0, vec2(2));
+  Manifold flange =
+      Manifold::Extrude(cube.Slice(), 2, 0, 0, vec2(2)).AsOriginal();
   EXPECT_TRUE(flange.HasSimpleProps());
   Manifold result = cube + flange;
   EXPECT_EQ(result.NumProp(), 3);
@@ -1018,7 +1014,7 @@ TEST(Boolean, BatchBoolean) {
   Manifold add = Manifold::BatchBoolean({cube, cylinder1, cylinder2, cylinder3},
                                         OpType::Add);
 
-  ExpectMeshes(add, {{152, 300}});
+  ExpectMeshes(add, {{150, 296}});
   EXPECT_FLOAT_EQ(add.Volume(), 16290.478);
   EXPECT_FLOAT_EQ(add.SurfaceArea(), 33156.594);
 
