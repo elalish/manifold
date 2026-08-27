@@ -778,6 +778,13 @@ TEST(Manifold, Extrude) {
   EXPECT_FLOAT_EQ(donut.SurfaceArea(), 48.0);
 }
 
+TEST(Manifold, ExtrudeSquare) {
+  const Polygons square = {{{0, 0}, {1, 0}, {1, 1}, {0, 1}}};
+  const Manifold prism = Manifold::Extrude(square, 10.0);
+  EXPECT_NEAR(prism.Volume(), 10.0, 0.001);
+  EXPECT_NEAR(prism.SurfaceArea(), 42.0, 0.001);
+}
+
 TEST(Manifold, ExtrudeCone) {
   Polygons polys = SquareHole();
   Manifold donut = Manifold::Extrude(polys, 1.0, 0, 0, vec2(0.0));
