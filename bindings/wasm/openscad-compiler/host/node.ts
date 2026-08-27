@@ -2,8 +2,41 @@ import {Canvas, createCanvas, Image} from 'canvas';
 import fs from 'fs';
 import path from 'path';
 
-import type {CanvasResolver, FileResolver} from '../core/types.js';
+import type {CanvasResolver, FileResolver, ScadFileHit} from '../core/types.js';
 
+
+// Directories searched for include <...>/use <...>: the file's folder, working
+// directory, then OPENSCADPATH
+function searchRoots(entryDir: string): string[] {
+  return [
+    entryDir,
+    process.cwd(),
+    ...(process.env.OPENSCADPATH?.split(path.delimiter) ?? []),
+  ];
+}
+
+// Resolves include/use paths
+function findScadFile(includePath: string, fromDir: string, entryDir: string):
+    ScadFileHit|undefined {
+  const relative = path.resolve(fromDir, includePath);
+  if (fs.existsSync(relative)) return {path: relative};
+
+  const firstSegment = includePath.replace(/\\/g, '/').split('/')[0] || '';
+  for (const root of searchRoots(entryDir)) {
+    const candidate = path.resolve(root, includePath);
+    if (!fs.existsSync(candidate)) continue;
+    if (firstSegment && firstSegment !== '.' && firstSegment !== '..') {
+      return {
+        path: candidate,
+        libraryName: firstSegment,
+        libraryRoot: path.resolve(root, firstSegment),
+      };
+    }
+    return {path: candidate};
+  }
+
+  return undefined;
+}
 
 export const nodeFileResolver: FileResolver = {
   readText(filePath: string): Promise<string|null> {
@@ -61,9 +94,8 @@ export const nodeFileResolver: FileResolver = {
       return Promise.reject(err);
     }
   },
-  libraryPaths() {
-    return Promise.resolve(
-        process.env.OPENSCADPATH?.split(path.delimiter) ?? []);
+  findScadFile(includePath: string, fromDir: string, entryDir: string) {
+    return Promise.resolve(findScadFile(includePath, fromDir, entryDir));
   },
   fontPath() {
     return Promise.resolve(process.env.FONTPATH);

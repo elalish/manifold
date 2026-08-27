@@ -24,7 +24,7 @@ function toPosixSpecifier(p: string): string {
 }
 
 export async function ensureLibraryCompiled(
-    ref: ExternalLibraryRef, libraryPaths: string[], cwd: string,
+    ref: ExternalLibraryRef, entryDir: string, cwd: string,
     log: (msg: string) => void =
         () => {}): Promise<{manifest: LibraryManifest; libDir: string}> {
   const libDir = path.join(cwd, 'runtime', 'libraries', ref.name.toLowerCase());
@@ -71,7 +71,7 @@ export async function ensureLibraryCompiled(
     if (!entryFiles.includes(e.file)) entryFiles.push(e.file);
   }
   const closure =
-      await resolveLibraryClosure(ref.name, ref.root, entryFiles, libraryPaths);
+      await resolveLibraryClosure(ref.name, ref.root, entryFiles, entryDir);
   const runtimeJsAbs = path.join(cwd, 'runtime', 'runtime.js');
   const runtimePathFor = (outRel: string) => toPosixSpecifier(
       path.relative(path.dirname(path.join(libDir, outRel)), runtimeJsAbs));
@@ -96,18 +96,19 @@ export async function ensureLibraryCompiled(
 }
 
 export async function compileConsumer(
-    entryFile: string, outputFile: string, libraryPaths: string[], cwd: string,
+    entryFile: string, outputFile: string, cwd: string,
     log: (msg: string) => void = () => {}):
     Promise<
         {code: string; externalLibraries: string[]; resolvedFiles: string[]}> {
   const entryAbs = path.resolve(entryFile);
-  const resolved = await resolveProgramWithLibraries(entryAbs, libraryPaths);
+  const entryDir = path.dirname(entryAbs);
+  const resolved = await resolveProgramWithLibraries(entryAbs);
 
   const outDir = path.dirname(path.resolve(outputFile));
   const externalLibraries: ResolvedExternalLib[] = [];
 
   for (const [name, ref] of resolved.externalLibraries) {
-    const {manifest} = await ensureLibraryCompiled(ref, libraryPaths, cwd, log);
+    const {manifest} = await ensureLibraryCompiled(ref, entryDir, cwd, log);
     const libDir = path.join(cwd, 'runtime', 'libraries', name.toLowerCase())
 
     const importSpecifierFor = (sourceRel: string): string => {

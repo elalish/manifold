@@ -10,9 +10,16 @@ export interface FileResolver {
   makeDir(path: string): Promise<void>;
   readDir(path: string): Promise<string[]>;
   exists(filePath: string): Promise<boolean>;
-  libraryPaths(): Promise<string[]>;
+  findScadFile(includePath: string, fromDir: string, entryDir: string):
+      Promise<ScadFileHit|undefined>;
   fontPath(): Promise<string|undefined>;
   baseDir(): Promise<string>;
+}
+
+export interface ScadFileHit {
+  path: string;
+  libraryName?: string;
+  libraryRoot?: string;
 }
 
 export interface CanvasResolver {

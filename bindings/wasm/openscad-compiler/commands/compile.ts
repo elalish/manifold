@@ -3,8 +3,7 @@ import fs from 'fs';
 import path from 'path';
 
 import {compileConsumer} from '../core/orchestrate.js';
-import {getOpenSCADLibraryPaths} from '../core/resolver.js';
-import {setGlobalCanvasResolver} from '../core/state.js';
+import {setGlobalCanvasResolver, setGlobalFileResolver} from '../core/state.js';
 import {nodeCanvasResolver, nodeFileResolver} from '../host/node.js';
 
 const compileSingleFileCommand = new Command();
@@ -32,20 +31,15 @@ compileSingleFileCommand.name('compile')
         const absFile = path.resolve(file);
 
         try {
-          const libraryPaths = [
-            path.dirname(absFile),
-            process.cwd(),
-            ...await getOpenSCADLibraryPaths(nodeFileResolver),
-          ];
-
           const outputFile = userGivenOutPutPath ||
               path.join(
                   'test/out', path.basename(file, path.extname(file)) + '.ts');
 
+          setGlobalFileResolver(nodeFileResolver);
           setGlobalCanvasResolver(nodeCanvasResolver);
           const {code: js, externalLibraries, resolvedFiles} =
               await compileConsumer(
-                  absFile, outputFile, libraryPaths, process.cwd(),
+                  absFile, outputFile, process.cwd(),
                   msg => console.log(`  ${msg}`));
           if (resolvedFiles.length > 1) {
             console.log(`Resolved ${resolvedFiles.length} local files`);
