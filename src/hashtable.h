@@ -20,6 +20,7 @@
 #include <intrin.h>
 #endif
 
+#include "atomic_compat.h"
 #include "utils.h"
 #include "vec.h"
 
@@ -62,23 +63,21 @@ inline uint32_t CeilLog2(size_t value) {
 
 template <typename T>
 T AtomicCAS(T& target, T compare, T val) {
-  std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);
+  // Must be the strong form: Insert treats a returned `kOpen` as proof it
+  // claimed the slot, and a spurious weak failure would report exactly that
+  // without having written the key.
+  manifold::AtomicRef<T> tar(target);
   tar.compare_exchange_strong(compare, val, std::memory_order_acq_rel);
   return compare;
 }
 
 template <typename T>
-void AtomicStore(T& target, T val) {
-  std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);
-  // release is good enough, although not really something general
-  tar.store(val, std::memory_order_release);
-}
-
-template <typename T>
 T AtomicLoad(const T& target) {
-  const std::atomic<T>& tar = reinterpret_cast<const std::atomic<T>&>(target);
-  // acquire is good enough, although not general
-  return tar.load(std::memory_order_acquire);
+  // acquire is good enough, although not general. The const_cast is the
+  // caller's business rather than AtomicRef's, so the C++20 path can be a
+  // plain alias for std::atomic_ref, which takes only a mutable reference.
+  return manifold::AtomicRef<T>(const_cast<T&>(target))
+      .load(std::memory_order_acquire);
 }
 
 }  // namespace

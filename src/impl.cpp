@@ -136,8 +136,7 @@ void Manifold::Impl::RemoveUnreferencedVerts() {
   for_each_n(policy, countAt(0), halfedge_.size(), [&keep, this](int edge) {
     const int startVert = halfedge_.Start(edge);
     if (startVert >= 0) {
-      reinterpret_cast<std::atomic<int>*>(&keep[startVert])
-          ->store(1, std::memory_order_relaxed);
+      AtomicRef<int>(keep[startVert]).store(1, std::memory_order_relaxed);
     }
   });
 

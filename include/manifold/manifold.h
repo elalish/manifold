@@ -320,6 +320,7 @@ class Manifold {
    */
   ///@{
   bool MatchesTriNormals() const;
+  bool HasSimpleProps() const;
   size_t NumDegenerateTris() const;
   double GetEpsilon() const;
   ///@}
@@ -345,16 +346,16 @@ class Manifold {
   // Propagates through copy ctor / op= (raw copy preserves the attachment).
   // Manifold-returning ops do *not* propagate it: derived Manifolds get a
   // null ctx_. Eager ops (Status, Refine family) snapshot ctx_ to observe
-  // their in-call work; the snapshot uses std::atomic_load, which pins the
+  // their in-call work; the snapshot uses an atomic load, which pins the
   // Impl across long-running evaluations even if a concurrent op= reseats
   // ctx_ mid-eval.
   //
-  // Accessed only via std::atomic_load / std::atomic_store: no const method
-  // mutates ctx_, but op= and the copy ctor write it on a Manifold that
+  // Accessed only atomically (AtomicLoadShared/AtomicStoreShared): no const
+  // method mutates ctx_, but op= and the copy ctor write it on a Manifold that
   // may be concurrently observed by const methods on other threads. The
   // atomic-shared-ptr free functions give a torn-read-free snapshot
   // without taking a lock. (pNode_ uses a mutex instead because lazy CSG
-  // eval mutates it through const methods, which atomic_load can't model.)
+  // eval mutates it through const methods, which an atomic load can't model.)
   std::shared_ptr<ExecutionContext::Impl> ctx_;
 
   std::shared_ptr<CsgNode> LoadPNode() const;

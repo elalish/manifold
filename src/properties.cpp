@@ -247,7 +247,8 @@ int Manifold::Impl::NumDegenerateTris() const {
  * boundaries. This is not true in general, but only because an input mesh may
  * have property discontinuities. For simple input meshes where properties are
  * 1:1 with verts, this HasSimpleProps condition should still be true after any
- * combination of boolean operations and simplifications.
+ * combination of boolean operations and simplifications. CalculateNormals()
+ * will cause this to be false anytime the mesh contains a sharp edge.
  */
 bool Manifold::Impl::HasSimpleProps() const {
   if (halfedge_.size() == 0 || NumProp() == 0) return true;
@@ -359,9 +360,8 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
       const int vert = halfedge_.Start(edge);
       const int propVert = halfedge_.Prop(edge);
 
-      auto old = std::atomic_exchange(
-          reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]),
-          static_cast<uint8_t>(1));
+      auto old = AtomicRef<uint8_t>(counters[propVert])
+                     .exchange(static_cast<uint8_t>(1));
       if (old == 1) continue;
 
       for (int p = 0; p < oldNumProp; ++p) {

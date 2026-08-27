@@ -32,7 +32,7 @@
 using namespace manifold;
 
 // A CSG tree with N leaves reduces to 1 result in N-1 combinations.
-TEST(Manifold, ExecutionContextProgress) {
+TEST(Context, ExecutionContextProgress) {
   // Build a tree with 5 leaves: a union of 5 cubes.
   std::vector<Manifold> items;
   for (int i = 0; i < 5; i++) {
@@ -49,7 +49,7 @@ TEST(Manifold, ExecutionContextProgress) {
 
 // Forcing evaluation first, then observing with a fresh context, should
 // report no pending work: the Manifold is already a leaf.
-TEST(Manifold, ExecutionContextAlreadyEvaluated) {
+TEST(Context, ExecutionContextAlreadyEvaluated) {
   Manifold u = Manifold::Cube(vec3(1), true) + Manifold::Cube(vec3(1), true);
   // Force evaluation.
   EXPECT_EQ(u.Status(), Manifold::Error::NoError);
@@ -62,7 +62,7 @@ TEST(Manifold, ExecutionContextAlreadyEvaluated) {
 
 // Setting cancel before calling Status(ctx) should return Cancelled
 // without doing any work.
-TEST(Manifold, ExecutionContextCancelBeforeEval) {
+TEST(Context, ExecutionContextCancelBeforeEval) {
   std::vector<Manifold> items;
   for (int i = 0; i < 10; i++) {
     items.push_back(Manifold::Sphere(1.0, 32).Translate(vec3(i * 0.5, 0, 0)));
@@ -83,7 +83,7 @@ TEST(Manifold, ExecutionContextCancelBeforeEval) {
 // — cancellation mid-evaluation isn't meaningful there anyway since the
 // eval is synchronous.
 #if MANIFOLD_PAR == 1
-TEST(Manifold, ExecutionContextCancelConcurrent) {
+TEST(Context, ExecutionContextCancelConcurrent) {
   // Build a large enough tree that evaluation takes measurable time.
   std::vector<Manifold> items;
   for (int i = 0; i < 50; i++) {
@@ -121,7 +121,7 @@ TEST(Manifold, ExecutionContextCancelConcurrent) {
 // single boolean would run to completion. With phase-boundary checks, cancel
 // requested mid-way is honored.
 #if MANIFOLD_PAR == 1
-TEST(Manifold, ExecutionContextCancelMidBoolean) {
+TEST(Context, ExecutionContextCancelMidBoolean) {
   // One big boolean — N-1 = 1 op, so outer-loop cancel only has a single
   // checkpoint. The work itself (two large spheres overlapping) takes long
   // enough that cancel fires reliably while Boolean3 is running.
@@ -147,7 +147,7 @@ TEST(Manifold, ExecutionContextCancelMidBoolean) {
 #endif  // MANIFOLD_PAR == 1
 
 // Status() and Status(ctx) should return identical results when no cancel.
-TEST(Manifold, ExecutionContextMatchesPlainStatus) {
+TEST(Context, ExecutionContextMatchesPlainStatus) {
   Manifold u = (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, 32)) -
                Manifold::Tetrahedron();
 
@@ -166,7 +166,7 @@ TEST(Manifold, ExecutionContextMatchesPlainStatus) {
 }
 
 // N-1 invariant holds for Subtract trees too.
-TEST(Manifold, ExecutionContextProgressSubtract) {
+TEST(Context, ExecutionContextProgressSubtract) {
   // Tree shape: (cube + sphere) - tet - octahedron
   Manifold u = (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, 16)) -
                Manifold::Tetrahedron() - Manifold::Cube(vec3(0.5), true);
@@ -179,7 +179,7 @@ TEST(Manifold, ExecutionContextProgressSubtract) {
 
 // Reusing the same context for two sequential evaluations should reset
 // doneBooleans so Progress is always in [0, 1].
-TEST(Manifold, ExecutionContextReuse) {
+TEST(Context, ExecutionContextReuse) {
   auto makeTree = [](int n) {
     std::vector<Manifold> items;
     for (int i = 0; i < n; i++) {
@@ -204,7 +204,7 @@ TEST(Manifold, ExecutionContextReuse) {
 
 // Cancel is permanent: once fired, Status on that Manifold stays Cancelled
 // even when called without a context.
-TEST(Manifold, ExecutionContextCancelPermanent) {
+TEST(Context, ExecutionContextCancelPermanent) {
   std::vector<Manifold> items;
   for (int i = 0; i < 30; i++) {
     items.push_back(Manifold::Sphere(1.0, 48).Translate(vec3(i * 0.3, 0, 0)));
@@ -225,7 +225,7 @@ TEST(Manifold, ExecutionContextCancelPermanent) {
 
 // Once a context is cancelled it stays cancelled for any future evaluation
 // through it — not just the Manifold in flight at the time of Cancel().
-TEST(Manifold, ExecutionContextCancelStickyAcrossManifolds) {
+TEST(Context, ExecutionContextCancelStickyAcrossManifolds) {
   ExecutionContext ctx;
   ctx.Cancel();
 
@@ -242,7 +242,7 @@ TEST(Manifold, ExecutionContextCancelStickyAcrossManifolds) {
 
 // A cancelled ctx does NOT contaminate a fresh context: constructing a new
 // ExecutionContext gives an evaluation that can complete normally.
-TEST(Manifold, ExecutionContextFreshContextEscapesCancel) {
+TEST(Context, ExecutionContextFreshContextEscapesCancel) {
   ExecutionContext cancelledCtx;
   cancelledCtx.Cancel();
   Manifold dead = Manifold::Cube() + Manifold::Sphere(0.5);
@@ -259,7 +259,7 @@ TEST(Manifold, ExecutionContextFreshContextEscapesCancel) {
 // evaluation needed) returns the Manifold's real status — cancel only
 // applies when there is actual evaluation work to short-circuit. This
 // matches the docstring phrasing "every subsequent evaluation".
-TEST(Manifold, ExecutionContextCancelSkippedOnLeaf) {
+TEST(Context, ExecutionContextCancelSkippedOnLeaf) {
   Manifold cube = Manifold::Cube();  // CsgLeafNode from the start
   ExecutionContext ctx;
   ctx.Cancel();
@@ -269,7 +269,7 @@ TEST(Manifold, ExecutionContextCancelSkippedOnLeaf) {
 // Progress is observable from another thread while evaluation runs.
 // MANIFOLD_PAR guard: see note on ExecutionContextCancelConcurrent above.
 #if MANIFOLD_PAR == 1
-TEST(Manifold, ExecutionContextConcurrentProgress) {
+TEST(Context, ExecutionContextConcurrentProgress) {
   std::vector<Manifold> items;
   for (int i = 0; i < 30; i++) {
     items.push_back(Manifold::Sphere(1.0, 48).Translate(vec3(i * 0.5, 0, 0)));
@@ -305,7 +305,7 @@ TEST(Manifold, ExecutionContextConcurrentProgress) {
 // Boolean3::Result before any phase() site executes. The PhaseBalance scope
 // guard must still credit a full kPhasesPerBoolean phases on those returns
 // so Progress() reaches 1.0 after a sequence of no-op evaluations.
-TEST(Manifold, ExecutionContextProgressReachesOneOnTrivialBooleans) {
+TEST(Context, ExecutionContextProgressReachesOneOnTrivialBooleans) {
   ExecutionContext ctx;
   // Boolean of empty + cube: Boolean3::Result takes the IsEmpty fast-path.
   Manifold result = Manifold() + Manifold::Cube();
@@ -320,7 +320,7 @@ TEST(Manifold, ExecutionContextProgressReachesOneOnTrivialBooleans) {
 // Sub-Boolean granularity: within a single Boolean3 op, Progress() should
 // observably advance through phases (donePhases > 0 while doneBooleans == 0).
 // MANIFOLD_PAR guard: same as above, polling thread requires std::thread.
-TEST(Manifold, ExecutionContextSubBooleanProgress) {
+TEST(Context, ExecutionContextSubBooleanProgress) {
   // A single nontrivial Boolean with a real intersection: NumLeaves == 2 ->
   // totalBooleans == 1, so doneBooleans only flips from 0 to 1 at the very
   // end. Any observed Progress() > 0 mid-eval comes from sub-Boolean phase
@@ -358,7 +358,7 @@ TEST(Manifold, ExecutionContextSubBooleanProgress) {
 
 // Calling Status(ctx) on an already-evaluated Manifold should reset counters,
 // not leave stale values from a previous evaluation on a different Manifold.
-TEST(Manifold, ExecutionContextNoStaleState) {
+TEST(Context, ExecutionContextNoStaleState) {
   Manifold complex = Manifold::BatchBoolean(
       {Manifold::Cube(vec3(1), true),
        Manifold::Cube(vec3(1), true).Translate(vec3(2, 0, 0)),
@@ -379,7 +379,7 @@ TEST(Manifold, ExecutionContextNoStaleState) {
 
 // ExecutionContext copies share state (pimpl semantics): one thread
 // evaluates, another thread holds a copy and observes the same progress.
-TEST(Manifold, ExecutionContextCopyShareState) {
+TEST(Context, ExecutionContextCopyShareState) {
   ExecutionContext ctx1;
   ExecutionContext ctx2 = ctx1;  // copy shares impl
 
@@ -396,7 +396,7 @@ TEST(Manifold, ExecutionContextCopyShareState) {
 }
 
 // Move construction and move assignment preserve shared state.
-TEST(Manifold, ExecutionContextMoveSemantics) {
+TEST(Context, ExecutionContextMoveSemantics) {
   ExecutionContext ctx1;
   ctx1.Cancel();
   ExecutionContext ctx2 = std::move(ctx1);  // move-construct
@@ -409,7 +409,7 @@ TEST(Manifold, ExecutionContextMoveSemantics) {
 }
 
 // A Manifold that's already a leaf (no CSG tree) should report no work.
-TEST(Manifold, ExecutionContextNoWorkNeeded) {
+TEST(Context, ExecutionContextNoWorkNeeded) {
   Manifold cube = Manifold::Cube(vec3(1), true);
   ExecutionContext ctx;
   EXPECT_EQ(cube.WithContext(ctx).Status(), Manifold::Error::NoError);
@@ -421,7 +421,7 @@ TEST(Manifold, ExecutionContextNoWorkNeeded) {
 
 // doneBooleans reaches totalBooleans exactly for many tree shapes — the N-1
 // invariant shouldn't depend on op type or tree shape.
-TEST(Manifold, ExecutionContextProgressInvariant) {
+TEST(Context, ExecutionContextProgressInvariant) {
   // Intersect
   {
     std::vector<Manifold> items{
@@ -469,7 +469,7 @@ TEST(Manifold, ExecutionContextProgressInvariant) {
 // must skip the entire range; cancel-unset must run every element. This
 // is the mechanism test; the integration test that cancel works
 // end-to-end on a real boolean is ExecutionContextCancelMidBoolean.
-TEST(Manifold, ForEachCtxSkipsWhenCancelled) {
+TEST(Context, ForEachCtxSkipsWhenCancelled) {
   ExecutionContext ctx;
   ctx.Cancel();
   std::atomic<int> calls{0};
@@ -481,7 +481,7 @@ TEST(Manifold, ForEachCtxSkipsWhenCancelled) {
 }
 
 // Nullptr ctx: must not crash and must invoke the functor for every element.
-TEST(Manifold, ForEachCtxNullCtxPassesThrough) {
+TEST(Context, ForEachCtxNullCtxPassesThrough) {
   std::atomic<int> calls{0};
   Vec<int> range(10);
   sequence(range.begin(), range.end());
@@ -494,7 +494,7 @@ TEST(Manifold, ForEachCtxNullCtxPassesThrough) {
 // Cancel set mid-iteration must be observed within bounded latency
 // (kSeqCancelChunk = 1024 in parallel.h). Functor cancels after 100
 // calls; total calls must be < N + 1024 (= 100 + at most one full chunk).
-TEST(Manifold, ForEachCtxCancelMidSeqLoop) {
+TEST(Context, ForEachCtxCancelMidSeqLoop) {
   ExecutionContext ctx;
   std::atomic<int> calls{0};
   constexpr int N = 10000;
@@ -514,7 +514,7 @@ TEST(Manifold, ForEachCtxCancelMidSeqLoop) {
 // are sequential and unique; keys are scrambled by a multiplicative hash
 // so the input isn't already sorted by key. std::stable_sort is the
 // oracle.
-TEST(Manifold, ParallelStableSortStability) {
+TEST(Context, ParallelStableSortStability) {
   constexpr size_t kN = 50000;  // > kSeqThreshold to hit parallel
   constexpr size_t kBucketSizes[] = {kN, kN / 2, kN / 4, kN / 8, 1000, 100};
   for (size_t bucket : kBucketSizes) {
@@ -553,7 +553,7 @@ TEST(Manifold, ParallelStableSortStability) {
 
 // Raw copy preserves the attachment: ctx-attached on the source means
 // Status on the copy observes the same ctx.
-TEST(Manifold, ManifoldContextRawCopyPreservesAttachment) {
+TEST(Context, ManifoldContextRawCopyPreservesAttachment) {
   ExecutionContext ctx;
   Manifold u = Manifold::Cube(vec3(1), true) +
                Manifold::Cube(vec3(1), true).Translate(vec3(2, 0, 0));
@@ -566,7 +566,7 @@ TEST(Manifold, ManifoldContextRawCopyPreservesAttachment) {
 }
 
 // Assignment also preserves the attachment.
-TEST(Manifold, ManifoldContextAssignmentPreservesAttachment) {
+TEST(Context, ManifoldContextAssignmentPreservesAttachment) {
   ExecutionContext ctx;
   Manifold u = Manifold::Cube(vec3(1), true) +
                Manifold::Cube(vec3(1), true).Translate(vec3(2, 0, 0));
@@ -583,7 +583,7 @@ TEST(Manifold, ManifoldContextAssignmentPreservesAttachment) {
 // result. Verified behaviorally: a pre-cancelled ctx attached to the input
 // does not cancel the result's Status (the deferred op's result has no
 // ctx, so Status routes around it).
-TEST(Manifold, ManifoldContextDeferredOpsDropAttachment) {
+TEST(Context, ManifoldContextDeferredOpsDropAttachment) {
   ExecutionContext ctx;
   ctx.Cancel();
   Manifold a = Manifold::Cube(vec3(1), true).WithContext(ctx);
@@ -600,7 +600,7 @@ TEST(Manifold, ManifoldContextDeferredOpsDropAttachment) {
 
 // Static factories (BatchBoolean, vector-of-Manifold Hull) are deferred and
 // drop any ctx attached to their inputs.
-TEST(Manifold, ManifoldContextStaticFactoriesDropAttachment) {
+TEST(Context, ManifoldContextStaticFactoriesDropAttachment) {
   ExecutionContext ctx;
   ctx.Cancel();
   std::vector<Manifold> items = {
@@ -616,7 +616,7 @@ TEST(Manifold, ManifoldContextStaticFactoriesDropAttachment) {
 
 // no-arg Status() on a ctx-attached Manifold observes the attached ctx:
 // counters update exactly as if Status had been passed an explicit ctx.
-TEST(Manifold, ManifoldContextStatusObservesAttached) {
+TEST(Context, ManifoldContextStatusObservesAttached) {
   std::vector<Manifold> items;
   for (int i = 0; i < 4; i++) {
     items.push_back(Manifold::Cube(vec3(1), true).Translate(vec3(i * 2, 0, 0)));
@@ -633,7 +633,7 @@ TEST(Manifold, ManifoldContextStatusObservesAttached) {
 
 // Idiom for observing a deferred CSG tree: build the tree, attach ctx to
 // the root, call Status. Cancel via the same ctx aborts mid-evaluation.
-TEST(Manifold, ManifoldContextDeferredTreeRootObserves) {
+TEST(Context, ManifoldContextDeferredTreeRootObserves) {
   std::vector<Manifold> items;
   for (int i = 0; i < 8; i++) {
     items.push_back(Manifold::Cube(vec3(1), true).Translate(vec3(i * 2, 0, 0)));
@@ -648,7 +648,7 @@ TEST(Manifold, ManifoldContextDeferredTreeRootObserves) {
 // Eager ops (Refine family) read this->ctx_ during the in-call work. A
 // pre-cancelled attached ctx aborts Refine via the cancel check between
 // Subdivide and the post-pass; the result is a Cancelled-status leaf.
-TEST(Manifold, ManifoldContextCancelMidRefine) {
+TEST(Context, ManifoldContextCancelMidRefine) {
   ExecutionContext ctx;
   ctx.Cancel();
   Manifold cube = Manifold::Cube(vec3(1), true).WithContext(ctx);
@@ -660,7 +660,7 @@ TEST(Manifold, ManifoldContextCancelMidRefine) {
 // attached. Verified behaviorally: a fresh ctx pre-loaded with a sentinel
 // counter value is left untouched by Status() on the Refine result, because
 // no ctx is attached to dispatch through.
-TEST(Manifold, ManifoldContextRefineDropsAttachmentFromResult) {
+TEST(Context, ManifoldContextRefineDropsAttachmentFromResult) {
   ExecutionContext ctx;
   Manifold cube = Manifold::Cube(vec3(1), true).WithContext(ctx);
   Manifold refined = cube.Refine(2);
@@ -678,7 +678,7 @@ TEST(Manifold, ManifoldContextRefineDropsAttachmentFromResult) {
 // Eager Hull observes attached ctx -- a pre-cancelled ctx aborts the
 // post-pass that runs after QuickHull's buildMesh, returning a Cancelled
 // result rather than a finished hull.
-TEST(Manifold, ManifoldContextCancelMidHull) {
+TEST(Context, ManifoldContextCancelMidHull) {
   ExecutionContext ctx;
   ctx.Cancel();
   // Non-trivial input so the post-buildMesh path is reached.
@@ -690,7 +690,7 @@ TEST(Manifold, ManifoldContextCancelMidHull) {
 // Eager Minkowski observes attached ctx -- a pre-cancelled ctx aborts
 // between the hull/Boolean phases. Cancel granularity is "one batch" of
 // per-face hulls.
-TEST(Manifold, ManifoldContextCancelMidMinkowski) {
+TEST(Context, ManifoldContextCancelMidMinkowski) {
   ExecutionContext ctx;
   ctx.Cancel();
   // Two convex inputs hit the fast path; that's enough to exercise the
@@ -709,7 +709,7 @@ TEST(Manifold, ManifoldContextCancelMidMinkowski) {
 // MANIFOLD_PAR guard: same as the other concurrent tests -- requires
 // std::thread.
 #if MANIFOLD_PAR == 1
-TEST(Manifold, ManifoldContextCancelConcurrentHull) {
+TEST(Context, ManifoldContextCancelConcurrentHull) {
   // High-resolution sphere so QuickHull + SortGeometry have measurable
   // work to do.
   Manifold sphere = Manifold::Sphere(1.0, 256);
@@ -739,7 +739,7 @@ TEST(Manifold, ManifoldContextCancelConcurrentHull) {
 // MANIFOLD_PAR guard: same as the other concurrent tests -- requires
 // std::thread.
 #if MANIFOLD_PAR == 1
-TEST(Manifold, ManifoldContextCancelConcurrentMinkowski) {
+TEST(Context, ManifoldContextCancelConcurrentMinkowski) {
   // Two non-convex inputs to force the slow path. The tet-difference here
   // produces near-degenerate geometry that fails the MANIFOLD_DEBUG
   // triangulation CCW check on macOS without processOverlaps -- matches
@@ -769,7 +769,7 @@ TEST(Manifold, ManifoldContextCancelConcurrentMinkowski) {
 
 // Cancellation requested on the attached ctx after Status() begins (or
 // before, in the deferred-tree-root idiom) aborts evaluation.
-TEST(Manifold, ManifoldContextCancelMidEval) {
+TEST(Context, ManifoldContextCancelMidEval) {
   std::vector<Manifold> items;
   for (int i = 0; i < 8; i++) {
     items.push_back(Manifold::Cube(vec3(1), true).Translate(vec3(i * 2, 0, 0)));
@@ -783,7 +783,7 @@ TEST(Manifold, ManifoldContextCancelMidEval) {
 }
 
 // FromMeshGL: ctx-aware analog of the `Manifold(MeshGL)` ctor.
-TEST(ExecutionContextFromMeshGL, HappyPath) {
+TEST(Context, MeshGLHappyPath) {
   ExecutionContext ctx;
   Manifold tet = ctx.FromMeshGL(TetGL());
   EXPECT_FALSE(tet.IsEmpty());
@@ -794,7 +794,7 @@ TEST(ExecutionContextFromMeshGL, HappyPath) {
 }
 
 // Equivalent geometry to the plain ctor.
-TEST(ExecutionContextFromMeshGL, MatchesCtor) {
+TEST(Context, MeshGLMatchesCtor) {
   MeshGL mesh = Manifold::Sphere(1.0, 32).GetMeshGL();
   ExecutionContext ctx;
   Manifold viaCtx = ctx.FromMeshGL(mesh);
@@ -805,7 +805,7 @@ TEST(ExecutionContextFromMeshGL, MatchesCtor) {
 }
 
 // Pre-cancel beats the heavy path on well-formed input.
-TEST(ExecutionContextFromMeshGL, CancelBeforeIngest) {
+TEST(Context, MeshGLCancelBeforeIngest) {
   ExecutionContext ctx;
   ctx.Cancel();
   Manifold m = ctx.FromMeshGL(TetGL());
@@ -813,7 +813,7 @@ TEST(ExecutionContextFromMeshGL, CancelBeforeIngest) {
 }
 
 // Pre-cancel beats the empty-input fast path (would otherwise be NoError).
-TEST(ExecutionContextFromMeshGL, CancelBeforeEmptyInputWinsOverNoError) {
+TEST(Context, MeshGLCancelBeforeEmptyInputWinsOverNoError) {
   ExecutionContext ctx;
   ctx.Cancel();
   Manifold m = ctx.FromMeshGL(MeshGL{});
@@ -833,7 +833,7 @@ static MeshGL MalformedMissingPositionProperties() {
 }
 
 // Pre-cancel beats validation errors.
-TEST(ExecutionContextFromMeshGL, CancelBeforeMalformedWinsOverValidation) {
+TEST(Context, MeshGLCancelBeforeMalformedWinsOverValidation) {
   ExecutionContext ctx;
   ctx.Cancel();
   Manifold m = ctx.FromMeshGL(MalformedMissingPositionProperties());
@@ -842,7 +842,7 @@ TEST(ExecutionContextFromMeshGL, CancelBeforeMalformedWinsOverValidation) {
 
 // Validation errors surface unchanged when no cancel is in flight;
 // counters stay at 0/kPhasesPerFromMesh since no phase ran.
-TEST(ExecutionContextFromMeshGL, ValidationErrorWithoutCancel) {
+TEST(Context, MeshGLValidationErrorWithoutCancel) {
   ExecutionContext ctx;
   Manifold m = ctx.FromMeshGL(MalformedMissingPositionProperties());
   EXPECT_EQ(m.Status(), Manifold::Error::MissingPositionProperties);
@@ -854,7 +854,7 @@ TEST(ExecutionContextFromMeshGL, ValidationErrorWithoutCancel) {
 // at least one Cancelled outcome (otherwise the cancel path is dead);
 // each Cancelled hit also pins donePhases < totalPhases.
 #if MANIFOLD_PAR == 1
-TEST(ExecutionContextFromMeshGL, CancelConcurrent) {
+TEST(Context, MeshGLCancelConcurrent) {
   MeshGL mesh = Manifold::Sphere(1.0, 512).GetMeshGL();  // ~524k tris
   int cancelledHits = 0;
   auto sleep = std::chrono::microseconds(100);
@@ -880,7 +880,7 @@ TEST(ExecutionContextFromMeshGL, CancelConcurrent) {
 #endif  // MANIFOLD_PAR == 1
 
 // FromMeshGL then a Boolean on the same ctx: counters reset between.
-TEST(ExecutionContextFromMeshGL, ReuseForBoolean) {
+TEST(Context, MeshGLReuseForBoolean) {
   ExecutionContext ctx;
   Manifold tet = ctx.FromMeshGL(TetGL());
   ASSERT_EQ(tet.Status(), Manifold::Error::NoError);
@@ -894,7 +894,7 @@ TEST(ExecutionContextFromMeshGL, ReuseForBoolean) {
 }
 
 // Two FromMeshGL calls on the same ctx: counters reset between.
-TEST(ExecutionContextFromMeshGL, ReuseForSecondFromMeshGL) {
+TEST(Context, MeshGLReuseForSecondFromMeshGL) {
   ExecutionContext ctx;
   ASSERT_EQ(ctx.FromMeshGL(TetGL()).Status(), Manifold::Error::NoError);
   ASSERT_EQ(ctx.impl_->donePhases.load(), kPhasesPerFromMesh);
@@ -906,7 +906,7 @@ TEST(ExecutionContextFromMeshGL, ReuseForSecondFromMeshGL) {
 }
 
 // Sticky cancel survives across FromMeshGL calls.
-TEST(ExecutionContextFromMeshGL, StickyCancelAcrossCalls) {
+TEST(Context, MeshGLStickyCancelAcrossCalls) {
   ExecutionContext ctx;
   ctx.Cancel();
   EXPECT_EQ(ctx.FromMeshGL(TetGL()).Status(), Manifold::Error::Cancelled);
@@ -919,7 +919,7 @@ TEST(ExecutionContextFromMeshGL, StickyCancelAcrossCalls) {
 // path, parity with the plain factory, the entry-time cancel gate in
 // MakeSmoothImpl (distinct from the shared Impl-ctor gate), concurrent cancel
 // through the extra tangent-creation phases, and the sharpenedEdges argument.
-TEST(ExecutionContextSmooth, HappyPath) {
+TEST(Context, SmoothHappyPath) {
   ExecutionContext ctx;
   Manifold tet = ctx.Smooth(TetGL());
   EXPECT_FALSE(tet.IsEmpty());
@@ -930,7 +930,7 @@ TEST(ExecutionContextSmooth, HappyPath) {
 }
 
 // Equivalent geometry to the plain factory.
-TEST(ExecutionContextSmooth, MatchesFactory) {
+TEST(Context, SmoothMatchesFactory) {
   MeshGL mesh = Manifold::Sphere(1.0, 32).GetMeshGL();
   ExecutionContext ctx;
   Manifold viaCtx = ctx.Smooth(mesh);
@@ -942,7 +942,7 @@ TEST(ExecutionContextSmooth, MatchesFactory) {
 
 // Pre-cancel hits Smooth's own entry gate in MakeSmoothImpl and returns
 // before ingest - distinct from the shared Impl-ctor gate FromMeshGL covers.
-TEST(ExecutionContextSmooth, CancelBeforeIngest) {
+TEST(Context, SmoothCancelBeforeIngest) {
   ExecutionContext ctx;
   ctx.Cancel();
   Manifold m = ctx.Smooth(TetGL());
@@ -953,7 +953,7 @@ TEST(ExecutionContextSmooth, CancelBeforeIngest) {
 // at least one Cancelled outcome; each Cancelled hit pins donePhases <
 // totalPhases.
 #if MANIFOLD_PAR == 1
-TEST(ExecutionContextSmooth, CancelConcurrent) {
+TEST(Context, SmoothCancelConcurrent) {
   MeshGL mesh = Manifold::Sphere(1.0, 512).GetMeshGL();  // ~524k tris
   int cancelledHits = 0;
   auto sleep = std::chrono::microseconds(100);
@@ -982,7 +982,7 @@ TEST(ExecutionContextSmooth, CancelConcurrent) {
 // faceID-restoration loop in MakeSmoothImpl is a natural no-op after
 // MakeEmpty.
 #if MANIFOLD_PAR == 1
-TEST(ExecutionContextSmooth, CancelWithSharpenedEdges) {
+TEST(Context, SmoothCancelWithSharpenedEdges) {
   MeshGL mesh = Manifold::Sphere(1.0, 512).GetMeshGL();
   std::vector<Smoothness> sharpenedEdges = {{0, 0.0}, {3, 0.5}, {6, 0.0}};
   int cancelledHits = 0;
@@ -1015,7 +1015,7 @@ TEST(ExecutionContextSmooth, CancelWithSharpenedEdges) {
 // happy path, parity with the plain factory, the entry-time cancel gate in
 // CreateLevelSet, and concurrent cancel through the dominant voxel-sampling
 // phase.
-TEST(ExecutionContextLevelSet, HappyPath) {
+TEST(Context, LevelSetHappyPath) {
   // Sphere SDF: positive inside, negative outside.
   auto sphere = [](vec3 p) { return 1.0 - la::length(p); };
   ExecutionContext ctx;
@@ -1029,7 +1029,7 @@ TEST(ExecutionContextLevelSet, HappyPath) {
 
 // Equivalent geometry to the plain factory. (Named MatchesFactory, not
 // MatchesCtor - LevelSet has no constructor form.)
-TEST(ExecutionContextLevelSet, MatchesFactory) {
+TEST(Context, LevelSetMatchesFactory) {
   auto sphere = [](vec3 p) { return 1.0 - la::length(p); };
   const Box bounds = {vec3(-1.1), vec3(1.1)};
   const double edgeLength = 0.1;
@@ -1043,7 +1043,7 @@ TEST(ExecutionContextLevelSet, MatchesFactory) {
 
 // Pre-cancel hits CreateLevelSet's entry gate and returns before allocating or
 // sampling the voxel grid - LevelSet's analog of Smooth's CancelBeforeIngest.
-TEST(ExecutionContextLevelSet, CancelBeforeSampling) {
+TEST(Context, LevelSetCancelBeforeSampling) {
   auto sphere = [](vec3 p) { return 1.0 - la::length(p); };
   ExecutionContext ctx;
   ctx.Cancel();
@@ -1057,7 +1057,7 @@ TEST(ExecutionContextLevelSet, CancelBeforeSampling) {
 // backoff guarantees at least one Cancelled outcome; each pins donePhases <
 // totalPhases.
 #if MANIFOLD_PAR == 1
-TEST(ExecutionContextLevelSet, CancelConcurrent) {
+TEST(Context, LevelSetCancelConcurrent) {
   auto slowSphere = [](vec3 p) {
     std::this_thread::sleep_for(std::chrono::microseconds(5));
     return 1.0 - la::length(p);

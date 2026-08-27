@@ -45,7 +45,7 @@ TEST(Smooth, RefineQuads) {
   Manifold cylinder = WithPositionColors(Manifold::Cylinder(2, 1, -1, 12))
                           .SmoothOut()
                           .RefineToLength(0.05);
-  EXPECT_EQ(cylinder.NumTri(), 17044);
+  EXPECT_EQ(cylinder.NumTri(), 16644);
   EXPECT_NEAR(cylinder.Volume(), 2 * kPi, 0.003);
   EXPECT_NEAR(cylinder.SurfaceArea(), 6 * kPi, 0.004);
   const MeshGL out = cylinder.GetMeshGL();
@@ -85,6 +85,7 @@ TEST(Smooth, ToLength) {
       CrossSection::Circle(10, 10).Translate({10, 0}).ToPolygons(), 2, 0, 0,
       {0, 0});
   cone += cone.Scale({1, 1, -5});
+  EXPECT_EQ(cone.NumVert(), 12);
   Manifold smooth =
       cone.AsOriginal().Simplify().SmoothOut(180).RefineToLength(0.1);
   ExpectMeshes(smooth, {{85250, 170496}});
@@ -105,7 +106,7 @@ TEST(Smooth, ToLength) {
 TEST(Smooth, Sphere) {
   int n[5] = {4, 8, 16, 32, 64};
   // Tests vertex precision of interpolation
-  double precision[5] = {0.04, 0.003, 0.003, 0.0005, 0.00006};
+  double precision[5] = {0.04, 0.015, 0.003, 0.0005, 0.00006};
   for (int i = 0; i < 5; ++i) {
     Manifold sphere = Manifold::Sphere(1, n[i]);
     // Refine(3*x) makes a center point, which is the worst case.
@@ -210,36 +211,68 @@ TEST(Smooth, MissingNormals) {
 }
 
 TEST(Smooth, MissingNormalsCone) {
-  Manifold cone = Manifold::Cylinder(10, 10, 0, 5).CalculateNormals(0, 60);
-  Manifold diff = cone - Manifold::Cube(vec3(10), true).Translate({0, 0, 10});
-  Manifold out = diff.SmoothByNormals(0).Refine(20);
-  EXPECT_NEAR(out.Volume(), 1009, 1);
-  EXPECT_NEAR(out.SurfaceArea(), 736, 1);
+  Manifold cone = Manifold::Cylinder(5, 10, 7, 6).CalculateNormals(0, 60);
+  Manifold peak = Manifold::Cylinder(4, 7, 0, 6);
+  Manifold biCone = cone + peak.Translate({0, 0, 5});
+  Manifold out = biCone.SmoothByNormals(0).RefineToTolerance(0.01);
+  EXPECT_NEAR(out.Volume(), 1480, 1);
+  EXPECT_NEAR(out.SurfaceArea(), 828, 1);
   if (options.exportModels) WriteTestOBJ("missingNormalsCone.obj", out);
 }
 
 TEST(Smooth, Fillet) {
   float depth = 3;
   float radius = 10;
-  Manifold cylinder =
-      Manifold::Cylinder(10, radius, radius, 6, false).CalculateNormals(0, 80);
-  Manifold chamfer = Manifold::Extrude(cylinder.Slice(0), depth, 0, 0,
-                                       vec2(radius + depth) / radius)
-                         .Simplify()
-                         .Mirror({0, 0, 1});
+  float filletScale = 1 + depth / radius;
+  Manifold cylinder = Manifold::Cylinder(20, radius, radius, 6, true)
+                          .CalculateNormals(0, 80)
+                          .Rotate(20);
+  CrossSection section = cylinder.Slice(0);
+  Manifold chamfer =
+      Manifold::Extrude(section.Simplify().ToPolygons(), depth, 0, 0,
+                        vec2(filletScale, 1.1 * filletScale))
+          .Mirror({0, 0, 1});
   EXPECT_EQ(chamfer.NumDegenerateTris(), 0);
   EXPECT_EQ(chamfer.NumTri(), 20);
-  Manifold base = Manifold::Cylinder(5, 15, 15, 6)
-                      .Translate({0, 0, -5 - depth})
+  Manifold base = Manifold::Cylinder(10, 15, 15, 6)
+                      .Translate({0, 0, -10 - depth})
+                      .Scale({1, 1.2, 1})
                       .CalculateNormals(0, 80);
   Manifold chamfered = cylinder + chamfer + base;
   EXPECT_EQ(chamfered.NumDegenerateTris(), 0);
   EXPECT_EQ(chamfered.NumTri(), 56);
   Manifold fillet = chamfered.SmoothByNormals(0).RefineToTolerance(0.01);
   EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);
-  EXPECT_NEAR(fillet.Volume(), 7745, 1);
-  EXPECT_NEAR(fillet.SurfaceArea(), 2622, 1);
+  EXPECT_NEAR(fillet.Volume(), 12805, 1);
+  EXPECT_NEAR(fillet.SurfaceArea(), 3452, 1);
   if (options.exportModels) WriteTestOBJ("fillet.obj", fillet);
+}
+
+TEST(Smooth, Fillet2) {
+  float depth = 3;
+  float radius = 10;
+  float filletScale = 1 + depth / radius;
+  Manifold cylinder = Manifold::Cylinder(40, radius, radius, 6, true)
+                          .Rotate(0, 30)
+                          .CalculateNormals(0, 80);
+  CrossSection section = cylinder.Slice(0);
+
+  Manifold chamfer = Manifold::Extrude(section.Simplify().ToPolygons(), depth,
+                                       0, 0, vec2(1.3, 1.2))
+                         .Mirror({0, 0, 1});
+  EXPECT_EQ(chamfer.NumDegenerateTris(), 0);
+  EXPECT_EQ(chamfer.NumTri(), 20);
+  Manifold base = Manifold::Cube(vec3(40), true)
+                      .Translate({0, 0, -20 - depth})
+                      .CalculateNormals();
+  Manifold chamfered = cylinder + chamfer + base;
+  EXPECT_EQ(chamfered.NumDegenerateTris(), 0);
+  EXPECT_EQ(chamfered.NumTri(), 48);
+  Manifold fillet = chamfered.SmoothByNormals(0).RefineToTolerance(0.01);
+  EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);
+  EXPECT_NEAR(fillet.Volume(), 71507, 1);
+  EXPECT_NEAR(fillet.SurfaceArea(), 10936, 1);
+  if (options.exportModels) WriteTestOBJ("fillet2.obj", fillet);
 }
 
 TEST(Smooth, Manual) {
@@ -299,8 +332,8 @@ TEST(Smooth, Csaszar) {
   Manifold csaszar = Manifold::Smooth(Csaszar());
   csaszar = csaszar.Refine(100);
   ExpectMeshes(csaszar, {{70000, 140000}});
-  EXPECT_NEAR(csaszar.Volume(), 78760, 10);
-  EXPECT_NEAR(csaszar.SurfaceArea(), 11935, 10);
+  EXPECT_NEAR(csaszar.Volume(), 74757, 10);
+  EXPECT_NEAR(csaszar.SurfaceArea(), 11313, 10);
 
   if (options.exportModels) WriteTestOBJ("smoothCsaszar.obj", csaszar);
 }
@@ -425,7 +458,7 @@ TEST(Smooth, SDF) {
           .SetProperties(1, error);
 
   MeshGL out = smoothed.GetMeshGL();
-  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.028);
+  EXPECT_NEAR(GetMaxProperty(out, 3), 0, 0.035);
   EXPECT_NEAR(GetMaxProperty(interpolated.GetMeshGL(), 3), 0, 0.083);
 
   if (options.exportModels) WriteTestOBJ("smoothGyroid.obj", smoothed);

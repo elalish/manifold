@@ -12,33 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// The site is deployed to several paths at once (master/, latest/, vX.Y.Z/),
+// each registering this worker under its own scope. Key the cache by scope so
+// deployments do not share or evict each other's entries.
+const cachePrefix = `manifoldCAD-cache:${self.registration.scope}:`;
 // Increment version when updating CDN URLs to clean up cache.
-const cacheName = 'manifoldCAD-cache-v4';
+const cacheName = `${cachePrefix}v5`;
 
+// Relative to this worker's location, so they resolve within the deployment
+// this worker is scoped to rather than always hitting the site root.
 const appShellAssets = [
-  '/',
-  '/index.html',
-  '/editor.css',
-  '/editor.js',
-  '/editor-examples.js',
-  '/manifest.json',
-  '/fonts/orbitron-black-webfont.ttf',
-  '/icons/close.png',
-  '/icons/docs.png',
-  '/icons/manifoldCAD.png',
-  '/icons/manifoldCADonly.png',
-  '/icons/ManifoldIcon.png',
-  '/icons/mengerSponge192.png',
-  '/icons/mengerSponge512.png',
-  '/icons/mengerSponge64.png',
-  '/icons/pause.png',
-  '/icons/pencil.png',
-  '/icons/play.png',
-  '/icons/redo.png',
-  '/icons/share.png',
-  '/icons/star.png',
-  '/icons/trash.png',
-  '/icons/undo.png'
+  './',
+  './index.html',
+  './manifest.json',
+  './fonts/orbitron-black-webfont.ttf',
+  './icons/close.png',
+  './icons/docs.png',
+  './icons/manifoldCAD.png',
+  './icons/manifoldCADonly.png',
+  './icons/ManifoldIcon.png',
+  './icons/mengerSponge192.png',
+  './icons/mengerSponge512.png',
+  './icons/mengerSponge64.png',
+  './icons/pause.png',
+  './icons/pencil.png',
+  './icons/play.png',
+  './icons/redo.png',
+  './icons/share.png',
+  './icons/star.png',
+  './icons/trash.png',
+  './icons/undo.png'
 ];
 
 const shouldHandleRequest = request => {
@@ -70,7 +73,9 @@ self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()
                   .then((keyList) => {
                     return Promise.all(keyList.map((key) => {
-                      if (key !== cacheName) {
+                      // Only evict stale caches belonging to this scope, so
+                      // other deployments keep theirs.
+                      if (key.startsWith(cachePrefix) && key !== cacheName) {
                         return caches.delete(key);
                       }
                     }));

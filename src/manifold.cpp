@@ -14,6 +14,7 @@
 
 #include <algorithm>
 
+#include "atomic_compat.h"
 #include "boolean3.h"
 #include "csg_tree.h"
 #include "execution_impl.h"
@@ -128,7 +129,7 @@ Manifold& Manifold::operator=(Manifold&&) noexcept = default;
 Manifold::Manifold(const Manifold& other) {
   std::lock_guard<std::mutex> lock(*other.pNodeMutex_);
   pNode_ = other.pNode_;
-  std::atomic_store(&ctx_, std::atomic_load(&other.ctx_));
+  AtomicStoreShared(&ctx_, AtomicLoadShared(&other.ctx_));
 }
 
 Manifold::Manifold(std::shared_ptr<CsgNode> pNode) : pNode_(pNode) {}
@@ -156,7 +157,7 @@ Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
     std::scoped_lock lock(*pNodeMutex_, *other.pNodeMutex_);
     pNode_ = other.pNode_;
-    std::atomic_store(&ctx_, std::atomic_load(&other.ctx_));
+    AtomicStoreShared(&ctx_, AtomicLoadShared(&other.ctx_));
   }
   return *this;
 }
@@ -170,7 +171,7 @@ Manifold& Manifold::operator=(const Manifold& other) {
  */
 Manifold Manifold::WithContext(const ExecutionContext& ctx) const {
   Manifold result = *this;
-  std::atomic_store(&result.ctx_, ctx.impl_);
+  AtomicStoreShared(&result.ctx_, ctx.impl_);
   return result;
 }
 
@@ -305,7 +306,7 @@ Manifold::Error Manifold::Status() const {
   // expression -- through the lazy eval inside GetCsgLeafNode -- so a
   // concurrent op= reseating ctx_ on this Manifold can't free the Impl out
   // from under us.
-  return GetCsgLeafNode(std::atomic_load(&ctx_).get()).GetImpl()->status_;
+  return GetCsgLeafNode(AtomicLoadShared(&ctx_).get()).GetImpl()->status_;
 }
 /**
  * The number of vertices in the Manifold.
@@ -485,6 +486,18 @@ uint32_t Manifold::ReserveIDs(uint32_t n) {
  */
 bool Manifold::MatchesTriNormals() const {
   return GetCsgLeafNode().GetImpl()->MatchesTriNormals();
+}
+
+/**
+ * Returns true if properties are shared everywhere except across mesh
+ * boundaries. This is not true in general, but only because an input mesh may
+ * have property discontinuities. For simple input meshes where properties are
+ * 1:1 with verts, this HasSimpleProps condition should still be true after any
+ * combination of boolean operations and simplifications. CalculateNormals()
+ * will cause this to be false anytime the mesh contains a sharp edge.
+ */
+bool Manifold::HasSimpleProps() const {
+  return GetCsgLeafNode().GetImpl()->HasSimpleProps();
 }
 
 /**
@@ -799,7 +812,7 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
  * @param n The number of pieces to split every edge into. Must be > 1.
  */
 Manifold Manifold::Refine(int n) const {
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
@@ -824,7 +837,7 @@ Manifold Manifold::Refine(int n) const {
  */
 Manifold Manifold::RefineToLength(double length) const {
   length = std::abs(length);
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
@@ -853,7 +866,7 @@ Manifold Manifold::RefineToLength(double length) const {
  */
 Manifold Manifold::RefineToTolerance(double tolerance) const {
   tolerance = std::abs(tolerance);
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
@@ -1022,7 +1035,7 @@ Manifold Manifold::TrimByPlane(vec3 normal, double originOffset) const {
  * @param other The other manifold to minkowski sum to this one.
  */
 Manifold Manifold::MinkowskiSum(const Manifold& other) const {
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto aImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (aImpl->status_ != Error::NoError) return PropagateStatus(aImpl->status_);
   auto bImpl = other.GetCsgLeafNode(ctx.get()).GetImpl();
@@ -1040,7 +1053,7 @@ Manifold Manifold::MinkowskiSum(const Manifold& other) const {
  * @param other The other manifold to minkowski subtract from this one.
  */
 Manifold Manifold::MinkowskiDifference(const Manifold& other) const {
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto aImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (aImpl->status_ != Error::NoError) return PropagateStatus(aImpl->status_);
   auto bImpl = other.GetCsgLeafNode(ctx.get()).GetImpl();
@@ -1087,7 +1100,7 @@ Manifold Manifold::Hull(const std::vector<vec3>& pts) {
  * Compute the convex hull of this manifold.
  */
 Manifold Manifold::Hull() const {
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto srcImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (srcImpl->status_ != Error::NoError)
     return PropagateStatus(srcImpl->status_);

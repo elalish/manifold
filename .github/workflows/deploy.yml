@@ -1,18 +1,31 @@
-name: Deploy documentation 
+name: Deploy documentation
 
 on:
+  release:
+    types: [published]
   workflow_run:
     workflows: [CI]
-    types:
-      - completed
+    types: [completed]
     branches: [master]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch or tag to build docs from (e.g. v3.4.0)'
+        required: true
+      destination_dir:
+        description: 'Subdirectory to deploy to on gh-pages (e.g. v3.4.0)'
+        required: true
 
 jobs:
   deploy_github_pages:
     runs-on: ubuntu-latest
+    # Skip when the CI run that triggered us failed.
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
     - uses: actions/checkout@v6
+      with:
+        ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.ref) || (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || github.ref }}
 
     - name: Doxygen Action
       uses: mattnotmitt/doxygen-action@edge
@@ -22,26 +35,52 @@ jobs:
         mkdir public
         mv ./samples ./public
         mv ./docs ./public
-        # weekly benchmark dashboard, served at /dashboard
         mv ./dashboard ./public
 
     - name: Download manifoldCAD editor, examples and documentation
+      continue-on-error: ${{ github.event_name == 'workflow_dispatch' }}
       uses: dawidd6/action-download-artifact@v6
       with:
         workflow: manifold.yml
-        workflow_conclusion: completed
-        # specific to the triggering workflow
-        run_id: ${{github.event.workflow_run.id}}
-        # do not download from old run
-        check_artifacts: true 
+        workflow_conclusion: success
+        # Pin to the artifact from the CI run that triggered us
+        commit: ${{ (github.event_name != 'workflow_run' && github.sha) || '' }}
+        run_id: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.id) || '' }}
+        check_artifacts: true
         name: wasmpublic
         path: ./public
 
-    - name: Deploy to Github Pages
+    # unreleased build for testing, not a version anyone should pin to.
+    - name: Deploy master to alpha/
+      if: github.event_name == 'workflow_run'
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_branch: gh-pages
-        force_orphan: true
-        cname: manifoldcad.org
         publish_dir: ./public
+        destination_dir: alpha
+
+    - name: Deploy to vX.Y.Z/
+      if: github.event_name != 'workflow_run'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_branch: gh-pages
+        publish_dir: ./public
+        destination_dir: ${{ (github.event_name == 'release' && github.ref_name) || inputs.destination_dir }}
+
+    # A release also publishes to the site root, so manifoldcad.org always
+    # serves the current release without a redirect.(it is the latest release)
+    #
+    # keep_files is load-bearing here and must not be removed. With no
+    # destination_dir the action's cleanup runs at the branch root, so
+    # without this it would delete alpha/ and every vX.Y.Z/ directory.
+    - name: Deploy to gh-pages root
+      if: github.event_name == 'release'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_branch: gh-pages
+        publish_dir: ./public
+        keep_files: true
+        cname: manifoldcad.org
