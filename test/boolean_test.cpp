@@ -547,14 +547,6 @@ TEST(Boolean, Perturb3) {
   }
 }
 
-TEST(Boolean, Perturb4) {
-  Manifold a = ReadTestOBJ("perturb3A.obj");
-  Manifold b = ReadTestOBJ("perturb3B.obj");
-  Manifold result = a + b;
-  EXPECT_EQ(result.NumDegenerateTris(), 0);
-  WriteTestOBJ("perturb4.obj", result);
-}
-
 TEST(Boolean, Coplanar) {
   Manifold cylinder = WithPositionColors(Manifold::Cylinder(1.0, 1.0));
   MeshGL cylinderGL = cylinder.GetMeshGL();

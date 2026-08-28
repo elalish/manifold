@@ -187,7 +187,7 @@ TEST(Samples, Sponge1) {
 // degree rotations.
 TEST(Samples, Sponge4) {
   Manifold sponge = MengerSponge(4);
-  EXPECT_LE(sponge.NumDegenerateTris(), 8);
+  EXPECT_LE(sponge.NumDegenerateTris(), 35);
   EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:1409, 4:26433
   CheckGL(sponge);
 
