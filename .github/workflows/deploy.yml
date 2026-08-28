@@ -27,6 +27,13 @@ jobs:
       with:
         ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.ref) || (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || github.ref }}
 
+    # github.sha is the ref the workflow was launched from, which on a manual
+    # dispatch is not the ref being deployed. Use what checkout landed on so
+    # the artifact matches the code.
+    - name: Resolve deployed commit
+      id: deployed
+      run: echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+
     - name: Doxygen Action
       uses: mattnotmitt/doxygen-action@edge
 
@@ -37,14 +44,16 @@ jobs:
         mv ./docs ./public
         mv ./dashboard ./public
 
+    # No continue-on-error: a missing artifact means the editor, examples and
+    # TypeScript docs would be absent, and publishing that silently is worse
+    # than failing.
     - name: Download manifoldCAD editor, examples and documentation
-      continue-on-error: ${{ github.event_name == 'workflow_dispatch' }}
       uses: dawidd6/action-download-artifact@v6
       with:
         workflow: manifold.yml
         workflow_conclusion: success
         # Pin to the artifact from the CI run that triggered us
-        commit: ${{ (github.event_name != 'workflow_run' && github.sha) || '' }}
+        commit: ${{ (github.event_name != 'workflow_run' && steps.deployed.outputs.sha) || '' }}
         run_id: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.id) || '' }}
         check_artifacts: true
         name: wasmpublic
