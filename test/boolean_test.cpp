@@ -223,8 +223,14 @@ TEST(Boolean, DeterminismSimpleIntersect) {
 
 TEST(Boolean, CubeUnion) {
   Manifold cube = Manifold::Cube();
-  Manifold result = cube + cube.Translate({1, 0, 0});
-  EXPECT_EQ(result.NumTri(), 12);
+  Manifold result = cube + cube.Translate({0.5, 0.5, 0});
+  EXPECT_EQ(result.NumVert(), 16);
+}
+
+TEST(Boolean, CubeUnionProp) {
+  Manifold cube = WithPositionColors(Manifold::Cube());
+  Manifold result = cube + cube.Translate({0.5, 0.5, 0});
+  EXPECT_EQ(result.NumVert(), 18);
 }
 
 TEST(Boolean, Simplify) {

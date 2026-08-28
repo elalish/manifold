@@ -151,6 +151,7 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
 
   CleanupTopology();
   CollapseShortEdges(firstNewVert);
+  SwapDegenerates(firstNewVert);
   CollapseColinearEdges(firstNewVert);
   SwapDegenerates(firstNewVert);
   // Merging verts causes their normals to change
