@@ -216,17 +216,12 @@ struct Manifold::Impl {
   Merger CheckEdge(int edge) const;
   bool Continuous(int edge) const;
   bool Swappable(int edge) const;
+  bool Colinear(int edge) const;
   void SwapEdge(int edge, double a);
   void SimplifyTopology(int firstNewVert = 0);
-  void CollapseShortEdges(int firstNewVert = 0);
-  void CollapseColinearEdges(int firstNewVert = 0);
-  void SwapDegenerates(int firstNewVert = 0);
   void DedupeEdge(int edge);
-  bool CollapseEdge(int edge, Vec<int>& edges, double tol = -1,
-                    int firstNewVert = 0);
+  void CollapseEdge(int edge, Vec<int>& edges);
   bool CollapseEdge2(int edge, Vec<int>& scratch, const Merger& merger);
-  void RecursiveEdgeSwap(int edge, int& tag, Vec<int>& visited,
-                         Vec<int>& edgeSwapStack, Vec<int>& edges);
   void RemoveIfFolded(int edge);
   void PairUp(int edge0, int edge1);
   void UpdateVert(int vert, int startEdge, int endEdge);

@@ -225,12 +225,14 @@ TEST(Boolean, CubeUnion) {
   Manifold cube = Manifold::Cube();
   Manifold result = cube + cube.Translate({0.5, 0.5, 0});
   EXPECT_EQ(result.NumVert(), 16);
+  if (options.exportModels) WriteTestOBJ("cubeUnion.obj", result);
 }
 
 TEST(Boolean, CubeUnionProp) {
   Manifold cube = WithPositionColors(Manifold::Cube());
   Manifold result = cube + cube.Translate({0.5, 0.5, 0});
   EXPECT_EQ(result.NumVert(), 18);
+  if (options.exportModels) WriteTestOBJ("cubeUnionProp.obj", result);
 }
 
 TEST(Boolean, Simplify) {
