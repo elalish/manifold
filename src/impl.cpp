@@ -738,15 +738,21 @@ void Manifold::Impl::CalculateVertNormals() {
  */
 void Manifold::Impl::IncrementMeshIDs() {
   ZoneScoped;
-  HashTable<uint32_t> meshIDold2new(meshRelation_.meshIDtransform.size() * 2);
+  const int numMeshIDs = meshRelation_.meshIDtransform.size();
+  if (numMeshIDs == 1 && meshRelation_.meshIDtransform.begin()->first == 0)
+    return;
+
+  HashTable<uint32_t> meshIDold2new(numMeshIDs * 2);
   // Update keys of the transform map
   std::map<int, Relation> oldTransforms;
   std::swap(meshRelation_.meshIDtransform, oldTransforms);
-  const int numMeshIDs = oldTransforms.size();
+
   int nextMeshID = ReserveIDs(numMeshIDs);
   for (const auto& pair : oldTransforms) {
-    meshIDold2new.D().Insert(pair.first, nextMeshID);
-    meshRelation_.meshIDtransform[nextMeshID++] = pair.second;
+    const int thisID = pair.first == 0 ? 0 : nextMeshID++;
+    if (pair.first == 0) continue;
+    meshIDold2new.D().Insert(pair.first, thisID);
+    meshRelation_.meshIDtransform[thisID] = pair.second;
   }
 
   const size_t numTri = NumTri();

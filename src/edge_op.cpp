@@ -250,15 +250,26 @@ bool Manifold::Impl::Colinear(int edge) const {
   const int endVert = halfedge_.Start(tri0edge[1]);
   const vec3 pNew = vertPos_[endVert];
   const vec3 pOld = vertPos_[startVert];
+
+  auto alignedProps = [&](int current, const vec3& pNext) {
+    if (Continuous(current)) return true;
+    const vec3 across = pNext - pNew;
+    return la::length2(la::cross(across, pOld - pNew)) <=
+           epsilon_ * epsilon_ * la::length2(across);
+  };
+
   // Orbit startVert
   int start = halfedge_.Pair(tri1edge[1]);
-  int current = start;
   vec3 pLast = vertPos_[halfedge_.Start(tri1edge[2])];
-  while (current != tri1edge[0]) {
+  if (!alignedProps(start, pLast)) return false;
+
+  int current = start;
+  while (current != tri0edge[2]) {
     current = NextHalfedge(current);
     vec3 pNext = vertPos_[halfedge_.End(current)];
     const int tri = current / 3;
 
+    // TODO: use faceNormal offsets instead to avoid error stacking.
     if (la::abs(la::dot(pNew - pOld, faceNormal_[tri])) > epsilon_)
       return false;
 
@@ -267,6 +278,8 @@ bool Manifold::Impl::Colinear(int edge) const {
     if (CCW(projection * pNext, projection * pLast, projection * pNew,
             epsilon_) < 0)
       return false;
+
+    if (!alignedProps(current, pNext)) return false;
 
     pLast = pNext;
     current = halfedge_.Pair(current);
