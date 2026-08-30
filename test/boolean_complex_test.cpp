@@ -1503,8 +1503,6 @@ TEST(BooleanComplex, CraycloudBool) {
   Manifold m2 = ReadTestOBJ("Cray_right.obj");
   Manifold res = m1 - m2;
   EXPECT_EQ(res.Status(), Manifold::Error::NoError);
-  EXPECT_FALSE(res.IsEmpty());
-  res = res.AsOriginal().Simplify();
   EXPECT_TRUE(res.IsEmpty());
 }
 

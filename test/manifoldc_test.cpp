@@ -722,8 +722,9 @@ TEST(CBIND, meshgl_run_accessors) {
 TEST(CBIND, run_flag_accessors) {
   // CalculateNormals sets the per-run hasNormals bit; a subtractee cavity
   // gets backside set. Exercise the C accessors for both bits.
-  ManifoldManifold* cube =
-      manifold_cube(alloc_manifold_buffer(), 2.0, 2.0, 2.0, 1);
+  ManifoldManifold* cube = manifold_as_original(
+      alloc_manifold_buffer(),
+      manifold_cube(alloc_manifold_buffer(), 2.0, 2.0, 2.0, 1));
   ManifoldManifold* sphere =
       manifold_as_original(alloc_manifold_buffer(),
                            manifold_sphere(alloc_manifold_buffer(), 1.0, 32));

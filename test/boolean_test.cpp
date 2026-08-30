@@ -893,9 +893,11 @@ TEST(Boolean, BatchBooleanComposeMeshIDStable) {
   // Three pairwise-disjoint cubes — forces the Compose path inside
   // BatchBoolean(Add).
   auto build = []() {
-    Manifold a = Manifold::Cube(vec3(1, 1, 1));
-    Manifold b = Manifold::Cube(vec3(1, 1, 1)).Translate({3, 0, 0});
-    Manifold c = Manifold::Cube(vec3(1, 1, 1)).Translate({0, 3, 0});
+    Manifold a = Manifold::Cube(vec3(1, 1, 1)).AsOriginal();
+    Manifold b =
+        Manifold::Cube(vec3(1, 1, 1)).AsOriginal().Translate({3, 0, 0});
+    Manifold c =
+        Manifold::Cube(vec3(1, 1, 1)).AsOriginal().Translate({0, 3, 0});
     return Manifold::BatchBoolean({a, b, c}, OpType::Add);
   };
 

@@ -687,7 +687,7 @@ TEST(Manifold, OppositeFace) {
  */
 TEST(Manifold, Decompose) {
   std::vector<Manifold> manifoldList;
-  manifoldList.emplace_back(Manifold::Tetrahedron());
+  manifoldList.emplace_back(Manifold::Tetrahedron().AsOriginal());
   manifoldList.emplace_back(Manifold::Cube().Translate({2, 0, 0}).AsOriginal());
   manifoldList.emplace_back(
       Manifold::Sphere(1, 4).Translate({4, 0, 0}).AsOriginal());
