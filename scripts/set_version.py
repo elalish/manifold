@@ -19,19 +19,23 @@ from pathlib import Path
 VERSION_PATTERN = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 
 
-def replace_once(path: Path, pattern: re.Pattern, replacement: str) -> bool:
-    """Rewrite the single match of pattern in path. True if the file changed.
+def replace_all(path: Path, pattern: re.Pattern, replacement: str) -> bool:
+    """Rewrite every match of pattern in path. True if the file changed.
+
+    A file with no match at all is an error: it means the format changed and
+    a version would silently go un-bumped. Lockfiles carry the version more
+    than once, so every occurrence is replaced rather than just the first.
 
     newline="" on both ends so line endings survive untouched; without it
     Python rewrites every line of the file and the diff becomes unreadable.
     """
     with open(path, encoding="utf-8", newline="") as f:
         original = f.read()
-    updated, count = pattern.subn(replacement, original, count=1)
-    if count != 1:
+    updated, count = pattern.subn(replacement, original)
+    if count == 0:
         raise SystemExit(
-            f"{path}: expected exactly one match for {pattern.pattern!r}, "
-            f"found {count}. The file's format has changed; update this script."
+            f"{path}: no match for {pattern.pattern!r}. "
+            "The file's format has changed; update this script."
         )
     if updated == original:
         return False
@@ -67,10 +71,14 @@ def set_version(root: Path, major: str, minor: str, patch: str) -> list[Path]:
             ),
             rf"\g<1>{major}\g<2>{minor}\g<3>{patch}\g<4>",
         ),
-        # scripts/test-cmake.sh
-        # This asserts the version just built is available to consumers, so it
-        # tracks the release. The separate find_package() minimum above it is
-        # deliberately older and is left alone.
+        # scripts/test-cmake.sh carries the version twice: once as the
+        # find_package() minimum and once as the MANIFOLD_VERSION_NUMBER check.
+        # Both track the release so there is only ever one version in play.
+        (
+            Path("scripts/test-cmake.sh"),
+            re.compile(r'(find_package\(manifold ")\d+\.\d+\.\d+(")'),
+            rf"\g<1>{dotted}\g<2>",
+        ),
         (
             Path("scripts/test-cmake.sh"),
             re.compile(r"(MANIFOLD_VERSION_NUMBER\()\d+,\s*\d+,\s*\d+(\))"),
@@ -78,12 +86,26 @@ def set_version(root: Path, major: str, minor: str, patch: str) -> list[Path]:
         ),
     ]
 
+    # The lockfiles embed the version in their manifold-3d entries. Editing
+    # them directly rather than running npm install keeps the release commit
+    # to just the version change, and keeps the workflow fast.
+    lock_pattern = re.compile(
+        r'("name":\s*"manifold-3d",\s*\n\s*"version":\s*")\d+\.\d+\.\d+(")'
+    )
+    # Globbed non-recursively; "**" would descend into node_modules.
+    lockfiles = [Path("bindings/wasm/package-lock.json")] + sorted(
+        p.relative_to(root)
+        for p in root.glob("bindings/wasm/examples/*/package-lock.json")
+    )
+    for lockfile in lockfiles:
+        edits.append((lockfile, lock_pattern, rf"\g<1>{dotted}\g<2>"))
+
     changed = []
     for relative, pattern, replacement in edits:
         path = root / relative
         if not path.exists():
             raise SystemExit(f"{relative}: not found. Has it moved?")
-        if replace_once(path, pattern, replacement):
+        if replace_all(path, pattern, replacement) and relative not in changed:
             changed.append(relative)
     return changed
 

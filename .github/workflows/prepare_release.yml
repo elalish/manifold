@@ -25,18 +25,11 @@ jobs:
       with:
         python-version: '3.x'
 
-    - uses: actions/setup-node@v6
-      with:
-        node-version: 25
-
+    # Nothing is built or tested here; that all happens on the resulting PR.
+    # The lockfiles are edited in place rather than regenerated with npm
+    # install, which keeps this fast and limits the commit to the version.
     - name: Set the version
       run: python3 scripts/set_version.py "${{ inputs.version }}"
-
-    # package-lock files embed the version, so they drift if left alone.
-    - name: Update package-lock files
-      run: |
-        cd bindings/wasm
-        npm run install:all
 
     # gh rather than a third-party action; release_file.yml already uses it.
     - name: Commit and open a pull request
