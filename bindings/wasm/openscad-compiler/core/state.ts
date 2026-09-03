@@ -15,13 +15,6 @@ export interface LocalDecl {
   params: Parameter[];
 }
 
-// Generated `surface()` data file with decoded pixels or raw matrix data
-export interface SurfaceAsset {
-  stem: string;
-  exportName: string;
-  kind: 'image'|'text';
-}
-
 export let globalFileResolver: FileResolver|undefined;
 export let globalCanvasResolver: CanvasResolver|undefined;
 
@@ -32,8 +25,6 @@ export const moduleDeclRegistry = new Map<string, ModuleDeclStmtType>();
 
 // Track unique fonts encountered during compilation for base64 generation.
 export const encounteredFonts = new Set<string>();
-// Generated surface data modules to import, keyed by source filename
-export const encounteredSurfaceData = new Map<string, SurfaceAsset>();
 
 // Loaded from library manifests so their calls aren't treated as unknown
 // modules

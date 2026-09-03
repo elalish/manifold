@@ -12,7 +12,7 @@ import {assignPrettyNames, buildRuntimeImport, builtinConstantsFor, builtinSymbo
 import {collectDeclarations, openNoArgSlots, scanProgram} from './scan.js';
 import {setModuleDecls} from './state.js';
 import type {Signature} from './state.js';
-import {currentBindOptions, currentMainFilename, currentScope, dynamicScopeVars, encounteredFonts, encounteredSurfaceData, externalFunctionNames, externalModuleNames, externalVariableNames, globalVarDeclKeyword, localDecls, moduleDeclRegistry, noArgDemotions, resetTailTemps, RT, setBindResult, setCurrentRuntimePath, setCurrentScope, setCurrentSourceFilename, setMainFilename, setParentModulesReadInFunction, signatures} from './state.js';
+import {currentBindOptions, currentMainFilename, currentScope, dynamicScopeVars, encounteredFonts, externalFunctionNames, externalModuleNames, externalVariableNames, globalVarDeclKeyword, localDecls, moduleDeclRegistry, noArgDemotions, resetTailTemps, RT, setBindResult, setCurrentRuntimePath, setCurrentScope, setCurrentSourceFilename, setMainFilename, setParentModulesReadInFunction, signatures} from './state.js';
 import {reportDivergentCalls} from './tailcall.js';
 import type {CompileOptions, ModuleDeclStmtType} from './types.js';
 
@@ -129,7 +129,6 @@ export async function compile(
   setCurrentSourceFilename(currentMainFilename);
   dynamicScopeVars.clear();
   encounteredFonts.clear();
-  encounteredSurfaceData.clear();
   externalModuleNames.clear();
   externalFunctionNames.clear();
   externalVariableNames.clear();
@@ -358,15 +357,6 @@ export async function compile(
     const importPath = `${runtimeDir}/fonts/${sanitized}_base64.js`;
     const varName = `${T(`font_${sanitized.replace(/-/g, '_')}`)}`;
     output += `import { fontBase64 as ${varName} } from "${importPath}";\n`;
-  }
-
-  // Add data imports for each resolved surface file (decoded pixels or matrix)
-  for (const [filename, info] of encounteredSurfaceData) {
-    const runtimeDir = options?.runtimePath ?
-        path.dirname(options.runtimePath).replace(/\\/g, '/') :
-        './runtime';
-    const importPath = `${runtimeDir}/surface_data/${info.stem}_data.js`;
-    output += `import { ${info.exportName} } from "${importPath}";\n`;
   }
 
   // One shared table lives in the runtime, so a `text()` routed through a

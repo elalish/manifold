@@ -5,6 +5,7 @@
  */
 import Module from 'manifold-3d';
 import * as opentype from 'opentype.js';
+import { computeSurfaceData } from './utils/surface.js';
 
 const opentypeParse = opentype.parse || (opentype as any).default?.parse;
 
@@ -3025,7 +3026,7 @@ function parse_color_for_scope(c: any, alpha: any): any {
 }
 
 
-// A PNG decoded at compile time
+// A PNG decoded from disk at runtime
 export interface SurfaceImage {
   width: number;
   height: number;
@@ -3089,9 +3090,9 @@ function gridFromText(text: string): {
   return {width, height, Z, minVal};
 }
 
-// Text matrices are parsed here, and images arrive already decoded from the
-// compiler
-function surface(source: string|SurfaceImage, opts: {
+// The source file is read here: text matrices are parsed, PNGs decoded to
+// pixels
+function surface(filePath: string, opts: {
   center?: boolean;
   invert?: boolean;
   kind?: 'image' | 'text';
@@ -3100,6 +3101,9 @@ function surface(source: string|SurfaceImage, opts: {
   fs?: number
 } = {}) {
   const {center = false, invert = false, kind = 'image'} = opts;
+  const source = computeSurfaceData(filePath);
+  // A missing or undecodable file is warned about and ignored
+  if (source === undefined) return Manifold.union([]);
   // OpenSCAD only honors a bool invert, and only for images
   const grid = kind === 'text' ?
       gridFromText(source as string) :

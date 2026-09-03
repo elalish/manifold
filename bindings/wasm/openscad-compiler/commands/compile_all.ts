@@ -5,6 +5,7 @@ import path from 'path';
 import {compileConsumer} from '../core/orchestrate.js';
 import {setGlobalCanvasResolver, setGlobalFileResolver} from '../core/state.js';
 import {nodeCanvasResolver, nodeFileResolver} from '../host/node.js'
+import { getExternalLibraries } from './util/library_compilation.js';
 
 const compileAllCommand = new Command();
 
@@ -49,9 +50,11 @@ compileAllCommand.name('compile-all')
 
             setGlobalFileResolver(nodeFileResolver);
             setGlobalCanvasResolver(nodeCanvasResolver);
-            const {code: js, externalLibraries} = await compileConsumer(
-                absFile, outputFile, process.cwd(),
-                msg => console.log(`  ${msg}`));
+
+            const {externalLibraries, resolved} = await getExternalLibraries(absFile, outputFile);
+
+            const {code: js} = await compileConsumer(
+                absFile, outputFile, process.cwd(), externalLibraries, resolved);
             if (externalLibraries.length > 0) {
               console.log(
                   `External libraries: ${externalLibraries.join(', ')}`);

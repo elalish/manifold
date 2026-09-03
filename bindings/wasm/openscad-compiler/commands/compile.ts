@@ -5,6 +5,7 @@ import path from 'path';
 import {compileConsumer} from '../core/orchestrate.js';
 import {setGlobalCanvasResolver, setGlobalFileResolver} from '../core/state.js';
 import {nodeCanvasResolver, nodeFileResolver} from '../host/node.js';
+import { getExternalLibraries } from './util/library_compilation.js';
 
 const compileSingleFileCommand = new Command();
 
@@ -37,10 +38,12 @@ compileSingleFileCommand.name('compile')
 
           setGlobalFileResolver(nodeFileResolver);
           setGlobalCanvasResolver(nodeCanvasResolver);
-          const {code: js, externalLibraries, resolvedFiles} =
+
+          const { externalLibraries, resolved } = await getExternalLibraries(absFile, outputFile);
+
+          const {code: js, resolvedFiles} =
               await compileConsumer(
-                  absFile, outputFile, process.cwd(),
-                  msg => console.log(`  ${msg}`));
+                  absFile, outputFile, process.cwd(), externalLibraries, resolved);
           if (resolvedFiles.length > 1) {
             console.log(`Resolved ${resolvedFiles.length} local files`);
           }
