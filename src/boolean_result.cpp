@@ -951,13 +951,12 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   outR.SimplifyTopology(nPv + nQv);
   outR.RemoveUnreferencedVerts();
 
-  if (ManifoldParams().intermediateChecks)
+  if (ManifoldParams().intermediateChecks) {
     DEBUG_ASSERT(outR.Is2Manifold(), logicErr,
                  "simplified mesh is not 2-manifold!");
-
-  // if (ManifoldParams().intermediateChecks)
-  //   DEBUG_ASSERT(outR.NumDegenerateTris() == 0, logicErr,
-  //                "simplified mesh has degenerate triangles!");
+    // DEBUG_ASSERT(outR.NumDegenerateTris() == 0, logicErr,
+    //              "simplified mesh has degenerate triangles!");
+  }
 
   outR.CalculateBBox();
   outR.SortGeometry(ctx_);

@@ -1630,18 +1630,6 @@ TEST(Manifold, MergeRefine) {
   EXPECT_NEAR(manifold.Volume(), 31.21, 0.01);
 }
 
-#ifdef MANIFOLD_DEBUG
-TEST(Manifold, OpenscadCrash) {
-  ManifoldParamGuard guard;
-  ManifoldParams().processOverlaps = true;
-  Manifold m = ReadTestOBJ("openscad-nonmanifold-crash.obj");
-  // m is not empty
-  EXPECT_EQ(m.IsEmpty(), false);
-  Manifold m2 = m + m.Translate({0, 0.6, 0});
-  EXPECT_EQ(m2.IsEmpty(), false);
-}
-#endif
-
 // Deeply-nested CsgOpNode chain (e.g. repeated `+=` in a loop) must not
 // stack-overflow in the leaf-counting pre-pass. Cancel up front so we only
 // exercise NumLeaves, not the full boolean evaluation.

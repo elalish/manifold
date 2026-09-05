@@ -210,6 +210,14 @@ struct Manifold::Impl {
     bool Short() const { return totalCost == kShort; }
     bool Swap() const { return totalCost == kSwap; }
   };
+
+  struct TriResult {
+    bool colinear;
+    int longEdge;  // 0, 1, 2
+  };
+
+  TriResult IsDegenerate(int tri) const;
+
   double MaxCost() const { return tolerance_ * tolerance_; }
   void CleanupTopology();
   void SimplifyTopology2();
@@ -220,8 +228,10 @@ struct Manifold::Impl {
   void SwapEdge(int edge, double a);
   void SimplifyTopology(int firstNewVert = 0);
   void DedupeEdge(int edge);
-  void CollapseEdge(int edge, Vec<int>& edges);
+  void CollapseEdge(int edge, Vec<int>& scratch);
   bool CollapseEdge2(int edge, Vec<int>& scratch, const Merger& merger);
+  int RecursiveEdgeSwap(int tri, const int firstNewVert, Vec<int>& scratch,
+                        int depth);
   void RemoveIfFolded(int edge);
   void PairUp(int edge0, int edge1);
   void UpdateVert(int vert, int startEdge, int endEdge);

@@ -85,7 +85,7 @@ TEST(Smooth, ToLength) {
       CrossSection::Circle(10, 10).Translate({10, 0}).ToPolygons(), 2, 0, 0,
       {0, 0});
   cone += cone.Scale({1, 1, -5});
-  EXPECT_EQ(cone.NumVert(), 11);
+  EXPECT_EQ(cone.NumVert(), 12);
   Manifold smooth =
       cone.AsOriginal().Simplify().SmoothOut(180).RefineToLength(0.1);
   ExpectMeshes(smooth, {{85250, 170496}});

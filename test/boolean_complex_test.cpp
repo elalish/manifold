@@ -1550,4 +1550,14 @@ TEST(BooleanComplex, OffsetSelfIntersect) {
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
 }
+
+TEST(BooleanComplex, OpenscadCrash) {
+  ManifoldParamGuard guard;
+  ManifoldParams().processOverlaps = true;
+  Manifold m = ReadTestOBJ("openscad-nonmanifold-crash.obj");
+  // m is not empty
+  EXPECT_EQ(m.IsEmpty(), false);
+  Manifold m2 = m + m.Translate({0, 0.6, 0});
+  EXPECT_EQ(m2.IsEmpty(), false);
+}
 #endif
