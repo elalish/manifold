@@ -12,11 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "../src/utils.h"
-
 #include <atomic>
 #include <cstdint>
-#include <iostream>
 
 #include "../src/atomic_compat.h"
 #include "gtest/gtest.h"
