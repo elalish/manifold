@@ -67,7 +67,9 @@ TEST(Boolean, Tetra) {
 
 TEST(Boolean, MeshGLRoundTrip) {
   Manifold cube = Manifold::Cube(vec3(2));
-  ASSERT_GE(cube.OriginalID(), 0);
+  ASSERT_EQ(cube.OriginalID(), 0);
+  cube = cube.AsOriginal();
+  ASSERT_GT(cube.OriginalID(), 0);
   const MeshGL original = cube.GetMeshGL();
 
   Manifold result = cube + cube.Translate({1, 1, 0});
@@ -92,7 +94,7 @@ TEST(Boolean, Normals) {
   MeshGL cubeGL = CubeSTL();
   cubeGL.Merge();
   const Manifold cube(cubeGL);
-  const Manifold sphere = Manifold::Sphere(60).CalculateNormals(0);
+  const Manifold sphere = Manifold::Sphere(60).CalculateNormals(0).AsOriginal();
   const MeshGL sphereGL = sphere.GetMeshGL();
 
   Manifold result =
@@ -124,8 +126,8 @@ TEST(Boolean, MissingNormals) {
 }
 
 TEST(Boolean, EmptyOriginal) {
-  const Manifold cube = Manifold::Cube();
-  const Manifold tet = Manifold::Tetrahedron();
+  const Manifold cube = Manifold::Cube().AsOriginal();
+  const Manifold tet = Manifold::Tetrahedron().AsOriginal();
   const Manifold result = tet - cube.Translate({3, 4, 5});
   const MeshGL mesh = result.GetMeshGL();
   ASSERT_EQ(mesh.runIndex.size(), 3);
@@ -175,10 +177,7 @@ TEST(Boolean, Cubes2) {
 
   Manifold result = cube + cube.Rotate(0, 0, 45);
 
-  // has 14 verts instead of 12 because of symbolic perturbation making a jagged
-  // intersection, which is maintained to keep meshIDs separate. I don't love
-  // either of those behaviors by default...
-  ExpectMeshes(result, {{14, 24}});
+  ExpectMeshes(result, {{12, 20}});
 
   if (options.exportModels) WriteTestOBJ("cubes2.obj", result);
 }
@@ -222,13 +221,25 @@ TEST(Boolean, DeterminismSimpleIntersect) {
   if (options.exportModels) WriteTestOBJ("det_simple_intersect.obj", out);
 }
 
+TEST(Boolean, CubeUnion) {
+  Manifold cube = Manifold::Cube();
+  Manifold result = cube + cube.Translate({0.5, 0.5, 0});
+  EXPECT_EQ(result.NumVert(), 16);
+  if (options.exportModels) WriteTestOBJ("cubeUnion.obj", result);
+}
+
+TEST(Boolean, CubeUnionProp) {
+  Manifold cube = WithPositionColors(Manifold::Cube());
+  Manifold result = cube + cube.Translate({0.5, 0.5, 0});
+  EXPECT_EQ(result.NumVert(), 18);
+  if (options.exportModels) WriteTestOBJ("cubeUnionProp.obj", result);
+}
+
 TEST(Boolean, Simplify) {
   const int n = 10;
   MeshGL cubeGL = Manifold::Cube().Refine(n).GetMeshGL();
-  size_t tri = 0;
-  for (auto& id : cubeGL.faceID) {
-    id = tri++;
-  }
+  // Give unique face IDs to stop edge removal
+  std::iota(cubeGL.faceID.begin(), cubeGL.faceID.end(), 0);
   Manifold cube(cubeGL);
 
   const int nExpected = 20 * n * n;
@@ -286,7 +297,7 @@ TEST(Boolean, PropertiesNoIntersection) {
 TEST(Boolean, MixedProperties) {
   MeshGL cubeUV = CubeUV();
   Manifold m0(cubeUV);
-  Manifold m1 = Manifold::Cube();
+  Manifold m1 = Manifold::Cube().AsOriginal();
   Manifold result = m0 + m1.Translate(vec3(0.5));
   EXPECT_EQ(result.NumProp(), 2);
   RelatedGL(result, {cubeUV, m1.GetMeshGL()});
@@ -295,7 +306,7 @@ TEST(Boolean, MixedProperties) {
 TEST(Boolean, MixedNumProp) {
   MeshGL cubeUV = CubeUV();
   Manifold m0(cubeUV);
-  Manifold m1 = Manifold::Cube();
+  Manifold m1 = Manifold::Cube().AsOriginal();
   Manifold result =
       m0 + m1.SetProperties(1, [](double* prop, vec3 p, const double* n) {
                prop[0] = 1;
@@ -352,7 +363,8 @@ TEST(Boolean, CreatePropertiesSlow) {
 TEST(Boolean, SimpleProperties) {
   Manifold cube = Manifold::Cube(vec3(2), true).CalculateNormals(0, 180);
   EXPECT_TRUE(cube.HasSimpleProps());
-  Manifold flange = Manifold::Extrude(cube.Slice(), 2, 0, 0, vec2(2));
+  Manifold flange =
+      Manifold::Extrude(cube.Slice(), 2, 0, 0, vec2(2)).AsOriginal();
   EXPECT_TRUE(flange.HasSimpleProps());
   Manifold result = cube + flange;
   EXPECT_EQ(result.NumProp(), 3);
@@ -574,7 +586,7 @@ TEST(Boolean, AlmostCoplanar) {
 }
 
 TEST(Boolean, FaceUnion) {
-  Manifold cubes = Manifold::Cube();
+  Manifold cubes = Manifold::Cube().AsOriginal();
   cubes += cubes.Translate({1, 0, 0});
   EXPECT_EQ(cubes.Genus(), 0);
   ExpectMeshes(cubes, {{12, 20}});
@@ -723,6 +735,7 @@ TEST(Boolean, NonConvexConvexMinkowskiSum) {
 TEST(Boolean, NonConvexConvexMinkowskiDifference) {
   ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
+  ManifoldParams().verifyNoDegenerates = false;
 
   Manifold sphere = Manifold::Sphere(1.2, 20);
   Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
@@ -756,6 +769,7 @@ TEST(Boolean, NonConvexNonConvexMinkowskiSum) {
 TEST(Boolean, NonConvexNonConvexMinkowskiDifference) {
   ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
+  ManifoldParams().verifyNoDegenerates = false;
 
   Manifold tet = Manifold::Tetrahedron();
   Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
@@ -881,9 +895,11 @@ TEST(Boolean, BatchBooleanComposeMeshIDStable) {
   // Three pairwise-disjoint cubes — forces the Compose path inside
   // BatchBoolean(Add).
   auto build = []() {
-    Manifold a = Manifold::Cube(vec3(1, 1, 1));
-    Manifold b = Manifold::Cube(vec3(1, 1, 1)).Translate({3, 0, 0});
-    Manifold c = Manifold::Cube(vec3(1, 1, 1)).Translate({0, 3, 0});
+    Manifold a = Manifold::Cube(vec3(1, 1, 1)).AsOriginal();
+    Manifold b =
+        Manifold::Cube(vec3(1, 1, 1)).AsOriginal().Translate({3, 0, 0});
+    Manifold c =
+        Manifold::Cube(vec3(1, 1, 1)).AsOriginal().Translate({0, 3, 0});
     return Manifold::BatchBoolean({a, b, c}, OpType::Add);
   };
 
@@ -1002,7 +1018,7 @@ TEST(Boolean, BatchBoolean) {
   Manifold add = Manifold::BatchBoolean({cube, cylinder1, cylinder2, cylinder3},
                                         OpType::Add);
 
-  ExpectMeshes(add, {{152, 300}});
+  ExpectMeshes(add, {{150, 296}});
   EXPECT_FLOAT_EQ(add.Volume(), 16290.478);
   EXPECT_FLOAT_EQ(add.SurfaceArea(), 33156.594);
 

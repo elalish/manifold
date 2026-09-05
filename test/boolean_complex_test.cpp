@@ -1503,8 +1503,6 @@ TEST(BooleanComplex, CraycloudBool) {
   Manifold m2 = ReadTestOBJ("Cray_right.obj");
   Manifold res = m1 - m2;
   EXPECT_EQ(res.Status(), Manifold::Error::NoError);
-  EXPECT_FALSE(res.IsEmpty());
-  res = res.AsOriginal().Simplify();
   EXPECT_TRUE(res.IsEmpty());
 }
 
@@ -1538,6 +1536,7 @@ TEST(BooleanComplex, LazyCollider) {
 TEST(BooleanComplex, OffsetTriangulationFailure) {
   ManifoldParamGuard guard;
   ManifoldParams().selfIntersectionChecks = true;
+  manifold::ManifoldParams().verifyNoDegenerates = false;
   Manifold a = ReadTestOBJ("Offset1.obj");
   Manifold b = ReadTestOBJ("Offset2.obj");
   Manifold result = a + b;
@@ -1547,9 +1546,21 @@ TEST(BooleanComplex, OffsetTriangulationFailure) {
 TEST(BooleanComplex, OffsetSelfIntersect) {
   ManifoldParamGuard guard;
   ManifoldParams().selfIntersectionChecks = true;
+  manifold::ManifoldParams().verifyNoDegenerates = false;
   Manifold a = ReadTestOBJ("Offset3.obj");
   Manifold b = ReadTestOBJ("Offset4.obj");
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+}
+
+TEST(BooleanComplex, OpenscadCrash) {
+  ManifoldParamGuard guard;
+  ManifoldParams().processOverlaps = true;
+  manifold::ManifoldParams().verifyNoDegenerates = false;
+  Manifold m = ReadTestOBJ("openscad-nonmanifold-crash.obj");
+  // m is not empty
+  EXPECT_EQ(m.IsEmpty(), false);
+  Manifold m2 = m + m.Translate({0, 0.6, 0});
+  EXPECT_EQ(m2.IsEmpty(), false);
 }
 #endif

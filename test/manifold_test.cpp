@@ -92,11 +92,11 @@ TEST(Manifold, MeshDeterminism) {
   Manifold result = cube1 - cube2;
   MeshGL out = result.GetMeshGL();
 
-  uint32_t triVerts[]{0,  2,  7,  0,  10, 1,  0,  6,  10, 0, 1,  2,  1, 3,  2,
-                      1,  5,  3,  1,  11, 5,  0,  7,  6,  6, 7,  8,  6, 8,  13,
-                      10, 12, 11, 1,  10, 11, 11, 13, 5,  6, 12, 10, 6, 13, 12,
-                      13, 9,  5,  13, 8,  9,  11, 12, 13, 4, 2,  3,  4, 3,  5,
-                      4,  7,  2,  4,  5,  8,  4,  8,  7,  9, 8,  5};
+  uint32_t triVerts[]{0, 2,  7,  0,  10, 1,  0,  6,  10, 0,  1,  2, 1, 3,  2,
+                      1, 5,  3,  4,  2,  3,  1,  11, 5,  4,  3,  5, 0, 7,  6,
+                      6, 7,  8,  4,  7,  2,  4,  5,  8,  4,  8,  7, 6, 8,  13,
+                      9, 8,  5,  10, 12, 11, 1,  10, 11, 11, 13, 5, 6, 12, 10,
+                      6, 13, 12, 13, 9,  5,  13, 8,  9,  11, 12, 13};
 
   float vertProperties[]{-1,      -1,       -1,     -1,      -1,       1,
                          -1,      -0.11491, 0.3099, -1,      -0.11491, 1,
@@ -687,7 +687,7 @@ TEST(Manifold, OppositeFace) {
  */
 TEST(Manifold, Decompose) {
   std::vector<Manifold> manifoldList;
-  manifoldList.emplace_back(Manifold::Tetrahedron());
+  manifoldList.emplace_back(Manifold::Tetrahedron().AsOriginal());
   manifoldList.emplace_back(Manifold::Cube().Translate({2, 0, 0}).AsOriginal());
   manifoldList.emplace_back(
       Manifold::Sphere(1, 4).Translate({4, 0, 0}).AsOriginal());
@@ -1136,7 +1136,6 @@ TEST(Manifold, MeshGLRoundTrip) {
 
 void CheckCube(const MeshGL& cubeSTL) {
   Manifold cube(cubeSTL);
-  cube = cube.AsOriginal();
   EXPECT_EQ(cube.NumTri(), 12);
   EXPECT_EQ(cube.NumVert(), 8);
   EXPECT_EQ(cube.NumPropVert(), 24);
@@ -1630,18 +1629,6 @@ TEST(Manifold, MergeRefine) {
   manifold = manifold.RefineToLength(1.0);
   EXPECT_NEAR(manifold.Volume(), 31.21, 0.01);
 }
-
-#ifdef MANIFOLD_DEBUG
-TEST(Manifold, OpenscadCrash) {
-  ManifoldParamGuard guard;
-  ManifoldParams().processOverlaps = true;
-  Manifold m = ReadTestOBJ("openscad-nonmanifold-crash.obj");
-  // m is not empty
-  EXPECT_EQ(m.IsEmpty(), false);
-  Manifold m2 = m + m.Translate({0, 0.6, 0});
-  EXPECT_EQ(m2.IsEmpty(), false);
-}
-#endif
 
 // Deeply-nested CsgOpNode chain (e.g. repeated `+=` in a loop) must not
 // stack-overflow in the leaf-counting pre-pass. Cancel up front so we only

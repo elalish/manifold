@@ -502,38 +502,36 @@ void AppendWholeEdges(Manifold::Impl& outR, Vec<int>& facePtrR,
                          inP.halfedge_, i03, vP2R, faceP2R, forward});
 }
 
-struct MapTriRef {
-  VecView<const TriRef> triRefP;
-  VecView<const TriRef> triRefQ;
-  const int offsetQ;
-
-  void operator()(TriRef& triRef) {
-    const int tri = triRef.faceID;
-    const bool PQ = triRef.meshID == 0;
-    triRef = PQ ? triRefP[tri] : triRefQ[tri];
-    if (!PQ) triRef.meshID += offsetQ;
-  }
-};
-
 void UpdateReference(Manifold::Impl& outR, const Manifold::Impl& inP,
                      const Manifold::Impl& inQ, bool invertQ,
                      ExecutionContext::Impl* ctx) {
   // Invariant: every ctx-passing parallel op is followed by IsCancelled to
   // keep partial output from feeding unconditional downstream consumers.
   const int offsetQ = Manifold::Impl::meshIDCounter_;
-  for_each_n(
-      autoPolicy(outR.NumTri(), 1e5), outR.meshRelation_.triRef.begin(),
-      outR.NumTri(), ctx,
-      MapTriRef({inP.meshRelation_.triRef, inQ.meshRelation_.triRef, offsetQ}));
+  for_each_n(autoPolicy(outR.NumTri(), 1e5), outR.meshRelation_.triRef.begin(),
+             outR.NumTri(), ctx, [&inP, &inQ, offsetQ](TriRef& triRef) {
+               const int tri = triRef.faceID;
+               const bool PQ = triRef.meshID == 0;
+               triRef = PQ ? inP.meshRelation_.triRef[tri]
+                           : inQ.meshRelation_.triRef[tri];
+               if (!PQ && triRef.meshID != 0) triRef.meshID += offsetQ;
+             });
   if (IsCancelled(ctx)) return;
 
   for (const auto& pair : inP.meshRelation_.meshIDtransform) {
     outR.meshRelation_.meshIDtransform[pair.first] = pair.second;
   }
   for (const auto& pair : inQ.meshRelation_.meshIDtransform) {
-    outR.meshRelation_.meshIDtransform[pair.first + offsetQ] = pair.second;
-    outR.meshRelation_.meshIDtransform[pair.first + offsetQ].backSide ^=
-        invertQ;
+    if (pair.first != 0) {
+      outR.meshRelation_.meshIDtransform[pair.first + offsetQ] = pair.second;
+      outR.meshRelation_.meshIDtransform[pair.first + offsetQ].backSide ^=
+          invertQ;
+    }
+  }
+  if (outR.meshRelation_.meshIDtransform.find(0) !=
+      outR.meshRelation_.meshIDtransform.end()) {
+    // recalculate since multiple ID 0 meshes may incorrectly share a faceID
+    outR.SetNormalsAndCoplanar();
   }
 }
 
@@ -950,16 +948,17 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   UpdateReference(outR, inP_, inQ_, invertQ, ctx_);
   if (auto c = phase(__LINE__)) return *c;
 
-  outR.SimplifyTopology(nPv + nQv);
+  outR.RemoveDegenerates(nPv + nQv);
   outR.RemoveUnreferencedVerts();
 
-  if (ManifoldParams().intermediateChecks)
+  if (ManifoldParams().intermediateChecks) {
     DEBUG_ASSERT(outR.Is2Manifold(), logicErr,
                  "simplified mesh is not 2-manifold!");
-
-  // if (ManifoldParams().intermediateChecks)
-  //   DEBUG_ASSERT(outR.NumDegenerateTris() == 0, logicErr,
-  //                "simplified mesh has degenerate triangles!");
+  }
+  if (ManifoldParams().verifyNoDegenerates) {
+    DEBUG_ASSERT(outR.NumDegenerateTris() == 0, logicErr,
+                 "simplified mesh has degenerate triangles!");
+  }
 
   outR.CalculateBBox();
   outR.SortGeometry(ctx_);

@@ -118,7 +118,7 @@ struct Manifold::Impl {
   void SetNormalsAndCoplanar();
   void DedupePropVerts();
   void RemoveUnreferencedVerts();
-  void InitializeOriginal();
+  void InitializeOriginal(int id = 0, bool keepFaceID = false);
   void CreateHalfedges(const Vec<ivec3>& triProp,
                        const Vec<ivec3>& triVert = {});
   void CalculateVertNormals();
@@ -210,23 +210,28 @@ struct Manifold::Impl {
     bool Short() const { return totalCost == kShort; }
     bool Swap() const { return totalCost == kSwap; }
   };
+
+  struct TriResult {
+    bool colinear;
+    int longEdge;  // 0, 1, 2
+  };
+
+  TriResult IsDegenerate(int tri) const;
+
   double MaxCost() const { return tolerance_ * tolerance_; }
   void CleanupTopology();
-  void SimplifyTopology2();
+  void RemoveDegenerates(int firstNewVert = 0);
+  void Decimate();
   Merger CheckEdge(int edge) const;
   bool Continuous(int edge) const;
   bool Swappable(int edge) const;
+  bool Colinear(int edge) const;
   void SwapEdge(int edge, double a);
-  void SimplifyTopology(int firstNewVert = 0);
-  void CollapseShortEdges(int firstNewVert = 0);
-  void CollapseColinearEdges(int firstNewVert = 0);
-  void SwapDegenerates(int firstNewVert = 0);
   void DedupeEdge(int edge);
-  bool CollapseEdge(int edge, Vec<int>& edges, double tol = -1,
-                    int firstNewVert = 0);
-  bool CollapseEdge2(int edge, Vec<int>& scratch, const Merger& merger);
-  void RecursiveEdgeSwap(int edge, int& tag, Vec<int>& visited,
-                         Vec<int>& edgeSwapStack, Vec<int>& edges);
+  void CollapseDegenerate(int edge, Vec<int>& scratch);
+  bool CollapseEdge(int edge, Vec<int>& scratch, const Merger& merger);
+  int RecursiveEdgeSwap(int tri, const int firstNewVert, Vec<int>& scratch,
+                        int depth);
   void RemoveIfFolded(int edge);
   void PairUp(int edge0, int edge1);
   void UpdateVert(int vert, int startEdge, int endEdge);

@@ -112,6 +112,7 @@ int main(int argc, char** argv) {
   }
 
   manifold::ManifoldParams().intermediateChecks = true;
+  manifold::ManifoldParams().verifyNoDegenerates = true;
   manifold::ManifoldParams().processOverlaps = false;
 
   FrameMarkEnd(name);
@@ -239,7 +240,7 @@ Manifold WithPositionColors(const Manifold& in) {
   const Box bbox = in.BoundingBox();
   const vec3 size = bbox.Size();
 
-  return in.SetProperties(
+  return in.AsOriginal().SetProperties(
       3, [bbox, size](double* prop, vec3 pos, const double* oldProp) {
         for (int i : {0, 1, 2}) {
           prop[i] = (pos[i] - bbox.min[i]) / size[i];
@@ -517,10 +518,6 @@ void CheckGLEquiv(const MeshGL& mgl1, const MeshGL& mgl2) {
 
 #ifndef MANIFOLD_NO_FILESYSTEM
 Manifold ReadTestOBJ(const std::string& filename) {
-  return Manifold(ReadTestMeshGL64OBJ(filename));
-}
-
-MeshGL64 ReadTestMeshGL64OBJ(const std::string& filename) {
 #ifdef __EMSCRIPTEN__
   std::string obj = "/models/" + filename;
 #else
@@ -531,8 +528,9 @@ MeshGL64 ReadTestMeshGL64OBJ(const std::string& filename) {
 #endif
   std::ifstream f;
   f.open(obj);
-  MeshGL64 a = ReadOBJ(f);
+  Manifold a = Manifold::ReadOBJ(f);
   f.close();
+  EXPECT_FALSE(a.IsEmpty());
   return a;
 }
 

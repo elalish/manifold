@@ -43,18 +43,6 @@
 namespace {
 using namespace manifold;
 
-struct Transform4x3 {
-  const mat3x4 transform;
-
-  vec3 operator()(vec3 position) { return transform * vec4(position, 1.0); }
-};
-
-struct UpdateMeshID {
-  const HashTableD<uint32_t> meshIDold2new;
-
-  void operator()(TriRef& ref) { ref.meshID = meshIDold2new[ref.meshID]; }
-};
-
 int GetLabels(std::vector<int>& components,
               const Vec<std::pair<int, int>>& edges, int numNodes) {
   DisjointSets uf(numNodes);
@@ -192,8 +180,15 @@ void Manifold::Impl::EagerTransformPropNormals(
   }
 }
 
-void Manifold::Impl::InitializeOriginal() {
-  const int meshID = ReserveIDs(1);
+/**
+ * Initialize the mesh IDs and face IDs of this manifold.
+ *
+ * @param id The original ID to assign to this manifold. If -1, a new ID is
+ *          generated.
+ * @param keepFaceID If true, the coplanar IDs are not changed.
+ */
+void Manifold::Impl::InitializeOriginal(int id, bool keepFaceID) {
+  const int meshID = id < 0 ? ReserveIDs(1) : id;
   meshRelation_.originalID = meshID;
   auto& triRef = meshRelation_.triRef;
   triRef.resize_nofill(NumTri());
@@ -622,7 +617,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   result.faceNormal_.resize(faceNormal_.size());
   result.vertNormal_.resize(vertNormal_.size());
   transform(vertPos_.begin(), vertPos_.end(), result.vertPos_.begin(),
-            Transform4x3({transform_}));
+            [&transform_](const vec3& v) { return transform_ * vec4(v, 1.0); });
 
   mat3 normalTransform = NormalTransform(transform_);
   transform(faceNormal_.begin(), faceNormal_.end(), result.faceNormal_.begin(),
@@ -743,20 +738,28 @@ void Manifold::Impl::CalculateVertNormals() {
  */
 void Manifold::Impl::IncrementMeshIDs() {
   ZoneScoped;
-  HashTable<uint32_t> meshIDold2new(meshRelation_.meshIDtransform.size() * 2);
+  const int numMeshIDs = meshRelation_.meshIDtransform.size();
+  if (numMeshIDs == 1 && meshRelation_.meshIDtransform.begin()->first == 0)
+    return;
+
+  HashTable<uint32_t> meshIDold2new(numMeshIDs * 2);
   // Update keys of the transform map
   std::map<int, Relation> oldTransforms;
   std::swap(meshRelation_.meshIDtransform, oldTransforms);
-  const int numMeshIDs = oldTransforms.size();
+
   int nextMeshID = ReserveIDs(numMeshIDs);
   for (const auto& pair : oldTransforms) {
-    meshIDold2new.D().Insert(pair.first, nextMeshID);
-    meshRelation_.meshIDtransform[nextMeshID++] = pair.second;
+    const int thisID = pair.first == 0 ? 0 : nextMeshID++;
+    if (pair.first == 0) continue;
+    meshIDold2new.D().Insert(pair.first, thisID);
+    meshRelation_.meshIDtransform[thisID] = pair.second;
   }
 
   const size_t numTri = NumTri();
   for_each_n(autoPolicy(numTri, 1e5), meshRelation_.triRef.begin(), numTri,
-             UpdateMeshID({meshIDold2new.D()}));
+             [&meshIDold2new](TriRef& tri) {
+               tri.meshID = meshIDold2new.D()[tri.meshID];
+             });
 }
 
 #ifndef MANIFOLD_NO_IOSTREAM
@@ -822,7 +825,8 @@ static std::ostream& WriteOBJWithEpsilon(std::ostream& stream,
 static std::pair<MeshGL64, std::optional<double>> ReadOBJWithEpsilon(
     std::istream& stream) {
   static const std::string FLOAT_PATTERN =
-      "(-?\\d+(?:\\.\\d*)?(?:[eE][+\\-]?\\d+)?)";
+      "(-?(?:0[xX][0-9a-fA-F]+(?:\\.[0-9a-fA-F]*)?[pP][+\\-]?\\d+|\\d+(?:\\."
+      "\\d*)?(?:[eE][+\\-]?\\d+)?))";
   static const std::string FACE_ELEMENT = "(\\d+)(?:\\S+)?";
   static const std::string TRAILING_SPACES = "(?:\\s*)";
   static const std::string SEPARATOR = "\\s+";

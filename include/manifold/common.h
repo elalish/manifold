@@ -703,6 +703,10 @@ struct ExecutionParams {
   /// Perform 3D mesh self-intersection test on intermediate boolean results to
   /// test for ϵ-validity. For debug purposes only.
   bool selfIntersectionChecks = false;
+  /// Check that each Boolean does not produce any degenerate triangles. For
+  /// debug purposes only. Only valid for inputs that also don't contain
+  /// degenerate triangles.
+  bool verifyNoDegenerates = false;
   /// If processOverlaps is false, a geometric check will be performed to assert
   /// all triangles are CCW.
   bool processOverlaps = true;

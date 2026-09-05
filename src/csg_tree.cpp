@@ -177,7 +177,7 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl& a,
               << std::endl;
     std::cout << "RHS self-intersecting: " << b.IsSelfIntersecting()
               << std::endl;
-    if (ManifoldParams().verbose) {
+    if (ManifoldParams().verbose > 3) {
       if (op == OpType::Add)
         std::cout << "Add";
       else if (op == OpType::Intersect)
