@@ -4,15 +4,23 @@ on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch or tag to publish from (e.g. v3.5.2)'
+        required: true
 
 jobs:
   publish_npm:
-    runs-on: ubuntu-latest
+    # Matches the WASM build environment in manifold.yml.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 30
     permissions:
       id-token: write  # Required for OIDC
       contents: read
     steps:
     - uses: actions/checkout@v6
+      with:
+        ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.ref) || github.ref }}
 
     - name: Setup Node
       uses: actions/setup-node@v6
@@ -23,15 +31,45 @@ jobs:
     - name: Update npm # Ensure npm 11.5.1 or later for trusted publishing
       run: npm install -g npm@latest
 
-    - name: Download built examples
-      uses: dawidd6/action-download-artifact@v6
+    - name: Install apt packages
+      uses: awalsh128/cache-apt-pkgs-action@v1.6.0
       with:
-        workflow: manifold.yml
-        workflow_conclusion: completed
-        branch: master
-        check_artifacts: true
-        name: wasm
-        path: ./bindings/wasm/
+        packages: cmake
+        version: 1
+
+    - name: Setup EMSDK
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: 5.0.2
+
+    - uses: ./.github/actions/git-clone
+      with:
+        name: tbb
+        url: https://github.com/oneapi-src/oneTBB.git
+        tag: v2022.3.0
+
+    - uses: ./.github/actions/git-clone
+      with:
+        name: gtest
+        url: https://github.com/google/googletest.git
+        tag: v1.17.0
+
+    # Built here rather than downloaded from a CI artifact, so what ships is
+    # always the checked-out commit.
+    - name: Build WASM
+      run: |
+        emcmake cmake \
+          -DCMAKE_BUILD_TYPE=MinSizeRel \
+          -DMANIFOLD_STRICT=ON \
+          -DMANIFOLD_PAR=OFF \
+          -DMANIFOLD_USE_BUILTIN_TBB=ON \
+          -DMANIFOLD_DEBUG=OFF \
+          -DMANIFOLD_ASSERT=OFF \
+          -DFETCHCONTENT_SOURCE_DIR_TBB=tbb \
+          -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=gtest \
+          . -B build
+        cd build
+        emmake make
 
     - name: Publish to npm
       run: |
