@@ -30,80 +30,12 @@ ivec3 TriOf(int edge) {
   return triEdge;
 }
 
-bool Is01Longest(vec2 v0, vec2 v1, vec2 v2) {
-  const vec2 e[3] = {v1 - v0, v2 - v1, v0 - v2};
-  double l[3];
-  for (int i : {0, 1, 2}) l[i] = la::dot(e[i], e[i]);
-  return l[0] > l[1] && l[0] > l[2];
-}
-
 bool Is01Longest(vec3 v0, vec3 v1, vec3 v2) {
   const vec3 e[3] = {v1 - v0, v2 - v1, v0 - v2};
   double l[3];
   for (int i : {0, 1, 2}) l[i] = la::dot(e[i], e[i]);
   return l[0] > l[1] && l[0] > l[2];
 }
-
-struct FlagStore {
-#if MANIFOLD_PAR == 1
-  tbb::combinable<Vec<size_t>> store;
-#endif
-  Vec<size_t> s;
-
-  template <typename Pred, typename F>
-  void run_seq(size_t n, Pred pred, F f) {
-    for (size_t i = 0; i < n; ++i)
-      if (pred(i)) s.push_back(i);
-    for (size_t i : s) f(i);
-    s.clear();
-  }
-
-#if MANIFOLD_PAR == 1
-  template <typename Pred, typename F>
-  void run_par(size_t n, Pred pred, F f) {
-    // Test pred in parallel, store i into thread-local vectors when pred(i) is
-    // true. After testing pred, iterate and call f over the indices in
-    // ascending order by using a heap in a single thread
-    auto& store = this->store;
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, n),
-                      [&store, &pred](const auto& r) {
-                        auto& local = store.local();
-                        for (auto i = r.begin(); i < r.end(); i++)
-                          if (pred(i)) local.push_back(i);
-                      });
-
-    std::vector<Vec<size_t>> stores;
-    Vec<size_t> result;
-    store.combine_each(
-        [&](auto& data) { stores.emplace_back(std::move(data)); });
-    Vec<size_t> sizes;
-    size_t total_size = 0;
-    for (const auto& tmp : stores) {
-      sizes.push_back(total_size);
-      total_size += tmp.size();
-    }
-    result.resize(total_size);
-    for_each_n(ExecutionPolicy::Seq, countAt(0), stores.size(), [&](size_t i) {
-      std::copy(stores[i].begin(), stores[i].end(), result.begin() + sizes[i]);
-    });
-    stable_sort(autoPolicy(result.size()), result.begin(), result.end());
-    for (size_t x : result) f(x);
-  }
-#endif
-
-  template <typename Pred, typename F>
-  void run(size_t n, Pred pred, F f) {
-#if MANIFOLD_PAR == 1
-    if (n > 1e5) {
-      run_par(n, pred, f);
-    } else
-#endif
-    {
-      run_seq(n, pred, f);
-    }
-  }
-};
-
 }  // namespace
 
 namespace manifold {
@@ -124,10 +56,8 @@ void Manifold::Impl::CleanupTopology() {
 }
 
 /**
- * Collapses degenerate triangles by removing edges shorter than tolerance_ and
- * any edge that is preceeded by an edge that joins the same two face relations.
- * It also performs edge swaps on the long edges of degenerate triangles, though
- * there are some configurations of degenerates that cannot be removed this way.
+ * Removes all degenerate triangles, as well as collapsing coplanar edges that
+ * are not important boundaries.
  *
  * Before collapsing edges, the mesh is checked for duplicate edges (more than
  * one pair of triangles sharing the same edge), which are removed by
@@ -139,13 +69,14 @@ void Manifold::Impl::CleanupTopology() {
  * meshes, thus decreasing the Genus(). It only increases when meshes that have
  * collapsed to just a pair of triangles are removed entirely.
  *
- * Verts with index less than firstNewVert will be left uncollapsed. This is
- * zero by default so that everything can be collapsed.
+ * Verts with index less than firstNewVert will be skipped for expensive checks,
+ * but short edges will still be collapsed. This is used to avoid re-checking
+ * verts that have already been processed in a previous boolean operation.
  *
  * Rather than actually removing the edges, this step merely marks them for
  * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
  */
-void Manifold::Impl::SimplifyTopology(int firstNewVert) {
+void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
   if (halfedge_.empty()) return;
   halfedge_.MakeUnique();
 
@@ -160,7 +91,7 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
                 vertPos_[halfedge_.Start(edge)]) > epsilon_ * epsilon_)
       continue;
 
-    CollapseEdge(edge, scratch);
+    CollapseDegenerate(edge, scratch);
     ++shortCollapsed;
   }
 #ifdef MANIFOLD_DEBUG
@@ -189,7 +120,7 @@ void Manifold::Impl::SimplifyTopology(int firstNewVert) {
       continue;
 
     if (Colinear(edge)) {
-      CollapseEdge(edge, scratch);
+      CollapseDegenerate(edge, scratch);
       ++colinear;
     }
   }
@@ -419,7 +350,7 @@ void Manifold::Impl::SwapEdge(int edge, double a) {
   }
 }
 
-void Manifold::Impl::SimplifyTopology2() {
+void Manifold::Impl::Decimate() {
   if (!halfedge_.size()) return;
   halfedge_.MakeUnique();
 
@@ -527,7 +458,7 @@ void Manifold::Impl::SimplifyTopology2() {
         ++numSwapped;
         continue;
       }
-      const bool didCollapse = CollapseEdge2(edge, scratchBuffer, merger[edge]);
+      const bool didCollapse = CollapseEdge(edge, scratchBuffer, merger[edge]);
       vertsVisited.resize(vertPos_.size(), true);
       totalCost.resize(vertPos_.size(), 0);
       if (didCollapse) {
@@ -604,7 +535,7 @@ int Manifold::Impl::RecursiveEdgeSwap(const int tri, const int firstNewVert,
   SwapEdge(edge, dot(a, edgeVec) / length2(edgeVec));
 
   if (length2(next - last) < epsilon_ * epsilon_) {
-    CollapseEdge(PrevHalfedge(edge), scratch);
+    CollapseDegenerate(PrevHalfedge(edge), scratch);
   }
   int swaps = 1;
   if (pairResult.colinear) {
@@ -781,12 +712,11 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
   }
 }
 
-// Collapses the given edge by removing startVert - returns false if the edge
-// cannot be collapsed. May split the mesh topologically if the collapse would
-// have resulted in a 4-manifold edge. Do not collapse an edge if startVert is
-// pinched - the vert would be marked NaN, but other edges could still be
-// pointing to it.
-void Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges) {
+// Collapses the given degenerate edge by removing startVert. May split the mesh
+// topologically if the collapse would have resulted in a 4-manifold edge. Do
+// not collapse an edge if startVert is pinched - the vert would be marked NaN,
+// but other edges could still be pointing to it.
+void Manifold::Impl::CollapseDegenerate(const int edge, Vec<int>& edges) {
   const int pair = halfedge_.Pair(edge);
   if (pair < 0) return;
   const ivec3 tri0edge = TriOf(edge);
@@ -845,13 +775,15 @@ void Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges) {
   RemoveIfFolded(start);
 }
 
-// Collapses the given edge by removing startVert - returns false if the edge
-// cannot be collapsed. May split the mesh topologically if the collapse would
-// have resulted in a 4-manifold edge. Do not collapse an edge if startVert is
+// Collapses the given edge by removing startVert and moving endVert to an
+// optimized location in the plane of the edge and its normal - returns false if
+// the edge is not collapsed, due to inverting a triangle or exceeding our
+// Delaunay metric. May split the mesh topologically if the collapse would have
+// resulted in a 4-manifold edge. Do not collapse an edge if startVert is
 // pinched - the vert would be marked NaN, but other edges could still be
 // pointing to it.
-bool Manifold::Impl::CollapseEdge2(const int edge, Vec<int>& edges,
-                                   const Merger& merger) {
+bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges,
+                                  const Merger& merger) {
   edges.resize(0);
   Vec<TriRef>& triRef = meshRelation_.triRef;
 

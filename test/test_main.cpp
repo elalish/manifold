@@ -112,6 +112,7 @@ int main(int argc, char** argv) {
   }
 
   manifold::ManifoldParams().intermediateChecks = true;
+  manifold::ManifoldParams().verifyNoDegenerates = true;
   manifold::ManifoldParams().processOverlaps = false;
 
   FrameMarkEnd(name);

@@ -220,16 +220,16 @@ struct Manifold::Impl {
 
   double MaxCost() const { return tolerance_ * tolerance_; }
   void CleanupTopology();
-  void SimplifyTopology2();
+  void RemoveDegenerates(int firstNewVert = 0);
+  void Decimate();
   Merger CheckEdge(int edge) const;
   bool Continuous(int edge) const;
   bool Swappable(int edge) const;
   bool Colinear(int edge) const;
   void SwapEdge(int edge, double a);
-  void SimplifyTopology(int firstNewVert = 0);
   void DedupeEdge(int edge);
-  void CollapseEdge(int edge, Vec<int>& scratch);
-  bool CollapseEdge2(int edge, Vec<int>& scratch, const Merger& merger);
+  void CollapseDegenerate(int edge, Vec<int>& scratch);
+  bool CollapseEdge(int edge, Vec<int>& scratch, const Merger& merger);
   int RecursiveEdgeSwap(int tri, const int firstNewVert, Vec<int>& scratch,
                         int depth);
   void RemoveIfFolded(int edge);

@@ -948,14 +948,16 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   UpdateReference(outR, inP_, inQ_, invertQ, ctx_);
   if (auto c = phase(__LINE__)) return *c;
 
-  outR.SimplifyTopology(nPv + nQv);
+  outR.RemoveDegenerates(nPv + nQv);
   outR.RemoveUnreferencedVerts();
 
   if (ManifoldParams().intermediateChecks) {
     DEBUG_ASSERT(outR.Is2Manifold(), logicErr,
                  "simplified mesh is not 2-manifold!");
-    // DEBUG_ASSERT(outR.NumDegenerateTris() == 0, logicErr,
-    //              "simplified mesh has degenerate triangles!");
+  }
+  if (ManifoldParams().verifyNoDegenerates) {
+    DEBUG_ASSERT(outR.NumDegenerateTris() == 0, logicErr,
+                 "simplified mesh has degenerate triangles!");
   }
 
   outR.CalculateBBox();

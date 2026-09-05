@@ -851,6 +851,8 @@ void Manifold::Impl::Hull(VecView<const vec3> vertPos,
   CalculateBBox();
   SetEpsilon();
   InitializeOriginal();
+  SetNormalsAndCoplanar();
+  RemoveDegenerates();
   SortGeometry(ctx);
   // SortGeometry returns silently on cancel, leaving the Impl in a
   // partial state; catch that here so SetNormalsAndCoplanar doesn't
@@ -859,7 +861,6 @@ void Manifold::Impl::Hull(VecView<const vec3> vertPos,
     MakeEmpty(Error::Cancelled);
     return;
   }
-  SetNormalsAndCoplanar();
 }
 
 }  // namespace manifold

@@ -375,7 +375,7 @@ Manifold Manifold::SetTolerance(double tolerance) const {
   if (tolerance > impl->tolerance_) {
     impl->tolerance_ = tolerance;
     impl->SetNormalsAndCoplanar();
-    impl->SimplifyTopology2();
+    impl->Decimate();
     impl->SortGeometry();
   } else {
     // for reducing tolerance, we need to make sure it is still at least
@@ -403,9 +403,22 @@ Manifold Manifold::Simplify(double tolerance) const {
     impl->tolerance_ = tolerance;
     impl->SetNormalsAndCoplanar();
   }
-  impl->SimplifyTopology2();
+  impl->Decimate();
   impl->SortGeometry();
   impl->tolerance_ = oldTolerance;
+  return Manifold(impl);
+}
+
+/**
+ * Returns a copy of the manifold with all degenerate triangles removed, as well
+ * as collapsing coplanar edges that are not important boundaries.
+ */
+Manifold Manifold::RemoveDegenerates() const {
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto impl = std::make_shared<Impl>(*leafImpl);
+  impl->RemoveDegenerates();
   return Manifold(impl);
 }
 

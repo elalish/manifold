@@ -32,7 +32,6 @@ TEST(Utils, AtomicRefBackend) {
   const char* backend = "C++17 cast";
 #endif
   RecordProperty("backend", backend);
-  std::cout << "AtomicRef backend: " << backend << std::endl;
 }
 
 // A failed compare_exchange reports the current value through `expected`,
