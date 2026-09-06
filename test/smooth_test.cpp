@@ -77,8 +77,8 @@ TEST(Smooth, TruncatedCone) {
                         .SmoothByNormals()
                         .RefineToLength(0.5)
                         .CalculateNormals();
-  EXPECT_NEAR(smooth.Volume(), 1163.53, 0.01);
-  EXPECT_NEAR(smooth.SurfaceArea(), 769.33, 0.01);
+  EXPECT_NEAR(smooth.Volume(), 1021.05, 0.01);
+  EXPECT_NEAR(smooth.SurfaceArea(), 737.67, 0.01);
   CheckGL(smooth, false);
 
   if (options.exportModels) WriteTestOBJ("smoothTruncatedCone.obj", smooth);
@@ -93,9 +93,9 @@ TEST(Smooth, ToLength) {
   Manifold smooth =
       cone.Simplify().CalculateNormals(0, 180).SmoothByNormals().RefineToLength(
           0.1);
-  ExpectMeshes(smooth, {{85250, 170496, 3}});
-  EXPECT_NEAR(smooth.Volume(), 4570, 1);
-  EXPECT_NEAR(smooth.SurfaceArea(), 1348, 1);
+  ExpectMeshes(smooth, {{85645, 171286, 3}});
+  EXPECT_NEAR(smooth.Volume(), 4493, 1);
+  EXPECT_NEAR(smooth.SurfaceArea(), 1334, 1);
 
   MeshGL out = smooth.CalculateCurvature(-1, 3).GetMeshGL();
   float maxMeanCurvature = 0;
@@ -103,7 +103,7 @@ TEST(Smooth, ToLength) {
     maxMeanCurvature =
         std::max(maxMeanCurvature, std::abs(out.vertProperties[i]));
   }
-  EXPECT_NEAR(maxMeanCurvature, 1.63, 0.01);
+  EXPECT_NEAR(maxMeanCurvature, 1.86, 0.01);
 
   if (options.exportModels) WriteTestOBJ("smoothToLength.obj", smooth);
 }

@@ -776,10 +776,12 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               return GetNormal(halfedge, normalIdx);
             },
             [&](int halfedge, const vec3& here, const vec3& next) {
-              // Tangents not known at first are used as temporary storage for
-              // normals and w is set to a negative flag value. This starts with
-              // the flag clear.
-              if (next == vec3(0.) || here == vec3(0.)) {
+              if (next != vec3(0.) && here != vec3(0.)) {
+                calculateTangent(halfedge, here, next);
+              } else {
+                // Tangents not known at first are used as temporary storage for
+                // normals and w is set to a negative flag value. This starts
+                // with the flag clear.
                 if (here != vec3(0.)) {  // next missing
                   markToAlign(halfedge);
                   lastNormal = here;
@@ -792,15 +794,19 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 halfedgeTangent_[halfedge].w = kMissingNormal;
                 for (const int i : {0, 1, 2})
                   halfedgeTangent_[halfedge][i] = lastNormal[i];
-                return;
               }
-
-              calculateTangent(halfedge, here, next);
             });
+
+        if (startHalfedge == -1 && faceEdges[0] == -1) {
+          // A single normal - mark this halfedge for distributing tangents.
+          fixedHalfedge[e] = true;
+        }
 
         if (startHalfedge != -1 && lastNormal == vec3(0.)) {
           // Use vert pseudo normal if no normals are present at all.
           const vec3 normal = vertNormal_[halfedge_.Start(e)];
+          // mark this halfedge for distributing tangents.
+          fixedHalfedge[e] = true;
           ForVert(e, [&](int halfedge) {
             halfedgeTangent_[halfedge] = TangentFromNormal(normal, halfedge);
           });
