@@ -23,16 +23,16 @@ using namespace manifold;
 
 TEST(Smooth, Tetrahedron) {
   Manifold tet = Manifold::Tetrahedron();
-  Manifold smooth = tet.CalculateNormals().SmoothByNormals();
+  Manifold smooth = tet.CalculateNormals(0, 180).SmoothByNormals();
   int n = 100;
   smooth = smooth.Refine(n);
-  ExpectMeshes(smooth, {{2 * n * n + 2, 4 * n * n}});
+  ExpectMeshes(smooth, {{2 * n * n + 2, 4 * n * n, 3}});
   EXPECT_NEAR(smooth.Volume(), 17.0, 0.1);
   EXPECT_NEAR(smooth.SurfaceArea(), 32.9, 0.1);
 
-  MeshGL out = smooth.CalculateCurvature(-1, 0).GetMeshGL();
+  MeshGL out = smooth.CalculateCurvature(-1, 3).GetMeshGL();
   float maxMeanCurvature = 0;
-  for (size_t i = 3; i < out.vertProperties.size(); i += 4) {
+  for (size_t i = 6; i < out.vertProperties.size(); i += 7) {
     maxMeanCurvature =
         std::max(maxMeanCurvature, std::abs(out.vertProperties[i]));
   }
@@ -43,9 +43,14 @@ TEST(Smooth, Tetrahedron) {
 
 TEST(Smooth, RefineQuads) {
   Manifold cylinder = WithPositionColors(Manifold::Cylinder(2, 1, -1, 12))
-                          .CalculateNormals()
-                          .SmoothByNormals()
-                          .RefineToLength(0.05);
+                          .CalculateNormals(3)
+                          .SmoothByNormals(3)
+                          .RefineToLength(0.05)
+                          .SetProperties(3, [](double* newProp, vec3 pos,
+                                               const double* oldProp) {
+                            for (const int i : {0, 1, 2})
+                              newProp[i] = oldProp[i];
+                          });
   EXPECT_EQ(cylinder.NumTri(), 16644);
   EXPECT_NEAR(cylinder.Volume(), 2 * kPi, 0.003);
   EXPECT_NEAR(cylinder.SurfaceArea(), 6 * kPi, 0.004);
@@ -85,18 +90,16 @@ TEST(Smooth, ToLength) {
       {0, 0});
   cone += cone.Scale({1, 1, -5});
   EXPECT_EQ(cone.NumVert(), 12);
-  Manifold smooth = cone.AsOriginal()
-                        .Simplify()
-                        .CalculateNormals(180)
-                        .SmoothByNormals()
-                        .RefineToLength(0.1);
-  ExpectMeshes(smooth, {{85250, 170496}});
+  Manifold smooth =
+      cone.Simplify().CalculateNormals(0, 180).SmoothByNormals().RefineToLength(
+          0.1);
+  ExpectMeshes(smooth, {{85250, 170496, 3}});
   EXPECT_NEAR(smooth.Volume(), 4570, 1);
   EXPECT_NEAR(smooth.SurfaceArea(), 1348, 1);
 
-  MeshGL out = smooth.CalculateCurvature(-1, 0).GetMeshGL();
+  MeshGL out = smooth.CalculateCurvature(-1, 3).GetMeshGL();
   float maxMeanCurvature = 0;
-  for (size_t i = 3; i < out.vertProperties.size(); i += 4) {
+  for (size_t i = 6; i < out.vertProperties.size(); i += 7) {
     maxMeanCurvature =
         std::max(maxMeanCurvature, std::abs(out.vertProperties[i]));
   }
@@ -112,7 +115,8 @@ TEST(Smooth, Sphere) {
   for (int i = 0; i < 5; ++i) {
     Manifold sphere = Manifold::Sphere(1, n[i]);
     // Refine(3*x) makes a center point, which is the worst case.
-    Manifold smoothed = sphere.CalculateNormals().SmoothByNormals().Refine(6);
+    Manifold smoothed =
+        sphere.CalculateNormals(0, 180).SmoothByNormals().Refine(6);
     // Refine(3*x) puts a center point in the triangle, which is the worst
     // case.
     MeshGL64 out = smoothed.GetMeshGL64();
@@ -283,7 +287,7 @@ TEST(Smooth, Fillet2) {
 TEST(Smooth, Manual) {
   // Unit Octahedron
   const auto oct = Manifold::Sphere(1, 4);
-  MeshGL smooth = oct.CalculateNormals().SmoothByNormals().GetMeshGL();
+  MeshGL smooth = oct.CalculateNormals(0, 180).SmoothByNormals().GetMeshGL();
   // Sharpen the edge from vert 4 to 5
   smooth.halfedgeTangent[4 * 6 + 3] = 0;
   smooth.halfedgeTangent[4 * 22 + 3] = 0;
@@ -292,16 +296,16 @@ TEST(Smooth, Manual) {
   Manifold interp(smooth);
   interp = interp.Refine(100);
 
-  ExpectMeshes(interp, {{40002, 80000}});
+  ExpectMeshes(interp, {{40002, 80000, 3}});
   EXPECT_NEAR(interp.Volume(), 3.74, 0.01);
   EXPECT_NEAR(interp.SurfaceArea(), 11.78, 0.01);
 
   if (options.exportModels) {
-    interp = interp.CalculateCurvature(-1, 0).SetProperties(
+    interp = interp.CalculateCurvature(-1, 3).SetProperties(
         3, [](double* newProp, vec3 pos, const double* oldProp) {
           const vec3 red(1, 0, 0);
           const vec3 purple(1, 0, 1);
-          vec3 color = la::lerp(purple, red, smoothstep(0.0, 2.0, oldProp[0]));
+          vec3 color = la::lerp(purple, red, smoothstep(0.0, 2.0, oldProp[3]));
           for (const int i : {0, 1, 2}) newProp[i] = color[i];
         });
     WriteTestOBJ("manual.obj", interp);
@@ -309,7 +313,7 @@ TEST(Smooth, Manual) {
 }
 
 TEST(Smooth, InvalidTangents) {
-  Manifold cube = Manifold::Cube().CalculateNormals(180).SmoothByNormals();
+  Manifold cube = Manifold::Cube().CalculateNormals(0, 180).SmoothByNormals();
   MeshGL withTangents = cube.GetMeshGL();
   size_t sizeHalfedges = withTangents.halfedgeTangent.size();
   for (size_t i = (sizeHalfedges / 8) * 4 + 3; i < sizeHalfedges; i += 4) {
@@ -335,8 +339,8 @@ TEST(Smooth, Mirrored) {
 
 TEST(Smooth, Csaszar) {
   Manifold csaszar(Csaszar());
-  csaszar = csaszar.CalculateNormals().SmoothByNormals().Refine(100);
-  ExpectMeshes(csaszar, {{70000, 140000}});
+  csaszar = csaszar.CalculateNormals(0, 180).SmoothByNormals().Refine(100);
+  ExpectMeshes(csaszar, {{70000, 140000, 3}});
   EXPECT_NEAR(csaszar.Volume(), 74757, 10);
   EXPECT_NEAR(csaszar.SurfaceArea(), 11313, 10);
 
