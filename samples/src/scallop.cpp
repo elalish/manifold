@@ -17,8 +17,8 @@
 namespace manifold {
 
 /**
- * A smoothed manifold demonstrating selective edge sharpening with
- * Manifold.Smooth(). Use Manifold.Refine() before export to see the curvature.
+ * A smoothed manifold demonstrating manual smoothing by assigning tangents to
+ * halfedges. Use Manifold.Refine() before export to see the curvature.
  */
 Manifold Scallop() {
   constexpr double height = 1;
@@ -26,6 +26,7 @@ Manifold Scallop() {
   constexpr double offset = 2;
   constexpr int wiggles = 12;
   constexpr double lean = 0.3;
+  constexpr double frontalSharpness = 1;
 
   MeshGL64 scallop;
   scallop.numProp = 3;
@@ -54,23 +55,29 @@ Manifold Scallop() {
   for (uint32_t i = 0; i < 2 * wiggles; ++i) {
     const uint32_t next = i + 1 == 2 * wiggles ? 0 : i + 1;
 
-    scallop.triVerts.insert(scallop.triVerts.end(), {0, 2 + i, 2 + next});
-    const vec3 topCenterTan = centerTangents[i];
-    const vec3 topEdgeTan = edgeTangents[i];
-    scallop.halfedgeTangent.insert(
-        scallop.halfedgeTangent.end(),
-        {topCenterTan.x, topCenterTan.y, topCenterTan.z, 1,  //
-         topEdgeTan.x, topEdgeTan.y, topEdgeTan.z, 1,        //
-         0, 0, len, 1});
+    const vec3 radial = centerTangents[i];
+    const vec3 nextRadial = centerTangents[next];
+    const vec3 edge = edgeTangents[i];
+    const vec3 nextEdge = -edgeTangents[next];
+    const double sharpness = frontalSharpness * (la::cos(i * delta) + 1) / 4;
+    const vec3 up =
+        la::lerp(vec3(0, 0, len), vec3(nextEdge.y, -nextEdge.x, 0), sharpness);
+    const vec3 down =
+        la::lerp(vec3(0, 0, -len), vec3(-edge.y, edge.x, 0), sharpness);
 
-    const vec3 centerTan = centerTangents[next];
-    const vec3 edgeTan = -edgeTangents[next];
+    scallop.triVerts.insert(scallop.triVerts.end(), {0, 2 + i, 2 + next});
+    scallop.halfedgeTangent.insert(        //
+        scallop.halfedgeTangent.end(),     //
+        {radial.x, radial.y, radial.z, 1,  //
+         edge.x, edge.y, edge.z, 1,        //
+         up.x, up.y, up.z, 1});
+
     scallop.triVerts.insert(scallop.triVerts.end(), {1, 2 + next, 2 + i});
     scallop.halfedgeTangent.insert(
         scallop.halfedgeTangent.end(),
-        {centerTan.x, centerTan.y, -centerTan.z, 1,  //
-         edgeTan.x, edgeTan.y, edgeTan.z, 1,         //
-         0, 0, -len, 1});
+        {nextRadial.x, nextRadial.y, -nextRadial.z, 1,  //
+         nextEdge.x, nextEdge.y, nextEdge.z, 1,         //
+         down.x, down.y, down.z, 1});
   }
 
   return Manifold(scallop);
