@@ -3,9 +3,10 @@ import fs from 'fs';
 import path from 'path';
 
 import {compileConsumer} from '../core/orchestrate.js';
-import {setGlobalCanvasResolver, setGlobalFileResolver} from '../core/state.js';
-import {nodeCanvasResolver, nodeFileResolver} from '../host/node.js'
-import { getExternalLibraries } from './util/library_compilation.js';
+import {setGlobalFileResolver} from '../core/state.js';
+import {nodeFileResolver} from '../host/node.js'
+
+import {getExternalLibraries} from './util/library_compilation.js';
 
 const compileAllCommand = new Command();
 
@@ -22,7 +23,6 @@ function getAllScadFiles(dir: string, baseDir: string = dir): string[] {
   }
   return results;
 }
-
 
 compileAllCommand.name('compile-all')
     .description(
@@ -49,12 +49,13 @@ compileAllCommand.name('compile-all')
                 path.join(outputDir, path.dirname(file), basename + '.ts');
 
             setGlobalFileResolver(nodeFileResolver);
-            setGlobalCanvasResolver(nodeCanvasResolver);
 
-            const {externalLibraries, resolved} = await getExternalLibraries(absFile, outputFile);
+            const {externalLibraries, resolved} =
+                await getExternalLibraries(absFile, outputFile);
 
             const {code: js} = await compileConsumer(
-                absFile, outputFile, process.cwd(), externalLibraries, resolved);
+                absFile, outputFile, process.cwd(), externalLibraries,
+                resolved);
             if (externalLibraries.length > 0) {
               console.log(
                   `External libraries: ${externalLibraries.join(', ')}`);

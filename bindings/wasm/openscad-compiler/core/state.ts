@@ -1,6 +1,6 @@
 import type {Expr, FunctionDeclStmt, Parameter} from './ast.js';
 import {BUILTIN_FUNCTIONS, BUILTIN_MODULES, BUILTIN_VAR_CONSTANTS, RUNTIME_SYMBOLS,} from './builtins.js';
-import type {BindOptions, BindResult, CanvasResolver, FileResolver, ModuleDeclStmtType, Scope,} from './types.js';
+import type {BindOptions, BindResult, FileResolver, ModuleDeclStmtType, Scope,} from './types.js';
 
 // Signatures
 export interface Signature {
@@ -16,15 +16,12 @@ export interface LocalDecl {
 }
 
 export let globalFileResolver: FileResolver|undefined;
-export let globalCanvasResolver: CanvasResolver|undefined;
 
 export const signatures = new Map<string, Signature>();
 export const localDecls = new Map<string, LocalDecl>();
 export const noArgDemotions = new Map<string, boolean[]>();
 export const moduleDeclRegistry = new Map<string, ModuleDeclStmtType>();
 
-// Track unique fonts encountered during compilation for base64 generation.
-export const encounteredFonts = new Set<string>();
 
 // Loaded from library manifests so their calls aren't treated as unknown
 // modules
@@ -76,10 +73,6 @@ export const currentBindOptions: BindOptions = {
 
 export function setGlobalFileResolver(fileResolver: FileResolver): void {
   globalFileResolver = fileResolver;
-}
-
-export function setGlobalCanvasResolver(canvasResolver: CanvasResolver): void {
-  globalCanvasResolver = canvasResolver;
 }
 
 export function setModuleDecls(decls: Map<string, ModuleDeclStmtType>): void {

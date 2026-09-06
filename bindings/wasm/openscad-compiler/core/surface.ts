@@ -19,9 +19,9 @@ export async function compileSurface(
 
   // surface() resolves files relative to the calling .scad; otherwise, the
   // host's base directory is used.
-  const base = await globalFileResolver?.baseDir() ?? '';
-  const basePath = sourceFile ? path.dirname(path.resolve(base, sourceFile)) : base;
-  const filePath = path.resolve(basePath, filenameStr);
+  const filePath =
+      await globalFileResolver?.getSurfaceFilePath(filenameStr, sourceFile) ??
+      '';
 
   const isImage = path.extname(filePath).toLowerCase() === '.png';
 

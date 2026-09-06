@@ -5,7 +5,9 @@
  */
 import Module from 'manifold-3d';
 import * as opentype from 'opentype.js';
-import { computeSurfaceData } from './utils/surface.js';
+
+import {computeFontData} from './utils/font.js';
+import {computeSurfaceData} from './utils/surface.js';
 
 const opentypeParse = opentype.parse || (opentype as any).default?.parse;
 
@@ -2074,24 +2076,6 @@ function pathToContours(commands: any[], fn: number): [number, number][][] {
   return contours.map(c => c.map(([x, y]): [number, number] => [x, -y]));
 }
 
-function fontSpecToFilename(fontSpec: string): string {
-  const cleaned = fontSpec.replace(/"/g, '').trim();
-  const parts = cleaned.split(':');
-  const family = (parts[0] || 'Liberation Sans').trim().replace(/\s+/g, '');
-
-  let style = 'Regular';
-  for (let i = 1; i < parts.length; i++) {
-    const part = parts[i]!.trim();
-    const match = part.match(/^style\s*=\s*(.+)$/i);
-    if (match) {
-      style = match[1]!.trim().replace(/\s+/g, '');
-      break;
-    }
-  }
-
-  return `${family}-${style}`;
-}
-
 const opentypeFontCache = new Map<string, any>();
 
 function getOpentypeFont(base64DataUrl: string): any|undefined {
@@ -2327,41 +2311,15 @@ function canvasTextContours(
   return contours;
 }
 
-/* Base64 font data, keyed by sanitized font filename. One table shared by
-   every compiled file: the consumer fills it in at module init, and a `text()`
-   routed through a library's own module reads the same entries. */
-const font_registry: Record<string, string> = {};
-
-// Faces are registered under the filename they were embedded from, which
-// fontconfig matches without regard to case — `style=bold` and `style=Bold`
-// name the same face. A face that still does not match renders as nothing:
-// substituting an arbitrary registered face instead would quietly draw the
-// wrong typeface, which reads as slightly-off geometry rather than as a
-// missing font.
-function lookupFontFace(registry: Record<string, string>, font: string): string|
-    undefined {
-  const wanted = fontSpecToFilename(font);
-  const exact = registry[wanted];
-  if (exact) return exact;
-
-  const lowered = wanted.toLowerCase();
-  for (const key of Object.keys(registry))
-    if (key.toLowerCase() === lowered) return registry[key];
-
-  return undefined;
-}
-
 function text(
     text: string, size: number = 10, font: string, halign: string = 'left',
     valign: string = 'baseline', spacing: number = 1, direction: string = 'ltr',
-    fn: number = 0,
-    fontBase64Data: string|Record<string, string>|undefined = undefined): any {
+    fn: number = 0): any {
   if (!text || text.length === 0)
     return CrossSection.square([0.001, 0.001], false);
 
-  // OpenSCAD's default typeface. Calls compiled straight from `text()` get this
-  // filled in at compile time, but a call routed through a library's own `text`
-  // module arrives with whatever the caller left undefined.
+  // OpenSCAD's default typeface, for a call that arrives with whatever the
+  // caller left undefined.
   font = font || 'Liberation Sans:style=Regular';
 
   void fn;
@@ -2373,13 +2331,8 @@ function text(
 
   contours = canvasTextContours(chars, size, spacing, dir, font);
 
-  if (!contours && fontBase64Data) {
-    let base64: string|undefined;
-    if (typeof fontBase64Data === 'string') {
-      base64 = fontBase64Data;
-    } else if (typeof fontBase64Data === 'object' && fontBase64Data !== null) {
-      base64 = lookupFontFace(fontBase64Data, font);
-    }
+  if (!contours) {
+    const base64 = computeFontData(font);
     if (base64) {
       contours = opentypeTextContours(chars, size, spacing, dir, base64, fn);
     }
@@ -3302,7 +3255,6 @@ export {
   echo,
   oecho,
   fnlit,
-  font_registry,
   tc,
   call
 };

@@ -17,8 +17,7 @@ compiles to
 
 ```ts
 import * as rt from '../../runtime/runtime.js';
-const {Manifold, CrossSection, cube, translate, ctx, union, applyRoot, font_registry} = rt;
-Object.assign(font_registry, {});
+const {Manifold, CrossSection, cube, translate, ctx, union, applyRoot} = rt;
 
 const result_items: InstanceType<typeof Manifold | typeof CrossSection>[] = [];
 const background_items: InstanceType<typeof Manifold | typeof CrossSection>[] = [];
@@ -44,7 +43,7 @@ export const viewport = {vpr: ctx.$vpr, vpt: ctx.$vpt, vpd: ctx.$vpd, vpf: ctx.$
 | `core/resolver.ts` | Resolves `include <>` / `use <>`, walks the file closure, applies `use`-scope privatization, and finds library roots from `OPENSCADPATH`. |
 | `core/binder.ts` | Lexical binding pass: builds the scope tree, creates one `Binding` per declared name in the `var` / `fn` / `mod` namespaces, and points every reference at the binding it resolves to. |
 | `core/naming.ts` | Chooses the JavaScript identifier for each binding, once resolution and the runtime's own names are known. |
-| `core/compiler.ts` | Emitter: a single whole-program scan feeds module/function lowering, tail-call elimination, numeric type inference, the no-arg calling convention, and font/surface-data embedding. |
+| `core/compiler.ts` | Emitter: a single whole-program scan feeds module/function lowering, tail-call elimination, numeric type inference, and the no-arg calling convention. |
 | `core/types.ts` | Types shared across the phases: source ranges and tokens, bindings and scopes, library manifests. |
 | `core/format.ts` | Runs Prettier over each generated file at the point it is written. |
 | `core/orchestrate.ts` | Drives consumer + external-library compilation and the library cache. |
@@ -98,7 +97,8 @@ need no configuration: they are resolved relative to the `.scad` file containing
 call, exactly like OpenSCAD does.
 
 `bundle/fonts` ships Liberation Sans (regular/bold), so pointing `FONTPATH` at it is
-enough to run everything in this repo.
+enough to run everything in this repo. `text()` reads the font file when the compiled
+output runs, not when it is compiled, so `FONTPATH` must be set for both.
 
 ### 3. Build
 
@@ -145,15 +145,61 @@ the test corpus to be unpacked — see [Testing](#testing).
 
 A compiled module is a normal ES module - importing it evaluates the model.
 
+Before that import, the runtime needs its host resolvers. The runtime never touches
+`fs` or a canvas implementation directly: file and image access go through two
+resolvers the host installs, which is what lets the same compiled output run in Node
+and in the browser. Nothing is wired up by default, so `setRunTimeFileResolver` and
+`setRunTimeCanvasResolver` must be called **before** the compiled module is imported -
+importing it runs the model immediately, so use a dynamic `import()` (or a separate
+entry module) for the model itself.
+
 ```ts
-import {result} from './out/model.js';
+// runner.ts
+import fs from 'fs';
+import {createCanvas, Image} from 'canvas';
+import {
+  setRunTimeFileResolver,
+  setRunTimeCanvasResolver,
+} from '<path_to_runtime>/runtime/utils/host.js';
+
+setRunTimeFileResolver({
+  exists(filePath: string): boolean {
+    return fs.existsSync(filePath);
+  },
+  readText(filePath: string): string | null {
+    try { return fs.readFileSync(filePath, 'utf8'); } catch { return null; }
+  },
+  readBinary(filePath: string): Buffer | null {
+    try { return fs.readFileSync(filePath); } catch { return null; }
+  },
+  readDir(dirPath: string): string[] {
+    try { return fs.readdirSync(dirPath); } catch { return []; }
+  },
+});
+
+setRunTimeCanvasResolver({
+  createCanvas(width: number, height: number) {
+    return createCanvas(width, height);
+  },
+  image() {
+    return new Image();
+  },
+});
+
+const {result} = await import('./out/model.js');
 
 console.log(result.volume(), result.surfaceArea());
 ```
 
 ```bash
-npx tsx out/model.ts
+npx tsx runner.ts
 ```
+
+The file resolver backs `text()` (font lookup under `FONTPATH`) and `surface()` (reading
+`.dat` heightmaps); the canvas resolver backs `surface()`'s PNG decoding. A model that
+uses neither never reaches them, but installing both is the safe default - a missing
+resolver only shows up as a crash once the model happens to call `text()` or `surface()`.
+`test/test-worker.ts` is a working example of this setup.
 
 Named exports:
 

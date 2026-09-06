@@ -7,11 +7,6 @@ import {globalFileResolver} from './state.js';
 import type {ExternalLibraryRef, LibraryClosure, LibraryEdge, ResolvedProgram, ResolvedProgramWithLibraries, ScadFileHit} from './types.js';
 
 // FONTPATH as set in the user's shell/OS environment
-export async function getFontPath(): Promise<string|undefined> {
-  const fp = await globalFileResolver?.fontPath();
-  return fp && fp.trim() !== '' ? fp.trim() : undefined;
-}
-
 // Keep only what a `use` imports. OpenSCAD compiles the used file separately
 // and takes just its declarations, so its top-level actions never run
 function importableDecls(stmts: Statement[]): Statement[] {

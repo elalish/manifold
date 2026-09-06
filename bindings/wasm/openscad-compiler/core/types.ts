@@ -1,30 +1,19 @@
-import type {Argument, Expr, ForVariable, FunctionCallExpr, LetAssignment, Parameter, Program, Statement,} from './ast.js';
+import type {ForVariable, FunctionCallExpr, LetAssignment, Parameter, Program, Statement,} from './ast.js';
 import type {TokenType} from './lexer.js';
 
 
 export interface FileResolver {
   readText(filePath: string): Promise<string|null>;
-  readBinary(filePath: string): Promise<Uint8Array|null>;
-  writeText(filePath: string, content: string): Promise<void>;
-  removeDir(path: string): Promise<void>;
-  makeDir(path: string): Promise<void>;
-  readDir(path: string): Promise<string[]>;
   exists(filePath: string): Promise<boolean>;
   findScadFile(includePath: string, fromDir: string, entryDir: string):
       Promise<ScadFileHit|undefined>;
-  fontPath(): Promise<string|undefined>;
-  baseDir(): Promise<string>;
+  getSurfaceFilePath(filenameStr: string, sourceFile: string): Promise<string>;
 }
 
 export interface ScadFileHit {
   path: string;
   libraryName?: string;
   libraryRoot?: string;
-}
-
-export interface CanvasResolver {
-  create(width: number, height: number): any;
-  image(): any;
 }
 
 // Lexing
@@ -260,28 +249,6 @@ export interface ProgramScan {
   topLevelChildren: boolean;
   functionDefs: Map<string, FunctionDeclStmtType>;
   divergenceCandidates: FunctionCallExpr[];
-  font: FontScan;
-}
-
-// Record text-reachable modules and candidate literals; resolve the transitive
-// closure afterward
-export interface FontScan {
-  // moduleName -> modules called directly in its body, excluding nested
-  // declarations
-  edges: Map<string, Set<string>>;
-  // Literals whose relevance is already settled: font/style/family variables
-  literals: Set<string>;
-  // Sites kept only if the named module turns out to reach text()
-  paramDefaults: {module: string; exprs: Expr[]}[];
-  calls: {name: string; args: Argument[]}[];
-  scopedVars: {module: string; value: Expr}[];
-}
-
-// Top-level modules used by the font fixpoint; nested declarations are ignored
-// Splices `scope` like the old pass and only processes top-level statements
-export interface FontTargets {
-  names: Set<string>;
-  decls: Set<ModuleDeclStmtType>;
 }
 
 export interface ScanOptions {
@@ -290,7 +257,4 @@ export interface ScanOptions {
   noArgSlots?: Map<string, boolean[]>;
   // Collect candidate call sites for the divergence check. Consumer only
   divergence?: boolean;
-  // Top-level modules from `fontCandidateNames`; their presence enables font
-  // recording
-  fontCandidates?: FontTargets;
 }

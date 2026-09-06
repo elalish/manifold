@@ -4,7 +4,6 @@ import type {Expr, Program, Statement,} from './ast.js';
 import {bindProgram} from './binder.js';
 import {BUILTIN_FUNCTIONS, BUILTIN_SIGNATURES} from './builtins.js';
 import {namesNeedingPredeclaration,} from './expr.js';
-import {DEFAULT_FONT_SPEC, fontCandidateNames, fontsMatchingLiterals, generateFontBase64, resolveFontLiterals,} from './fonts.js';
 import {formatCode} from './format.js';
 import {compileDeclaration, compileGeometry, GEOMETRY_TYPE, hasBackgroundModifier, isModuleCallBackgroundOnly, PRE_DECLARED_VARS, pushCommentedLine} from './geometry.js';
 import {compileUsedFileScope, declKey, isDecl} from './library.js';
@@ -12,7 +11,7 @@ import {assignPrettyNames, buildRuntimeImport, builtinConstantsFor, builtinSymbo
 import {collectDeclarations, openNoArgSlots, scanProgram} from './scan.js';
 import {setModuleDecls} from './state.js';
 import type {Signature} from './state.js';
-import {currentBindOptions, currentMainFilename, currentScope, dynamicScopeVars, encounteredFonts, externalFunctionNames, externalModuleNames, externalVariableNames, globalVarDeclKeyword, localDecls, moduleDeclRegistry, noArgDemotions, resetTailTemps, RT, setBindResult, setCurrentRuntimePath, setCurrentScope, setCurrentSourceFilename, setMainFilename, setParentModulesReadInFunction, signatures} from './state.js';
+import {currentBindOptions, currentMainFilename, currentScope, dynamicScopeVars, externalFunctionNames, externalModuleNames, externalVariableNames, globalVarDeclKeyword, localDecls, moduleDeclRegistry, noArgDemotions, resetTailTemps, RT, setBindResult, setCurrentRuntimePath, setCurrentScope, setCurrentSourceFilename, setMainFilename, setParentModulesReadInFunction, signatures} from './state.js';
 import {reportDivergentCalls} from './tailcall.js';
 import type {CompileOptions, ModuleDeclStmtType} from './types.js';
 
@@ -128,7 +127,6 @@ export async function compile(
   setMainFilename(program.filename ?? '');
   setCurrentSourceFilename(currentMainFilename);
   dynamicScopeVars.clear();
-  encounteredFonts.clear();
   externalModuleNames.clear();
   externalFunctionNames.clear();
   externalVariableNames.clear();
@@ -173,7 +171,6 @@ export async function compile(
       externalSymbols.set(`var:${n}`, sym);
   }
   setModuleDecls(collectDeclarations(program.statements));
-  const fontCandidates = fontCandidateNames(program.statements);
 
   const bind = bindProgram(program, currentBindOptions);
   setBindResult(bind);
@@ -181,8 +178,7 @@ export async function compile(
   const openSlots = openNoArgSlots();
 
   const scan = scanProgram(
-      program.statements,
-      {noArgSlots: openSlots, divergence: true, fontCandidates});
+      program.statements, {noArgSlots: openSlots, divergence: true});
   for (const [key, slots] of openSlots) {
     if (slots.some(Boolean)) noArgDemotions.set(key, slots);
   }
@@ -200,21 +196,6 @@ export async function compile(
 
   // Reject top-level constant-argument calls to non-tail recursive functions
   reportDivergentCalls(scan.divergenceCandidates, scan.functionDefs);
-
-
-  // Library `text` calls bypass face registration, so register the default face
-  // upfront
-  const programRefs = scan.refs;
-  if (programRefs.modules.has('text') || programRefs.functions.has('text'))
-    encounteredFonts.add(DEFAULT_FONT_SPEC);
-
-  // Gather all font-related string literals from the program
-  const fontLiterals = resolveFontLiterals(scan.font, fontCandidates.names);
-
-  const fontNames = await fontsMatchingLiterals(fontLiterals);
-  for (const name of fontNames) {
-    encounteredFonts.add(name);
-  }
 
   const slotOrder: string[] = [];
   const slotExpr = new Map<string, Expr>();
@@ -277,22 +258,6 @@ export async function compile(
     declarations.push(entry.code);
   }
 
-  const currentFileDir = typeof __dirname !== 'undefined' ?
-      __dirname :
-      path.dirname(
-          new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/i, '$1'));
-  const compilerDir = path.resolve(currentFileDir, '..');
-  const fontImports: string[] = [];
-  const resolvedFonts =
-      new Map<string, string>();  // fontFamily → sanitized name (if resolved)
-
-  for (const fontFamily of encounteredFonts) {
-    const sanitized = await generateFontBase64(fontFamily, compilerDir);
-    if (sanitized) {
-      resolvedFonts.set(fontFamily, sanitized);
-    }
-  }
-
   let output = '';
 
   // Inject imports for names referenced from separately compiled external
@@ -344,33 +309,6 @@ export async function compile(
     for (const [spec, syms] of importsBySpec) {
       output += `import { ${[...syms].join(', ')} } from "${spec}";\n`;
     }
-  }
-
-  // Add font base64 imports for each resolved font.
-  const seenImports = new Set<string>();
-  for (const [fontFamily, sanitized] of resolvedFonts) {
-    if (seenImports.has(sanitized)) continue;
-    seenImports.add(sanitized);
-    const runtimeDir = options?.runtimePath ?
-        path.dirname(options.runtimePath).replace(/\\/g, '/') :
-        './runtime';
-    const importPath = `${runtimeDir}/fonts/${sanitized}_base64.js`;
-    const varName = `${T(`font_${sanitized.replace(/-/g, '_')}`)}`;
-    output += `import { fontBase64 as ${varName} } from "${importPath}";\n`;
-  }
-
-  // One shared table lives in the runtime, so a `text()` routed through a
-  // library's own module reads the same faces the consumer embedded
-  if (resolvedFonts.size > 0) {
-    output += `Object.assign(${RT.font_registry}, {\n`;
-    const seenSanitized = new Set<string>();
-    for (const [fontFamily, sanitized] of resolvedFonts) {
-      if (seenSanitized.has(sanitized)) continue;
-      seenSanitized.add(sanitized);
-      const varName = `${T(`font_${sanitized.replace(/-/g, '_')}`)}`;
-      output += `  ${JSON.stringify(sanitized)}: ${varName},\n`;
-    }
-    output += `});\n\n`;
   }
 
   const preamble = output;

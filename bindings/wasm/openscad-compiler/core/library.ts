@@ -8,7 +8,7 @@ import {formatCode} from './format.js';
 import {compileDeclaration, PRE_DECLARED_VARS} from './geometry.js';
 import {assignPrettyNames, bindJsName, buildRuntimeImport, builtinConstantsFor, builtinSymbolNames, declJsName, globalJsName, namesBlockingRuntimeLocals, namesInUse, reservedNames, resetTempNames, resolveRuntimeLocals, T,} from './naming.js';
 import {collectDeclarations, paramUsesNoArg, scanProgram,} from './scan.js';
-import {currentBindOptions, currentMainFilename, currentScope, currentSourceFilename, dynamicScopeVars, encounteredFonts, externalFunctionNames, externalModuleNames, externalVariableNames, localDecls, noArgDemotions, resetTailTemps, RT, setBindResult, setCurrentRuntimePath, setCurrentScope, setCurrentSourceFilename, setGlobalVarDeclKeyword, setMainFilename, setModuleDecls, setParentModulesReadInFunction, signatures,} from './state.js';
+import {currentBindOptions, currentMainFilename, currentScope, currentSourceFilename, dynamicScopeVars, externalFunctionNames, externalModuleNames, externalVariableNames, localDecls, noArgDemotions, resetTailTemps, RT, setBindResult, setCurrentRuntimePath, setCurrentScope, setCurrentSourceFilename, setGlobalVarDeclKeyword, setMainFilename, setModuleDecls, setParentModulesReadInFunction, signatures,} from './state.js';
 import type {Binding, CompiledLibrary, CompiledLibraryFile, LibraryClosure, LibraryManifest, Namespace, Scope,} from './types.js';
 
 // Separate library compilation
@@ -211,7 +211,6 @@ async function emitLibraryFile(
   setCurrentScope(ctx.scope);
   resetTailTemps();
   dynamicScopeVars.clear();
-  encounteredFonts.clear();
   setCurrentRuntimePath(ctx.runtimePath);
   setMainFilename(program.filename ?? '');
   setCurrentSourceFilename(currentMainFilename);

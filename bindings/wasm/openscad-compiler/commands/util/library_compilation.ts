@@ -1,8 +1,9 @@
-import path from "path";
-import { readFileSync, writeFileSync, existsSync, rmSync, mkdirSync } from 'fs';
-import type { ExternalLibraryRef, LibraryManifest, ResolvedExternalLib, ResolvedProgramWithLibraries} from "../../core/types.js";
-import { resolveLibraryClosure, resolveProgramWithLibraries } from "../../core/resolver.js";
-import { compileLibrary } from "../../core/library.js";
+import {existsSync, mkdirSync, readFileSync, rmSync, writeFileSync} from 'fs';
+import path from 'path';
+
+import {compileLibrary} from '../../core/library.js';
+import {resolveLibraryClosure, resolveProgramWithLibraries} from '../../core/resolver.js';
+import type {ExternalLibraryRef, LibraryManifest, ResolvedExternalLib, ResolvedProgramWithLibraries} from '../../core/types.js';
 
 const MANIFEST_VERSION = 1;
 
@@ -14,7 +15,8 @@ function toPosixSpecifier(p: string): string {
 
 function getRuntimeVersion(cwd: string): string {
   try {
-    const pkg = JSON.parse(readFileSync(path.join(cwd, 'package.json'), 'utf-8') as string);
+    const pkg = JSON.parse(
+        readFileSync(path.join(cwd, 'package.json'), 'utf-8') as string);
     return String(pkg.version ?? '0.0.0');
   } catch {
     return '0.0.0';
@@ -22,8 +24,8 @@ function getRuntimeVersion(cwd: string): string {
 }
 
 async function ensureLibraryCompiled(
-    ref: ExternalLibraryRef, entryDir: string, cwd: string):
-    Promise<{manifest: LibraryManifest; libDir: string}> {
+    ref: ExternalLibraryRef, entryDir: string,
+    cwd: string): Promise<{manifest: LibraryManifest; libDir: string}> {
   const libDir = path.join(cwd, 'runtime', 'libraries', ref.name.toLowerCase());
   const manifestPath = path.join(libDir, '.manifest.json');
   const runtimeVersion = getRuntimeVersion(cwd);
@@ -33,7 +35,9 @@ async function ensureLibraryCompiled(
   let priorFiles: string[] = [];
   let staleRuntime = false;
   if (existsSync(libDir) && existsSync(manifestPath)) {
-    const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8') as string) as LibraryManifest;
+    const manifest =
+        JSON.parse(readFileSync(manifestPath, 'utf-8') as string) as
+        LibraryManifest;
     const relOf = (abs: string) =>
         path.relative(ref.root, abs).replace(/\\/g, '/');
     const missing = ref.entries.filter(e => !(relOf(e.file) in manifest.files));
@@ -50,7 +54,8 @@ async function ensureLibraryCompiled(
     }
     priorFiles =
         Object.keys(manifest.files).map(rel => path.join(ref.root, rel));
-    console.log(staleRuntime ?
+    console.log(
+        staleRuntime ?
             `Library ${ref.name}: cached build targets runtime ${
                 manifest.runtimeVersion ??
                 'unknown'}, current is ${runtimeVersion}; recompiling...` :
@@ -88,7 +93,11 @@ async function ensureLibraryCompiled(
   return {manifest: compiled.manifest, libDir};
 }
 
-export async function getExternalLibraries(absFile: string, outputFile: any): Promise<{ externalLibraries: ResolvedExternalLib[], resolved: ResolvedProgramWithLibraries }> {
+export async function getExternalLibraries(
+    absFile: string, outputFile: any): Promise<{
+  externalLibraries: ResolvedExternalLib[],
+  resolved: ResolvedProgramWithLibraries
+}> {
   const entryAbs = path.resolve(absFile);
   const entryDir = path.dirname(entryAbs);
   const resolved = await resolveProgramWithLibraries(entryAbs);
@@ -96,8 +105,10 @@ export async function getExternalLibraries(absFile: string, outputFile: any): Pr
   const externalLibraries: ResolvedExternalLib[] = [];
 
   for (const [name, ref] of resolved.externalLibraries) {
-    const {manifest} = await ensureLibraryCompiled(ref, entryDir, process.cwd());
-    const libDir = path.join(process.cwd(), 'runtime', 'libraries', name.toLowerCase())
+    const {manifest} =
+        await ensureLibraryCompiled(ref, entryDir, process.cwd());
+    const libDir =
+        path.join(process.cwd(), 'runtime', 'libraries', name.toLowerCase())
 
     const importSpecifierFor = (sourceRel: string): string => {
       const out = manifest.files[sourceRel]?.out ??

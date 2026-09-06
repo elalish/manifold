@@ -18,7 +18,8 @@
     "test:semantic": "cd test && npx vitest run semantic.test.ts",
     "test:parse-errors": "cd test && npx vitest run parse-errors.test.ts",
     "compute-parameters": "cd test && npx tsx parameter-calculator-bulk.ts",
-    "benchmark": "npx tsx test/benchmark.ts"
+    "benchmark": "npx tsx test/benchmark.ts",
+    "benchmark:phases": "npx tsx test/benchmark-phases.ts"
   },
   "keywords": [],
   "author": "",

@@ -3,7 +3,6 @@
 import {someNode, walk} from './ast.js';
 import type {Expr, FunctionCallExpr, KindedNode, ModuleCallStmt, Parameter, Statement,} from './ast.js';
 import {BUILTIN_MODULES} from './builtins.js';
-import {collectStringLiterals, isFontRelatedName} from './fonts.js';
 import {bindJsName, escapeName} from './naming.js';
 import {localDecls, noArgDemotions, signatures} from './state.js';
 import {resolveArgsToParams} from './tailcall.js';
@@ -27,13 +26,6 @@ export function scanProgram(
     topLevelChildren: false,
     functionDefs: new Map(),
     divergenceCandidates: [],
-    font: {
-      edges: new Map(),
-      literals: new Set(),
-      paramDefaults: [],
-      calls: [],
-      scopedVars: [],
-    },
   };
 
   let moduleDeclDepth = 0;  // children(): file scope only
@@ -41,9 +33,6 @@ export function scanProgram(
   let declBodyDepth = 0;    // divergence: bodies run only when called
   let callChildDepth = 0;   // functionDefs: match forEachDeclaration's reach
   const callChildren = new Set<KindedNode>();
-  const moduleStack: ModuleDeclStmtType[] = [];
-  const fontTargets = options.fontCandidates;
-  const fontNames = fontTargets?.names;
 
   const enter = (node: KindedNode): void => {
     if (callChildren.has(node)) callChildDepth++;
@@ -76,28 +65,6 @@ export function scanProgram(
               scan.moduleArgNames.add(escapeName(arg.name));
         if (openSlots) demoteNoArgSlots(node, openSlots);
         if (node.child) callChildren.add(node.child);
-        if (fontTargets && fontNames) {
-          const caller = moduleStack[0];
-          if (moduleStack.length === 1 && fontTargets.decls.has(caller!)) {
-            let called = scan.font.edges.get(caller!.name);
-            if (!called) scan.font.edges.set(caller!.name, called = new Set());
-            called.add(node.name);
-          }
-          if (fontNames.has(node.name))
-            scan.font.calls.push({name: node.name, args: node.args});
-        }
-        break;
-      case 'variableDecl':
-        if (fontNames) {
-          if (isFontRelatedName(node.name)) {
-            collectStringLiterals(node.value, scan.font.literals);
-          } else {
-            const owner = moduleStack[moduleStack.length - 1];
-            if (owner !== undefined && fontNames.has(owner.name))
-              scan.font.scopedVars.push(
-                  {module: owner.name, value: node.value});
-          }
-        }
         break;
       case 'functionDecl':
         if (callChildDepth === 0) scan.functionDefs.set(node.name, node);
@@ -107,15 +74,6 @@ export function scanProgram(
       case 'moduleDecl':
         moduleDeclDepth++;
         declBodyDepth++;
-        if (fontNames) {
-          moduleStack.push(node);
-          if (fontNames.has(node.name)) {
-            const exprs = node.params.map(p => p.defaultValue)
-                              .filter((e): e is Expr => !!e);
-            if (exprs.length)
-              scan.font.paramDefaults.push({module: node.name, exprs});
-          }
-        }
         break;
       case 'lambda':
         functionDepth++;
@@ -133,7 +91,6 @@ export function scanProgram(
       case 'moduleDecl':
         moduleDeclDepth--;
         declBodyDepth--;
-        if (fontNames) moduleStack.pop();
         break;
       case 'lambda':
         functionDepth--;

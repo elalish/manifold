@@ -1,15 +1,13 @@
 import path from 'path';
 
-import { compile } from './compiler.js';
-import { resolveProgramWithLibraries } from './resolver.js';
-import type { ResolvedExternalLib, ResolvedProgramWithLibraries } from './types.js';
+import {compile} from './compiler.js';
+import type {ResolvedExternalLib, ResolvedProgramWithLibraries} from './types.js';
 
 export async function compileConsumer(
     entryFile: string, outputFile: string, cwd: string,
     externalLibraries: ResolvedExternalLib[],
     resolved: ResolvedProgramWithLibraries):
-    Promise<
-        {code: string; resolvedFiles: string[]}> {
+    Promise<{code: string; resolvedFiles: string[]}> {
   const entryAbs = path.resolve(entryFile);
 
   const outDir = path.dirname(path.resolve(outputFile));

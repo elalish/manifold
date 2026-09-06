@@ -4,10 +4,9 @@ import type {Argument, ASTNode, BlockStmt, Expr, ForStmt, ForVariable, IfStmt, M
 import {shadowsOuterVar} from './binder.js';
 import {BUILTIN_VAR_CONSTANTS} from './builtins.js';
 import {compileArgList, compileExpr, findArg, inferDeclaredType, isIndexRange, locTag, namesNeedingPredeclaration, numericTypeOf} from './expr.js';
-import {DEFAULT_FONT_SPEC} from './fonts.js';
 import {bindJsName, declJsName, escapeName, svTarget, T,} from './naming.js';
 import {nodeReferencesIdentifier, slotUsesNoArg} from './scan.js';
-import {currentMainFilename, currentSourceFilename, dynamicScopeVars, encounteredFonts, externalModuleNames, globalVarDeclKeyword, moduleDeclRegistry, parentModulesReadInFunction, RT, signatures} from './state.js';
+import {currentMainFilename, currentSourceFilename, dynamicScopeVars, externalModuleNames, globalVarDeclKeyword, moduleDeclRegistry, parentModulesReadInFunction, RT, signatures} from './state.js';
 import {compileSurface} from './surface.js';
 import {deduplicateParams, emitTailBody, hasSelfTailCall, moduleAlwaysRecurses, tailAlwaysRecurses} from './tailcall.js';
 import type {Binding, ModuleDeclStmtType} from './types.js';
@@ -820,13 +819,9 @@ function compileText(args: Argument[]): string {
   const dirStr = dir ? compileExpr(dir.value) : `"ltr"`;
   const fnStr = fn ? compileExpr(fn.value) : `${RT.ctx}.$fn`;
 
-  // Track font for base64 generation and resolve variable name.
-  const rawFontSpec = font && font.value.kind === 'string' ? font.value.value :
-                                                             DEFAULT_FONT_SPEC;
-  encounteredFonts.add(rawFontSpec);
-
+  // The face itself is resolved at runtime, from the spec compiled in here
   return `${RT.text}(${txtStr}, ${sizeStr}, ${fontStr}, ${halignStr}, ${
-      valignStr}, ${spacingStr}, ${dirStr}, ${fnStr}, ${RT.font_registry})`;
+      valignStr}, ${spacingStr}, ${dirStr}, ${fnStr})`;
 }
 
 function compilePolyhedron(args: Argument[]): string {

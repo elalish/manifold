@@ -212,7 +212,6 @@ export const RUNTIME_SYMBOLS: string[] = [
   'echo',
   'oecho',
   'fnlit',
-  'font_registry',
   'tc',
   'call',
 ];

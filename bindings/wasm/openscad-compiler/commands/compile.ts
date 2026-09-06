@@ -3,9 +3,10 @@ import fs from 'fs';
 import path from 'path';
 
 import {compileConsumer} from '../core/orchestrate.js';
-import {setGlobalCanvasResolver, setGlobalFileResolver} from '../core/state.js';
-import {nodeCanvasResolver, nodeFileResolver} from '../host/node.js';
-import { getExternalLibraries } from './util/library_compilation.js';
+import {setGlobalFileResolver} from '../core/state.js';
+import {nodeFileResolver} from '../host/node.js';
+
+import {getExternalLibraries} from './util/library_compilation.js';
 
 const compileSingleFileCommand = new Command();
 
@@ -37,13 +38,12 @@ compileSingleFileCommand.name('compile')
                   'test/out', path.basename(file, path.extname(file)) + '.ts');
 
           setGlobalFileResolver(nodeFileResolver);
-          setGlobalCanvasResolver(nodeCanvasResolver);
 
-          const { externalLibraries, resolved } = await getExternalLibraries(absFile, outputFile);
+          const {externalLibraries, resolved} =
+              await getExternalLibraries(absFile, outputFile);
 
-          const {code: js, resolvedFiles} =
-              await compileConsumer(
-                  absFile, outputFile, process.cwd(), externalLibraries, resolved);
+          const {code: js, resolvedFiles} = await compileConsumer(
+              absFile, outputFile, process.cwd(), externalLibraries, resolved);
           if (resolvedFiles.length > 1) {
             console.log(`Resolved ${resolvedFiles.length} local files`);
           }

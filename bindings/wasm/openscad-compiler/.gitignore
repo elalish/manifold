@@ -2,5 +2,6 @@
 .env
 .env.local
 /runtime/runtime.js
-/runtime/*/
+/runtime/libraries/
+/runtime/surface_data/
 /test/
