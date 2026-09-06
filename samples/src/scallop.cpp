@@ -25,24 +25,45 @@ Manifold Scallop() {
   constexpr double radius = 3;
   constexpr double offset = 2;
   constexpr int wiggles = 12;
-  constexpr double sharpness = 0.8;
-  constexpr double lean = 0.2;
+  constexpr double lean = 0.3;
 
   MeshGL64 scallop;
   scallop.numProp = 3;
   scallop.vertProperties = {-offset, 0, height, -offset, 0, -height};
 
-  const double len = kPi * radius / (3 * wiggles);
+  const double len = kPi * radius / (2 * wiggles);
   const vec3 topNormal = normalize(vec3(-lean, 0, 1));
-  vec3 lastCenterTan(-1, 0, 0);
-  lastCenterTan = lastCenterTan - la::dot(lastCenterTan, topNormal) * topNormal;
-  const vec3 lastEdgeTangent(0, len, 0);
+
+  auto centerTangent = [&](vec3 point) {
+    vec3 tangent = point - vec3(-offset, 0, height);
+    tangent /= 2;
+    return tangent - la::dot(tangent, topNormal) * topNormal;
+  };
+
+  auto addTri = [&](std::array<uint32_t, 3> triVerts, vec3 firstTangent,
+                    vec3 secondTangent, double thirdZ) {
+    scallop.triVerts.insert(scallop.triVerts.end(), triVerts.begin(),
+                            triVerts.end());
+    scallop.halfedgeTangent.insert(
+        scallop.halfedgeTangent.end(),
+        {firstTangent.x, firstTangent.y, firstTangent.z, 1,     //
+         secondTangent.x, secondTangent.y, secondTangent.z, 1,  //
+         0, 0, thirdZ, 1});
+  };
+
+  const vec3 v0(radius, 0, 0.5 * height);
+  scallop.vertProperties.insert(scallop.vertProperties.end(),
+                                {v0.x, v0.y, v0.z});
+
+  vec3 lastCenterTan = centerTangent(v0);
+  const vec3 firstCenterTan = lastCenterTan;
+  const vec3 firstEdgeTangent(0, len, 0);
+  vec3 lastEdgeTangent = firstEdgeTangent;
 
   const double delta = kPi / wiggles;
-  for (uint32_t i = 1; i <= 2 * wiggles; ++i) {
-    const uint32_t j = i == 2 * wiggles ? 0 : i;
+  for (uint32_t i = 1; i < 2 * wiggles; ++i) {
     const double theta = i * delta;
-    const double amp = 0.5 * height * (la::cos(theta) + 1);
+    const double amp = 0.25 * height * (la::cos(theta) + 1);
 
     vec3 v = vec3(radius * la::cos(theta), radius * la::sin(theta),
                   amp * (i % 2 == 0 ? 1 : -1));
@@ -50,26 +71,24 @@ Manifold Scallop() {
     scallop.vertProperties.insert(scallop.vertProperties.end(),
                                   {v.x, v.y, v.z});
     const vec3 edgeTangent(-len * la::sin(theta), len * la::cos(theta), 0);
-    vec3 centerTan = v - vec3(-offset, 0, height);
-    centerTan /= 3;
-    centerTan = centerTan - la::dot(centerTan, topNormal) * topNormal;
+    vec3 centerTan = centerTangent(v);
+    const uint32_t prev = 1 + i;
+    const uint32_t curr = 2 + i;
 
-    scallop.triVerts.insert(scallop.triVerts.end(), {0, 2 + i - 1, 2 + j});
-    scallop.halfedgeTangent.insert(
-        scallop.halfedgeTangent.end(),
-        {lastCenterTan.x, lastCenterTan.y, lastCenterTan.z, 1,        //
-         lastEdgeTangent.x, lastEdgeTangent.y, lastEdgeTangent.z, 1,  //
-         0, 0, len, 1});
+    addTri({0, prev, curr}, lastCenterTan, lastEdgeTangent, len);
 
-    scallop.triVerts.insert(scallop.triVerts.end(), {1, 2 + j, 2 + i - 1});
-    scallop.halfedgeTangent.insert(
-        scallop.halfedgeTangent.end(),
-        {centerTan.x, centerTan.y, -centerTan.z, 1,          //
-         -edgeTangent.x, -edgeTangent.y, -edgeTangent.z, 1,  //
-         0, 0, -len, 1});
+    addTri({1, curr, prev}, {centerTan.x, centerTan.y, -centerTan.z},
+           -edgeTangent, -len);
 
     lastCenterTan = centerTan;
+    lastEdgeTangent = edgeTangent;
   }
+
+  const uint32_t last = 1 + 2 * wiggles;
+  addTri({0, last, 2}, lastCenterTan, lastEdgeTangent, len);
+
+  addTri({1, 2, last}, {firstCenterTan.x, firstCenterTan.y, -firstCenterTan.z},
+         -firstEdgeTangent, -len);
 
   return Manifold(scallop);
 }
