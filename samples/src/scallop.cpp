@@ -33,7 +33,7 @@ Manifold Scallop() {
   scallop.vertProperties = {-offset, 0, height, -offset, 0, -height};
 
   const double len = kPi * radius / (2 * wiggles);
-  const vec3 topNormal = normalize(vec3(-lean, 0, 1));
+  const vec3 topNormal = vec3(-lean, 0, la::sqrt(1 - lean * lean));
 
   const double delta = kPi / wiggles;
   std::array<vec3, 2 * wiggles> centerTangents;

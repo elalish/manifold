@@ -107,7 +107,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("cancelled", &ExecutionContext::Cancelled)
       .function("progress", &ExecutionContext::Progress)
       .function("_FromMesh", &man_js::ExecutionContextFromMesh)
-      .function("_Smooth", &man_js::ExecutionContextSmooth)
       .function("_LevelSet", &man_js::ExecutionContextLevelSet);
 
   register_vector<RayHit>("Vector_rayHit");

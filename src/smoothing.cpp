@@ -388,17 +388,6 @@ Vec<int> Manifold::Impl::VertHalfedge() const {
 }
 
 /**
- * Sharpen tangents that intersect an edge to sharpen that edge. The weight is
- * unchanged, as this has a squared effect on radius of curvature, except
- * in the case of zero radius, which is marked with weight = 0.
- */
-void Manifold::Impl::SharpenTangent(int halfedge, double smoothness) {
-  halfedgeTangent_[halfedge] =
-      vec4(smoothness * vec3(halfedgeTangent_[halfedge]),
-           smoothness == 0 ? 0 : halfedgeTangent_[halfedge].w);
-}
-
-/**
  * Instead of calculating the internal shared normals like CalculateNormals
  * does, this method fills in vertex properties, unshared across edges that
  * are bent more than minSharpAngle.
@@ -587,42 +576,6 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
       ++idx;
     });
   }
-}
-
-/**
- * Tangents get flattened to create sharp edges by setting their weight to zero.
- * This is the natural limit of reducing the weight to increase the sharpness
- * smoothly. This limit gives a decent shape, but it causes the parameterization
- * to be stretched and compresses it near the edges, which is good for resolving
- * tight curvature, but bad for property interpolation. This function fixes the
- * parameter stretch at the limit for sharp edges, since there is no curvature
- * to resolve. Note this also changes the overall shape - making it more evenly
- * curved.
- */
-void Manifold::Impl::LinearizeFlatTangents() {
-  const int n = halfedgeTangent_.size();
-  for_each_n(autoPolicy(n, 1e4), countAt(0), n, [this](const int halfedge) {
-    vec4& tangent = halfedgeTangent_[halfedge];
-    const int pair = halfedge_.Pair(halfedge);
-    vec4& otherTangent = halfedgeTangent_[pair];
-
-    const bool flat[2] = {tangent.w == 0, otherTangent.w == 0};
-    if (!halfedge_.IsForward(halfedge) || (!flat[0] && !flat[1])) {
-      return;
-    }
-
-    const vec3 edgeVec =
-        vertPos_[halfedge_.End(halfedge)] - vertPos_[halfedge_.Start(halfedge)];
-
-    if (flat[0] && flat[1]) {
-      tangent = vec4(edgeVec / 3.0, 1);
-      otherTangent = vec4(-edgeVec / 3.0, 1);
-    } else if (flat[0]) {
-      tangent = vec4((edgeVec + vec3(otherTangent)) / 2.0, 1);
-    } else {
-      otherTangent = vec4((-edgeVec + vec3(tangent)) / 2.0, 1);
-    }
-  });
 }
 
 /**

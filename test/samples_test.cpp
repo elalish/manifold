@@ -81,8 +81,8 @@ TEST(Samples, Scallop) {
 
   scallop = scallop.Refine(50).CalculateCurvature(-1, 0).SetProperties(
       3, colorCurvature);
-  EXPECT_NEAR(scallop.Volume(), 37.1, 0.1);
-  EXPECT_NEAR(scallop.SurfaceArea(), 82.6, 0.1);
+  EXPECT_NEAR(scallop.Volume(), 37.3, 0.1);
+  EXPECT_NEAR(scallop.SurfaceArea(), 82.7, 0.1);
   EXPECT_EQ(scallop.NumVert(), scallop.NumPropVert());
   CheckGL(scallop);
 
