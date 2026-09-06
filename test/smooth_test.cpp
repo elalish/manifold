@@ -23,7 +23,7 @@ using namespace manifold;
 
 TEST(Smooth, Tetrahedron) {
   Manifold tet = Manifold::Tetrahedron();
-  Manifold smooth = Manifold::Smooth(tet.GetMeshGL());
+  Manifold smooth = tet.CalculateNormals().SmoothByNormals();
   int n = 100;
   smooth = smooth.Refine(n);
   ExpectMeshes(smooth, {{2 * n * n + 2, 4 * n * n}});
@@ -43,7 +43,8 @@ TEST(Smooth, Tetrahedron) {
 
 TEST(Smooth, RefineQuads) {
   Manifold cylinder = WithPositionColors(Manifold::Cylinder(2, 1, -1, 12))
-                          .SmoothOut()
+                          .CalculateNormals()
+                          .SmoothByNormals()
                           .RefineToLength(0.05);
   EXPECT_EQ(cylinder.NumTri(), 16644);
   EXPECT_NEAR(cylinder.Volume(), 2 * kPi, 0.003);
@@ -67,15 +68,13 @@ TEST(Smooth, RefineQuads) {
 
 TEST(Smooth, TruncatedCone) {
   Manifold cone = Manifold::Cylinder(5, 10, 5, 12);
-  Manifold smooth = cone.SmoothOut().RefineToLength(0.5).CalculateNormals(0);
+  Manifold smooth = cone.CalculateNormals()
+                        .SmoothByNormals()
+                        .RefineToLength(0.5)
+                        .CalculateNormals();
   EXPECT_NEAR(smooth.Volume(), 1163.53, 0.01);
   EXPECT_NEAR(smooth.SurfaceArea(), 769.33, 0.01);
   CheckGL(smooth, false);
-
-  Manifold smooth1 = cone.SmoothOut(180, 1).RefineToLength(0.5);
-  Manifold smooth2 = cone.SmoothOut(180, 0).RefineToLength(0.5);
-  EXPECT_NEAR(smooth2.Volume(), smooth1.Volume(), 0.01);
-  EXPECT_NEAR(smooth2.SurfaceArea(), smooth1.SurfaceArea(), 0.01);
 
   if (options.exportModels) WriteTestOBJ("smoothTruncatedCone.obj", smooth);
 }
@@ -86,8 +85,11 @@ TEST(Smooth, ToLength) {
       {0, 0});
   cone += cone.Scale({1, 1, -5});
   EXPECT_EQ(cone.NumVert(), 12);
-  Manifold smooth =
-      cone.AsOriginal().Simplify().SmoothOut(180).RefineToLength(0.1);
+  Manifold smooth = cone.AsOriginal()
+                        .Simplify()
+                        .CalculateNormals(180)
+                        .SmoothByNormals()
+                        .RefineToLength(0.1);
   ExpectMeshes(smooth, {{85250, 170496}});
   EXPECT_NEAR(smooth.Volume(), 4570, 1);
   EXPECT_NEAR(smooth.SurfaceArea(), 1348, 1);
@@ -110,7 +112,7 @@ TEST(Smooth, Sphere) {
   for (int i = 0; i < 5; ++i) {
     Manifold sphere = Manifold::Sphere(1, n[i]);
     // Refine(3*x) makes a center point, which is the worst case.
-    Manifold smoothed = Manifold::Smooth(sphere.GetMeshGL()).Refine(6);
+    Manifold smoothed = sphere.CalculateNormals().SmoothByNormals().Refine(6);
     // Refine(3*x) puts a center point in the triangle, which is the worst
     // case.
     MeshGL64 out = smoothed.GetMeshGL64();
@@ -134,7 +136,9 @@ TEST(Smooth, Precision) {
   const double radius = 10;
   const double height = 10;
   Manifold cylinder = Manifold::Cylinder(height, radius, radius, 8);
-  Manifold smoothed = cylinder.SmoothOut().RefineToTolerance(tolerance);
+  Manifold smoothed =
+      cylinder.CalculateNormals().SmoothByNormals().RefineToTolerance(
+          tolerance);
   // Makes an edge bisector, which is the worst case.
   MeshGL64 out = smoothed.Refine(2).GetMeshGL64();
   const int numVert = out.NumVert();
@@ -158,7 +162,8 @@ TEST(Smooth, Precision) {
 
 TEST(Smooth, Normals) {
   Manifold cylinder = Manifold::Cylinder(10, 5, 5, 8);
-  Manifold out = cylinder.SmoothOut().RefineToLength(0.1);
+  Manifold out =
+      cylinder.CalculateNormals().SmoothByNormals().RefineToLength(0.1);
   Manifold byNormals =
       cylinder.CalculateNormals(0).SmoothByNormals(0).RefineToLength(0.1);
   EXPECT_FLOAT_EQ(out.Volume(), byNormals.Volume());
@@ -277,8 +282,8 @@ TEST(Smooth, Fillet2) {
 
 TEST(Smooth, Manual) {
   // Unit Octahedron
-  const auto oct = Manifold::Sphere(1, 4).GetMeshGL();
-  MeshGL smooth = Manifold::Smooth(oct).GetMeshGL();
+  const auto oct = Manifold::Sphere(1, 4);
+  MeshGL smooth = oct.CalculateNormals().SmoothByNormals().GetMeshGL();
   // Sharpen the edge from vert 4 to 5
   smooth.halfedgeTangent[4 * 6 + 3] = 0;
   smooth.halfedgeTangent[4 * 22 + 3] = 0;
@@ -304,7 +309,7 @@ TEST(Smooth, Manual) {
 }
 
 TEST(Smooth, InvalidTangents) {
-  Manifold cube = Manifold::Cube().SmoothOut(180);
+  Manifold cube = Manifold::Cube().CalculateNormals(180).SmoothByNormals();
   MeshGL withTangents = cube.GetMeshGL();
   size_t sizeHalfedges = withTangents.halfedgeTangent.size();
   for (size_t i = (sizeHalfedges / 8) * 4 + 3; i < sizeHalfedges; i += 4) {
@@ -317,8 +322,8 @@ TEST(Smooth, InvalidTangents) {
 }
 
 TEST(Smooth, Mirrored) {
-  const auto tet = Manifold::Tetrahedron().Scale({1, 2, 3}).GetMeshGL();
-  Manifold smooth = Manifold::Smooth(tet);
+  const auto tet = Manifold::Tetrahedron().Scale({1, 2, 3});
+  Manifold smooth = tet.CalculateNormals().SmoothByNormals();
   Manifold mirror = smooth.Scale({-2, 2, 2}).Refine(10);
   smooth = smooth.Refine(10).Scale({2, 2, 2});
 
@@ -329,8 +334,8 @@ TEST(Smooth, Mirrored) {
 }
 
 TEST(Smooth, Csaszar) {
-  Manifold csaszar = Manifold::Smooth(Csaszar());
-  csaszar = csaszar.Refine(100);
+  Manifold csaszar(Csaszar());
+  csaszar = csaszar.CalculateNormals().SmoothByNormals().Refine(100);
   ExpectMeshes(csaszar, {{70000, 140000}});
   EXPECT_NEAR(csaszar.Volume(), 74757, 10);
   EXPECT_NEAR(csaszar.SurfaceArea(), 11313, 10);

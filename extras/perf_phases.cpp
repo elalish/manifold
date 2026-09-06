@@ -111,7 +111,8 @@ void BenchSmooth(const std::string& workload, const MeshGL& gl, int refine) {
             << ", refine = " << refine << " ===" << std::endl;
   auto t0 = std::chrono::high_resolution_clock::now();
   ExecutionContext ctx;
-  Manifold result = ctx.Smooth(gl, {}).Refine(refine);
+  Manifold result =
+      ctx.FromMeshGL(gl).CalculateNormals().SmoothByNormals().Refine(refine);
   result.NumTri();
   auto t1 = std::chrono::high_resolution_clock::now();
   std::cout << "total = " << std::chrono::duration<double>(t1 - t0).count()

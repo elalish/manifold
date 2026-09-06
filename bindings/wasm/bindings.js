@@ -200,11 +200,6 @@ Module.setup = function() {
 
   // Manifold methods
 
-  Module.Manifold.prototype.smoothOut = function(
-      minSharpAngle = 52.5, minSmoothness = 0) {
-    return this._SmoothOut(minSharpAngle, minSmoothness);
-  };
-
   Module.Manifold.prototype.warp = function(func) {
     const wasmFuncPtr = addFunction(function(vec3Ptr) {
       const x = getValue(vec3Ptr, 'double');
@@ -669,14 +664,6 @@ Module.setup = function() {
     return Module._Sphere(radius, circularSegments);
   };
 
-  Module.Manifold.smooth = function(mesh, sharpenedEdges = []) {
-    const sharp = new Module.Vector_smoothness();
-    toVec(sharp, sharpenedEdges);
-    const result = Module._Smooth(mesh, sharp);
-    sharp.delete();
-    return result;
-  };
-
   Module.Manifold.extrude = function(
       polygons, height, nDivisions = 0, twistDegrees = 0.0,
       scaleTop = [1.0, 1.0], center = false) {
@@ -736,19 +723,10 @@ Module.setup = function() {
     return out;
   };
 
-  // ctx-aware static factories: mirror Manifold.ofMesh / smooth / levelSet but
+  // ctx-aware static factories: mirror Manifold.ofMesh / levelSet but
   // run under this ExecutionContext so progress/cancellation are observed.
   Module.ExecutionContext.prototype.fromMesh = function(mesh) {
     return this._FromMesh(mesh);
-  };
-
-  Module.ExecutionContext.prototype.smooth = function(
-      mesh, sharpenedEdges = []) {
-    const sharp = new Module.Vector_smoothness();
-    toVec(sharp, sharpenedEdges);
-    const result = this._Smooth(mesh, sharp);
-    sharp.delete();
-    return result;
   };
 
   Module.ExecutionContext.prototype.levelSet = function(

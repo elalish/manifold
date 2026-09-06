@@ -95,10 +95,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
   value_object<Rect>("rect").field("min", &Rect::min).field("max", &Rect::max);
   value_object<Box>("box").field("min", &Box::min).field("max", &Box::max);
 
-  value_object<Smoothness>("smoothness")
-      .field("halfedge", &Smoothness::halfedge)
-      .field("smoothness", &Smoothness::smoothness);
-
   value_object<RayHit>("rayHit")
       .field("faceID", &RayHit::faceID)
       .field("distance", &RayHit::distance)
@@ -123,7 +119,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
   register_vector<int>("Vector_i32");
   register_vector<CrossSection>("Vector_crossSection");
   register_vector<Manifold>("Vector_manifold");
-  register_vector<Smoothness>("Vector_smoothness");
   register_vector<vec4>("Vector_vec4");
 
   class_<CrossSection>("CrossSection")
@@ -181,7 +176,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("refineToLength", &Manifold::RefineToLength)
       .function("refineToTolerance", &Manifold::RefineToTolerance)
       .function("_SmoothByNormals", &Manifold::SmoothByNormals)
-      .function("_SmoothOut", &Manifold::SmoothOut)
       .function("_Warp", &man_js::Warp)
       .function("_WarpBatch", &man_js::WarpBatch)
       .function("_SetProperties", &man_js::SetProperties)
@@ -220,7 +214,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_Cylinder", &Manifold::Cylinder);
   function("_Sphere", &Manifold::Sphere);
   function("_Tetrahedron", &Manifold::Tetrahedron);
-  function("_Smooth", &js::Smooth);
   function("_Extrude", &Manifold::Extrude);
   function("_Triangulate", &Triangulate);
   function("_Revolve", &Manifold::Revolve);
