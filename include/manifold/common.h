@@ -161,19 +161,6 @@ using SimplePolygon = std::vector<vec2>;
 using Polygons = std::vector<SimplePolygon>;
 
 /**
- * @brief Defines which edges to sharpen and how much for the Manifold.Smooth()
- * constructor.
- */
-struct Smoothness {
-  /// The halfedge index = 3 * tri + i, referring to Mesh.triVerts[tri][i].
-  size_t halfedge;
-  /// A value between 0 and 1, where 0 is sharp and 1 is the default and the
-  /// curvature is interpolated between these values. The two paired halfedges
-  /// can have different values while maintaining C-1 continuity (except for 0).
-  double smoothness;
-};
-
-/**
  * @brief Result of a ray cast query against a Manifold.
  */
 struct RayHit {
@@ -275,15 +262,6 @@ class ExecutionContext {
   /// values; the returned Manifolds remain valid.
   Manifold FromMeshGL(const MeshGL& mesh);
   Manifold FromMeshGL(const MeshGL64& mesh);
-
-  /// Eager ctx-aware `Manifold::Smooth(MeshGL[64])`. The ingest phases
-  /// plus the tangent-creation phases check cancel and credit
-  /// `Progress()` between phases. Same cancel-vs-validation precedence
-  /// as `FromMeshGL`.
-  Manifold Smooth(const MeshGL& mesh,
-                  const std::vector<Smoothness>& sharpenedEdges = {});
-  Manifold Smooth(const MeshGL64& mesh,
-                  const std::vector<Smoothness>& sharpenedEdges = {});
 
   /// Eager ctx-aware `Manifold::LevelSet`. The voxel-sampling and
   /// mesh-extraction phases check cancel and credit `Progress()` between
@@ -732,11 +710,6 @@ inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
 
 inline std::ostream& operator<<(std::ostream& stream, const Rect& box) {
   return stream << "min: " << box.min << ", " << "max: " << box.max;
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const Smoothness& s) {
-  return stream << "halfedge: " << s.halfedge << ", "
-                << "smoothness: " << s.smoothness;
 }
 
 /**

@@ -165,9 +165,6 @@ ManifoldManifold* manifold_warp(void* mem, ManifoldManifold* m,
                                 void* ctx);
 ManifoldManifold* manifold_smooth_by_normals(void* mem, ManifoldManifold* m,
                                              int normalIdx);
-ManifoldManifold* manifold_smooth_out(void* mem, ManifoldManifold* m,
-                                      double minSharpAngle,
-                                      double minSmoothness);
 ManifoldManifold* manifold_refine(void* mem, ManifoldManifold* m, int refine);
 ManifoldManifold* manifold_refine_to_length(void* mem, ManifoldManifold* m,
                                             double length);
@@ -192,12 +189,6 @@ ManifoldManifold* manifold_sphere(void* mem, double radius,
                                   int circular_segments);
 ManifoldManifold* manifold_of_meshgl(void* mem, ManifoldMeshGL* mesh);
 ManifoldManifold* manifold_of_meshgl64(void* mem, ManifoldMeshGL64* mesh);
-ManifoldManifold* manifold_smooth(void* mem, ManifoldMeshGL* mesh,
-                                  size_t* half_edges, double* smoothness,
-                                  size_t n_idxs);
-ManifoldManifold* manifold_smooth64(void* mem, ManifoldMeshGL64* mesh,
-                                    size_t* half_edges, double* smoothness,
-                                    size_t n_idxs);
 ManifoldManifold* manifold_extrude(void* mem, ManifoldPolygons* cs,
                                    double height, int slices,
                                    double twist_degrees, double scale_x,
@@ -275,7 +266,7 @@ double manifold_execution_context_progress(ManifoldExecutionContext* ctx);
 // ctx-aware static factories. These ops have no source manifold to attach via
 // manifold_with_context, so they run on the ExecutionContext directly to report
 // progress / observe cancellation. Mirror manifold_level_set /
-// manifold_of_meshgl / manifold_smooth; `sdf_context` is the SDF callback's
+// manifold_of_meshgl; `sdf_context` is the SDF callback's
 // user-data.
 ManifoldManifold* manifold_execution_context_level_set(
     void* mem, ManifoldExecutionContext* ec, ManifoldSdf sdf,
@@ -289,12 +280,6 @@ ManifoldManifold* manifold_execution_context_of_meshgl(
     void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL* mesh);
 ManifoldManifold* manifold_execution_context_of_meshgl64(
     void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL64* mesh);
-ManifoldManifold* manifold_execution_context_smooth(
-    void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL* mesh,
-    size_t* half_edges, double* smoothness, size_t n_edges);
-ManifoldManifold* manifold_execution_context_smooth64(
-    void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL64* mesh,
-    size_t* half_edges, double* smoothness, size_t n_edges);
 
 // CrossSection Shapes/Constructors
 ManifoldCrossSection* manifold_cross_section_empty(void* mem);

@@ -260,12 +260,6 @@ class Manifold {
   Manifold RefineToLength(double) const;
   Manifold RefineToTolerance(double) const;
   Manifold SmoothByNormals(int normalIdx = 0) const;
-  Manifold SmoothOut(double minSharpAngle = 52.5,
-                     double minSmoothness = 0) const;
-  static Manifold Smooth(const MeshGL&,
-                         const std::vector<Smoothness>& sharpenedEdges = {});
-  static Manifold Smooth(const MeshGL64&,
-                         const std::vector<Smoothness>& sharpenedEdges = {});
   ///@}
 
   /** @name Convex Hull

@@ -315,13 +315,6 @@ ManifoldManifold* manifold_smooth_by_normals(void* mem, ManifoldManifold* m,
   return to_c(new (mem) Manifold(smoothed));
 }
 
-ManifoldManifold* manifold_smooth_out(void* mem, ManifoldManifold* m,
-                                      double minSharpAngle,
-                                      double minSmoothness) {
-  auto smoothed = from_c(m)->SmoothOut(minSharpAngle, minSmoothness);
-  return to_c(new (mem) Manifold(smoothed));
-}
-
 ManifoldManifold* manifold_refine(void* mem, ManifoldManifold* m, int refine) {
   auto refined = from_c(m)->Refine(refine);
   return to_c(new (mem) Manifold(refined));
@@ -501,28 +494,6 @@ ManifoldMeshGL64* manifold_meshgl64_w_options(
   }
 
   return to_c(mesh);
-}
-
-ManifoldManifold* manifold_smooth(void* mem, ManifoldMeshGL* mesh,
-                                  size_t* half_edges, double* smoothness,
-                                  size_t n_edges) {
-  auto smooth = std::vector<Smoothness>();
-  for (size_t i = 0; i < n_edges; ++i) {
-    smooth.push_back({half_edges[i], smoothness[i]});
-  }
-  auto m = Manifold::Smooth(*from_c(mesh), smooth);
-  return to_c(new (mem) Manifold(m));
-}
-
-ManifoldManifold* manifold_smooth64(void* mem, ManifoldMeshGL64* mesh,
-                                    size_t* half_edges, double* smoothness,
-                                    size_t n_edges) {
-  auto smooth = std::vector<Smoothness>();
-  for (size_t i = 0; i < n_edges; ++i) {
-    smooth.push_back({half_edges[i], smoothness[i]});
-  }
-  auto m = Manifold::Smooth(*from_c(mesh), smooth);
-  return to_c(new (mem) Manifold(m));
 }
 
 ManifoldManifold* manifold_of_meshgl(void* mem, ManifoldMeshGL* mesh) {
@@ -908,7 +879,7 @@ double manifold_execution_context_progress(ManifoldExecutionContext* ctx) {
   return from_c(ctx)->Progress();
 }
 
-// ctx-aware static factories: the FromMeshGL / LevelSet / Smooth ops have no
+// ctx-aware static factories: the FromMeshGL / LevelSet ops have no
 // source Manifold to attach via manifold_with_context, so they run directly on
 // the ExecutionContext. Each mirrors its plain factory but observes progress /
 // cancellation. `sdf_context` is the SDF callback's user-data (distinct from
@@ -937,26 +908,6 @@ ManifoldManifold* manifold_execution_context_of_meshgl(
 ManifoldManifold* manifold_execution_context_of_meshgl64(
     void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL64* mesh) {
   return to_c(new (mem) Manifold(from_c(ec)->FromMeshGL(*from_c(mesh))));
-}
-
-ManifoldManifold* manifold_execution_context_smooth(
-    void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL* mesh,
-    size_t* half_edges, double* smoothness, size_t n_edges) {
-  auto smooth = std::vector<Smoothness>();
-  for (size_t i = 0; i < n_edges; ++i) {
-    smooth.push_back({half_edges[i], smoothness[i]});
-  }
-  return to_c(new (mem) Manifold(from_c(ec)->Smooth(*from_c(mesh), smooth)));
-}
-
-ManifoldManifold* manifold_execution_context_smooth64(
-    void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL64* mesh,
-    size_t* half_edges, double* smoothness, size_t n_edges) {
-  auto smooth = std::vector<Smoothness>();
-  for (size_t i = 0; i < n_edges; ++i) {
-    smooth.push_back({half_edges[i], smoothness[i]});
-  }
-  return to_c(new (mem) Manifold(from_c(ec)->Smooth(*from_c(mesh), smooth)));
 }
 
 ManifoldManifold* manifold_calculate_normals(void* mem, ManifoldManifold* m,
