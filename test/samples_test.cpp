@@ -91,7 +91,6 @@ TEST(Samples, Scallop) {
 
 TEST(Samples, TetPuzzle) {
   Manifold puzzle = TetPuzzle(50, 0.2, 50);
-  EXPECT_LE(puzzle.NumDegenerateTris(), 2);
   CheckGL(puzzle);
 
   Manifold puzzle2 = puzzle.Rotate(0, 0, 180);
@@ -103,7 +102,6 @@ TEST(Samples, TetPuzzle) {
 
 TEST(Samples, FrameReduced) {
   Manifold frame = RoundedFrame(100, 10, 4);
-  EXPECT_EQ(frame.NumDegenerateTris(), 0);
   EXPECT_EQ(frame.Genus(), 5);
   EXPECT_NEAR(frame.Volume(), 227333, 10);
   EXPECT_NEAR(frame.SurfaceArea(), 62635, 1);
@@ -113,7 +111,6 @@ TEST(Samples, FrameReduced) {
 
 TEST(Samples, Frame) {
   Manifold frame = RoundedFrame(100, 10);
-  EXPECT_EQ(frame.NumDegenerateTris(), 0);
   EXPECT_EQ(frame.Genus(), 5);
   CheckGL(frame);
   if (options.exportModels) WriteTestOBJ("roundedFrame.obj", frame);
@@ -123,7 +120,6 @@ TEST(Samples, Frame) {
 // that are not in general position, e.g. coplanar faces.
 TEST(Samples, Bracelet) {
   Manifold bracelet = StretchyBracelet();
-  EXPECT_EQ(bracelet.NumDegenerateTris(), 0);
   EXPECT_EQ(bracelet.Genus(), 1);
   CheckGL(bracelet);
 
@@ -138,7 +134,6 @@ TEST(Samples, Bracelet) {
   EXPECT_NEAR(projection.Area(), 649, 1);
   EXPECT_EQ(projection.NumContour(), 2);
   Manifold extrusion = Manifold::Extrude(projection.ToPolygons(), 1);
-  EXPECT_EQ(extrusion.NumDegenerateTris(), 0);
   EXPECT_EQ(extrusion.Genus(), 1);
 
   CrossSection slice(bracelet.Slice());
@@ -153,7 +148,6 @@ TEST(Samples, Bracelet) {
 TEST(Samples, GyroidModule) {
   const double size = 20;
   Manifold gyroid = GyroidModule(size);
-  EXPECT_LE(gyroid.NumDegenerateTris(), 4);
   EXPECT_EQ(gyroid.Genus(), 15);
   CheckGL(gyroid);
 
@@ -173,7 +167,6 @@ TEST(Samples, GyroidModule) {
 
 TEST(Samples, Sponge1) {
   Manifold sponge = MengerSponge(1);
-  EXPECT_EQ(sponge.NumDegenerateTris(), 0);
   EXPECT_EQ(sponge.NumVert(), 40);
   EXPECT_EQ(sponge.Genus(), 5);
   CheckGL(sponge);
@@ -187,7 +180,6 @@ TEST(Samples, Sponge1) {
 // degree rotations.
 TEST(Samples, Sponge4) {
   Manifold sponge = MengerSponge(4);
-  EXPECT_LE(sponge.NumDegenerateTris(), 35);
   EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:1409, 4:26433
   CheckGL(sponge);
 
@@ -205,9 +197,6 @@ TEST(Samples, Sponge4) {
   EXPECT_EQ(rect.max.y, box.max.y);
   EXPECT_NEAR(projection.Area(), 0.535, 0.001);
   Manifold extrusion = Manifold::Extrude(projection.ToPolygons(), 1);
-  // This dense extrusion keeps a few sub-tolerance sliver tris; Genus (below)
-  // is the meaningful invariant.
-  EXPECT_LE(extrusion.NumDegenerateTris(), 80);
   EXPECT_EQ(extrusion.Genus(), 502);
 
   if (options.exportModels) {

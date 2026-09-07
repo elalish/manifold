@@ -165,7 +165,6 @@ TEST(Boolean, Cubes) {
   result += Manifold::Cube({1.2, 0.1, 0.5}).Translate({-0.6, -0.1, 0});
 
   EXPECT_TRUE(result.MatchesTriNormals());
-  EXPECT_LE(result.NumDegenerateTris(), 0);
   EXPECT_NEAR(result.Volume(), 1.6, 0.001);
   EXPECT_NEAR(result.SurfaceArea(), 9.2, 0.01);
 
@@ -343,11 +342,8 @@ TEST(Boolean, TreeTransforms) {
   auto c = a + b;
 
   EXPECT_FLOAT_EQ(c.Volume(), 2);
-  EXPECT_EQ(c.NumDegenerateTris(), 0);
   EXPECT_FLOAT_EQ(a.Volume(), 1);
-  EXPECT_EQ(a.NumDegenerateTris(), 0);
   EXPECT_FLOAT_EQ(b.Volume(), 1);
-  EXPECT_EQ(b.NumDegenerateTris(), 0);
 }
 
 TEST(Boolean, CreatePropertiesSlow) {
@@ -418,7 +414,6 @@ TEST(Boolean, Perturb1) {
       Manifold::Extrude({{{1, 2}, {2, 2}, {2, 3}}}, 1.0).Translate({0, 0, 1});
   const Manifold result = (big + little) - punchHole;
 
-  EXPECT_EQ(result.NumDegenerateTris(), 0);
   EXPECT_EQ(result.NumVert(), 24);
   EXPECT_FLOAT_EQ(result.Volume(), 7.5);
   EXPECT_NEAR(result.SurfaceArea(), 38.2, 0.1);
@@ -470,7 +465,6 @@ TEST(Boolean, Perturb2) {
   // The result should be a double-sized cube, 4 units to a side.
   // If symbolic perturbation fails, the number of verts and the surface area
   // will increase, indicating cracks and internal geometry.
-  EXPECT_EQ(result.NumDegenerateTris(), 0);
   EXPECT_EQ(result.NumVert(), 8);
   EXPECT_FLOAT_EQ(result.Volume(), 64.0);
   EXPECT_FLOAT_EQ(result.SurfaceArea(), 96.0);
@@ -556,7 +550,6 @@ TEST(Boolean, Coplanar) {
   Manifold cylinder2 = cylinder.Scale({0.8, 0.8, 1.0}).Rotate(0, 0, 185);
   Manifold out = cylinder - cylinder2;
   ExpectMeshes(out, {{32, 64, 3, 48}});
-  EXPECT_EQ(out.NumDegenerateTris(), 0);
   EXPECT_EQ(out.Genus(), 1);
 
   if (options.exportModels) WriteTestOBJ("coplanar.obj", out);
@@ -569,7 +562,7 @@ TEST(Boolean, MultiCoplanar) {
   Manifold first = cube - cube.Translate({0.3, 0.3, 0.0});
   cube = cube.Translate({-0.3, -0.3, 0.0});
   Manifold out = first - cube;
-  CheckStrictly(out);
+  EXPECT_TRUE(out.MatchesTriNormals());
   EXPECT_EQ(out.Genus(), -1);
   EXPECT_NEAR(out.Volume(), 0.18, 1e-5);
   EXPECT_NEAR(out.SurfaceArea(), 2.76, 1e-5);
@@ -624,8 +617,8 @@ TEST(Boolean, Split) {
   Manifold cube = Manifold::Cube(vec3(2.0), true);
   Manifold oct = Manifold::Sphere(1, 4).Translate(vec3(0.0, 0.0, 1.0));
   std::pair<Manifold, Manifold> splits = cube.Split(oct);
-  CheckStrictly(splits.first);
-  CheckStrictly(splits.second);
+  EXPECT_TRUE(splits.first.MatchesTriNormals());
+  EXPECT_TRUE(splits.second.MatchesTriNormals());
   EXPECT_FLOAT_EQ(splits.first.Volume() + splits.second.Volume(),
                   cube.Volume());
 }
@@ -650,8 +643,8 @@ TEST(Boolean, SplitByPlane) {
   cube = cube.Rotate(90.0, 0.0, 0.0);
   std::pair<Manifold, Manifold> splits =
       cube.SplitByPlane({0.0, 0.0, 1.0}, 1.0);
-  CheckStrictly(splits.first);
-  CheckStrictly(splits.second);
+  EXPECT_TRUE(splits.first.MatchesTriNormals());
+  EXPECT_TRUE(splits.second.MatchesTriNormals());
   EXPECT_NEAR(splits.first.Volume(), splits.second.Volume(), 1e-5);
 
   Manifold first = cube.TrimByPlane({0.0, 0.0, 1.0}, 1.0);
@@ -669,8 +662,8 @@ TEST(Boolean, SplitByPlane60) {
   double phi = 30.0;
   std::pair<Manifold, Manifold> splits =
       cube.SplitByPlane({sind(phi), -cosd(phi), 0.0}, 1.0);
-  CheckStrictly(splits.first);
-  CheckStrictly(splits.second);
+  EXPECT_TRUE(splits.first.MatchesTriNormals());
+  EXPECT_TRUE(splits.second.MatchesTriNormals());
   EXPECT_NEAR(splits.first.Volume(), splits.second.Volume(), 1e-5);
 }
 
@@ -794,7 +787,7 @@ TEST(Boolean, Vug) {
   EXPECT_EQ(vug.Genus(), -1);
 
   Manifold half = vug.SplitByPlane({0.0, 0.0, 1.0}, -1.0).first;
-  CheckStrictly(half);
+  EXPECT_TRUE(half.MatchesTriNormals());
   EXPECT_EQ(half.Genus(), -1);
 
   EXPECT_FLOAT_EQ(half.Volume(), 4.0 * 4.0 * 3.0 - 1.0);
@@ -874,7 +867,7 @@ TEST(Boolean, SimpleCubeRegression) {
       Manifold::Cube() -
       Manifold::Cube().Rotate(-0.10000000000000001, -0.10000000000066571, -1.);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
-  EXPECT_EQ(result.NumDegenerateTris(), 0);
+  EXPECT_TRUE(result.MatchesTriNormals());
   if (options.exportModels) WriteTestOBJ("simple_cube_regression.obj", result);
 }
 

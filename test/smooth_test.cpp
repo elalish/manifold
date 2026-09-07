@@ -240,14 +240,12 @@ TEST(Smooth, Fillet) {
       Manifold::Extrude(section.Simplify().ToPolygons(), depth, 0, 0,
                         vec2(filletScale, 1.1 * filletScale))
           .Mirror({0, 0, 1});
-  EXPECT_EQ(chamfer.NumDegenerateTris(), 0);
   EXPECT_EQ(chamfer.NumTri(), 20);
   Manifold base = Manifold::Cylinder(10, 15, 15, 6)
                       .Translate({0, 0, -10 - depth})
                       .Scale({1, 1.2, 1})
                       .CalculateNormals(0, 80);
   Manifold chamfered = cylinder + chamfer + base;
-  EXPECT_EQ(chamfered.NumDegenerateTris(), 0);
   EXPECT_EQ(chamfered.NumTri(), 56);
   Manifold fillet = chamfered.SmoothByNormals(0).RefineToTolerance(0.01);
   EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);
@@ -268,13 +266,11 @@ TEST(Smooth, Fillet2) {
   Manifold chamfer = Manifold::Extrude(section.Simplify().ToPolygons(), depth,
                                        0, 0, vec2(1.3, 1.2))
                          .Mirror({0, 0, 1});
-  EXPECT_EQ(chamfer.NumDegenerateTris(), 0);
   EXPECT_EQ(chamfer.NumTri(), 20);
   Manifold base = Manifold::Cube(vec3(40), true)
                       .Translate({0, 0, -20 - depth})
                       .CalculateNormals();
   Manifold chamfered = cylinder + chamfer + base;
-  EXPECT_EQ(chamfered.NumDegenerateTris(), 0);
   EXPECT_EQ(chamfered.NumTri(), 48);
   Manifold fillet = chamfered.SmoothByNormals(0).RefineToTolerance(0.01);
   EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);

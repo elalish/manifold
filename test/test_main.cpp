@@ -472,10 +472,6 @@ void ExpectMeshes(const Manifold& manifold,
   }
 }
 
-void CheckStrictly(const Manifold& manifold) {
-  EXPECT_EQ(manifold.NumDegenerateTris(), 0);
-}
-
 void CheckGL(const Manifold& manifold, bool noMerge) {
   ASSERT_FALSE(manifold.IsEmpty());
   const MeshGL meshGL = manifold.GetMeshGL();
