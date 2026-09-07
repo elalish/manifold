@@ -129,7 +129,6 @@ var annotated_dup =
       [ "Quality", "classmanifold_1_1_quality.html", "classmanifold_1_1_quality" ],
       [ "RayHit", "group___structs.html#structmanifold_1_1_ray_hit", "group___structs_structmanifold_1_1_ray_hit" ],
       [ "Rect", "structmanifold_1_1_rect.html", "structmanifold_1_1_rect" ],
-      [ "Smoothness", "group___structs.html#structmanifold_1_1_smoothness", "group___structs_structmanifold_1_1_smoothness" ],
       [ "Timer", "structmanifold_1_1_timer.html", null ],
       [ "VecView", "classmanifold_1_1_vec_view.html", null ]
     ] ],

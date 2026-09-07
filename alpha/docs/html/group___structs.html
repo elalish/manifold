@@ -112,8 +112,6 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('group___struct
 Classes</h2></td></tr>
 <tr class="memitem:PolyVert_5Fstructmanifold_5F1_5F1_5Fpoly_5Fvert" id="r_PolyVert_5Fstructmanifold_5F1_5F1_5Fpoly_5Fvert"><td class="memItemLeft">struct &#160;</td><td class="memItemRight"><a class="el" href="#structmanifold_1_1_poly_vert">PolyVert</a></td></tr>
 <tr class="memdesc:structmanifold_1_1_poly_vert"><td class="mdescLeft">&#160;</td><td class="mdescRight">Polygon vertex.  <a href="#structmanifold_1_1_poly_vert">More...</a><br /></td></tr>
-<tr class="memitem:Smoothness_5Fstructmanifold_5F1_5F1_5Fsmoothness" id="r_Smoothness_5Fstructmanifold_5F1_5F1_5Fsmoothness"><td class="memItemLeft">struct &#160;</td><td class="memItemRight"><a class="el" href="#structmanifold_1_1_smoothness">Smoothness</a></td></tr>
-<tr class="memdesc:structmanifold_1_1_smoothness"><td class="mdescLeft">&#160;</td><td class="mdescRight">Defines which edges to sharpen and how much for the <a class="el" href="classmanifold_1_1_manifold.html#aff03aac40d42a60f8e4254db90530c83">Manifold.Smooth()</a> constructor.  <a href="#structmanifold_1_1_smoothness">More...</a><br /></td></tr>
 <tr class="memitem:RayHit_5Fstructmanifold_5F1_5F1_5Fray_5Fhit" id="r_RayHit_5Fstructmanifold_5F1_5F1_5Fray_5Fhit"><td class="memItemLeft">struct &#160;</td><td class="memItemRight"><a class="el" href="#structmanifold_1_1_ray_hit">RayHit</a></td></tr>
 <tr class="memdesc:structmanifold_1_1_ray_hit"><td class="mdescLeft">&#160;</td><td class="mdescRight">Result of a ray cast query against a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>.  <a href="#structmanifold_1_1_ray_hit">More...</a><br /></td></tr>
 <tr class="memitem:ExecutionContext" id="r_ExecutionContext"><td class="memItemLeft">class &#160;</td><td class="memItemRight"><a class="el" href="classmanifold_1_1_execution_context.html">ExecutionContext</a></td></tr>
@@ -191,37 +189,6 @@ X-Y position. </td></tr>
 idx</td>
 <td class="fielddoc">
 ID or index into another vertex vector. </td></tr>
-</table>
-
-</div>
-</div>
-<a name="structmanifold_1_1_smoothness" id="structmanifold_1_1_smoothness"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#structmanifold_1_1_smoothness">&#9670;&#160;</a></span>manifold::Smoothness</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">struct manifold::Smoothness</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-<div class="textblock"><p>Defines which edges to sharpen and how much for the <a class="el" href="classmanifold_1_1_manifold.html#aff03aac40d42a60f8e4254db90530c83">Manifold.Smooth()</a> constructor. </p>
-</div><table class="fieldtable">
-<tr><th colspan="3">Class Members</th></tr>
-<tr><td class="fieldtype">
-<a id="aac5709f1a46385ba2978c8184909a8f9" name="aac5709f1a46385ba2978c8184909a8f9"></a>size_t</td>
-<td class="fieldname">
-halfedge</td>
-<td class="fielddoc">
-The halfedge index = 3 * tri + i, referring to Mesh.triVerts[tri][i]. </td></tr>
-<tr><td class="fieldtype">
-<a id="af27647008768bbb6d067a4342dad9001" name="af27647008768bbb6d067a4342dad9001"></a>double</td>
-<td class="fieldname">
-smoothness</td>
-<td class="fielddoc">
-<p>A value between 0 and 1, where 0 is sharp and 1 is the default and the curvature is interpolated between these values. The two paired halfedges can have different values while maintaining C-1 continuity (except for 0). </p>
-</td></tr>
 </table>
 
 </div>

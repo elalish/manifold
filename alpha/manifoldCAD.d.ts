@@ -474,14 +474,12 @@ export declare interface ExecutionContext {
      */
     progress(): number;
 
-    // ctx-aware static factories: like Manifold.ofMesh / smooth / levelSet, but
+    // ctx-aware static factories: like Manifold.ofMesh / levelSet, but
     // run under this context so progress / cancellation are observed (these ops
     // have no source Manifold to attach via Manifold.withContext).
 
     /** Like {@link Manifold.ofMesh}, observed/cancellable via this context. */
     fromMesh(mesh: Mesh): Manifold;
-    /** Like {@link Manifold.smooth}, observed/cancellable via this context. */
-    smooth(mesh: Mesh, sharpenedEdges?: readonly Smoothness[]): Manifold;
     /** Like {@link Manifold.levelSet}, observed/cancellable via this context. */
     levelSet(
     sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
@@ -862,38 +860,6 @@ export declare class Manifold {
      */
     static ofMesh(mesh: Mesh): Manifold;
 
-    /**
-     * Constructs a smooth version of the input mesh by creating tangents; this
-     * method will throw if you have supplied tangents with your mesh already. The
-     * actual triangle resolution is unchanged; use the Refine() method to
-     * interpolate to a higher-resolution curve.
-     *
-     * By default, every edge is calculated for maximum smoothness (very much
-     * approximately), attempting to minimize the maximum mean Curvature
-     * magnitude. No higher-order derivatives are considered, as the interpolation
-     * is independent per triangle, only sharing constraints on their boundaries.
-     *
-     * @param mesh input Mesh.
-     * @param sharpenedEdges If desired, you can supply a vector of sharpened
-     * halfedges, which should in general be a small subset of all halfedges.
-     * Order of entries doesn't matter, as each one specifies the desired
-     * smoothness (between zero and one, with one the default for all unspecified
-     * halfedges) and the halfedge index (3 * triangle index + [0,1,2] where 0 is
-     * the edge between triVert 0 and 1, etc).
-     *
-     * At a smoothness value of zero, a sharp crease is made. The smoothness is
-     * interpolated along each edge, so the specified value should be thought of
-     * as an average. Where exactly two sharpened edges meet at a vertex, their
-     * tangents are rotated to be colinear so that the sharpened edge can be
-     * continuous. Vertices with only one sharpened edge are completely smooth,
-     * allowing sharpened edges to smoothly vanish at termination. A single vertex
-     * can be sharpened by sharping all edges that are incident on it, allowing
-     * cones to be formed.
-     *
-     * @group Smoothing
-     */
-    static smooth(mesh: Mesh, sharpenedEdges?: readonly Smoothness[]): Manifold;
-
     // Signed Distance Functions
 
     /**
@@ -1018,26 +984,6 @@ export declare class Manifold {
      * @group Smoothing
      */
     smoothByNormals(normalIdx?: number): Manifold;
-
-    /**
-     * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
-     * geometry will remain unchanged until Refine or RefineToLength is called to
-     * interpolate the surface. This version uses the geometry of the triangles
-     * and pseudo-normals to define the tangent vectors.
-     *
-     * @param minSharpAngle degrees, default 52.5. Any edges with angles greater
-     * than this value will remain sharp. The rest will be smoothed to G1
-     * continuity, with the caveat that flat faces of three or more triangles will
-     * always remain flat. With a value of zero, the model is faceted, but in this
-     * case there is no point in smoothing.
-     *
-     * @param minSmoothness range: 0 - 1, default 0. The smoothness applied to
-     * sharp angles. The default gives a hard edge, while values > 0 will give a
-     * small fillet on these sharp edges. A value of 1 is equivalent to a
-     * minSharpAngle of 180 - all edges will be smooth.
-     * @group Smoothing
-     */
-    smoothOut(minSharpAngle?: number, minSmoothness?: number): Manifold;
 
     /**
      * Increase the density of the mesh by splitting every edge into n pieces. For
@@ -1890,11 +1836,6 @@ export declare function setMorphStart(manifold: Manifold, func: (v: Vec3) => voi
 export declare function show(manifold: Manifold): Manifold;
 
 export declare type SimplePolygon = Vec2[];
-
-export declare type Smoothness = {
-    halfedge: number,
-    smoothness: number
-};
 
 /**
  * Triangulates a set of /epsilon-valid polygons.

@@ -4,10 +4,6 @@ var group___structs =
       [ "pos", "group___structs.html#a8b2c7ec938814a57e13bd292f12f3a40", null ],
       [ "idx", "group___structs.html#ae40354a1051342eb5a9db005715dcfa9", null ]
     ] ],
-    [ "Smoothness", "group___structs.html#structmanifold_1_1_smoothness", [
-      [ "halfedge", "group___structs.html#aac5709f1a46385ba2978c8184909a8f9", null ],
-      [ "smoothness", "group___structs.html#af27647008768bbb6d067a4342dad9001", null ]
-    ] ],
     [ "RayHit", "group___structs.html#structmanifold_1_1_ray_hit", [
       [ "faceID", "group___structs.html#a46de78de02bc26b0f04d09b055b9ff4c", null ],
       [ "distance", "group___structs.html#a79b8e036dca6911e3295a47d99f21f43", null ],
@@ -19,7 +15,6 @@ var group___structs =
       [ "Cancelled", "classmanifold_1_1_execution_context.html#a7b9d2d5a6c6b3639b65a808c0e1cfc75", null ],
       [ "Progress", "classmanifold_1_1_execution_context.html#aa480c2bfebb7c2cf5613eccc969dcd02", null ],
       [ "FromMeshGL", "classmanifold_1_1_execution_context.html#a64b616f0231c55d69a904e8173c3b6b0", null ],
-      [ "Smooth", "classmanifold_1_1_execution_context.html#aa625ea3f52879a06d16fe6d7d35eacba", null ],
       [ "LevelSet", "classmanifold_1_1_execution_context.html#a098fe7bfec8a178d3d2113ba33b09d26", null ]
     ] ],
     [ "Box", "structmanifold_1_1_box.html", [

@@ -118,7 +118,6 @@ var hierarchy =
     [ "scalars&lt;&gt;", "structlinalg_1_1detail_1_1scalars_3_4.html", null ],
     [ "select", "structlinalg_1_1detail_1_1select.html", null ],
     [ "seq&lt; I &gt;", "structlinalg_1_1detail_1_1seq.html", null ],
-    [ "Smoothness", "group___structs.html#structmanifold_1_1_smoothness", null ],
     [ "std_abs", "structlinalg_1_1detail_1_1std__abs.html", null ],
     [ "std_acos", "structlinalg_1_1detail_1_1std__acos.html", null ],
     [ "std_asin", "structlinalg_1_1detail_1_1std__asin.html", null ],

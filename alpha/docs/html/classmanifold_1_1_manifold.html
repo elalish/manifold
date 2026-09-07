@@ -261,9 +261,6 @@ Smoothing</h2></td></tr>
 <tr class="memitem:a1381728e52975862d954032f717106d5" id="r_a1381728e52975862d954032f717106d5"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a1381728e52975862d954032f717106d5">RefineToLength</a> (double) const</td></tr>
 <tr class="memitem:a723efa99b25f74d4099f004a47313be1" id="r_a723efa99b25f74d4099f004a47313be1"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a723efa99b25f74d4099f004a47313be1">RefineToTolerance</a> (double) const</td></tr>
 <tr class="memitem:ae3f30feea958dad00591d5fb4db4b7f3" id="r_ae3f30feea958dad00591d5fb4db4b7f3"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#ae3f30feea958dad00591d5fb4db4b7f3">SmoothByNormals</a> (int normalIdx=0) const</td></tr>
-<tr class="memitem:a0d375a213dca6954c7d437a44d148e2a" id="r_a0d375a213dca6954c7d437a44d148e2a"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a0d375a213dca6954c7d437a44d148e2a">SmoothOut</a> (double minSharpAngle=52.5, double minSmoothness=0) const</td></tr>
-<tr class="memitem:aff03aac40d42a60f8e4254db90530c83" id="r_aff03aac40d42a60f8e4254db90530c83"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#aff03aac40d42a60f8e4254db90530c83">Smooth</a> (const MeshGL &amp;, const std::vector&lt; <a class="el" href="group___structs.html#structmanifold_1_1_smoothness">Smoothness</a> &gt; &amp;sharpenedEdges={})</td></tr>
-<tr class="memitem:a65451c02a8868005e16804c1bb1d965d" id="r_a65451c02a8868005e16804c1bb1d965d"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a65451c02a8868005e16804c1bb1d965d">Smooth</a> (const MeshGL64 &amp;, const std::vector&lt; <a class="el" href="group___structs.html#structmanifold_1_1_smoothness">Smoothness</a> &gt; &amp;sharpenedEdges={})</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-member-group" class="groupheader"><a id="member-group" name="member-group"></a>
 Convex Hull</h2></td></tr>
@@ -1844,7 +1841,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Increase the density of the mesh by splitting every edge into n pieces. For instance, with n = 2, each triangle will be split into 4 triangles. Quads will ignore their interior triangle bisector. These will all be coplanar (and will not be immediately collapsed) unless the Mesh/Manifold has halfedgeTangents specified (e.g. from the <a class="el" href="#aff03aac40d42a60f8e4254db90530c83">Smooth()</a> constructor), in which case the new vertices will be moved to the interpolated surface according to their barycentric coordinates. Any normals recording set by <span class="tt"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals()</a></span> is preserved; the new verts get linearly-interpolated normals, which are less precise than recomputed ones but still meaningful.</p>
+<p>Increase the density of the mesh by splitting every edge into n pieces. For instance, with n = 2, each triangle will be split into 4 triangles. Quads will ignore their interior triangle bisector. These will all be coplanar (and will not be immediately collapsed) unless the Mesh/Manifold has halfedgeTangents specified (e.g. from the Smooth() constructor), in which case the new vertices will be moved to the interpolated surface according to their barycentric coordinates. Any normals recording set by <span class="tt"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals()</a></span> is preserved; the new verts get linearly-interpolated normals, which are less precise than recomputed ones but still meaningful.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">n</td><td>The number of pieces to split every edge into. Must be &gt; 1. </td></tr>
@@ -1868,7 +1865,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Increase the density of the mesh by splitting each edge into pieces of roughly the input length. Interior verts are added to keep the rest of the triangulation edges also of roughly the same length. If halfedgeTangents are present (e.g. from the <a class="el" href="#aff03aac40d42a60f8e4254db90530c83">Smooth()</a> constructor), the new vertices will be moved to the interpolated surface according to their barycentric coordinates. Quads will ignore their interior triangle bisector. Any normals recording set by <span class="tt"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals()</a></span> is preserved; the new verts get linearly-interpolated normals, which are less precise than recomputed ones but still meaningful.</p>
+<p>Increase the density of the mesh by splitting each edge into pieces of roughly the input length. Interior verts are added to keep the rest of the triangulation edges also of roughly the same length. If halfedgeTangents are present (e.g. from the Smooth() constructor), the new vertices will be moved to the interpolated surface according to their barycentric coordinates. Quads will ignore their interior triangle bisector. Any normals recording set by <span class="tt"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals()</a></span> is preserved; the new verts get linearly-interpolated normals, which are less precise than recomputed ones but still meaningful.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">length</td><td>The length that edges will be broken down to. </td></tr>
@@ -1923,113 +1920,6 @@ Testing Hooks</h2></td></tr>
   </table>
   </dd>
 </dl>
-
-</div>
-</div>
-<a id="a0d375a213dca6954c7d437a44d148e2a" name="a0d375a213dca6954c7d437a44d148e2a"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a0d375a213dca6954c7d437a44d148e2a">&#9670;&#160;</a></span>SmoothOut()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> SmoothOut </td>
-          <td>(</td>
-          <td class="paramtype">double</td>          <td class="paramname"><span class="paramname"><em>minSharpAngle</em></span><span class="paramdefsep"> = </span><span class="paramdefval">52.5</span>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double</td>          <td class="paramname"><span class="paramname"><em>minSmoothness</em></span><span class="paramdefsep"> = </span><span class="paramdefval">0</span>&#160;) const</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-<p>Smooths out the <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> by filling in the halfedgeTangent vectors. The geometry will remain unchanged until Refine, RefineToLength, or RefineToTolerance is called to interpolate the surface. This version uses the geometry of the triangles and pseudo-normals to define the tangent vectors. Faces of two coplanar triangles will be marked as quads, while faces with three or more will be flat.</p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">minSharpAngle</td><td>degrees, default 52.5. Any edges with angles greater than this value will remain sharp. The rest will be smoothed to G1 continuity. With a value of zero, the model is faceted, but in this case there is no point in smoothing.</td></tr>
-    <tr><td class="paramname">minSmoothness</td><td>range: 0 - 1, default 0. The smoothness applied to sharp angles. The default gives a hard edge, while values &gt; 0 will give a small fillet on these sharp edges. A value of 1 is equivalent to a minSharpAngle of 180 - all edges will be smooth. </td></tr>
-  </table>
-  </dd>
-</dl>
-
-</div>
-</div>
-<a id="aff03aac40d42a60f8e4254db90530c83" name="aff03aac40d42a60f8e4254db90530c83"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aff03aac40d42a60f8e4254db90530c83">&#9670;&#160;</a></span>Smooth() <span class="overload">[1/2]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> Smooth </td>
-          <td>(</td>
-          <td class="paramtype">const MeshGL &amp;</td>          <td class="paramname"><span class="paramname"><em>meshGL</em></span>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">const std::vector&lt; <a class="el" href="group___structs.html#structmanifold_1_1_smoothness">Smoothness</a> &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>sharpenedEdges</em></span><span class="paramdefsep"> = </span><span class="paramdefval">{}</span>&#160;)</td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-<p>Constructs a smooth version of the input mesh by creating tangents; this method will throw if you have supplied tangents with your mesh already. The actual triangle resolution is unchanged; use the <a class="el" href="#a5d9227a2d10d8ad7b005555213ecd1ac">Refine()</a> method to interpolate to a higher-resolution curve.</p>
-<p>By default, every edge is calculated for maximum smoothness (very much approximately), attempting to minimize the maximum mean Curvature magnitude. No higher-order derivatives are considered, as the interpolation is independent per triangle, only sharing constraints on their boundaries.</p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">meshGL</td><td>input MeshGL. </td></tr>
-    <tr><td class="paramname">sharpenedEdges</td><td>If desired, you can supply a vector of sharpened halfedges, which should in general be a small subset of all halfedges. Order of entries doesn't matter, as each one specifies the desired smoothness (between zero and one, with one the default for all unspecified halfedges) and the halfedge index (3 * triangle index + [0,1,2] where 0 is the edge between triVert 0 and 1, etc).</td></tr>
-  </table>
-  </dd>
-</dl>
-<p>At a smoothness value of zero, a sharp crease is made. The smoothness is interpolated along each edge, so the specified value should be thought of as an average. Where exactly two sharpened edges meet at a vertex, their tangents are rotated to be colinear so that the sharpened edge can be continuous. Vertices with only one sharpened edge are completely smooth, allowing sharpened edges to smoothly vanish at termination. A single vertex can be sharpened by sharping all edges that are incident on it, allowing cones to be formed. </p>
-
-</div>
-</div>
-<a id="a65451c02a8868005e16804c1bb1d965d" name="a65451c02a8868005e16804c1bb1d965d"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a65451c02a8868005e16804c1bb1d965d">&#9670;&#160;</a></span>Smooth() <span class="overload">[2/2]</span></h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> Smooth </td>
-          <td>(</td>
-          <td class="paramtype">const MeshGL64 &amp;</td>          <td class="paramname"><span class="paramname"><em>meshGL64</em></span>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">const std::vector&lt; <a class="el" href="group___structs.html#structmanifold_1_1_smoothness">Smoothness</a> &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>sharpenedEdges</em></span><span class="paramdefsep"> = </span><span class="paramdefval">{}</span>&#160;)</td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-<p>Constructs a smooth version of the input mesh by creating tangents; this method will throw if you have supplied tangents with your mesh already. The actual triangle resolution is unchanged; use the <a class="el" href="#a5d9227a2d10d8ad7b005555213ecd1ac">Refine()</a> method to interpolate to a higher-resolution curve.</p>
-<p>By default, every edge is calculated for maximum smoothness (very much approximately), attempting to minimize the maximum mean Curvature magnitude. No higher-order derivatives are considered, as the interpolation is independent per triangle, only sharing constraints on their boundaries.</p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">meshGL64</td><td>input MeshGL64. </td></tr>
-    <tr><td class="paramname">sharpenedEdges</td><td>If desired, you can supply a vector of sharpened halfedges, which should in general be a small subset of all halfedges. Order of entries doesn't matter, as each one specifies the desired smoothness (between zero and one, with one the default for all unspecified halfedges) and the halfedge index (3 * triangle index + [0,1,2] where 0 is the edge between triVert 0 and 1, etc).</td></tr>
-  </table>
-  </dd>
-</dl>
-<p>At a smoothness value of zero, a sharp crease is made. The smoothness is interpolated along each edge, so the specified value should be thought of as an average. Where exactly two sharpened edges meet at a vertex, their tangents are rotated to be colinear so that the sharpened edge can be continuous. Vertices with only one sharpened edge are completely smooth, allowing sharpened edges to smoothly vanish at termination. A single vertex can be sharpened by sharping all edges that are incident on it, allowing cones to be formed. </p>
 
 </div>
 </div>
