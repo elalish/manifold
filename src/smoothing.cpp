@@ -857,7 +857,7 @@ void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
 
   halfedgeTangent_.clear();
   if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
-    SetNormalsAndCoplanar();
+    SetFaceAndVertNormals();
     CalculateBBox();
   } else {
     CalculateVertNormals();

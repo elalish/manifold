@@ -115,7 +115,7 @@ struct Manifold::Impl {
     return it != meshRelation.meshIDtransform.end() && it->second.hasNormals;
   }
 
-  void SetNormalsAndCoplanar();
+  void SetFaceAndVertNormals();
   void DedupePropVerts();
   void RemoveUnreferencedVerts();
   void InitializeOriginal(int id = 0, bool keepFaceID = false);
@@ -440,7 +440,7 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
       ref.meshID = meshID;
       ref.originalID = originalID;
       ref.faceID = meshGL.faceID.empty() ? -1 : meshGL.faceID[tri];
-      ref.coplanarID = tri;
+      ref.triID = tri;
     }
 
     if (meshGL.runTransform.empty()) {
@@ -508,7 +508,7 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   DedupePropVerts();
   ADVANCE_PHASE_OR_RETURN(ctx);
 
-  SetNormalsAndCoplanar();
+  SetFaceAndVertNormals();
   ADVANCE_PHASE_OR_RETURN(ctx);
 
   RemoveUnreferencedVerts();
@@ -600,7 +600,7 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     const auto ref = triRef[oldTri];
     const int meshID = ref.meshID;
 
-    out.faceID[tri] = ref.faceID >= 0 ? ref.faceID : ref.coplanarID;
+    out.faceID[tri] = ref.faceID >= 0 ? ref.faceID : ref.triID;
     for (const int i : {0, 1, 2})
       out.triVerts[3 * tri + i] = impl.halfedge_.Start(3 * oldTri + i);
 

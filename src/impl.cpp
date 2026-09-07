@@ -125,7 +125,7 @@ Manifold::Impl::Impl(Shape shape, const mat3x4 m) {
   CalculateBBox();
   SetEpsilon();
   SortGeometry();
-  SetNormalsAndCoplanar();
+  SetFaceAndVertNormals();
 }
 
 void Manifold::Impl::RemoveUnreferencedVerts() {
@@ -194,7 +194,7 @@ void Manifold::Impl::InitializeOriginal(int id, bool keepFaceID) {
   triRef.resize_nofill(NumTri());
   for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
              [meshID, &triRef](const int tri) {
-               triRef[tri] = {meshID, meshID, -1, triRef[tri].coplanarID};
+               triRef[tri] = {meshID, meshID, -1, triRef[tri].triID};
              });
   // Preserve the AND-across-old-Relations state so AsOriginal keeps the
   // recording when it builds a fresh Relation. Primitives start with an
@@ -205,65 +205,19 @@ void Manifold::Impl::InitializeOriginal(int id, bool keepFaceID) {
                                            hadNormals};
 }
 
-void Manifold::Impl::SetNormalsAndCoplanar() {
+void Manifold::Impl::SetFaceAndVertNormals() {
   ZoneScoped;
   const int numTri = NumTri();
   faceNormal_.resize(numTri);
-  struct TriPriority {
-    double area2;
-    int tri;
-  };
-  Vec<TriPriority> triPriority(numTri);
-  for_each_n(autoPolicy(numTri), countAt(0), numTri,
-             [&triPriority, this](int tri) {
-               meshRelation_.triRef[tri].coplanarID = -1;
-               if (halfedge_.Start(3 * tri) < 0) {
-                 triPriority[tri] = {0, tri};
-                 return;
-               }
-               const vec3 v = vertPos_[halfedge_.Start(3 * tri)];
-               const vec3 n = cross(vertPos_[halfedge_.End(3 * tri)] - v,
-                                    vertPos_[halfedge_.End(3 * tri + 1)] - v);
-               faceNormal_[tri] = SafeNormalize(n);
-               triPriority[tri] = {length2(n), tri};
-             });
+  for_each_n(autoPolicy(numTri), countAt(0), numTri, [this](int tri) {
+    if (!halfedge_.Valid(3 * tri)) return;
+    const vec3 v = vertPos_[halfedge_.Start(3 * tri)];
+    const vec3 n = cross(vertPos_[halfedge_.End(3 * tri)] - v,
+                         vertPos_[halfedge_.End(3 * tri + 1)] - v);
+    faceNormal_[tri] = SafeNormalize(n);
+    meshRelation_.triRef[tri].triID = tri;
+  });
 
-  stable_sort(triPriority.begin(), triPriority.end(),
-              [](auto a, auto b) { return a.area2 > b.area2; });
-
-  Vec<int> interiorHalfedges;
-  for (const auto tp : triPriority) {
-    if (meshRelation_.triRef[tp.tri].coplanarID >= 0) continue;
-
-    meshRelation_.triRef[tp.tri].coplanarID = tp.tri;
-    if (halfedge_.Start(3 * tp.tri) < 0) continue;
-    const vec3 base = vertPos_[halfedge_.Start(3 * tp.tri)];
-    const vec3 normal = faceNormal_[tp.tri];
-    interiorHalfedges.resize(3);
-    interiorHalfedges[0] = 3 * tp.tri;
-    interiorHalfedges[1] = 3 * tp.tri + 1;
-    interiorHalfedges[2] = 3 * tp.tri + 2;
-    while (!interiorHalfedges.empty()) {
-      const int h = NextHalfedge(halfedge_.Pair(interiorHalfedges.back()));
-      interiorHalfedges.pop_back();
-      if (meshRelation_.triRef[h / 3].coplanarID >= 0) continue;
-
-      const vec3 v = vertPos_[halfedge_.End(h)];
-      if (std::abs(dot(v - base, normal)) < tolerance_) {
-        const size_t tri = h / 3;
-        meshRelation_.triRef[tri].coplanarID = tp.tri;
-
-        if (interiorHalfedges.empty() ||
-            h != halfedge_.Pair(interiorHalfedges.back())) {
-          interiorHalfedges.push_back(h);
-        } else {
-          interiorHalfedges.pop_back();
-        }
-        const int hNext = NextHalfedge(h);
-        interiorHalfedges.push_back(hNext);
-      }
-    }
-  }
   CalculateVertNormals();
 }
 
@@ -582,7 +536,7 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   }
   SetEpsilon();
   SortGeometry();
-  SetNormalsAndCoplanar();
+  SetFaceAndVertNormals();
   meshRelation_.originalID = -1;
 }
 

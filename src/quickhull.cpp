@@ -851,7 +851,7 @@ void Manifold::Impl::Hull(VecView<const vec3> vertPos,
   CalculateBBox();
   SetEpsilon();
   InitializeOriginal();
-  SetNormalsAndCoplanar();
+  SetFaceAndVertNormals();
   RemoveDegenerates();
   SortGeometry(ctx);
   // SortGeometry returns silently on cancel, leaving the Impl in a
