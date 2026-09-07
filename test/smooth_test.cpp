@@ -89,13 +89,12 @@ TEST(Smooth, ToLength) {
       CrossSection::Circle(10, 10).Translate({10, 0}).ToPolygons(), 2, 0, 0,
       {0, 0});
   cone += cone.Scale({1, 1, -5});
-  EXPECT_EQ(cone.NumVert(), 12);
+  EXPECT_EQ(cone.NumVert(), 11);
   Manifold smooth =
-      cone.Simplify().CalculateNormals(0, 180).SmoothByNormals().RefineToLength(
-          0.1);
-  ExpectMeshes(smooth, {{85645, 171286, 3}});
-  EXPECT_NEAR(smooth.Volume(), 4493, 1);
-  EXPECT_NEAR(smooth.SurfaceArea(), 1334, 1);
+      cone.CalculateNormals(0, 180).SmoothByNormals().RefineToLength(0.1);
+  ExpectMeshes(smooth, {{85250, 170496, 3}});
+  EXPECT_NEAR(smooth.Volume(), 4570, 1);
+  EXPECT_NEAR(smooth.SurfaceArea(), 1348, 1);
 
   MeshGL out = smooth.CalculateCurvature(-1, 3).GetMeshGL();
   float maxMeanCurvature = 0;
@@ -103,7 +102,7 @@ TEST(Smooth, ToLength) {
     maxMeanCurvature =
         std::max(maxMeanCurvature, std::abs(out.vertProperties[i]));
   }
-  EXPECT_NEAR(maxMeanCurvature, 1.86, 0.01);
+  EXPECT_NEAR(maxMeanCurvature, 1.63, 0.01);
 
   if (options.exportModels) WriteTestOBJ("smoothToLength.obj", smooth);
 }

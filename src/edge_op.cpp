@@ -91,7 +91,12 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
                 vertPos_[halfedge_.Start(edge)]) > epsilon_ * epsilon_)
       continue;
 
-    CollapseDegenerate(edge, scratch);
+    // Always collapse forward halfedges so that new verts are retained, which
+    // in turn allow more colinear edges to be collapsed below. We can't skip
+    // backward halfedges because as other edges collapse and swap verts, the
+    // backward halfedge may become a forward halfedge.
+    CollapseDegenerate(halfedge_.IsForward(edge) ? edge : halfedge_.Pair(edge),
+                       scratch);
     ++shortCollapsed;
   }
 #ifdef MANIFOLD_DEBUG
@@ -111,8 +116,6 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
   }
 #endif
 
-  // std::cout << __LINE__ << ": " << NumDegenerateTris() << std::endl;
-
   int colinear = 0;
   for (int edge = 0; edge < numHalfedge; ++edge) {
     if (!halfedge_.Valid(edge) || (halfedge_.Start(edge) < firstNewVert &&
@@ -131,7 +134,6 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
 #endif
   // Merging verts causes their normals to change
   CalculateVertNormals();
-  // std::cout << __LINE__ << ": " << NumDegenerateTris() << std::endl;
 }
 
 bool Manifold::Impl::Colinear(int edge) const {
