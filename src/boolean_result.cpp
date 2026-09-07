@@ -528,11 +528,6 @@ void UpdateReference(Manifold::Impl& outR, const Manifold::Impl& inP,
           invertQ;
     }
   }
-  if (outR.meshRelation_.meshIDtransform.find(0) !=
-      outR.meshRelation_.meshIDtransform.end()) {
-    // recalculate since multiple ID 0 meshes may incorrectly share a faceID
-    outR.SetFaceAndVertNormals();
-  }
 }
 
 struct Barycentric {
