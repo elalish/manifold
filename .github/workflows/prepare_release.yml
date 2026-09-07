@@ -46,7 +46,9 @@ jobs:
         git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
         git checkout -b "release/v$VERSION"
         git commit -am "Set version to $VERSION"
-        git push origin "release/v$VERSION"
+        # Force, so a re-run replaces an earlier attempt's branch rather than
+        # being rejected. The branch is generated, so there is nothing to lose.
+        git push --force origin "release/v$VERSION"
         # Heredoc so the body is not indented by the YAML block scalar,
         # which markdown would render as a code block.
         cat > /tmp/pr-body.md <<EOF
@@ -61,4 +63,10 @@ jobs:
         publish_npm reads.
         EOF
         sed -i 's/^        //' /tmp/pr-body.md
-        gh pr create --title "Release v$VERSION" --body-file /tmp/pr-body.md
+        # --base is required. Without it gh targets the repository's default
+        # branch, so a backport release dispatched against v3.5.x would open
+        # a PR into master carrying the whole branch difference.
+        gh pr create \
+          --base "$GITHUB_REF_NAME" \
+          --title "Release v$VERSION" \
+          --body-file /tmp/pr-body.md
