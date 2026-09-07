@@ -27,15 +27,14 @@ jobs:
       with:
         node-version: 25
         registry-url: 'https://registry.npmjs.org/'
+        # No shared cache on the publish path.
+        package-manager-cache: false
 
     - name: Update npm # Ensure npm 11.5.1 or later for trusted publishing
       run: npm install -g npm@latest
 
-    - name: Install apt packages
-      uses: awalsh128/cache-apt-pkgs-action@v1.6.0
-      with:
-        packages: cmake
-        version: 1
+    - name: Install cmake
+      run: sudo apt-get update && sudo apt-get install -y cmake
 
     - name: Setup EMSDK
       uses: mymindstorm/setup-emsdk@v14

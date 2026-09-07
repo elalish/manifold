@@ -29,7 +29,9 @@ jobs:
     # The lockfiles are edited in place rather than regenerated with npm
     # install, which keeps this fast and limits the commit to the version.
     - name: Set the version
-      run: python3 scripts/set_version.py "${{ inputs.version }}"
+      run: python3 scripts/set_version.py "$VERSION"
+      env:
+        VERSION: ${{ inputs.version }}
 
     # gh rather than a third-party action; release_file.yml already uses it.
     - name: Commit and open a pull request
