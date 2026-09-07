@@ -462,13 +462,11 @@ int Manifold::OriginalID() const {
  * and this new Manifold is marked an original. It also recreates faces
  * - these don't get joined at boundaries where originalID changes, so the
  * reset may allow triangles of flat faces to be further collapsed with
- * Simplify().
+ * RemoveDegenerates().
  *
  * @param id The ID to assign to this manifold. If negative (the default), a new
  * ID is assigned. Use zero to match all default-constructed manifolds, thus not
- * keeping track of the joints between input manifolds. Ensure separate IDs are
- * used for mesh inputs containing properties, generally by calling this
- * function without arguments just after construction.
+ * keeping track of the joints between input manifolds.
  */
 Manifold Manifold::AsOriginal(int id) const {
   auto oldImpl = GetCsgLeafNode().GetImpl();
