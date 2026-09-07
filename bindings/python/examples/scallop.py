@@ -69,26 +69,24 @@ def run():
         edge = edge_tangents[i]
         next_edge = -edge_tangents[next_i]
         sharpness = frontal_sharpness * (np.cos(i * delta) + 1) / 4
-        up = lerp(np.array([0, 0, len_]), np.array([next_edge[1], -next_edge[0], 0]), sharpness)
-        down = lerp(np.array([0, 0, -len_]), np.array([-edge[1], edge[0], 0]), sharpness)
+        up = lerp(
+            np.array([0, 0, len_]),
+            np.array([next_edge[1], -next_edge[0], 0]),
+            sharpness,
+        )
+        down = lerp(
+            np.array([0, 0, -len_]), np.array([-edge[1], edge[0], 0]), sharpness
+        )
 
         triangles.append([0, 2 + i, 2 + next_i])
-        halfedge_tangent.extend(
-            [
-                *radial.tolist(), 1,
-                *edge.tolist(), 1,
-                *up.tolist(), 1,
-            ]
-        )
+        halfedge_tangent.extend([*radial.tolist(), 1])
+        halfedge_tangent.extend([*edge.tolist(), 1])
+        halfedge_tangent.extend([*up.tolist(), 1])
 
         triangles.append([1, 2 + next_i, 2 + i])
-        halfedge_tangent.extend(
-            [
-                next_radial[0], next_radial[1], -next_radial[2], 1,
-                *next_edge.tolist(), 1,
-                *down.tolist(), 1,
-            ]
-        )
+        halfedge_tangent.extend([next_radial[0], next_radial[1], -next_radial[2], 1])
+        halfedge_tangent.extend([*next_edge.tolist(), 1])
+        halfedge_tangent.extend([*down.tolist(), 1])
 
     scallop = Mesh(
         tri_verts=np.array(triangles, np.int32),
