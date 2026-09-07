@@ -372,72 +372,6 @@ bool Manifold::Impl::IsMarkedInsideQuad(int halfedge) const {
          halfedgeTangent_[halfedge].w == kInsideQuad;
 }
 
-// sharpenedEdges are referenced to the input Mesh, but the triangles have
-// been sorted in creating the Manifold, so the indices are converted using
-// meshRelation_.faceID, which temporarily holds the mapping.
-std::vector<Smoothness> Manifold::Impl::UpdateSharpenedEdges(
-    const std::vector<Smoothness>& sharpenedEdges) const {
-  std::unordered_map<int, int> oldHalfedge2New;
-  for (size_t tri = 0; tri < NumTri(); ++tri) {
-    int oldTri = meshRelation_.triRef[tri].faceID;
-    for (int i : {0, 1, 2}) oldHalfedge2New[3 * oldTri + i] = 3 * tri + i;
-  }
-  std::vector<Smoothness> newSharp = sharpenedEdges;
-  for (Smoothness& edge : newSharp) {
-    edge.halfedge = oldHalfedge2New[edge.halfedge];
-  }
-  return newSharp;
-}
-
-// Find faces containing at least 3 triangles - these will not have
-// interpolated normals - all their vert normals must match their face normal.
-Vec<bool> Manifold::Impl::FlatFaces() const {
-  const int numTri = NumTri();
-  Vec<bool> triIsFlatFace(numTri, false);
-  for_each_n(autoPolicy(numTri, 1e5), countAt(0), numTri,
-             [this, &triIsFlatFace](const int tri) {
-               const TriRef& ref = meshRelation_.triRef[tri];
-               int faceNeighbors = 0;
-               ivec3 faceTris = {-1, -1, -1};
-               for (const int j : {0, 1, 2}) {
-                 const int neighborTri = halfedge_.Pair(3 * tri + j) / 3;
-                 const TriRef& jRef = meshRelation_.triRef[neighborTri];
-                 if (jRef.SameFace(ref)) {
-                   ++faceNeighbors;
-                   faceTris[j] = neighborTri;
-                 }
-               }
-               if (faceNeighbors > 1) {
-                 triIsFlatFace[tri] = true;
-                 for (const int j : {0, 1, 2}) {
-                   if (faceTris[j] >= 0) {
-                     triIsFlatFace[faceTris[j]] = true;
-                   }
-                 }
-               }
-             });
-  return triIsFlatFace;
-}
-
-// Returns a vector of length numVert that has a tri that is part of a
-// neighboring flat face if there is only one flat face. If there are none it
-// gets -1, and if there are more than one it gets -2.
-Vec<int> Manifold::Impl::VertFlatFace(const Vec<bool>& flatFaces) const {
-  Vec<int> vertFlatFace(NumVert(), -1);
-  Vec<TriRef> vertRef(NumVert(), {-1, -1, -1, -1});
-  for (size_t tri = 0; tri < NumTri(); ++tri) {
-    if (flatFaces[tri]) {
-      for (const int j : {0, 1, 2}) {
-        const int vert = halfedge_.Start(3 * tri + j);
-        if (vertRef[vert].SameFace(meshRelation_.triRef[tri])) continue;
-        vertRef[vert] = meshRelation_.triRef[tri];
-        vertFlatFace[vert] = vertFlatFace[vert] == -1 ? tri : -2;
-      }
-    }
-  }
-  return vertFlatFace;
-}
-
 Vec<int> Manifold::Impl::VertHalfedge() const {
   Vec<int> vertHalfedge(NumVert());
   Vec<uint8_t> counters(NumVert(), 0);
@@ -451,35 +385,6 @@ Vec<int> Manifold::Impl::VertHalfedge() const {
                vertHalfedge[start] = idx;
              });
   return vertHalfedge;
-}
-
-std::vector<Smoothness> Manifold::Impl::SharpenEdges(
-    double minSharpAngle, double minSmoothness) const {
-  std::vector<Smoothness> sharpenedEdges;
-  minSharpAngle = std::max(minSharpAngle, kMinSharpAngle);
-  const double minRadians = radians(minSharpAngle);
-  for (size_t e = 0; e < halfedge_.size(); ++e) {
-    if (!halfedge_.IsForward(e)) continue;
-    const size_t pair = halfedge_.Pair(e);
-    const double dihedral =
-        AngleBetween(faceNormal_[e / 3], faceNormal_[pair / 3]);
-    if (dihedral > minRadians) {
-      sharpenedEdges.push_back({e, minSmoothness});
-      sharpenedEdges.push_back({pair, minSmoothness});
-    }
-  }
-  return sharpenedEdges;
-}
-
-/**
- * Sharpen tangents that intersect an edge to sharpen that edge. The weight is
- * unchanged, as this has a squared effect on radius of curvature, except
- * in the case of zero radius, which is marked with weight = 0.
- */
-void Manifold::Impl::SharpenTangent(int halfedge, double smoothness) {
-  halfedgeTangent_[halfedge] =
-      vec4(smoothness * vec3(halfedgeTangent_[halfedge]),
-           smoothness == 0 ? 0 : halfedgeTangent_[halfedge].w);
 }
 
 /**
@@ -674,42 +579,6 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
 }
 
 /**
- * Tangents get flattened to create sharp edges by setting their weight to zero.
- * This is the natural limit of reducing the weight to increase the sharpness
- * smoothly. This limit gives a decent shape, but it causes the parameterization
- * to be stretched and compresses it near the edges, which is good for resolving
- * tight curvature, but bad for property interpolation. This function fixes the
- * parameter stretch at the limit for sharp edges, since there is no curvature
- * to resolve. Note this also changes the overall shape - making it more evenly
- * curved.
- */
-void Manifold::Impl::LinearizeFlatTangents() {
-  const int n = halfedgeTangent_.size();
-  for_each_n(autoPolicy(n, 1e4), countAt(0), n, [this](const int halfedge) {
-    vec4& tangent = halfedgeTangent_[halfedge];
-    const int pair = halfedge_.Pair(halfedge);
-    vec4& otherTangent = halfedgeTangent_[pair];
-
-    const bool flat[2] = {tangent.w == 0, otherTangent.w == 0};
-    if (!halfedge_.IsForward(halfedge) || (!flat[0] && !flat[1])) {
-      return;
-    }
-
-    const vec3 edgeVec =
-        vertPos_[halfedge_.End(halfedge)] - vertPos_[halfedge_.Start(halfedge)];
-
-    if (flat[0] && flat[1]) {
-      tangent = vec4(edgeVec / 3.0, 1);
-      otherTangent = vec4(-edgeVec / 3.0, 1);
-    } else if (flat[0]) {
-      tangent = vec4((edgeVec + vec3(otherTangent)) / 2.0, 1);
-    } else {
-      otherTangent = vec4((-edgeVec + vec3(tangent)) / 2.0, 1);
-    }
-  });
-}
-
-/**
  * Redistribute the tangents around each vertex so that the angles between them
  * have the same ratios as the angles of the triangles between the corresponding
  * edges. This avoids folding the output shape and gives smoother results. There
@@ -860,10 +729,12 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
               return GetNormal(halfedge, normalIdx);
             },
             [&](int halfedge, const vec3& here, const vec3& next) {
-              // Tangents not known at first are used as temporary storage for
-              // normals and w is set to a negative flag value. This starts with
-              // the flag clear.
-              if (next == vec3(0.) || here == vec3(0.)) {
+              if (next != vec3(0.) && here != vec3(0.)) {
+                calculateTangent(halfedge, here, next);
+              } else {
+                // Tangents not known at first are used as temporary storage for
+                // normals and w is set to a negative flag value. This starts
+                // with the flag clear.
                 if (here != vec3(0.)) {  // next missing
                   markToAlign(halfedge);
                   lastNormal = here;
@@ -876,15 +747,19 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
                 halfedgeTangent_[halfedge].w = kMissingNormal;
                 for (const int i : {0, 1, 2})
                   halfedgeTangent_[halfedge][i] = lastNormal[i];
-                return;
               }
-
-              calculateTangent(halfedge, here, next);
             });
+
+        if (startHalfedge == -1 && faceEdges[0] == -1) {
+          // A single normal - mark this halfedge for distributing tangents.
+          fixedHalfedge[e] = true;
+        }
 
         if (startHalfedge != -1 && lastNormal == vec3(0.)) {
           // Use vert pseudo normal if no normals are present at all.
           const vec3 normal = vertNormal_[halfedge_.Start(e)];
+          // mark this halfedge for distributing tangents.
+          fixedHalfedge[e] = true;
           ForVert(e, [&](int halfedge) {
             halfedgeTangent_[halfedge] = TangentFromNormal(normal, halfedge);
           });
@@ -936,149 +811,6 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
 
   DistributeTangents(fixedHalfedge);
   MarkQuads(fixedHalfedge);
-}
-
-/**
- * Calculates halfedgeTangent_, allowing the manifold to be refined and
- * smoothed. The tangents form weighted cubic Beziers along each edge. This
- * function creates circular arcs where possible (minimizing maximum curvature),
- * constrained to the vertex normals. Where sharpenedEdges are specified, the
- * tangents are shortened that intersect the sharpened edge, concentrating the
- * curvature there, while the tangents of the sharp edges themselves are aligned
- * for continuity.
- */
-void Manifold::Impl::CreateTangents(std::vector<Smoothness> sharpenedEdges,
-                                    ExecutionContext::Impl* ctx) {
-  ZoneScoped;
-  const int numHalfedge = halfedge_.size();
-  halfedgeTangent_.resize(numHalfedge, vec4(0.));
-  Vec<bool> fixedHalfedge(numHalfedge, false);
-
-  Vec<int> vertHalfedge = VertHalfedge();
-  Vec<bool> triIsFlatFace = FlatFaces();
-  Vec<int> vertFlatFace = VertFlatFace(triIsFlatFace);
-  Vec<vec3> vertNormal = vertNormal_;
-  for (size_t v = 0; v < NumVert(); ++v) {
-    if (vertFlatFace[v] >= 0) {
-      vertNormal[v] = faceNormal_[vertFlatFace[v]];
-    }
-  }
-  ADVANCE_PHASE_OR_RETURN(ctx);
-
-  for_each_n(autoPolicy(numHalfedge, 1e4), countAt(0), numHalfedge, ctx,
-             [&vertNormal, this](const int edgeIdx) {
-               halfedgeTangent_[edgeIdx] = TangentFromNormal(
-                   vertNormal[halfedge_.Start(edgeIdx)], edgeIdx);
-             });
-
-  ADVANCE_PHASE_OR_RETURN(ctx);
-
-  // Add sharpened edges around faces, just on the face side.
-  for (size_t tri = 0; tri < NumTri(); ++tri) {
-    if (!triIsFlatFace[tri]) continue;
-    for (const int j : {0, 1, 2}) {
-      const int tri2 = halfedge_.Pair(3 * tri + j) / 3;
-      if (!triIsFlatFace[tri2] ||
-          !meshRelation_.triRef[tri].SameFace(meshRelation_.triRef[tri2])) {
-        sharpenedEdges.push_back({3 * tri + j, 0});
-      }
-    }
-  }
-  ADVANCE_PHASE_OR_RETURN(ctx);
-
-  using Pair = std::pair<Smoothness, Smoothness>;
-  // Fill in missing pairs with default smoothness = 1.
-  std::map<int, Pair> edges;
-  for (Smoothness edge : sharpenedEdges) {
-    if (edge.smoothness >= 1) continue;
-    const bool forward = halfedge_.IsForward(edge.halfedge);
-    const int pair = halfedge_.Pair(edge.halfedge);
-    const int idx = forward ? edge.halfedge : pair;
-    if (edges.find(idx) == edges.end()) {
-      edges[idx] = {edge, {static_cast<size_t>(pair), 1}};
-      if (!forward) std::swap(edges[idx].first, edges[idx].second);
-    } else {
-      Smoothness& e = forward ? edges[idx].first : edges[idx].second;
-      e.smoothness = std::min(edge.smoothness, e.smoothness);
-    }
-  }
-
-  std::map<int, std::vector<Pair>> vertTangents;
-  for (const auto& value : edges) {
-    const Pair edge = value.second;
-    vertTangents[halfedge_.Start(edge.first.halfedge)].push_back(edge);
-    vertTangents[halfedge_.Start(edge.second.halfedge)].push_back(
-        {edge.second, edge.first});
-  }
-  ADVANCE_PHASE_OR_RETURN(ctx);
-
-  const int numVert = NumVert();
-  for_each_n(
-      autoPolicy(numVert, 1e4), countAt(0), numVert, ctx,
-      [this, &vertTangents, &fixedHalfedge, &vertHalfedge,
-       &triIsFlatFace](int v) {
-        auto it = vertTangents.find(v);
-        if (it == vertTangents.end()) {
-          fixedHalfedge[vertHalfedge[v]] = true;
-          return;
-        }
-        const std::vector<Pair>& vert = it->second;
-        // Sharp edges that end are smooth at their terminal vert.
-        if (vert.size() == 1) return;
-        if (vert.size() == 2) {  // Make continuous edge
-          const int first = vert[0].first.halfedge;
-          const int second = vert[1].first.halfedge;
-          fixedHalfedge[first] = true;
-          fixedHalfedge[second] = true;
-          const vec3 newTangent = la::normalize(vec3(halfedgeTangent_[first]) -
-                                                vec3(halfedgeTangent_[second]));
-
-          const vec3 pos = vertPos_[halfedge_.Start(first)];
-          halfedgeTangent_[first] =
-              CircularTangent(newTangent, vertPos_[halfedge_.End(first)] - pos);
-          halfedgeTangent_[second] = CircularTangent(
-              -newTangent, vertPos_[halfedge_.End(second)] - pos);
-
-          double smoothness =
-              (vert[0].second.smoothness + vert[1].first.smoothness) / 2;
-          ForVert(first, [this, &smoothness, &vert, first,
-                          second](int current) {
-            if (current == second) {
-              smoothness =
-                  (vert[1].second.smoothness + vert[0].first.smoothness) / 2;
-            } else if (current != first) {
-              SharpenTangent(current, smoothness);
-            }
-          });
-        } else {  // Sharpen vertex uniformly
-          double smoothness = 0;
-          double denom = 0;
-          for (const Pair& pair : vert) {
-            smoothness += pair.first.smoothness;
-            smoothness += pair.second.smoothness;
-            denom += pair.first.smoothness == 0 ? 0 : 1;
-            denom += pair.second.smoothness == 0 ? 0 : 1;
-          }
-          smoothness /= denom;
-
-          ForVert(vert[0].first.halfedge,
-                  [this, &triIsFlatFace, smoothness](int current) {
-                    const int pair = halfedge_.Pair(current);
-                    SharpenTangent(current, triIsFlatFace[current / 3] ||
-                                                    triIsFlatFace[pair / 3]
-                                                ? 0
-                                                : smoothness);
-                  });
-        }
-      });
-  ADVANCE_PHASE_OR_RETURN(ctx);
-
-  LinearizeFlatTangents();
-  ADVANCE_PHASE_OR_RETURN(ctx);
-
-  DistributeTangents(fixedHalfedge);
-  MarkQuads(fixedHalfedge);
-  ADVANCE_PHASE_OR_RETURN(ctx);
 }
 
 bool Manifold::Impl::ValidTangents() const {

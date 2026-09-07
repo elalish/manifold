@@ -107,11 +107,6 @@ val Merge(const val& mesh) {
   return out;
 }
 
-Manifold Smooth(const val& mesh,
-                const std::vector<Smoothness>& sharpenedEdges = {}) {
-  return Manifold::Smooth(MeshJS2GL(mesh), sharpenedEdges);
-}
-
 }  // namespace js
 
 namespace cross_js {
@@ -256,11 +251,6 @@ Manifold LevelSet(uintptr_t funcPtr, Box bounds, double edgeLength,
 // (first arg is the receiver).
 Manifold ExecutionContextFromMesh(ExecutionContext& ctx, const val& mesh) {
   return ctx.FromMeshGL(js::MeshJS2GL(mesh));
-}
-
-Manifold ExecutionContextSmooth(ExecutionContext& ctx, const val& mesh,
-                                const std::vector<Smoothness>& sharpenedEdges) {
-  return ctx.Smooth(js::MeshJS2GL(mesh), sharpenedEdges);
 }
 
 Manifold ExecutionContextLevelSet(ExecutionContext& ctx, uintptr_t funcPtr,

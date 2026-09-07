@@ -527,14 +527,6 @@ TEST(Manifold, ErrorPropagationSmoothByNormals) {
             Manifold::Error::NonFiniteVertex);
 }
 
-TEST(Manifold, ErrorPropagationSmoothOut) {
-  MeshGL in = TetGL();
-  in.vertProperties[2 * 3 + 1] = NAN;
-  Manifold errored(in);
-  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
-  EXPECT_EQ(errored.SmoothOut().Status(), Manifold::Error::NonFiniteVertex);
-}
-
 TEST(Manifold, ErrorPropagationRefine) {
   MeshGL in = TetGL();
   in.vertProperties[2 * 3 + 1] = NAN;
@@ -1109,10 +1101,10 @@ TEST(Manifold, MeshRelationRefine) {
 TEST(Manifold, MeshRelationRefinePrecision) {
   MeshGL inGL = WithPositionColors(Csaszar()).GetMeshGL();
   const int id = inGL.runOriginalID[0];
-  Manifold csaszar = Manifold::Smooth(inGL);
+  Manifold csaszar = Manifold(inGL).CalculateNormals(3, 180).SmoothByNormals(3);
 
   csaszar = csaszar.RefineToTolerance(0.05);
-  ExpectMeshes(csaszar, {{2135, 4270, 3}});
+  ExpectMeshes(csaszar, {{2135, 4270, 6}});
   std::vector<uint32_t> runOriginalID = csaszar.GetMeshGL().runOriginalID;
   EXPECT_EQ(runOriginalID.size(), 1);
   EXPECT_EQ(runOriginalID[0], id);

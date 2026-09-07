@@ -759,35 +759,6 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
 }
 
 /**
- * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
- * geometry will remain unchanged until Refine, RefineToLength, or
- * RefineToTolerance is called to interpolate the surface. This version uses the
- * geometry of the triangles and pseudo-normals to define the tangent vectors.
- * Faces of two coplanar triangles will be marked as quads, while faces with
- * three or more will be flat.
- *
- * @param minSharpAngle degrees, default 52.5. Any edges with angles greater
- * than this value will remain sharp. The rest will be smoothed to G1
- * continuity. With a value of zero, the model is faceted, but in this case
- * there is no point in smoothing.
- *
- * @param minSmoothness range: 0 - 1, default 0. The smoothness applied to sharp
- * angles. The default gives a hard edge, while values > 0 will give a small
- * fillet on these sharp edges. A value of 1 is equivalent to a minSharpAngle of
- * 180 - all edges will be smooth.
- */
-Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
-  auto leafImpl = GetCsgLeafNode().GetImpl();
-  if (leafImpl->status_ != Error::NoError)
-    return PropagateStatus(leafImpl->status_);
-  auto pImpl = std::make_shared<Impl>(*leafImpl);
-  if (!IsEmpty()) {
-    pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
-  }
-  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
-}
-
-/**
  * Increase the density of the mesh by splitting every edge into n pieces. For
  * instance, with n = 2, each triangle will be split into 4 triangles. Quads
  * will ignore their interior triangle bisector. These will all be coplanar (and

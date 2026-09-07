@@ -331,9 +331,6 @@ NB_MODULE(manifold3d, m) {
            manifold__calculate_normals__normal_idx__min_sharp_angle)
       .def("smooth_by_normals", &Manifold::SmoothByNormals,
            nb::arg("normal_idx") = 0, manifold__smooth_by_normals__normal_idx)
-      .def("smooth_out", &Manifold::SmoothOut,
-           nb::arg("min_sharp_angle") = 52.5, nb::arg("min_smoothness") = 0,
-           manifold__smooth_out__min_sharp_angle__min_smoothness)
       .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n)
       .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
            manifold__refine_to_length__length)
@@ -402,43 +399,6 @@ NB_MODULE(manifold3d, m) {
           },
           "Gets the manifold bounding box as a tuple "
           "(xmin, ymin, zmin, xmax, ymax, zmax).")
-      .def_static(
-          "smooth",
-          [](const MeshGL& mesh, std::vector<size_t> sharpened_edges,
-             std::vector<double> edge_smoothness) {
-            if (sharpened_edges.size() != edge_smoothness.size()) {
-              throw std::runtime_error(
-                  "sharpened_edges.size() != edge_smoothness.size()");
-            }
-            std::vector<Smoothness> vec(sharpened_edges.size());
-            for (size_t i = 0; i < vec.size(); i++) {
-              vec[i] = {sharpened_edges[i], edge_smoothness[i]};
-            }
-            return Manifold::Smooth(mesh, vec);
-          },
-          nb::arg("mesh"), nb::arg("sharpened_edges") = nb::list(),
-          nb::arg("edge_smoothness") = nb::list(),
-          manifold__smooth__mesh_gl__sharpened_edges)
-      .def_static(
-          "smooth",
-          [](const MeshGL64& mesh, std::vector<size_t> sharpened_edges,
-             std::vector<double> edge_smoothness) {
-            if (sharpened_edges.size() != edge_smoothness.size()) {
-              throw std::runtime_error(
-                  "sharpened_edges.size() != edge_smoothness.size()");
-            }
-            std::vector<Smoothness> vec(sharpened_edges.size());
-            for (size_t i = 0; i < vec.size(); i++) {
-              vec[i] = {sharpened_edges[i], edge_smoothness[i]};
-            }
-            return Manifold::Smooth(mesh, vec);
-          },
-          nb::arg("mesh"), nb::arg("sharpened_edges") = nb::list(),
-          nb::arg("edge_smoothness") = nb::list(),
-          // note: this is not a typo, the documentation is essentially the same
-          // so we just use the 32 byte variant to avoid duplicating docstring
-          // override...
-          manifold__smooth__mesh_gl__sharpened_edges)
       .def_static("batch_boolean", &Manifold::BatchBoolean,
                   nb::arg("manifolds"), nb::arg("op"),
                   manifold__batch_boolean__manifolds__op)
@@ -743,10 +703,9 @@ NB_MODULE(manifold3d, m) {
       .def("cancel", &ExecutionContext::Cancel)
       .def("cancelled", &ExecutionContext::Cancelled)
       .def("progress", &ExecutionContext::Progress)
-      // ctx-aware static factories: like Manifold.from_mesh / level_set /
-      // smooth, but run under this context so progress / cancellation are
-      // observed (these ops have no source Manifold to attach via
-      // with_context).
+      // ctx-aware static factories: like Manifold.from_mesh / level_set, but
+      // run under this context so progress / cancellation are observed (these
+      // ops have no source Manifold to attach via with_context).
       .def(
           "from_mesh",
           [](ExecutionContext& ctx, const MeshGL& mesh) {
@@ -780,45 +739,7 @@ NB_MODULE(manifold3d, m) {
           nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
           nb::arg("level") = 0.0, nb::arg("tolerance") = -1,
           "Like Manifold.level_set, run under this context so the level-set "
-          "evaluation reports progress and observes cancellation.")
-      .def(
-          "smooth",
-          [](ExecutionContext& ctx, const MeshGL& mesh,
-             std::vector<size_t> sharpened_edges,
-             std::vector<double> edge_smoothness) {
-            if (sharpened_edges.size() != edge_smoothness.size()) {
-              throw std::runtime_error(
-                  "sharpened_edges.size() != edge_smoothness.size()");
-            }
-            std::vector<Smoothness> vec(sharpened_edges.size());
-            for (size_t i = 0; i < vec.size(); i++) {
-              vec[i] = {sharpened_edges[i], edge_smoothness[i]};
-            }
-            return ctx.Smooth(mesh, vec);
-          },
-          nb::arg("mesh"), nb::arg("sharpened_edges") = nb::list(),
-          nb::arg("edge_smoothness") = nb::list(),
-          "Like Manifold.smooth, run under this context so progress and "
-          "cancellation are observed.")
-      .def(
-          "smooth",
-          [](ExecutionContext& ctx, const MeshGL64& mesh,
-             std::vector<size_t> sharpened_edges,
-             std::vector<double> edge_smoothness) {
-            if (sharpened_edges.size() != edge_smoothness.size()) {
-              throw std::runtime_error(
-                  "sharpened_edges.size() != edge_smoothness.size()");
-            }
-            std::vector<Smoothness> vec(sharpened_edges.size());
-            for (size_t i = 0; i < vec.size(); i++) {
-              vec[i] = {sharpened_edges[i], edge_smoothness[i]};
-            }
-            return ctx.Smooth(mesh, vec);
-          },
-          nb::arg("mesh"), nb::arg("sharpened_edges") = nb::list(),
-          nb::arg("edge_smoothness") = nb::list(),
-          "Like Manifold.smooth, run under this context so progress and "
-          "cancellation are observed.");
+          "evaluation reports progress and observes cancellation.");
 
   nb::enum_<Manifold::Error>(m, "Error")
       .value("NoError", Manifold::Error::NoError)
