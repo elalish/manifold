@@ -53,7 +53,7 @@ struct SpinBarrier {
  * The very simplest Boolean operation test.
  */
 TEST(Boolean, Tetra) {
-  Manifold tetra = WithPositionColors(Manifold::Tetrahedron());
+  Manifold tetra = WithPositionColors(Manifold::Tetrahedron().AsOriginal());
   MeshGL tetraGL = tetra.GetMeshGL();
   EXPECT_TRUE(!tetra.IsEmpty());
 
@@ -544,7 +544,8 @@ TEST(Boolean, Perturb3) {
 }
 
 TEST(Boolean, Coplanar) {
-  Manifold cylinder = WithPositionColors(Manifold::Cylinder(1.0, 1.0));
+  Manifold cylinder =
+      WithPositionColors(Manifold::Cylinder(1.0, 1.0).AsOriginal());
   MeshGL cylinderGL = cylinder.GetMeshGL();
 
   Manifold cylinder2 = cylinder.Scale({0.8, 0.8, 1.0}).Rotate(0, 0, 185);

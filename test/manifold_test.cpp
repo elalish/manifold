@@ -700,7 +700,7 @@ TEST(Manifold, Decompose) {
 TEST(Manifold, DecomposeProps) {
   std::vector<MeshGL> input;
   std::vector<Manifold> manifoldList;
-  auto tet = WithPositionColors(Manifold::Tetrahedron());
+  auto tet = WithPositionColors(Manifold::Tetrahedron().AsOriginal());
   manifoldList.emplace_back(tet);
   input.emplace_back(tet.GetMeshGL());
   auto cube =

@@ -51,7 +51,7 @@ TEST(Properties, Tolerance) {
   double degrees = 1;
   double tol = sind(degrees);
   Manifold cube = Manifold::Cube({1, 1, 1}, true);
-  Manifold imperfect = (cube ^ cube.Rotate(degrees)).AsOriginal();
+  Manifold imperfect = cube ^ cube.Rotate(degrees);
   EXPECT_EQ(imperfect.NumTri(), 28);
 
   Manifold imperfect2 = imperfect.Simplify(tol);

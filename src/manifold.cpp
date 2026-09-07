@@ -451,8 +451,7 @@ double Manifold::Volume() const {
  * by product manifolds' MeshRelation. If this manifold is a product, this
  * returns -1. The ID 0 is special, indicating this ID is not unique to this
  * object. ID 0 is the default, allowing maximum simplification of coplanar
- * faces, but does not support properties. When tracking materials and
- * properties on objects, be sure to call AsOriginal() and record its unique ID.
+ * faces.
  */
 int Manifold::OriginalID() const {
   return GetCsgLeafNode().GetImpl()->meshRelation_.originalID;
