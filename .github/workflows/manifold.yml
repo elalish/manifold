@@ -459,7 +459,8 @@ jobs:
       matrix:
         parallelization: [OFF, ON]
     runs-on: ubuntu-latest
-    container: openscad/mxe-x86_64-gui:latest
+    # Resolved from openscad/mxe-x86_64-gui:latest on 2026-09-07.
+    container: openscad/mxe-x86_64-gui@sha256:2df7d1c09a50192a523b4f9ea1f6155228a90e405545149d5bb3b41907f61b55
     steps:
     - uses: actions/checkout@v6
     - name: Build
