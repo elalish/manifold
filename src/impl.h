@@ -118,7 +118,7 @@ struct Manifold::Impl {
   void SetFaceAndVertNormals();
   void DedupePropVerts();
   void RemoveUnreferencedVerts();
-  void InitializeOriginal(int id = 0, bool keepFaceID = false);
+  void InitializeOriginal(int id = 0);
   void CreateHalfedges(const Vec<ivec3>& triProp,
                        const Vec<ivec3>& triVert = {});
   void CalculateVertNormals();

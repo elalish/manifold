@@ -185,9 +185,8 @@ void Manifold::Impl::EagerTransformPropNormals(
  *
  * @param id The original ID to assign to this manifold. If -1, a new ID is
  *          generated.
- * @param keepFaceID If true, the coplanar IDs are not changed.
  */
-void Manifold::Impl::InitializeOriginal(int id, bool keepFaceID) {
+void Manifold::Impl::InitializeOriginal(int id) {
   const int meshID = id < 0 ? ReserveIDs(1) : id;
   meshRelation_.originalID = meshID;
   auto& triRef = meshRelation_.triRef;

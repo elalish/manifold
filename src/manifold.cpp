@@ -397,15 +397,12 @@ Manifold Manifold::Simplify(double tolerance) const {
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
   auto impl = std::make_shared<Impl>(*leafImpl);
+  impl->RemoveDegenerates();
   const double oldTolerance = impl->tolerance_;
-  if (tolerance == 0) tolerance = oldTolerance;
-  if (tolerance > oldTolerance) {
-    impl->tolerance_ = tolerance;
-    impl->SetFaceAndVertNormals();
-  }
+  impl->tolerance_ = tolerance;
   impl->Decimate();
-  impl->SortGeometry();
   impl->tolerance_ = oldTolerance;
+  impl->SortGeometry();
   return Manifold(impl);
 }
 
@@ -474,9 +471,7 @@ Manifold Manifold::AsOriginal(int id) const {
     return PropagateStatus(oldImpl->status_);
   auto newImpl = std::make_shared<Impl>(*oldImpl);
   newImpl->InitializeOriginal(id);
-  id = newImpl->meshRelation_.originalID;
   newImpl->SetFaceAndVertNormals();
-  newImpl->InitializeOriginal(id, true);
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
 
