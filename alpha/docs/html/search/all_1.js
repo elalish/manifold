@@ -33,6 +33,6 @@ var searchData=
   ['apply_3c_20f_2c_20scalars_5ft_3c_3e_2c_20vec_3c_20a_2c_20m_20_3e_2c_20vec_3c_20b_2c_20m_20_3e_2c_20vec_3c_20c_2c_20m_20_3e_20_3e_30',['apply&lt; F, scalars_t&lt;&gt;, vec&lt; A, M &gt;, vec&lt; B, M &gt;, vec&lt; C, M &gt; &gt;',['../structlinalg_1_1detail_1_1apply_3_01_f_00_01scalars__t_3_4_00_01vec_3_01_a_00_01_m_01_4_00_01vec9e57e2f9d53ba71e1bb5381f1a156b44.html',1,'linalg::detail']]],
   ['area_31',['Area',['../classmanifold_1_1_cross_section.html#ac84b151a969c68d662637e8245548666',1,'manifold::CrossSection::Area()'],['../structmanifold_1_1_rect.html#a755a612bb3ecc4b74662828545e0e442',1,'manifold::Rect::Area()']]],
   ['array_32',['Array',['../group__array.html',1,'']]],
-  ['asoriginal_33',['AsOriginal',['../classmanifold_1_1_manifold.html#a9b4bbbc5b70a0d1f6b07c91f1684fb57',1,'manifold::Manifold']]],
+  ['asoriginal_33',['AsOriginal',['../classmanifold_1_1_manifold.html#a1a4d28e093d1fff6b8f32fd4ca48040d',1,'manifold::Manifold']]],
   ['author_34',['About the author',['../index.html#autotoc_md18',1,'']]]
 ];

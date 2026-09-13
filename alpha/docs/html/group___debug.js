@@ -3,6 +3,7 @@ var group___debug =
     [ "ExecutionParams", "group___debug.html#structmanifold_1_1_execution_params", [
       [ "intermediateChecks", "group___debug.html#ae8dc7c8ba98011f6f2dbe1caddf2a6fb", null ],
       [ "selfIntersectionChecks", "group___debug.html#aca3506c8f5774ba33cd774fd54b20d4a", null ],
+      [ "verifyNoDegenerates", "group___debug.html#acb0dd3ed3ab0d2b6adac1c53ea811f99", null ],
       [ "processOverlaps", "group___debug.html#a7166fd3caef3744f7241075f21f76af3", null ],
       [ "suppressErrors", "group___debug.html#a48b673772893c29c426e98f8c84f0206", null ],
       [ "cleanupTriangles", "group___debug.html#a85c1664e476e1da1b3d0973b3451857b", null ],

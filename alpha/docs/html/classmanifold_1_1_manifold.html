@@ -212,7 +212,7 @@ Mesh ID</h2></td></tr>
 <tr><td class="ititle" colspan="2"><p>Details of the manifold's relation to its input meshes, for the purposes of reapplying mesh properties. </p>
 </td></tr>
 <tr class="memitem:a65b3ff79efc694738a4f56270cc608e6" id="r_a65b3ff79efc694738a4f56270cc608e6"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a65b3ff79efc694738a4f56270cc608e6">OriginalID</a> () const</td></tr>
-<tr class="memitem:a9b4bbbc5b70a0d1f6b07c91f1684fb57" id="r_a9b4bbbc5b70a0d1f6b07c91f1684fb57"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a9b4bbbc5b70a0d1f6b07c91f1684fb57">AsOriginal</a> () const</td></tr>
+<tr class="memitem:a1a4d28e093d1fff6b8f32fd4ca48040d" id="r_a1a4d28e093d1fff6b8f32fd4ca48040d"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a1a4d28e093d1fff6b8f32fd4ca48040d">AsOriginal</a> (int id=-1) const</td></tr>
 <tr class="memitem:a1d7e7e674ce7bd9954dc0d54ec6ebc8c" id="r_a1d7e7e674ce7bd9954dc0d54ec6ebc8c"><td class="memItemLeft">static uint32_t&#160;</td><td class="memItemRight"><a class="el" href="#a1d7e7e674ce7bd9954dc0d54ec6ebc8c">ReserveIDs</a> (uint32_t)</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-member-group" class="groupheader"><a id="member-group" name="member-group"></a>
@@ -226,6 +226,7 @@ Transformations</h2></td></tr>
 <tr class="memitem:a7825d52e3102cc6e7d48a19f9ea0b468" id="r_a7825d52e3102cc6e7d48a19f9ea0b468"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a7825d52e3102cc6e7d48a19f9ea0b468">WarpBatch</a> (std::function&lt; void(<a class="el" href="classmanifold_1_1_vec_view.html">VecView</a>&lt; vec3 &gt;)&gt;) const</td></tr>
 <tr class="memitem:a80cc9e5711781e87ab04f159f271e8bc" id="r_a80cc9e5711781e87ab04f159f271e8bc"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a80cc9e5711781e87ab04f159f271e8bc">SetTolerance</a> (double) const</td></tr>
 <tr class="memitem:ae1d9b86f7268b531161eb7d510ed90a7" id="r_ae1d9b86f7268b531161eb7d510ed90a7"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#ae1d9b86f7268b531161eb7d510ed90a7">Simplify</a> (double tolerance=0) const</td></tr>
+<tr class="memitem:a10c9279f88f8ef7a396a04baad480076" id="r_a10c9279f88f8ef7a396a04baad480076"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a10c9279f88f8ef7a396a04baad480076">RemoveDegenerates</a> () const</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-member-group" class="groupheader"><a id="member-group" name="member-group"></a>
 Boolean</h2></td></tr>
@@ -1169,12 +1170,12 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>If this mesh is an original, this returns its meshID that can be referenced by product manifolds' MeshRelation. If this manifold is a product, this returns -1. </p>
+<p>If this mesh is an original, this returns its meshID that can be referenced by product manifolds' MeshRelation. If this manifold is a product, this returns -1. The ID 0 is special, indicating this ID is not unique to this object. ID 0 is the default, allowing maximum simplification of coplanar faces. </p>
 
 </div>
 </div>
-<a id="a9b4bbbc5b70a0d1f6b07c91f1684fb57" name="a9b4bbbc5b70a0d1f6b07c91f1684fb57"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a9b4bbbc5b70a0d1f6b07c91f1684fb57">&#9670;&#160;</a></span>AsOriginal()</h2>
+<a id="a1a4d28e093d1fff6b8f32fd4ca48040d" name="a1a4d28e093d1fff6b8f32fd4ca48040d"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1a4d28e093d1fff6b8f32fd4ca48040d">&#9670;&#160;</a></span>AsOriginal()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1182,14 +1183,20 @@ Testing Hooks</h2></td></tr>
         <tr>
           <td class="memname"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> AsOriginal </td>
           <td>(</td>
-          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>id</em></span><span class="paramdefsep"> = </span><span class="paramdefval">-1</span></td><td>)</td>
           <td> const</td>
         </tr>
       </table>
 </div><div class="memdoc">
 <p>This removes all relations (originalID, faceID, transform) to ancestor meshes and this new <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> is marked an original. It also recreates faces</p><ul>
-<li>these don't get joined at boundaries where originalID changes, so the reset may allow triangles of flat faces to be further collapsed with <a class="el" href="#ae1d9b86f7268b531161eb7d510ed90a7">Simplify()</a>. </li>
+<li>these don't get joined at boundaries where originalID changes, so the reset may allow triangles of flat faces to be further collapsed with <a class="el" href="#a10c9279f88f8ef7a396a04baad480076">RemoveDegenerates()</a>.</li>
 </ul>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">id</td><td>The ID to assign to this manifold. If negative (the default), a new ID is assigned. Use zero to match all default-constructed manifolds, thus not keeping track of the joints between input manifolds. </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>
@@ -1435,6 +1442,24 @@ Testing Hooks</h2></td></tr>
       </table>
 </div><div class="memdoc">
 <p>Return a copy of the manifold simplified to the given tolerance, but with its actual tolerance value unchanged. If the tolerance is not given or is less than the current tolerance, the current tolerance is used for simplification. The result will contain a subset of the original verts and all surfaces will have moved by less than tolerance. </p>
+
+</div>
+</div>
+<a id="a10c9279f88f8ef7a396a04baad480076" name="a10c9279f88f8ef7a396a04baad480076"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a10c9279f88f8ef7a396a04baad480076">&#9670;&#160;</a></span>RemoveDegenerates()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> RemoveDegenerates </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Returns a copy of the manifold with all degenerate triangles removed, as well as collapsing coplanar edges that are not important boundaries. </p>
 
 </div>
 </div>

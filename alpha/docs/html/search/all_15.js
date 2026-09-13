@@ -14,6 +14,7 @@ var searchData=
   ['vector_20algebra_11',['Vector Algebra',['../group__vec__algebra.html',1,'']]],
   ['vecview_12',['VecView',['../classmanifold_1_1_vec_view.html',1,'manifold']]],
   ['verbose_13',['verbose',['../group___debug.html#a0b2caeb4b6f130be43e5a2f0267dd453',1,'manifold::ExecutionParams']]],
-  ['vertproperties_14',['vertProperties',['../structmanifold_1_1_mesh_g_l_p.html#a46f72e2c73b83104e4a089142cb033d7',1,'manifold::MeshGLP']]],
-  ['volume_15',['Volume',['../classmanifold_1_1_manifold.html#a678f606b1ff10c8959240d2985e022ad',1,'manifold::Manifold']]]
+  ['verifynodegenerates_14',['verifyNoDegenerates',['../group___debug.html#acb0dd3ed3ab0d2b6adac1c53ea811f99',1,'manifold::ExecutionParams']]],
+  ['vertproperties_15',['vertProperties',['../structmanifold_1_1_mesh_g_l_p.html#a46f72e2c73b83104e4a089142cb033d7',1,'manifold::MeshGLP']]],
+  ['volume_16',['Volume',['../classmanifold_1_1_manifold.html#a678f606b1ff10c8959240d2985e022ad',1,'manifold::Manifold']]]
 ];
