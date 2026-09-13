@@ -123,7 +123,7 @@ Manifold Manifold::Sphere(double radius, int circularSegments) {
   pImpl_->CalculateBBox();
   pImpl_->SetEpsilon();
   pImpl_->SortGeometry();
-  pImpl_->SetNormalsAndCoplanar();
+  pImpl_->SetFaceAndVertNormals();
   return Manifold(pImpl_);
 }
 
@@ -219,7 +219,7 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
   pImpl_->CalculateBBox();
   pImpl_->SetEpsilon();
   pImpl_->SortGeometry();
-  pImpl_->SetNormalsAndCoplanar();
+  pImpl_->SetFaceAndVertNormals();
   return Manifold(pImpl_);
 }
 
@@ -364,7 +364,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   pImpl_->CalculateBBox();
   pImpl_->SetEpsilon();
   pImpl_->SortGeometry();
-  pImpl_->SetNormalsAndCoplanar();
+  pImpl_->SetFaceAndVertNormals();
   return Manifold(pImpl_);
 }
 
