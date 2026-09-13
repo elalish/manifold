@@ -112,6 +112,7 @@ int main(int argc, char** argv) {
   }
 
   manifold::ManifoldParams().intermediateChecks = true;
+  manifold::ManifoldParams().verifyNoDegenerates = true;
   manifold::ManifoldParams().processOverlaps = false;
 
   FrameMarkEnd(name);
@@ -471,10 +472,6 @@ void ExpectMeshes(const Manifold& manifold,
   }
 }
 
-void CheckStrictly(const Manifold& manifold) {
-  EXPECT_EQ(manifold.NumDegenerateTris(), 0);
-}
-
 void CheckGL(const Manifold& manifold, bool noMerge) {
   ASSERT_FALSE(manifold.IsEmpty());
   const MeshGL meshGL = manifold.GetMeshGL();
@@ -517,10 +514,6 @@ void CheckGLEquiv(const MeshGL& mgl1, const MeshGL& mgl2) {
 
 #ifndef MANIFOLD_NO_FILESYSTEM
 Manifold ReadTestOBJ(const std::string& filename) {
-  return Manifold(ReadTestMeshGL64OBJ(filename));
-}
-
-MeshGL64 ReadTestMeshGL64OBJ(const std::string& filename) {
 #ifdef __EMSCRIPTEN__
   std::string obj = "/models/" + filename;
 #else
@@ -531,8 +524,9 @@ MeshGL64 ReadTestMeshGL64OBJ(const std::string& filename) {
 #endif
   std::ifstream f;
   f.open(obj);
-  MeshGL64 a = ReadOBJ(f);
+  Manifold a = Manifold::ReadOBJ(f);
   f.close();
+  EXPECT_FALSE(a.IsEmpty());
   return a;
 }
 

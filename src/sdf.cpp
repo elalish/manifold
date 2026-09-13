@@ -596,7 +596,7 @@ void Manifold::Impl::CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
     MakeEmpty(Error::Cancelled);
     return;
   }
-  SetNormalsAndCoplanar();
+  SetFaceAndVertNormals();
   ADVANCE_PHASE_OR_RETURN(ctx);
 }
 }  // namespace manifold

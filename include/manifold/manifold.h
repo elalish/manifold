@@ -197,7 +197,7 @@ class Manifold {
    */
   ///@{
   int OriginalID() const;
-  Manifold AsOriginal() const;
+  Manifold AsOriginal(int id = -1) const;
   static uint32_t ReserveIDs(uint32_t);
   ///@}
 
@@ -214,6 +214,7 @@ class Manifold {
   Manifold WarpBatch(std::function<void(VecView<vec3>)>) const;
   Manifold SetTolerance(double) const;
   Manifold Simplify(double tolerance = 0) const;
+  Manifold RemoveDegenerates() const;
   ///@}
 
   /** @name Boolean

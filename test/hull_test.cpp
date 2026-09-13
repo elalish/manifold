@@ -207,17 +207,7 @@ TEST(Hull, Degenerate2D) {
       {0.5, 0.0, 0.0},
       {0.5, 0.0, 1.0},
   });
-  EXPECT_TRUE(!hull.IsEmpty());
-
-  EXPECT_FLOAT_EQ(hull.BoundingBox().min.x, 0.0);
-  EXPECT_FLOAT_EQ(hull.BoundingBox().min.y, 0.0);
-  EXPECT_FLOAT_EQ(hull.BoundingBox().min.z, 0.0);
-
-  EXPECT_FLOAT_EQ(hull.BoundingBox().max.x, 0.5);
-  EXPECT_FLOAT_EQ(hull.BoundingBox().max.y, 0.0);
-  EXPECT_FLOAT_EQ(hull.BoundingBox().max.z, 1.0);
-
-  EXPECT_FLOAT_EQ(hull.Volume(), 0.0);
+  EXPECT_TRUE(hull.IsEmpty());
 }
 
 TEST(Hull, Degenerate1D) {
@@ -228,17 +218,7 @@ TEST(Hull, Degenerate1D) {
       {0.5, 0.0, 0.0},
       {0.5, 0.0, 0.0},
   });
-  EXPECT_TRUE(!hull.IsEmpty());
-
-  EXPECT_FLOAT_EQ(hull.BoundingBox().min.x, 0.0);
-  EXPECT_FLOAT_EQ(hull.BoundingBox().min.y, 0.0);
-  EXPECT_FLOAT_EQ(hull.BoundingBox().min.z, 0.0);
-
-  EXPECT_FLOAT_EQ(hull.BoundingBox().max.x, 0.5);
-  EXPECT_FLOAT_EQ(hull.BoundingBox().max.y, 0.0);
-  EXPECT_FLOAT_EQ(hull.BoundingBox().max.z, 0.0);
-
-  EXPECT_FLOAT_EQ(hull.Volume(), 0.0);
+  EXPECT_TRUE(hull.IsEmpty());
 }
 
 TEST(Hull, NotEnoughPoints) {
@@ -246,17 +226,7 @@ TEST(Hull, NotEnoughPoints) {
       {0.0, 0.0, 0.0},
       {0.5, 0.0, 0.0},
   });
-  EXPECT_TRUE(!hull.IsEmpty());
-
-  EXPECT_FLOAT_EQ(hull.BoundingBox().min.x, 0.0);
-  EXPECT_FLOAT_EQ(hull.BoundingBox().min.y, 0.0);
-  EXPECT_FLOAT_EQ(hull.BoundingBox().min.z, 0.0);
-
-  EXPECT_FLOAT_EQ(hull.BoundingBox().max.x, 0.5);
-  EXPECT_FLOAT_EQ(hull.BoundingBox().max.y, 0.0);
-  EXPECT_FLOAT_EQ(hull.BoundingBox().max.z, 0.0);
-
-  EXPECT_FLOAT_EQ(hull.Volume(), 0.0);
+  EXPECT_TRUE(hull.IsEmpty());
 }
 
 TEST(Hull, EmptyHull) {

@@ -51,7 +51,7 @@ TEST(Properties, Tolerance) {
   double degrees = 1;
   double tol = sind(degrees);
   Manifold cube = Manifold::Cube({1, 1, 1}, true);
-  Manifold imperfect = (cube ^ cube.Rotate(degrees)).AsOriginal();
+  Manifold imperfect = cube ^ cube.Rotate(degrees);
   EXPECT_EQ(imperfect.NumTri(), 28);
 
   Manifold imperfect2 = imperfect.Simplify(tol);
@@ -177,16 +177,6 @@ TEST(Properties, CalculateNormals) {
   }
   EXPECT_EQ(numBad, 0);
   EXPECT_EQ(numBad2, 0);
-  for (int tv = out2.runIndex[0]; tv < out2.runIndex[1]; ++tv) {
-    const int v = out2.triVerts[tv];
-    auto pos = out2.GetVertPos(v);
-    auto norm = pos;
-    for (int j : {0, 1, 2}) {
-      norm[j] = out2.vertProperties[np * v + 3 + j];
-    }
-    EXPECT_FLOAT_EQ(la::length(norm), 1.0);
-    EXPECT_GT(dot(la::normalize(pos), norm), 0.99);
-  }
 }
 
 TEST(Properties, Coplanar) {

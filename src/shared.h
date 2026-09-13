@@ -333,10 +333,10 @@ struct TriRef {
   /// Triangles with the same coplanar ID are coplanar. Starts as a canonical
   /// triangle index, but after boolean operations it may refer to a triangle
   /// that is no longer present in this mesh.
-  int coplanarID;
+  int triID;
 
   bool SameFace(const TriRef& other) const {
-    return meshID == other.meshID && coplanarID == other.coplanarID &&
+    return meshID == other.meshID && triID == other.triID &&
            faceID == other.faceID;
   }
 };
@@ -392,8 +392,7 @@ inline std::ostream& operator<<(std::ostream& stream, const Barycentric& bary) {
 inline std::ostream& operator<<(std::ostream& stream, const TriRef& ref) {
   return stream << "meshID: " << ref.meshID
                 << ", originalID: " << ref.originalID
-                << ", faceID: " << ref.faceID
-                << ", coplanarID: " << ref.coplanarID;
+                << ", faceID: " << ref.faceID << ", coplanarID: " << ref.triID;
 }
 #endif
 }  // namespace manifold
