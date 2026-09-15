@@ -6,7 +6,7 @@ import {BUILTIN_VAR_CONSTANTS} from './builtins.js';
 import {compileArgList, compileExpr, findArg, inferDeclaredType, isIndexRange, locTag, namesNeedingPredeclaration, numericTypeOf} from './expr.js';
 import {bindJsName, declJsName, escapeName, svTarget, T,} from './naming.js';
 import {nodeReferencesIdentifier, slotUsesNoArg} from './scan.js';
-import {currentMainFilename, currentSourceFilename, dynamicScopeVars, externalModuleNames, globalVarDeclKeyword, moduleDeclRegistry, parentModulesReadInFunction, RT, signatures} from './state.js';
+import {cpsTransformedFunctions, currentMainFilename, currentSourceFilename, dynamicScopeVars, externalModuleNames, globalVarDeclKeyword, moduleDeclRegistry, parentModulesReadInFunction, RT, signatures} from './state.js';
 import {compileSurface} from './surface.js';
 import {deduplicateParams, emitTailBody, hasSelfTailCall, moduleAlwaysRecurses, tailAlwaysRecurses} from './tailcall.js';
 import type {Binding, ModuleDeclStmtType} from './types.js';
@@ -155,8 +155,9 @@ export async function compileDeclaration(
           renamedParams.map(n => `  let ${n}: any = ${n}${T('arg')};\n`)
               .join('');
       const defaultsPrologue = emitNoArgDefaults(declKey, dedup, '  ');
-      // Tail-recursive functions are lowered into an iterative loop so deep
-      // recursion doesn't overflow
+      const fnJsName = declJsName(stmt, 'fn');
+
+      // Lower self tail calls to CPS tc() thunks for iterative trampoline execution
       if (!dedup.some(p => p.name === stmt.name) &&
           hasSelfTailCall(stmt.body, stmt.name)) {
         if (tailAlwaysRecurses(stmt.body, stmt.name)) {
@@ -167,14 +168,17 @@ export async function compileDeclaration(
           throw new Error(`Recursion detected calling function '${
               stmt.name}' in file ${base}, line ${line}`);
         }
-        const loopBody = (emitTailBody(stmt.body, stmt.name, dedup, '    '));
+        // Mark the function for trampoline-based calls
+        cpsTransformedFunctions.add(fnJsName);
+        const loopBody =
+            emitTailBody(stmt.body, stmt.name, fnJsName, dedup, '  ');
         return withLeading(
-            `function ${declJsName(stmt, 'fn')}(${params}): any {\n${rebinds}${
-                defaultsPrologue}  while (true) {\n${loopBody}\n  }\n}`);
+            `function ${fnJsName}(${params}): any {\n${rebinds}${
+                defaultsPrologue}${loopBody}\n}`);
       }
       const bodyExpr = (compileExpr(stmt.body));
       return withLeading(
-          `function ${declJsName(stmt, 'fn')}(${params}): any {\n${rebinds}${
+          `function ${fnJsName}(${params}): any {\n${rebinds}${
               defaultsPrologue}  return ${bodyExpr};\n}`);
     }
 

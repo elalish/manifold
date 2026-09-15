@@ -1,4 +1,4 @@
-import type {Expr, FunctionDeclStmt, Parameter} from './ast.js';
+import type {Expr, Parameter} from './ast.js';
 import {BUILTIN_FUNCTIONS, BUILTIN_MODULES, BUILTIN_VAR_CONSTANTS, RUNTIME_SYMBOLS,} from './builtins.js';
 import type {BindOptions, BindResult, FileResolver, ModuleDeclStmtType, Scope,} from './types.js';
 
@@ -32,8 +32,8 @@ export const externalVariableNames: Set<string> = new Set();
 // Track special variables that need module-level declarations for dynamic
 // scoping
 export const dynamicScopeVars: Set<string> = new Set();
-// Compile-time divergence detection for non-tail recursion
-export const userFunctionDefs = new Map<string, FunctionDeclStmt>();
+// JS functions transformed to CPS. Calls must use call() to trampoline tc() thunks
+export const cpsTransformedFunctions = new Set<string>();
 // Names introduced by the emitter
 export const unitTakenNames = new Set<string>();
 export const tempNames = new Map<string, string>();

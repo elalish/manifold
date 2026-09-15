@@ -9,10 +9,9 @@ import {compileDeclaration, compileGeometry, GEOMETRY_TYPE, hasBackgroundModifie
 import {compileUsedFileScope, declKey, isDecl} from './library.js';
 import {assignPrettyNames, buildRuntimeImport, builtinConstantsFor, builtinSymbolNames, declJsName, escapeName, globalJsName, namesBlockingRuntimeLocals, namesInUse, reservedNames, resetTempNames, resolveRuntimeLocals, svTarget, T,} from './naming.js';
 import {collectDeclarations, openNoArgSlots, scanProgram} from './scan.js';
-import {setModuleDecls} from './state.js';
+import {cpsTransformedFunctions, setModuleDecls} from './state.js';
 import type {Signature} from './state.js';
 import {currentBindOptions, currentMainFilename, currentScope, dynamicScopeVars, externalFunctionNames, externalModuleNames, externalVariableNames, globalVarDeclKeyword, localDecls, moduleDeclRegistry, noArgDemotions, resetTailTemps, RT, setBindResult, setCurrentRuntimePath, setCurrentScope, setCurrentSourceFilename, setMainFilename, setParentModulesReadInFunction, signatures} from './state.js';
-import {reportDivergentCalls} from './tailcall.js';
 import type {CompileOptions, ModuleDeclStmtType} from './types.js';
 
 
@@ -134,6 +133,7 @@ export async function compile(
   signatures.clear();
   localDecls.clear();
   noArgDemotions.clear();
+  cpsTransformedFunctions.clear();
 
   // Record the builtin signatures
   for (const [k, v] of Object.entries(BUILTIN_SIGNATURES)) {
@@ -178,7 +178,7 @@ export async function compile(
   const openSlots = openNoArgSlots();
 
   const scan = scanProgram(
-      program.statements, {noArgSlots: openSlots, divergence: true});
+      program.statements, {noArgSlots: openSlots});
   for (const [key, slots] of openSlots) {
     if (slots.some(Boolean)) noArgDemotions.set(key, slots);
   }
@@ -193,9 +193,6 @@ export async function compile(
 
   resetTempNames(namesInUse(bind, scan.unresolved));
   setCurrentScope(bind.global);
-
-  // Reject top-level constant-argument calls to non-tail recursive functions
-  reportDivergentCalls(scan.divergenceCandidates, scan.functionDefs);
 
   const slotOrder: string[] = [];
   const slotExpr = new Map<string, Expr>();

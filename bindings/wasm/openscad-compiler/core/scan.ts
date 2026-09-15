@@ -24,18 +24,12 @@ export function scanProgram(
     moduleArgNames: new Set(),
     parentModulesInFunction: false,
     topLevelChildren: false,
-    functionDefs: new Map(),
-    divergenceCandidates: [],
   };
 
   let moduleDeclDepth = 0;  // children(): file scope only
   let functionDepth = 0;    // $parent_modules: inside a function only
-  let declBodyDepth = 0;    // divergence: bodies run only when called
-  let callChildDepth = 0;   // functionDefs: match forEachDeclaration's reach
-  const callChildren = new Set<KindedNode>();
 
   const enter = (node: KindedNode): void => {
-    if (callChildren.has(node)) callChildDepth++;
     switch (node.kind) {
       case 'identifier':
         if (!node.binding && node.name !== '$children')
@@ -49,8 +43,6 @@ export function scanProgram(
         scan.refs.functions.add(node.name);
         if (node.name === 'children' && moduleDeclDepth === 0)
           scan.topLevelChildren = true;
-        if (options.divergence && declBodyDepth === 0)
-          scan.divergenceCandidates.push(node);
         if (openSlots) demoteNoArgSlots(node, openSlots);
         break;
       case 'moduleCall':
@@ -64,16 +56,12 @@ export function scanProgram(
             if (arg.name && !arg.name.startsWith('$'))
               scan.moduleArgNames.add(escapeName(arg.name));
         if (openSlots) demoteNoArgSlots(node, openSlots);
-        if (node.child) callChildren.add(node.child);
         break;
       case 'functionDecl':
-        if (callChildDepth === 0) scan.functionDefs.set(node.name, node);
         functionDepth++;
-        declBodyDepth++;
         break;
       case 'moduleDecl':
         moduleDeclDepth++;
-        declBodyDepth++;
         break;
       case 'lambda':
         functionDepth++;
@@ -82,15 +70,12 @@ export function scanProgram(
   };
 
   const exit = (node: KindedNode): void => {
-    if (callChildren.has(node)) callChildDepth--;
     switch (node.kind) {
       case 'functionDecl':
         functionDepth--;
-        declBodyDepth--;
         break;
       case 'moduleDecl':
         moduleDeclDepth--;
-        declBodyDepth--;
         break;
       case 'lambda':
         functionDepth--;

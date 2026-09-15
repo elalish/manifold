@@ -1,4 +1,4 @@
-import type {ForVariable, FunctionCallExpr, LetAssignment, Parameter, Program, Statement,} from './ast.js';
+import type {ForVariable, LetAssignment, Parameter, Program, Statement,} from './ast.js';
 import type {TokenType} from './lexer.js';
 
 
@@ -247,14 +247,10 @@ export interface ProgramScan {
       Set<string>;  // non-$ named args of user module calls, escaped
   parentModulesInFunction: boolean;
   topLevelChildren: boolean;
-  functionDefs: Map<string, FunctionDeclStmtType>;
-  divergenceCandidates: FunctionCallExpr[];
 }
 
 export interface ScanOptions {
   // Open `NO_ARG` slots for demotion as calls are seen; library calls skip this
   // analysis
   noArgSlots?: Map<string, boolean[]>;
-  // Collect candidate call sites for the divergence check. Consumer only
-  divergence?: boolean;
 }
