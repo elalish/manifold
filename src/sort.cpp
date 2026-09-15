@@ -390,8 +390,8 @@ void Manifold::Impl::CompactProps(ExecutionContext::Impl* ctx) {
   auto policy = autoPolicy(numVerts, 1e5);
 
   for_each_n(policy, countAt(0), halfedge_.size(), ctx, [this, &keep](int idx) {
-    reinterpret_cast<std::atomic<int>*>(&keep[halfedge_.Prop(idx)])
-        ->store(1, std::memory_order_relaxed);
+    AtomicRef<int>(keep[halfedge_.Prop(idx)])
+        .store(1, std::memory_order_relaxed);
   });
   if (IsCancelled(ctx)) return;
   Vec<int> propOld2New(numVerts + 1, 0);

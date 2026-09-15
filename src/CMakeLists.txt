@@ -42,6 +42,7 @@ set(
 
 set(
   MANIFOLD_PRIVATE_HDRS
+  atomic_compat.h
   boolean2.h
   boolean2_diagnostics.h
   boolean3.h

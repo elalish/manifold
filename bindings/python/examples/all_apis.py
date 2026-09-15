@@ -100,12 +100,10 @@ def all_manifold():
     m = m.refine(2)
     m = m.refine_to_length(0.1)
     m = m.refine_to_tolerance(0.01)
-    m = m.smooth_out()
     i = Manifold.reserve_ids(1)
     m = m.scale((1, 2, 3))
     m = m.set_properties(3, lambda pos, prop: pos)
     c = m.slice(0.5)
-    m = Manifold.smooth(mesh, [0], [0.5])
     m = Manifold.sphere(1)
     m, n = m.split(m.translate((1, 0, 0)))
     m, n = m.split_by_plane((0, 0, 1), 0)
@@ -134,8 +132,6 @@ def all_manifold():
         0.2,
     )
     assert sphere.status() == Error.NoError
-    smooth_ctx = ExecutionContext()
-    m = smooth_ctx.smooth(Manifold.cube().to_mesh(), [0], [0.5])
     # A pre-cancelled ctx propagates through a factory; this proves the ctx is
     # wired, since NoError + progress==1 also hold for an untouched ctx.
     cancel_factory_ctx = ExecutionContext()

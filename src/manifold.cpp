@@ -14,6 +14,7 @@
 
 #include <algorithm>
 
+#include "atomic_compat.h"
 #include "boolean3.h"
 #include "csg_tree.h"
 #include "execution_impl.h"
@@ -128,7 +129,7 @@ Manifold& Manifold::operator=(Manifold&&) noexcept = default;
 Manifold::Manifold(const Manifold& other) {
   std::lock_guard<std::mutex> lock(*other.pNodeMutex_);
   pNode_ = other.pNode_;
-  std::atomic_store(&ctx_, std::atomic_load(&other.ctx_));
+  AtomicStoreShared(&ctx_, AtomicLoadShared(&other.ctx_));
 }
 
 Manifold::Manifold(std::shared_ptr<CsgNode> pNode) : pNode_(pNode) {}
@@ -156,7 +157,7 @@ Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
     std::scoped_lock lock(*pNodeMutex_, *other.pNodeMutex_);
     pNode_ = other.pNode_;
-    std::atomic_store(&ctx_, std::atomic_load(&other.ctx_));
+    AtomicStoreShared(&ctx_, AtomicLoadShared(&other.ctx_));
   }
   return *this;
 }
@@ -170,7 +171,7 @@ Manifold& Manifold::operator=(const Manifold& other) {
  */
 Manifold Manifold::WithContext(const ExecutionContext& ctx) const {
   Manifold result = *this;
-  std::atomic_store(&result.ctx_, ctx.impl_);
+  AtomicStoreShared(&result.ctx_, ctx.impl_);
   return result;
 }
 
@@ -305,7 +306,7 @@ Manifold::Error Manifold::Status() const {
   // expression -- through the lazy eval inside GetCsgLeafNode -- so a
   // concurrent op= reseating ctx_ on this Manifold can't free the Impl out
   // from under us.
-  return GetCsgLeafNode(std::atomic_load(&ctx_).get()).GetImpl()->status_;
+  return GetCsgLeafNode(AtomicLoadShared(&ctx_).get()).GetImpl()->status_;
 }
 /**
  * The number of vertices in the Manifold.
@@ -373,8 +374,8 @@ Manifold Manifold::SetTolerance(double tolerance) const {
   auto impl = std::make_shared<Impl>(*leafImpl);
   if (tolerance > impl->tolerance_) {
     impl->tolerance_ = tolerance;
-    impl->SetNormalsAndCoplanar();
-    impl->SimplifyTopology2();
+    impl->SetFaceAndVertNormals();
+    impl->Decimate();
     impl->SortGeometry();
   } else {
     // for reducing tolerance, we need to make sure it is still at least
@@ -396,15 +397,25 @@ Manifold Manifold::Simplify(double tolerance) const {
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
   auto impl = std::make_shared<Impl>(*leafImpl);
+  impl->RemoveDegenerates();
   const double oldTolerance = impl->tolerance_;
-  if (tolerance == 0) tolerance = oldTolerance;
-  if (tolerance > oldTolerance) {
-    impl->tolerance_ = tolerance;
-    impl->SetNormalsAndCoplanar();
-  }
-  impl->SimplifyTopology2();
-  impl->SortGeometry();
+  impl->tolerance_ = tolerance;
+  impl->Decimate();
   impl->tolerance_ = oldTolerance;
+  impl->SortGeometry();
+  return Manifold(impl);
+}
+
+/**
+ * Returns a copy of the manifold with all degenerate triangles removed, as well
+ * as collapsing coplanar edges that are not important boundaries.
+ */
+Manifold Manifold::RemoveDegenerates() const {
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto impl = std::make_shared<Impl>(*leafImpl);
+  impl->RemoveDegenerates();
   return Manifold(impl);
 }
 
@@ -435,7 +446,9 @@ double Manifold::Volume() const {
 /**
  * If this mesh is an original, this returns its meshID that can be referenced
  * by product manifolds' MeshRelation. If this manifold is a product, this
- * returns -1.
+ * returns -1. The ID 0 is special, indicating this ID is not unique to this
+ * object. ID 0 is the default, allowing maximum simplification of coplanar
+ * faces.
  */
 int Manifold::OriginalID() const {
   return GetCsgLeafNode().GetImpl()->meshRelation_.originalID;
@@ -446,15 +459,19 @@ int Manifold::OriginalID() const {
  * and this new Manifold is marked an original. It also recreates faces
  * - these don't get joined at boundaries where originalID changes, so the
  * reset may allow triangles of flat faces to be further collapsed with
- * Simplify().
+ * RemoveDegenerates().
+ *
+ * @param id The ID to assign to this manifold. If negative (the default), a new
+ * ID is assigned. Use zero to match all default-constructed manifolds, thus not
+ * keeping track of the joints between input manifolds.
  */
-Manifold Manifold::AsOriginal() const {
+Manifold Manifold::AsOriginal(int id) const {
   auto oldImpl = GetCsgLeafNode().GetImpl();
   if (oldImpl->status_ != Error::NoError)
     return PropagateStatus(oldImpl->status_);
   auto newImpl = std::make_shared<Impl>(*oldImpl);
-  newImpl->InitializeOriginal();
-  newImpl->SetNormalsAndCoplanar();
+  newImpl->InitializeOriginal(id);
+  newImpl->SetFaceAndVertNormals();
   return Manifold(std::make_shared<CsgLeafNode>(newImpl));
 }
 
@@ -474,6 +491,18 @@ uint32_t Manifold::ReserveIDs(uint32_t n) {
  */
 bool Manifold::MatchesTriNormals() const {
   return GetCsgLeafNode().GetImpl()->MatchesTriNormals();
+}
+
+/**
+ * Returns true if properties are shared everywhere except across mesh
+ * boundaries. This is not true in general, but only because an input mesh may
+ * have property discontinuities. For simple input meshes where properties are
+ * 1:1 with verts, this HasSimpleProps condition should still be true after any
+ * combination of boolean operations and simplifications. CalculateNormals()
+ * will cause this to be false anytime the mesh contains a sharp edge.
+ */
+bool Manifold::HasSimpleProps() const {
+  return GetCsgLeafNode().GetImpl()->HasSimpleProps();
 }
 
 /**
@@ -746,35 +775,6 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
 }
 
 /**
- * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
- * geometry will remain unchanged until Refine, RefineToLength, or
- * RefineToTolerance is called to interpolate the surface. This version uses the
- * geometry of the triangles and pseudo-normals to define the tangent vectors.
- * Faces of two coplanar triangles will be marked as quads, while faces with
- * three or more will be flat.
- *
- * @param minSharpAngle degrees, default 52.5. Any edges with angles greater
- * than this value will remain sharp. The rest will be smoothed to G1
- * continuity. With a value of zero, the model is faceted, but in this case
- * there is no point in smoothing.
- *
- * @param minSmoothness range: 0 - 1, default 0. The smoothness applied to sharp
- * angles. The default gives a hard edge, while values > 0 will give a small
- * fillet on these sharp edges. A value of 1 is equivalent to a minSharpAngle of
- * 180 - all edges will be smooth.
- */
-Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
-  auto leafImpl = GetCsgLeafNode().GetImpl();
-  if (leafImpl->status_ != Error::NoError)
-    return PropagateStatus(leafImpl->status_);
-  auto pImpl = std::make_shared<Impl>(*leafImpl);
-  if (!IsEmpty()) {
-    pImpl->CreateTangents(pImpl->SharpenEdges(minSharpAngle, minSmoothness));
-  }
-  return Manifold(std::make_shared<CsgLeafNode>(pImpl));
-}
-
-/**
  * Increase the density of the mesh by splitting every edge into n pieces. For
  * instance, with n = 2, each triangle will be split into 4 triangles. Quads
  * will ignore their interior triangle bisector. These will all be coplanar (and
@@ -788,7 +788,7 @@ Manifold Manifold::SmoothOut(double minSharpAngle, double minSmoothness) const {
  * @param n The number of pieces to split every edge into. Must be > 1.
  */
 Manifold Manifold::Refine(int n) const {
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
@@ -813,7 +813,7 @@ Manifold Manifold::Refine(int n) const {
  */
 Manifold Manifold::RefineToLength(double length) const {
   length = std::abs(length);
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
@@ -842,7 +842,7 @@ Manifold Manifold::RefineToLength(double length) const {
  */
 Manifold Manifold::RefineToTolerance(double tolerance) const {
   tolerance = std::abs(tolerance);
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
@@ -1011,7 +1011,7 @@ Manifold Manifold::TrimByPlane(vec3 normal, double originOffset) const {
  * @param other The other manifold to minkowski sum to this one.
  */
 Manifold Manifold::MinkowskiSum(const Manifold& other) const {
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto aImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (aImpl->status_ != Error::NoError) return PropagateStatus(aImpl->status_);
   auto bImpl = other.GetCsgLeafNode(ctx.get()).GetImpl();
@@ -1029,7 +1029,7 @@ Manifold Manifold::MinkowskiSum(const Manifold& other) const {
  * @param other The other manifold to minkowski subtract from this one.
  */
 Manifold Manifold::MinkowskiDifference(const Manifold& other) const {
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto aImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (aImpl->status_ != Error::NoError) return PropagateStatus(aImpl->status_);
   auto bImpl = other.GetCsgLeafNode(ctx.get()).GetImpl();
@@ -1076,7 +1076,7 @@ Manifold Manifold::Hull(const std::vector<vec3>& pts) {
  * Compute the convex hull of this manifold.
  */
 Manifold Manifold::Hull() const {
-  auto ctx = std::atomic_load(&ctx_);
+  auto ctx = AtomicLoadShared(&ctx_);
   auto srcImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (srcImpl->status_ != Error::NoError)
     return PropagateStatus(srcImpl->status_);

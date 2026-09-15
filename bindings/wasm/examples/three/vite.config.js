@@ -4,6 +4,8 @@ import {defineConfig} from 'vite'
 
 export default defineConfig({
   worker: {format: 'es'},
+  // Relative so a build works from any path.
+  base: './',
   server: {
     headers: {
       'Cross-Origin-Embedder-Policy': 'require-corp',

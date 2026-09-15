@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "../src/boolean2.h"
-
 #include <gtest/gtest.h>
 
 #include <algorithm>
@@ -29,6 +27,7 @@
 #include <utility>
 #include <vector>
 
+#include "../src/boolean2.h"
 #include "manifold/common.h"
 #include "manifold/cross_section.h"
 #include "manifold/manifold.h"
@@ -369,7 +368,7 @@ std::pair<std::vector<vec2>, std::vector<EdgeM>> CombinedInput(
 // Constructed verts may sit closer than eps only around a genuinely sub-eps
 // crossing tangle. Inputs whose features are all far above eps must not
 // silently acquire sub-eps output verts.
-TEST(Boolean2, CleanInputsKeepEpsSeparatedVerts) {
+TEST(CrossSectionComplex, CleanInputsKeepEpsSeparatedVerts) {
   const Polygons a = {{{0., 0.}, {4., 0.}, {4., 4.}, {0., 4.}}};
   const Polygons b = {{{2., 2.}, {6., 2.}, {6., 6.}, {2., 6.}}};
   const double eps = InferEps(a, b);
@@ -394,7 +393,7 @@ TEST(Boolean2, CleanInputsKeepEpsSeparatedVerts) {
 // RemoveOverlaps2D does so through a boolean Add on a hard mixed-scale input
 // (1e-6 alongside 1024). Replicated inline (CheckRetainedGraphValidity isn't
 // public).
-TEST(Boolean2, RemoveOverlaps2DTopologyMixedScale) {
+TEST(CrossSectionComplex, RemoveOverlaps2DTopologyMixedScale) {
   // Inputs A and B exactly as the BooleanRobustness fuzz target
   // constructs them from the counterexample raw polygons. The
   // topology check is on the OUTPUT of the boolean Add, not the
@@ -450,7 +449,7 @@ TEST(Boolean2, RemoveOverlaps2DTopologyMixedScale) {
   }
 }
 
-TEST(Boolean2, MergeVertsTransitiveChainCanDriftPastEps) {
+TEST(CrossSectionComplex, MergeVertsTransitiveChainCanDriftPastEps) {
   const double eps = 1.0;
   const std::vector<vec2> verts = {{0.0, 0.0},  {0.99, 0.0}, {1.98, 0.0},
                                    {2.97, 0.0}, {3.96, 0.0}, {10.0, 0.0},
@@ -471,7 +470,7 @@ TEST(Boolean2, MergeVertsTransitiveChainCanDriftPastEps) {
   EXPECT_GT(std::hypot(endpointDrift.x, endpointDrift.y), eps);
 }
 
-TEST(Boolean2, VertexMergeIdempotenceTightCluster) {
+TEST(CrossSectionComplex, VertexMergeIdempotenceTightCluster) {
   const std::vector<vec2> verts = {{-564.24299726366871, -1.},
                                    {-564.25684749526681, -1.},
                                    {-564.25684749526681, -1.},
@@ -514,7 +513,7 @@ TEST(Boolean2, VertexMergeIdempotenceTightCluster) {
       << ", eps=" << eps << ")";
 }
 
-TEST(Boolean2, ValidatorRejectsRetainedVertsWithinEps) {
+TEST(CrossSectionComplex, ValidatorRejectsRetainedVertsWithinEps) {
   const std::vector<vec2> verts = {{0.0, 0.0}, {10.0, 0.0}, {0.0, 10.0},
                                    {0.5, 0.5}, {20.0, 0.0}, {20.0, 10.0}};
   const std::vector<EdgeM> edges = {{0, 1, 1}, {1, 2, 1}, {2, 0, 1},
@@ -525,7 +524,7 @@ TEST(Boolean2, ValidatorRejectsRetainedVertsWithinEps) {
       result, edges, result.inputVert2Merged, result.numMergedVerts, 1.0));
 }
 
-TEST(Boolean2, ValidatorRejectsNearEndpointTJunction) {
+TEST(CrossSectionComplex, ValidatorRejectsNearEndpointTJunction) {
   const std::vector<vec2> verts = {{0.0, 0.0},   {10.0, 0.0}, {0.5, 0.9},
                                    {10.0, 10.0}, {20.0, 5.0}, {20.0, 15.0}};
   const std::vector<EdgeM> edges = {{0, 1, 1}, {1, 3, 1}, {3, 0, 1},
@@ -536,7 +535,7 @@ TEST(Boolean2, ValidatorRejectsNearEndpointTJunction) {
       result, edges, result.inputVert2Merged, result.numMergedVerts, 1.0));
 }
 
-TEST(Boolean2, ValidatorRejectsRetainedStrictCrossing) {
+TEST(CrossSectionComplex, ValidatorRejectsRetainedStrictCrossing) {
   const std::vector<vec2> verts = {{0.0, 0.0},  {10.0, 10.0}, {0.0, 10.0},
                                    {10.0, 0.0}, {-10.0, 5.0}, {20.0, 5.0}};
   const std::vector<EdgeM> edges = {{0, 1, 1}, {1, 4, 1}, {4, 0, 1},
@@ -547,7 +546,7 @@ TEST(Boolean2, ValidatorRejectsRetainedStrictCrossing) {
       result, edges, result.inputVert2Merged, result.numMergedVerts, 0.01));
 }
 
-TEST(Boolean2, CleanupPassMatchesValidAddSinglePass) {
+TEST(CrossSectionComplex, CleanupPassMatchesValidAddSinglePass) {
   Polygons polys{RandomTopologicalRing(8, 15)};
   const double eps = InferEps(polys, {});
   const auto [verts, edges] = PolygonsToInput(polys);
@@ -581,7 +580,7 @@ TEST(Boolean2, CleanupPassMatchesValidAddSinglePass) {
 // read in SweepMode::Winding and nowhere in the arrangement. So on the same
 // self-intersecting input it must produce a graph the independent oracle still
 // accepts, over the same vertex merge Add gets.
-TEST(Boolean2, EvenOddRetainedGraphMatchesAddArrangement) {
+TEST(CrossSectionComplex, EvenOddRetainedGraphMatchesAddArrangement) {
   Polygons polys{RandomTopologicalRing(8, 15)};
   const double eps = InferEps(polys, {});
   const auto [verts, edges] = PolygonsToInput(polys);
@@ -598,7 +597,7 @@ TEST(Boolean2, EvenOddRetainedGraphMatchesAddArrangement) {
   EXPECT_FALSE(OutEdgesToPolygons(evenOdd.verts, evenOdd.edges).empty());
 }
 
-TEST(Boolean2, OffsetRoundUsesRequestedSegments) {
+TEST(CrossSectionComplex, OffsetRoundUsesRequestedSegments) {
   SimplePolygon square = {{0, 0}, {20, 0}, {20, 20}, {0, 20}};
   const int segments = 20;
   const double delta = 5.0;
@@ -609,7 +608,7 @@ TEST(Boolean2, OffsetRoundUsesRequestedSegments) {
   EXPECT_EQ(rounded[0].size(), segments + 4);
 }
 
-TEST(Boolean2, OffsetRoundClampsHugeSegmentCount) {
+TEST(CrossSectionComplex, OffsetRoundClampsHugeSegmentCount) {
   // An absurd requested count is clamped so the vertex count cannot blow up;
   // the clamp is kMaxRoundJoinSegments == 1 << 15 (file-local in offset.cpp).
   SimplePolygon square = {{0, 0}, {20, 0}, {20, 20}, {0, 20}};
@@ -618,14 +617,14 @@ TEST(Boolean2, OffsetRoundClampsHugeSegmentCount) {
   EXPECT_EQ(rounded[0].size(), (1 << 15) + 4);
 }
 
-TEST(Boolean2, OffsetZeroDeltaRejectsNonFiniteInput) {
+TEST(CrossSectionComplex, OffsetZeroDeltaRejectsNonFiniteInput) {
   const double nan = std::numeric_limits<double>::quiet_NaN();
   SimplePolygon bad = {{0.0, 0.0}, {1.0, 0.0}, {nan, 1.0}, {0.0, 1.0}};
 
   EXPECT_TRUE(Offset({bad}, 0.0, JoinType::Miter).empty());
 }
 
-TEST(Boolean2, OffsetExtremeFiniteEdgesStayFinite) {
+TEST(CrossSectionComplex, OffsetExtremeFiniteEdgesStayFinite) {
   // Large-but-finite coordinates must not yield inf/nan. Collinearity uses the
   // canonical CCW predicate, whose area products saturate above ~1e77, so the
   // exercised scale stays under that (still far beyond any real input).
@@ -643,7 +642,7 @@ TEST(Boolean2, OffsetExtremeFiniteEdgesStayFinite) {
   }
 }
 
-TEST(Boolean2, OffsetSquareJoinKeepsCapOnSharpSpike) {
+TEST(CrossSectionComplex, OffsetSquareJoinKeepsCapOnSharpSpike) {
   // A near-degenerate spike (base 100, height 1e-9) survives regularization but
   // drives the square-join half-angle to ~90 degrees, where cosHalf can round
   // below 0. The caps must still be emitted (area ~204, two ~unit caps) rather
@@ -659,7 +658,7 @@ TEST(Boolean2, OffsetSquareJoinKeepsCapOnSharpSpike) {
   EXPECT_LT(area, 206.0);
 }
 
-TEST(Boolean2, DecomposeContainmentBboxUsesTolerance) {
+TEST(CrossSectionComplex, DecomposeContainmentBboxUsesTolerance) {
   const double eps = EpsilonFromScale(0.5);
   const double d = 0.25 * eps;
   SimplePolygon outer = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
@@ -672,7 +671,7 @@ TEST(Boolean2, DecomposeContainmentBboxUsesTolerance) {
   ASSERT_EQ(components[0].size(), 2);
 }
 
-TEST(Boolean2, DecomposeContainmentDropsDegenerateRings) {
+TEST(CrossSectionComplex, DecomposeContainmentDropsDegenerateRings) {
   SimplePolygon outer = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
   SimplePolygon line = {{0.25, 0.25}, {0.75, 0.75}};
 
@@ -683,7 +682,7 @@ TEST(Boolean2, DecomposeContainmentDropsDegenerateRings) {
   EXPECT_EQ(components[0][0].size(), outer.size());
 }
 
-TEST(Boolean2, OffsetSquareInsetCapStaysOnSolidSide) {
+TEST(CrossSectionComplex, OffsetSquareInsetCapStaysOnSolidSide) {
   // L-shape: 2x2 square minus the top-right [1,2]x[1,2] quadrant (CCW). The
   // reflex corner at (1,1) routes through the square join when inset.
   SimplePolygon L = {{0, 0}, {2, 0}, {2, 1}, {1, 1}, {1, 2}, {0, 2}};
@@ -709,7 +708,7 @@ TEST(Boolean2, OffsetSquareInsetCapStaysOnSolidSide) {
   EXPECT_GT(std::fabs(TotalSignedArea(grown)), 3.0);
 }
 
-TEST(Boolean2, OffsetLargeMiterLimitStaysBounded) {
+TEST(CrossSectionComplex, OffsetLargeMiterLimitStaysBounded) {
   // Thin spike: apex (0,1e6) with near-antiparallel edge normals (1+dotN ~ 1
   // ULP), so the apex miter is near-unbounded. A huge miter_limit must not let
   // MiterPoint escape; the square fallback must engage.
@@ -739,7 +738,7 @@ TEST(Boolean2, OffsetLargeMiterLimitStaysBounded) {
   EXPECT_TRUE(rightCap);
 }
 
-TEST(Boolean2, OffsetReversalSpikeKeepsFarCap) {
+TEST(CrossSectionComplex, OffsetReversalSpikeKeepsFarCap) {
   // A near-zero-width spike whose tip edges are antiparallel triggers the
   // collinear-reversal branch; the offset must still cap the far side rather
   // than collapse the tip to a single point.
@@ -756,7 +755,7 @@ TEST(Boolean2, OffsetReversalSpikeKeepsFarCap) {
   EXPECT_TRUE(farCap) << "far side of the reversal spike was dropped";
 }
 
-TEST(Boolean2, DecomposeContainmentDropsZeroAreaRing) {
+TEST(CrossSectionComplex, DecomposeContainmentDropsZeroAreaRing) {
   SimplePolygon outer = {{0, 0}, {10, 0}, {10, 10}, {0, 10}};
   SimplePolygon collinear = {{1, 1}, {2, 1}, {3, 1}};  // zero area, size 3
   auto comps = DecomposeByContainment({outer, collinear});
@@ -764,7 +763,7 @@ TEST(Boolean2, DecomposeContainmentDropsZeroAreaRing) {
   EXPECT_EQ(comps[0].size(), 1);  // sliver dropped, not leaked as a hole
 }
 
-TEST(Boolean2, DecomposeContainmentKeepsFiniteThinHole) {
+TEST(CrossSectionComplex, DecomposeContainmentKeepsFiniteThinHole) {
   SimplePolygon outer = {{0, 0}, {10, 0}, {10, 10}, {0, 10}};
   SimplePolygon thinHole = {{1, 1}, {1, 1.000001}, {9, 1.000001}, {9, 1}};
 
@@ -775,7 +774,7 @@ TEST(Boolean2, DecomposeContainmentKeepsFiniteThinHole) {
   EXPECT_NEAR(TotalSignedArea(comps[0]), 100.0 - 8e-6, 1e-12);
 }
 
-TEST(Boolean2, DecomposeContainmentKeepsNestedPositiveRing) {
+TEST(CrossSectionComplex, DecomposeContainmentKeepsNestedPositiveRing) {
   SimplePolygon A = {{0, 0}, {10, 0}, {10, 10}, {0, 10}};  // +100
   SimplePolygon B = {{3, 3}, {7, 3}, {7, 7}, {3, 7}};      // +16, inside A
   SimplePolygon H = {{4, 4}, {4, 6}, {6, 6}, {6, 4}};      // -4, inside B
@@ -786,7 +785,7 @@ TEST(Boolean2, DecomposeContainmentKeepsNestedPositiveRing) {
   EXPECT_NEAR(retained, 112.0, 1e-9);
 }
 
-TEST(Boolean2, DecomposeContainmentToleranceIsSizeScaledOffOrigin) {
+TEST(CrossSectionComplex, DecomposeContainmentToleranceIsSizeScaledOffOrigin) {
   // Off-origin rings: the containment epsilon must scale with the bbox SIZE,
   // not the coordinate magnitude. A hole sticking out by 1e-10 (above the
   // size-scaled eps, below a position-scaled one) is not contained, so it is
@@ -805,7 +804,7 @@ TEST(Boolean2, DecomposeContainmentToleranceIsSizeScaledOffOrigin) {
 
 // Output topology balance check fails after Add on raw
 // multi-contour, near-duplicate-heavy polygons.
-TEST(Boolean2, BooleanRobustnessMergeTopologyBalance) {
+TEST(CrossSectionComplex, BooleanRobustnessMergeTopologyBalance) {
   const Polygons a = {{{1024., 1024.},
                        {1., 1.},
                        {9.9999999999999995e-07, -9.9999999999999995e-07}}};
@@ -839,7 +838,7 @@ TEST(Boolean2, BooleanRobustnessMergeTopologyBalance) {
 
 // Direct-cast disconnected-component winding fallback emitted an
 // open spur after Add.
-TEST(Boolean2, BooleanRobustnessDirectCastKeepsExpectedArea) {
+TEST(CrossSectionComplex, BooleanRobustnessDirectCastKeepsExpectedArea) {
   const Polygons a = {{{-9.9999999999999995e-07, 9.9999999999999995e-07},
                        {-9.9999999999999995e-07, -9.9999999999999995e-07},
                        {-0., 0.},
@@ -886,7 +885,7 @@ TEST(Boolean2, BooleanRobustnessDirectCastKeepsExpectedArea) {
 // OutEdgesToPolygons. Earlier closure logic detected closure by trying to
 // re-select the start edge as `next`, which is skipped by the visited guard;
 // the natural walk terminates with destV == startV instead.
-TEST(Boolean2, OutEdgesToPolygonsClosesSimpleRing) {
+TEST(CrossSectionComplex, OutEdgesToPolygonsClosesSimpleRing) {
   const std::vector<vec2> verts = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
   const std::vector<OutEdge> edges = {{0, 1}, {1, 2}, {2, 3}, {3, 0}};
   const auto polys = OutEdgesToPolygons(verts, edges);
@@ -894,7 +893,7 @@ TEST(Boolean2, OutEdgesToPolygonsClosesSimpleRing) {
   EXPECT_EQ(polys[0].size(), 4u);
 }
 
-TEST(Boolean2, OutEdgesToPolygonsSplitsExactRepeatedVertex) {
+TEST(CrossSectionComplex, OutEdgesToPolygonsSplitsExactRepeatedVertex) {
   const std::vector<vec2> verts = {{0, 0}, {1, 0}, {1, -1}, {2, -1}, {1, 1}};
   const std::vector<OutEdge> edges = {{0, 1}, {1, 2}, {2, 3},
                                       {3, 1}, {1, 4}, {4, 0}};
@@ -905,7 +904,7 @@ TEST(Boolean2, OutEdgesToPolygonsSplitsExactRepeatedVertex) {
   EXPECT_NEAR(TotalSignedArea(polys), 1.0, 1e-12);
 }
 
-TEST(Boolean2, OutEdgesToPolygonsKeepsNearDistinctVertex) {
+TEST(CrossSectionComplex, OutEdgesToPolygonsKeepsNearDistinctVertex) {
   constexpr double kDelta = 1e-12;
   const std::vector<vec2> verts = {{0, 0},  {1, 0}, {1, -1},
                                    {2, -1}, {1, 1}, {1 + kDelta, 0}};
@@ -924,7 +923,7 @@ TEST(Boolean2, OutEdgesToPolygonsKeepsNearDistinctVertex) {
   EXPECT_NEAR(solid.Volume(), reconsumed.Area(), 1e-9);
 }
 
-TEST(Boolean2, KeepsNearDistinctPresentationVertex) {
+TEST(CrossSectionComplex, KeepsNearDistinctPresentationVertex) {
   constexpr double kDelta = 1e-12;
   const Polygons input = {
       {{0, 0}, {1, 0}, {1, -1}, {2, -1}, {1 + kDelta, 0}, {1, 1}}};
@@ -940,7 +939,7 @@ TEST(Boolean2, KeepsNearDistinctPresentationVertex) {
 // When the edge passes through the corner, the incidence pre-split makes the
 // corner a shared vertex and the crossing resolves to it, so the two coincide.
 // Mere proximity within the broad-phase band does not merge them.
-TEST(Boolean2, NearCornerCrossingDistinctUnlessIncident) {
+TEST(CrossSectionComplex, NearCornerCrossingDistinctUnlessIncident) {
   constexpr double eps = 1e-6;
   const Polygons a = {{{0, 0}, {10, 0}, {10, 1}, {0, 1}}};
   auto countNear = [](const std::vector<vec2>& points, vec2 target, double r) {
@@ -983,7 +982,7 @@ TEST(Boolean2, NearCornerCrossingDistinctUnlessIncident) {
   }
 }
 
-TEST(Boolean2, RemoveOverlapsMergesExactDuplicateCoordinates) {
+TEST(CrossSectionComplex, RemoveOverlapsMergesExactDuplicateCoordinates) {
   const Polygons polys = {{{0, 0}, {1, 0}, {0, 1}}, {{0, 0}, {-1, 0}, {0, -1}}};
   const auto [verts, edges] = PolygonsToInput(polys);
   ASSERT_EQ(verts.size(), 6u);
@@ -998,7 +997,7 @@ TEST(Boolean2, RemoveOverlapsMergesExactDuplicateCoordinates) {
   EXPECT_EQ(overlap.inputVert2Merged[0], overlap.inputVert2Merged[3]);
 }
 
-TEST(Boolean2, NonFiniteInputReturnsEmpty) {
+TEST(CrossSectionComplex, NonFiniteInputReturnsEmpty) {
   const double inf = std::numeric_limits<double>::infinity();
   Polygons bad = {{{0.0, 0.0}, {1.0, 0.0}, {inf, 1.0}, {0.0, 1.0}}};
   Polygons finite = {{{0.0, 0.0}, {1.0, 0.0}, {1.0, 1.0}, {0.0, 1.0}}};
@@ -1010,7 +1009,7 @@ TEST(Boolean2, NonFiniteInputReturnsEmpty) {
 // A near-origin degenerate Subtract whose regularized graph must stay valid; a
 // missed split would leave a retained vertex inside another edge's interior
 // band.
-TEST(Boolean2, NearOriginSubtractStaysValid) {
+TEST(CrossSectionComplex, NearOriginSubtractStaysValid) {
   const Polygons a = {{{0, 0},
                        {0, -1.3875065265425851e-15},
                        {0.00013875065265428477, -7.4683028744398387e-16},
@@ -1034,7 +1033,7 @@ TEST(Boolean2, NearOriginSubtractStaysValid) {
 // that overlap its left and right sides; their inner edges cross the short
 // bottom edge 0.4 eps apart. The eps-scale merge fuses those near-coincident
 // crossings, cancelling the subtraction cleanly back to the rectangle.
-TEST(Boolean2, ShortEdgeFusion) {
+TEST(CrossSectionComplex, ShortEdgeFusion) {
   const double eps = 1e-6;
   const double d = 2.6 * eps, h = 1.0 / eps, x0 = 1.1 * eps, x1 = 1.5 * eps;
   const SimplePolygon rect = {{0, 0}, {d, 0}, {d, h}, {0, h}};
@@ -1058,7 +1057,7 @@ TEST(Boolean2, ShortEdgeFusion) {
 // union n (left u right) = left u right = 9.99. Those are the true areas; the
 // engine fuses a sub-eps gap and lands within a loose eps*length band of them
 // (see the body) - a below-resolution floor, not a regression.
-TEST(Boolean2, ShortEdgeFusionAddIntersect) {
+TEST(CrossSectionComplex, ShortEdgeFusionAddIntersect) {
   const double eps = 1e-6;
   const double d = 2.6 * eps, h = 1.0 / eps, x0 = 1.1 * eps, x1 = 1.5 * eps;
   const SimplePolygon rect = {{0, 0}, {d, 0}, {d, h}, {0, h}};
@@ -1096,7 +1095,7 @@ TEST(Boolean2, ShortEdgeFusionAddIntersect) {
 // explicit op-eps (production InferEps would not reach the cluster). Same class
 // as the disabled near-coincident-corner case; re-enable once insertion keeps
 // the dropped crossing (reaches general position).
-TEST(Boolean2, VisibleMissedCrossingLargeEps) {
+TEST(CrossSectionComplex, VisibleMissedCrossingLargeEps) {
   const double eps = 1.75;
   const std::vector<vec2> verts = {
       {100, 0},    {93.99241891, -2.888671352},  {99.58902672, -0.3730219929},

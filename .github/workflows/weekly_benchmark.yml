@@ -8,7 +8,7 @@ on:
     - cron: "0 2 * * 0"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: weekly-benchmark
@@ -27,6 +27,9 @@ jobs:
     if: ${{ !cancelled() }}
     timeout-minutes: 60
     runs-on: macos-15
+    # Pushes results to the benchmark-data branch.
+    permissions:
+      contents: write
     env:
       WEEKLY_BENCHMARK_REPEATS: 5
       WEEKLY_BENCHMARK_THREADS: 1

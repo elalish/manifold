@@ -116,18 +116,6 @@ Manifold ExecutionContext::FromMeshGL(const MeshGL64& mesh) {
       std::make_shared<Manifold::Impl>(mesh, impl_.get()));
 }
 
-Manifold ExecutionContext::Smooth(
-    const MeshGL& mesh, const std::vector<Smoothness>& sharpenedEdges) {
-  ResetForStaticFactory(impl_.get(), kPhasesPerSmooth);
-  return Manifold::FromImpl(MakeSmoothImpl(mesh, sharpenedEdges, impl_.get()));
-}
-
-Manifold ExecutionContext::Smooth(
-    const MeshGL64& mesh, const std::vector<Smoothness>& sharpenedEdges) {
-  ResetForStaticFactory(impl_.get(), kPhasesPerSmooth);
-  return Manifold::FromImpl(MakeSmoothImpl(mesh, sharpenedEdges, impl_.get()));
-}
-
 Manifold ExecutionContext::LevelSet(std::function<double(vec3)> sdf, Box bounds,
                                     double edgeLength, double level,
                                     double tolerance, bool canParallel) {

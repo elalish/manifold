@@ -109,8 +109,14 @@ constexpr double smoothstep(double edge0, double edge1, double a) {
 inline double sind(double x) {
   if (!la::isfinite(x)) return NAN;
   if (x < 0.0) return -sind(-x);
+#if defined(_WIN32) && defined(_M_ARM64)
+  x = std::fmod(x, 360.0);
+  const int quo = static_cast<int>(std::floor(x / 90.0 + 0.5));
+  x -= quo * 90.0;
+#else
   int quo;
   x = std::remquo(std::fabs(x), 90.0, &quo);
+#endif
   const double xr = radians(x);
   switch (quo % 4) {
     case 0:
@@ -153,19 +159,6 @@ using SimplePolygon = std::vector<vec2>;
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
 using Polygons = std::vector<SimplePolygon>;
-
-/**
- * @brief Defines which edges to sharpen and how much for the Manifold.Smooth()
- * constructor.
- */
-struct Smoothness {
-  /// The halfedge index = 3 * tri + i, referring to Mesh.triVerts[tri][i].
-  size_t halfedge;
-  /// A value between 0 and 1, where 0 is sharp and 1 is the default and the
-  /// curvature is interpolated between these values. The two paired halfedges
-  /// can have different values while maintaining C-1 continuity (except for 0).
-  double smoothness;
-};
 
 /**
  * @brief Result of a ray cast query against a Manifold.
@@ -269,15 +262,6 @@ class ExecutionContext {
   /// values; the returned Manifolds remain valid.
   Manifold FromMeshGL(const MeshGL& mesh);
   Manifold FromMeshGL(const MeshGL64& mesh);
-
-  /// Eager ctx-aware `Manifold::Smooth(MeshGL[64])`. The ingest phases
-  /// plus the tangent-creation phases check cancel and credit
-  /// `Progress()` between phases. Same cancel-vs-validation precedence
-  /// as `FromMeshGL`.
-  Manifold Smooth(const MeshGL& mesh,
-                  const std::vector<Smoothness>& sharpenedEdges = {});
-  Manifold Smooth(const MeshGL64& mesh,
-                  const std::vector<Smoothness>& sharpenedEdges = {});
 
   /// Eager ctx-aware `Manifold::LevelSet`. The voxel-sampling and
   /// mesh-extraction phases check cancel and credit `Progress()` between
@@ -697,6 +681,10 @@ struct ExecutionParams {
   /// Perform 3D mesh self-intersection test on intermediate boolean results to
   /// test for ϵ-validity. For debug purposes only.
   bool selfIntersectionChecks = false;
+  /// Check that each Boolean does not produce any degenerate triangles. For
+  /// debug purposes only. Only valid for inputs that also don't contain
+  /// degenerate triangles.
+  bool verifyNoDegenerates = false;
   /// If processOverlaps is false, a geometric check will be performed to assert
   /// all triangles are CCW.
   bool processOverlaps = true;
@@ -722,11 +710,6 @@ inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
 
 inline std::ostream& operator<<(std::ostream& stream, const Rect& box) {
   return stream << "min: " << box.min << ", " << "max: " << box.max;
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const Smoothness& s) {
-  return stream << "halfedge: " << s.halfedge << ", "
-                << "smoothness: " << s.smoothness;
 }
 
 /**

@@ -36,9 +36,10 @@ if (navigator.serviceWorker) {
 
   if (window.caches) {
     window.caches.keys().then(keys => {
-      keys.filter(
-              key => key.startsWith('manifoldCAD-cache-') &&
-                  key !== 'manifoldCAD-cache-v4')
+      // Caches are now keyed by deployment scope ('manifoldCAD-cache:'),
+      // and the service worker prunes its own. Anything left on the old
+      // 'manifoldCAD-cache-' scheme is dead and can go.
+      keys.filter(key => key.startsWith('manifoldCAD-cache-'))
           .forEach(key => window.caches.delete(key));
     });
   }

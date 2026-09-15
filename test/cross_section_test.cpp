@@ -1399,7 +1399,7 @@ TEST(CrossSection, SubtractInvariantsSeeds) {
   for (const auto& c : kSubtractInvariantsSeeds) {
     SCOPED_TRACE(c.name);
     // Flush the seed name so a hard crash is still attributable.
-    std::cerr << "[seed] " << c.name << std::endl;
+    // std::cerr << "[seed] " << c.name << std::endl;
     const CrossSection a = MakeShape(c.a), b = MakeShape(c.b);
     const auto aIb = a ^ b;
     const auto aUb = a + b;
@@ -1534,7 +1534,7 @@ TEST(CrossSection, BooleanCommutativitySeeds) {
   for (const auto& c : kBooleanCommutativitySeeds) {
     SCOPED_TRACE(c.name);
     // Flush the seed name so a hard crash is still attributable.
-    std::cerr << "[seed] " << c.name << std::endl;
+    // std::cerr << "[seed] " << c.name << std::endl;
     const CrossSection a = MakeShape(c.a), b = MakeShape(c.b);
     const auto aPlusB = a + b;
     const auto bPlusA = b + a;
@@ -1586,7 +1586,7 @@ TEST(CrossSection, PrismSeeds) {
   };
   for (const auto& c : kPrismSeeds) {
     SCOPED_TRACE(c.name);
-    std::cerr << "[seed] " << c.name << std::endl;
+    // std::cerr << "[seed] " << c.name << std::endl;
     const CrossSection a(regular(3, c.radiusA));
     const CrossSection b(regular(3, c.radiusB));
     const auto expected = a + b;
@@ -1635,7 +1635,7 @@ TEST(CrossSection, BooleanAssociativitySeeds) {
   for (const auto& c : kBooleanAssociativitySeeds) {
     SCOPED_TRACE(c.name);
     // Flush the seed name so a hard crash is still attributable.
-    std::cerr << "[seed] " << c.name << std::endl;
+    // std::cerr << "[seed] " << c.name << std::endl;
     const CrossSection a = MakeShape(c.a), b = MakeShape(c.b),
                        cc = MakeShape(c.c);
     const auto ab_c = (a + b) + cc;
@@ -2173,7 +2173,7 @@ TEST(CrossSection, BooleanDistributivitySeeds) {
     // Print the seed name unconditionally: SCOPED_TRACE is not flushed on a
     // raw abort/segfault, so this line is what attributes a hard crash to a
     // specific seed.
-    std::cerr << "[seed] " << c.name << std::endl;
+    // std::cerr << "[seed] " << c.name << std::endl;
     const CrossSection a = MakeShape(c.a), b = MakeShape(c.b),
                        cc = MakeShape(c.c);
     if (c.kind == DistribKind::AreaOnly) {
