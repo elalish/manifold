@@ -57,7 +57,8 @@ jobs:
       url: https://pypi.org/p/manifold3d
     permissions:
       id-token: write  # IMPORTANT: this permission is mandatory for trusted publishing
-    if: ${{ github.event_name == 'release' }}
+    # No release gate on this branch: the 3.5.3 release has already been
+    # published, so the only way to reach PyPI now is a manual dispatch.
     steps:
     - uses: actions/download-artifact@v4
       with:
@@ -66,3 +67,7 @@ jobs:
         path: dist
     - name: Publish package distributions to PyPI
       uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        # Every 3.5.3 file but the win_arm64 wheel is already on PyPI, and
+        # re-uploading one is a hard error. Skip those, upload the new one.
+        skip-existing: true
