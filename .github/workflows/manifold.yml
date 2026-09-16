@@ -134,7 +134,7 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     - &setup-python
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v7
       with:
         python-version: '3.x'
         cache: 'pip'
@@ -495,7 +495,7 @@ jobs:
     runs-on: ${{matrix.os}}
     steps:
     - uses: actions/checkout@v6
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@v7
       with:
         python-version: '3.x'
         cache: 'pip'
@@ -548,7 +548,7 @@ jobs:
     runs-on: macos-latest
     steps:
     - uses: actions/checkout@v6
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@v7
       with:
         python-version: '3.x'
         cache: 'pip'
