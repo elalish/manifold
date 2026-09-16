@@ -38,7 +38,7 @@ jobs:
 
       - name: Cache TBB (TSAN build)
         id: cache-tbb
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.TBB_PREFIX }}
           key: tbb-tsan-${{ env.TBB_TAG }}-gcc14-ubuntu-24.04-v1
