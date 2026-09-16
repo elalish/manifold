@@ -318,6 +318,7 @@ class Manifold {
   bool HasSimpleProps() const;
   size_t NumDegenerateTris() const;
   double GetEpsilon() const;
+  Manifold TriID2FaceID() const;
   ///@}
 
   struct Impl;

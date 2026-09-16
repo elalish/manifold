@@ -119,11 +119,11 @@ Manifold Manifold::Sphere(double radius, int circularSegments) {
                if (std::isnan(v.x)) v = vec3(0.0);
              });
   // Ignore preceding octahedron.
-  pImpl_->InitializeOriginal();
   pImpl_->CalculateBBox();
   pImpl_->SetEpsilon();
   pImpl_->SortGeometry();
   pImpl_->SetFaceAndVertNormals();
+  pImpl_->InitializeOriginal();
   return Manifold(pImpl_);
 }
 
@@ -215,11 +215,11 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
   }
 
   pImpl_->CreateHalfedges(triVertsDH);
-  pImpl_->InitializeOriginal();
   pImpl_->CalculateBBox();
   pImpl_->SetEpsilon();
   pImpl_->SortGeometry();
   pImpl_->SetFaceAndVertNormals();
+  pImpl_->InitializeOriginal();
   return Manifold(pImpl_);
 }
 
@@ -360,11 +360,11 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   }
 
   pImpl_->CreateHalfedges(triVertsDH);
-  pImpl_->InitializeOriginal();
   pImpl_->CalculateBBox();
   pImpl_->SetEpsilon();
   pImpl_->SortGeometry();
   pImpl_->SetFaceAndVertNormals();
+  pImpl_->InitializeOriginal();
   return Manifold(pImpl_);
 }
 

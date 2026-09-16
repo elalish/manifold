@@ -121,11 +121,11 @@ Manifold::Impl::Impl(Shape shape, const mat3x4 m) {
   vertPos_ = Vec(vertPos);
   for (auto& v : vertPos_) v = m * vec4(v, 1.0);
   CreateHalfedges(triVerts);
-  InitializeOriginal();
   CalculateBBox();
   SetEpsilon();
   SortGeometry();
   SetFaceAndVertNormals();
+  InitializeOriginal();
 }
 
 void Manifold::Impl::RemoveUnreferencedVerts() {
@@ -193,7 +193,7 @@ void Manifold::Impl::InitializeOriginal(int id) {
   triRef.resize_nofill(NumTri());
   for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
              [meshID, &triRef](const int tri) {
-               triRef[tri] = {meshID, meshID, -1, triRef[tri].triID};
+               triRef[tri] = {meshID, meshID, -1, tri};
              });
   // Preserve the AND-across-old-Relations state so AsOriginal keeps the
   // recording when it builds a fresh Relation. Primitives start with an
@@ -214,7 +214,6 @@ void Manifold::Impl::SetFaceAndVertNormals() {
     const vec3 n = cross(vertPos_[halfedge_.End(3 * tri)] - v,
                          vertPos_[halfedge_.End(3 * tri + 1)] - v);
     faceNormal_[tri] = SafeNormalize(n);
-    meshRelation_.triRef[tri].triID = tri;
   });
 
   CalculateVertNormals();

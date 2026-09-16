@@ -330,15 +330,10 @@ struct TriRef {
   /// the user can tell us not to collapse certain edges: those that divide
   /// difference faceIDs. If not set, this is always -1.
   int faceID;
-  /// Triangles with the same coplanar ID are coplanar. Starts as a canonical
+  /// Starts as a canonical
   /// triangle index, but after boolean operations it may refer to a triangle
   /// that is no longer present in this mesh.
   int triID;
-
-  bool SameFace(const TriRef& other) const {
-    return meshID == other.meshID && triID == other.triID &&
-           faceID == other.faceID;
-  }
 };
 
 /**
@@ -392,7 +387,7 @@ inline std::ostream& operator<<(std::ostream& stream, const Barycentric& bary) {
 inline std::ostream& operator<<(std::ostream& stream, const TriRef& ref) {
   return stream << "meshID: " << ref.meshID
                 << ", originalID: " << ref.originalID
-                << ", faceID: " << ref.faceID << ", coplanarID: " << ref.triID;
+                << ", faceID: " << ref.faceID << ", triID: " << ref.triID;
 }
 #endif
 }  // namespace manifold

@@ -100,7 +100,7 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
     ++shortCollapsed;
   }
 #ifdef MANIFOLD_DEBUG
-  if (ManifoldParams().verbose >= 2 && shortCollapsed > 0) {
+  if (ManifoldParams().verbose >= 2) {
     std::cout << "collapsed " << shortCollapsed << " short edges" << std::endl;
   }
 #endif
@@ -111,7 +111,7 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
     swapped += RecursiveEdgeSwap(tri, firstNewVert, scratch, 0);
   }
 #ifdef MANIFOLD_DEBUG
-  if (ManifoldParams().verbose >= 2 && swapped > 0) {
+  if (ManifoldParams().verbose >= 2) {
     std::cout << "swapped " << swapped << " edges" << std::endl;
   }
 #endif
@@ -128,7 +128,7 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
     }
   }
 #ifdef MANIFOLD_DEBUG
-  if (ManifoldParams().verbose >= 2 && colinear > 0) {
+  if (ManifoldParams().verbose >= 2) {
     std::cout << "collapsed " << colinear << " long edges" << std::endl;
   }
 #endif

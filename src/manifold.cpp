@@ -416,6 +416,7 @@ Manifold Manifold::RemoveDegenerates() const {
     return PropagateStatus(leafImpl->status_);
   auto impl = std::make_shared<Impl>(*leafImpl);
   impl->RemoveDegenerates();
+  impl->SortGeometry();
   return Manifold(impl);
 }
 
@@ -512,6 +513,24 @@ bool Manifold::HasSimpleProps() const {
  */
 size_t Manifold::NumDegenerateTris() const {
   return GetCsgLeafNode().GetImpl()->NumDegenerateTris();
+}
+
+/**
+ * Converts triangle IDs to face IDs. This enables RelatedGL to work by
+ * providing a mapping back to the original input triangles. It is not a good
+ * idea to use generally because by making unique faceIDs, it prevents
+ * collapsing coplanar edges.
+ */
+Manifold Manifold::TriID2FaceID() const {
+  auto oldImpl = GetCsgLeafNode().GetImpl();
+  if (oldImpl->status_ != Error::NoError)
+    return PropagateStatus(oldImpl->status_);
+  auto newImpl = std::make_shared<Impl>(*oldImpl);
+
+  auto& triRef = newImpl->meshRelation_.triRef;
+  for_each_n(autoPolicy(triRef.size()), triRef.begin(), triRef.size(),
+             [&](TriRef& ref) { ref.faceID = ref.triID; });
+  return Manifold(newImpl);
 }
 
 /**

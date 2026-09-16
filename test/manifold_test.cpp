@@ -1071,6 +1071,7 @@ TEST(Manifold, MeshID) {
 TEST(Manifold, MeshRelation) {
   Manifold gyroid = WithPositionColors(Gyroid());
   MeshGL gyroidMeshGL = gyroid.GetMeshGL();
+
   gyroid = gyroid.Simplify();
 
   if (options.exportModels) WriteTestOBJ("gyroid.obj", gyroid);
@@ -1114,8 +1115,8 @@ TEST(Manifold, MeshRelationRefinePrecision) {
 
 TEST(Manifold, MeshGLRoundTrip) {
   const Manifold cylinder = Manifold::Cylinder(2, 1);
-  EXPECT_GE(cylinder.OriginalID(), 0);
-  MeshGL inGL = cylinder.GetMeshGL();
+  EXPECT_EQ(cylinder.OriginalID(), 0);
+  MeshGL inGL = cylinder.TriID2FaceID().GetMeshGL();
   const Manifold cylinder2(inGL);
   const MeshGL outGL = cylinder2.GetMeshGL();
 
@@ -1266,7 +1267,7 @@ TEST(Manifold, FaceIDRoundTrip) {
   const Manifold cube = Manifold::Cube();
   EXPECT_GE(cube.OriginalID(), 0);
   MeshGL inGL = cube.GetMeshGL();
-  EXPECT_EQ(NumUnique(inGL.faceID), 12);
+  EXPECT_EQ(NumUnique(inGL.faceID), 1);
   inGL.faceID = {3, 3, 3, 3, 3, 3, 5, 5, 5, 5, 5, 5};
 
   const Manifold cube2(inGL);
