@@ -378,8 +378,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
     }
     ASSERT_LT(i, originals.size());
     const MeshGL& inMesh = originals[i];
-    const float tolerance =
-        3 * std::max(static_cast<float>(out.GetTolerance()), inMesh.tolerance);
+    const float tolerance = 3 * std::max(output.tolerance, inMesh.tolerance);
 
     for (uint32_t tri = output.runIndex[run] / 3;
          tri < output.runIndex[run + 1] / 3; ++tri) {

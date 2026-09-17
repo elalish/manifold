@@ -332,12 +332,6 @@ ManifoldManifold* manifold_refine_to_tolerance(void* mem, ManifoldManifold* m,
   return to_c(new (mem) Manifold(refined));
 }
 
-ManifoldManifold* manifold_set_tolerance(void* mem, ManifoldManifold* m,
-                                         double tolerance) {
-  auto result = from_c(m)->SetTolerance(tolerance);
-  return to_c(new (mem) Manifold(result));
-}
-
 ManifoldManifold* manifold_simplify(void* mem, ManifoldManifold* m,
                                     double tolerance) {
   auto simplified = from_c(m)->Simplify(tolerance);
@@ -801,10 +795,6 @@ ManifoldBox* manifold_bounding_box(void* mem, ManifoldManifold* m) {
 }
 
 double manifold_epsilon(ManifoldManifold* m) { return from_c(m)->GetEpsilon(); }
-
-double manifold_get_tolerance(ManifoldManifold* m) {
-  return from_c(m)->GetTolerance();
-}
 
 size_t manifold_num_prop_vert(ManifoldManifold* m) {
   return from_c(m)->NumPropVert();

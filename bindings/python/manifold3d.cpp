@@ -356,9 +356,6 @@ NB_MODULE(manifold3d, m) {
           "Get the surface area of the manifold\n This is clamped to zero for "
           "a given face if they are within the Epsilon().")
       .def("original_id", &Manifold::OriginalID, manifold__original_id)
-      .def("get_tolerance", &Manifold::GetTolerance, manifold__get_tolerance)
-      .def("set_tolerance", &Manifold::SetTolerance,
-           manifold__set_tolerance__tolerance)
       .def("simplify", &Manifold::Simplify, manifold__simplify__tolerance)
       .def("as_original", &Manifold::AsOriginal, nb::arg("id") = -1,
            manifold__as_original__id)
@@ -864,10 +861,6 @@ NB_MODULE(manifold3d, m) {
           nb::arg("warp_func"), cross_section__warp_batch__warp_func)
       .def("simplify", &CrossSection::Simplify, nb::arg("tolerance") = 0,
            cross_section__simplify__tolerance)
-      .def("get_tolerance", &CrossSection::GetTolerance,
-           cross_section__get_tolerance)
-      .def("set_tolerance", &CrossSection::SetTolerance, nb::arg("tolerance"),
-           cross_section__set_tolerance__tolerance)
       .def(
           "offset", &CrossSection::Offset, nb::arg("delta"),
           nb::arg("join_type") = CrossSection::JoinType::Round,

@@ -355,37 +355,6 @@ double Manifold::GetEpsilon() const {
 }
 
 /**
- * Returns the tolerance value of this Manifold. Triangles that are coplanar
- * within tolerance tend to be merged and edges shorter than tolerance tend to
- * be collapsed.
- */
-double Manifold::GetTolerance() const {
-  return GetCsgLeafNode().GetImpl()->tolerance_;
-}
-
-/**
- * Return a copy of the manifold with the set tolerance value.
- * This performs mesh simplification when the tolerance value is increased.
- */
-Manifold Manifold::SetTolerance(double tolerance) const {
-  auto leafImpl = GetCsgLeafNode().GetImpl();
-  if (leafImpl->status_ != Error::NoError)
-    return PropagateStatus(leafImpl->status_);
-  auto impl = std::make_shared<Impl>(*leafImpl);
-  if (tolerance > impl->tolerance_) {
-    impl->tolerance_ = tolerance;
-    impl->SetFaceAndVertNormals();
-    impl->Decimate();
-    impl->SortGeometry();
-  } else {
-    // for reducing tolerance, we need to make sure it is still at least
-    // equal to epsilon.
-    impl->tolerance_ = std::max(impl->epsilon_, tolerance);
-  }
-  return Manifold(impl);
-}
-
-/**
  * Return a copy of the manifold simplified to the given tolerance, but with its
  * actual tolerance value unchanged. If the tolerance is not given or is less
  * than the current tolerance, the current tolerance is used for simplification.
@@ -398,10 +367,7 @@ Manifold Manifold::Simplify(double tolerance) const {
     return PropagateStatus(leafImpl->status_);
   auto impl = std::make_shared<Impl>(*leafImpl);
   impl->RemoveDegenerates();
-  const double oldTolerance = impl->tolerance_;
-  impl->tolerance_ = tolerance;
-  impl->Decimate();
-  impl->tolerance_ = oldTolerance;
+  impl->Decimate(tolerance);
   impl->SortGeometry();
   return Manifold(impl);
 }

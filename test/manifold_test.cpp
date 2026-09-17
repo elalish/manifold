@@ -539,15 +539,6 @@ TEST(Manifold, ErrorPropagationRefine) {
             Manifold::Error::NonFiniteVertex);
 }
 
-TEST(Manifold, ErrorPropagationSetTolerance) {
-  MeshGL in = TetGL();
-  in.vertProperties[2 * 3 + 1] = NAN;
-  Manifold errored(in);
-  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
-  EXPECT_EQ(errored.SetTolerance(0.1).Status(),
-            Manifold::Error::NonFiniteVertex);
-}
-
 TEST(Manifold, ErrorPropagationAsOriginal) {
   MeshGL in = TetGL();
   in.vertProperties[2 * 3 + 1] = NAN;
