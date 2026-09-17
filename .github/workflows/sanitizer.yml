@@ -33,7 +33,7 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     - name: Install apt packages
-      uses: awalsh128/cache-apt-pkgs-action@v1.6.3
+      uses: awalsh128/cache-apt-pkgs-action@v1
       with:
         packages: libgtest-dev cmake
         version: 1
