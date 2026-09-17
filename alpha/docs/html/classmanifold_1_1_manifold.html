@@ -308,6 +308,7 @@ Testing Hooks</h2></td></tr>
 <tr class="memitem:a229504ceeba4cfe69d815e46496090f7" id="r_a229504ceeba4cfe69d815e46496090f7"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a229504ceeba4cfe69d815e46496090f7">HasSimpleProps</a> () const</td></tr>
 <tr class="memitem:af46a22b8e84924f7159ae2a2db6cc956" id="r_af46a22b8e84924f7159ae2a2db6cc956"><td class="memItemLeft">size_t&#160;</td><td class="memItemRight"><a class="el" href="#af46a22b8e84924f7159ae2a2db6cc956">NumDegenerateTris</a> () const</td></tr>
 <tr class="memitem:ad4952fe30496434f3e128a33f5e350ef" id="r_ad4952fe30496434f3e128a33f5e350ef"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#ad4952fe30496434f3e128a33f5e350ef">GetEpsilon</a> () const</td></tr>
+<tr class="memitem:ac80b43d11acc218fcdaa4919091edee7" id="r_ac80b43d11acc218fcdaa4919091edee7"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#ac80b43d11acc218fcdaa4919091edee7">TriID2FaceID</a> () const</td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>This library's internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-representation of a solid object. Use this class to store and operate on solids, and use MeshGL for input and output. </p>
@@ -2099,6 +2100,24 @@ Testing Hooks</h2></td></tr>
       </table>
 </div><div class="memdoc">
 <p>Returns the epsilon value of this <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>'s vertices, which tracks the approximate rounding error over all the transforms and operations that have led to this state. This is the value of &epsilon; defining <a href="https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid">&epsilon;-valid</a>. </p>
+
+</div>
+</div>
+<a id="ac80b43d11acc218fcdaa4919091edee7" name="ac80b43d11acc218fcdaa4919091edee7"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ac80b43d11acc218fcdaa4919091edee7">&#9670;&#160;</a></span>TriID2FaceID()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> TriID2FaceID </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Converts triangle IDs to face IDs. This enables RelatedGL to work by providing a mapping back to the original input triangles. It is not a good idea to use generally because by making unique faceIDs, it prevents collapsing coplanar edges. </p>
 
 </div>
 </div>

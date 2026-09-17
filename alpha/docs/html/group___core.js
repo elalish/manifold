@@ -75,7 +75,8 @@ var group___core =
       [ "MatchesTriNormals", "classmanifold_1_1_manifold.html#a611a5fd95dc5d49cd88182b8ead722b7", null ],
       [ "HasSimpleProps", "classmanifold_1_1_manifold.html#a229504ceeba4cfe69d815e46496090f7", null ],
       [ "NumDegenerateTris", "classmanifold_1_1_manifold.html#af46a22b8e84924f7159ae2a2db6cc956", null ],
-      [ "GetEpsilon", "classmanifold_1_1_manifold.html#ad4952fe30496434f3e128a33f5e350ef", null ]
+      [ "GetEpsilon", "classmanifold_1_1_manifold.html#ad4952fe30496434f3e128a33f5e350ef", null ],
+      [ "TriID2FaceID", "classmanifold_1_1_manifold.html#ac80b43d11acc218fcdaa4919091edee7", null ]
     ] ],
     [ "MeshGLP&lt; Precision, I &gt;", "structmanifold_1_1_mesh_g_l_p.html", [
       [ "NumVert", "structmanifold_1_1_mesh_g_l_p.html#abe8f3e86d9e52e570b74cba17026579c", null ],

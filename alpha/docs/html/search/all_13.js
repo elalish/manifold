@@ -13,6 +13,7 @@ var searchData=
   ['translate_10',['Translate',['../classmanifold_1_1_manifold.html#a78fbea69555ea755f8731255060f7c9d',1,'manifold::Manifold::Translate()'],['../classmanifold_1_1_cross_section.html#a38bcb89b28140acbceca56f0bbda67b9',1,'manifold::CrossSection::Translate()']]],
   ['triangulate_11',['Triangulate',['../group___triangulation.html#gad94a4b0c8fcbba40756f72d741adf160',1,'manifold']]],
   ['triangulation_12',['Triangulation',['../group___triangulation.html',1,'']]],
-  ['trimbyplane_13',['TrimByPlane',['../classmanifold_1_1_manifold.html#aa8d62161da6e94da7651418c33c3e294',1,'manifold::Manifold']]],
-  ['triverts_14',['triVerts',['../structmanifold_1_1_mesh_g_l_p.html#ab0aa7d9b8f8adbb059ff0c6b70d38e6e',1,'manifold::MeshGLP']]]
+  ['triid2faceid_13',['TriID2FaceID',['../classmanifold_1_1_manifold.html#ac80b43d11acc218fcdaa4919091edee7',1,'manifold::Manifold']]],
+  ['trimbyplane_14',['TrimByPlane',['../classmanifold_1_1_manifold.html#aa8d62161da6e94da7651418c33c3e294',1,'manifold::Manifold']]],
+  ['triverts_15',['triVerts',['../structmanifold_1_1_mesh_g_l_p.html#ab0aa7d9b8f8adbb059ff0c6b70d38e6e',1,'manifold::MeshGLP']]]
 ];
