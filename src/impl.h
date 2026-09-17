@@ -440,7 +440,7 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
       ref.meshID = meshID;
       ref.originalID = originalID;
       ref.faceID = meshGL.faceID.empty() ? -1 : meshGL.faceID[tri];
-      ref.triID = tri;
+      ref.triID = meshGL.faceID.empty() ? tri : meshGL.faceID[tri];
     }
 
     if (meshGL.runTransform.empty()) {
@@ -600,7 +600,7 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     const auto ref = triRef[oldTri];
     const int meshID = ref.meshID;
 
-    out.faceID[tri] = ref.faceID >= 0 ? ref.faceID : ref.triID;
+    out.faceID[tri] = std::max(ref.faceID, 0);
     for (const int i : {0, 1, 2})
       out.triVerts[3 * tri + i] = impl.halfedge_.Start(3 * oldTri + i);
 

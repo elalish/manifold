@@ -861,6 +861,7 @@ void Manifold::Impl::Hull(VecView<const vec3> vertPos,
     MakeEmpty(Error::Cancelled);
     return;
   }
+  InitializeOriginal();
 }
 
 }  // namespace manifold

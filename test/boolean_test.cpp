@@ -78,7 +78,7 @@ TEST(Boolean, MeshGLRoundTrip) {
   ExpectMeshes(result, {{18, 32}});
   RelatedGL(result, {original});
 
-  MeshGL inGL = result.GetMeshGL();
+  MeshGL inGL = result.TriID2FaceID().GetMeshGL();
   ASSERT_EQ(inGL.runOriginalID.size(), 2);
   const Manifold result2(inGL);
 
@@ -104,7 +104,7 @@ TEST(Boolean, Normals) {
 
   RelatedGL(result, {cubeGL, sphereGL}, true, true);
 
-  MeshGL output = result.GetMeshGL();
+  MeshGL output = result.TriID2FaceID().GetMeshGL();
 
   if (options.exportModels) WriteTestOBJ("normals.obj", result);
 
@@ -241,18 +241,18 @@ TEST(Boolean, Simplify) {
   std::iota(cubeGL.faceID.begin(), cubeGL.faceID.end(), 0);
   Manifold cube(cubeGL);
 
-  const int nExpected = 20 * n * n;
+  const int nStarting = 20 * n * n;
   Manifold result = cube + cube.Translate({1, 0, 0});
-  EXPECT_EQ(result.NumTri(), nExpected);
-  result = result.Simplify();
-  EXPECT_EQ(result.NumTri(), nExpected);
+  EXPECT_EQ(result.NumTri(), nStarting);
+  EXPECT_EQ(result.RemoveDegenerates().NumTri(), nStarting);
+  EXPECT_EQ(result.Simplify().NumTri(), nStarting);
 
   MeshGL resultGL = result.GetMeshGL();
   resultGL.faceID.clear();
   Manifold result2(resultGL);
-  EXPECT_EQ(result2.NumTri(), nExpected);
-  result2 = result2.Simplify();
-  EXPECT_EQ(result2.NumTri(), 20);
+  EXPECT_EQ(result2.NumTri(), nStarting);
+  EXPECT_EQ(result2.RemoveDegenerates().NumTri(), 42);
+  EXPECT_EQ(result2.Simplify().NumTri(), 20);
 }
 
 TEST(Boolean, SimplifyCracks) {

@@ -334,7 +334,7 @@ void Identical(const MeshGL& mesh1, const MeshGL& mesh2) {
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
                bool checkNormals, bool updateNormals) {
   ASSERT_FALSE(out.IsEmpty());
-  MeshGL output = out.GetMeshGL();
+  MeshGL output = out.TriID2FaceID().GetMeshGL();
   std::vector<mat3x4> runTransforms(output.NumRun());
   for (size_t run = 0; run < output.NumRun(); ++run) {
     runTransforms[run] = output.GetRunTransform(run);

@@ -588,7 +588,6 @@ void Manifold::Impl::CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
   CreateHalfedges(triVerts);
   CleanupTopology();
   RemoveUnreferencedVerts();
-  InitializeOriginal();
   CalculateBBox();
   SetEpsilon();
   SortGeometry(ctx);
@@ -597,6 +596,7 @@ void Manifold::Impl::CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
     return;
   }
   SetFaceAndVertNormals();
+  InitializeOriginal();
   ADVANCE_PHASE_OR_RETURN(ctx);
 }
 }  // namespace manifold
