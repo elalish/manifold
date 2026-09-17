@@ -55,7 +55,6 @@ struct Manifold::Impl {
 
   Box bBox_;
   double epsilon_ = -1;
-  double tolerance_ = -1;
   int numProp_ = 0;
   Error status_ = Error::NoError;
 
@@ -388,7 +387,6 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   const auto numProp = meshGL.numProp - 3;
   numProp_ = numProp;
   properties_.resize_nofill(meshGL.NumVert() * numProp);
-  tolerance_ = meshGL.tolerance;
   // This will have unreferenced duplicate positions that will be removed by
   // Impl::RemoveUnreferencedVerts().
   vertPos_.resize_nofill(meshGL.NumVert());
@@ -539,7 +537,7 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
 
   MeshGLP<Precision, I> out;
   out.numProp = 3 + numProp;
-  out.tolerance = impl.tolerance_;
+  out.tolerance = impl.epsilon_;
   if (std::is_same<Precision, float>::value)
     out.tolerance =
         std::max(out.tolerance,

@@ -823,7 +823,6 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   }
 
   outR.epsilon_ = std::max(inP_.epsilon_, inQ_.epsilon_);
-  outR.tolerance_ = std::max(inP_.tolerance_, inQ_.tolerance_);
 
   outR.vertPos_.resize_nofill(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].

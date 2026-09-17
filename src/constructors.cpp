@@ -414,7 +414,6 @@ std::vector<Manifold> Manifold::Decompose() const {
     auto impl = std::make_shared<Impl>();
     // inherit original object's precision
     impl->epsilon_ = pImpl_->epsilon_;
-    impl->tolerance_ = pImpl_->tolerance_;
 
     Vec<int> vertNew2Old(numVert);
     const int nVert =

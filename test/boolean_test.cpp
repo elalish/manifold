@@ -251,7 +251,7 @@ TEST(Boolean, Simplify) {
   resultGL.faceID.clear();
   Manifold result2(resultGL);
   EXPECT_EQ(result2.NumTri(), nStarting);
-  EXPECT_EQ(result2.RemoveDegenerates().NumTri(), 42);
+  EXPECT_EQ(result2.RemoveDegenerates().NumTri(), 48);
   EXPECT_EQ(result2.Simplify().NumTri(), 20);
 }
 

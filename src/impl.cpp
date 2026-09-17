@@ -553,7 +553,6 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   }
   result.meshRelation_ = meshRelation_;
   result.epsilon_ = epsilon_;
-  result.tolerance_ = tolerance_;
   result.numProp_ = numProp_;
   result.properties_ = properties_;
   result.bBox_ = bBox_;
@@ -623,11 +622,9 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
  */
 void Manifold::Impl::SetEpsilon(double minEpsilon, bool useSingle) {
   epsilon_ = std::max(minEpsilon, Epsilon());
-  double minTol = epsilon_;
   if (useSingle)
-    minTol =
-        std::max(minTol, std::numeric_limits<float>::epsilon() * bBox_.Scale());
-  tolerance_ = std::max(tolerance_, minTol);
+    epsilon_ = std::max(epsilon_,
+                        std::numeric_limits<float>::epsilon() * bBox_.Scale());
 }
 
 /**
