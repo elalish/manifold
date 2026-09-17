@@ -149,7 +149,6 @@ struct Manifold::Impl {
   size_t NumPropVert() const {
     return NumProp() == 0 ? NumVert() : properties_.size() / NumProp();
   }
-  double Epsilon() const { return kPrecision * bBox_.Scale(); }
 
   // properties.cpp
   enum class Property { Volume, SurfaceArea };
@@ -158,7 +157,6 @@ struct Manifold::Impl {
   void CalculateBBox();
   bool IsFinite() const;
   bool IsIndexInBounds(VecView<const ivec3> triVerts) const;
-  void SetEpsilon(double minEpsilon = -1, bool useSingle = false);
   bool IsManifold() const;
   bool Is2Manifold() const;
   bool IsSelfIntersecting() const;
@@ -495,7 +493,6 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   ADVANCE_PHASE_OR_RETURN(ctx);
 
   CalculateBBox();
-  SetEpsilon(-1, std::is_same<Precision, float>::value);
 
   // we need to split pinched verts before calculating vertex normals, because
   // the algorithm doesn't work with pinched verts

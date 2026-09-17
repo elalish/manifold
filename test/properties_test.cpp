@@ -44,7 +44,7 @@ TEST(Properties, Epsilon) {
 TEST(Properties, Epsilon2) {
   Manifold cube = Manifold::Cube();
   cube = cube.Translate({-0.5, 0, 0}).Scale({2, 1, 1});
-  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 2 * kPrecision);
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), kPrecision);
 }
 
 TEST(Properties, Tolerance) {

@@ -195,7 +195,7 @@ bool Manifold::Impl::IsSelfIntersecting() const {
  */
 bool Manifold::Impl::MatchesTriNormals() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
-  const double tol = 2 * Epsilon();
+  const double tol = 2 * epsilon_;
   return all_of(countAt(0_uz), countAt(NumTri()), [&](size_t face) {
     if (halfedge_.Pair(3 * face) < 0) return true;
 
@@ -405,6 +405,7 @@ void Manifold::Impl::CalculateBBox() {
     // Decimated out of existence - early out.
     MakeEmpty(Error::NoError);
   }
+  epsilon_ = kPrecision * bBox_.Scale();
 }
 
 /**

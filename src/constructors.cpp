@@ -120,7 +120,6 @@ Manifold Manifold::Sphere(double radius, int circularSegments) {
              });
   // Ignore preceding octahedron.
   pImpl_->CalculateBBox();
-  pImpl_->SetEpsilon();
   pImpl_->SortGeometry();
   pImpl_->SetFaceAndVertNormals();
   pImpl_->InitializeOriginal();
@@ -216,7 +215,6 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
 
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->CalculateBBox();
-  pImpl_->SetEpsilon();
   pImpl_->SortGeometry();
   pImpl_->SetFaceAndVertNormals();
   pImpl_->InitializeOriginal();
@@ -361,7 +359,6 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
 
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->CalculateBBox();
-  pImpl_->SetEpsilon();
   pImpl_->SortGeometry();
   pImpl_->SetFaceAndVertNormals();
   pImpl_->InitializeOriginal();
@@ -412,8 +409,6 @@ std::vector<Manifold> Manifold::Decompose() const {
   std::vector<Manifold> meshes;
   for (int i = 0; i < numComponents; ++i) {
     auto impl = std::make_shared<Impl>();
-    // inherit original object's precision
-    impl->epsilon_ = pImpl_->epsilon_;
 
     Vec<int> vertNew2Old(numVert);
     const int nVert =
