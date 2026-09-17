@@ -626,10 +626,9 @@ CrossSection CrossSection::WarpBatch(
  * quality in any meaningful way. This is particularly important if further
  * offseting operations are to be performed, which would compound the issue.
  *
- * @param tolerance Default 0 uses the cross-section's own tolerance (from
- * GetTolerance()), which is geometry-scale-derived and may be larger than a
- * fixed epsilon for large-coordinate geometry. Pass an explicit value to
- * override.
+ * @param tolerance Default 0 uses the cross-section's own tolerance, which is
+ * geometry-scale-derived and may be larger than a fixed epsilon for
+ * large-coordinate geometry. Pass an explicit value to override.
  */
 CrossSection CrossSection::Simplify(double tolerance) const {
   // Stored paths are already fill-rule-regularized, so Simplify only decimates:
@@ -638,7 +637,7 @@ CrossSection CrossSection::Simplify(double tolerance) const {
   // clipper2, the result is NOT re-regularized - a coarse tolerance can
   // self-intersect a ring, so healing is left to a later boolean. Tolerance 0
   // decimates at the cross-section's own tolerance, matching Manifold.
-  if (tolerance == 0) tolerance = tolerance_;
+  tolerance = std::max(tolerance, InferEps(GetPaths()->paths_, {}));
   const Polygons& paths = GetPaths()->paths_;
   const Polygons filtered = FilterSmallContours(paths, tolerance);
   Polygons out;
@@ -650,24 +649,6 @@ CrossSection CrossSection::Simplify(double tolerance) const {
   CrossSection result(shared_paths(std::move(out)));
   result.tolerance_ = std::max(tolerance_, tolerance);
   return result;
-}
-
-/**
- * Return the cross-section's tolerance: the propagated drift budget, analogous
- * to Manifold::GetTolerance.
- */
-double CrossSection::GetTolerance() const { return tolerance_; }
-
-/**
- * Return a copy with the given tolerance. Raising it decimates the geometry to
- * the new tolerance (via Simplify); lowering it floors at the geometry's
- * epsilon. Mirrors Manifold::SetTolerance.
- */
-CrossSection CrossSection::SetTolerance(double tolerance) const {
-  if (tolerance > tolerance_) return Simplify(tolerance);
-  CrossSection out = *this;
-  out.tolerance_ = std::max(InferEps(GetPaths()->paths_, {}), tolerance);
-  return out;
 }
 
 /**

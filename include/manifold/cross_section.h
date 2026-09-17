@@ -89,8 +89,6 @@ class CrossSection {
   size_t NumContour() const;
   Rect Bounds() const;
   double Area() const;
-  double GetTolerance() const;
-  CrossSection SetTolerance(double tolerance) const;
   ///@}
 
   /** @name Transformation

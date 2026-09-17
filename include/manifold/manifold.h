@@ -154,7 +154,7 @@ class Manifold {
   /// not currently observe attached ctx.
   ///
   /// Deferred ops (Boolean operators, Translate / Rotate / Scale / Transform
-  /// / Mirror / Warp / SetTolerance / Simplify, BatchBoolean, the
+  /// / Mirror / Warp / Simplify, BatchBoolean, the
   /// vector-of-Manifold Hull) ignore any attached ctx and produce a result
   /// with no attached ctx. Inputs are not mutated. The idiom for observing a
   /// deferred tree is therefore:
@@ -178,7 +178,6 @@ class Manifold {
   size_t NumPropVert() const;
   Box BoundingBox() const;
   int Genus() const;
-  double GetTolerance() const;
   ///@}
 
   /** @name Measurement
@@ -212,7 +211,6 @@ class Manifold {
   Manifold Transform(const mat3x4&) const;
   Manifold Warp(std::function<void(vec3&)>) const;
   Manifold WarpBatch(std::function<void(VecView<vec3>)>) const;
-  Manifold SetTolerance(double) const;
   Manifold Simplify(double tolerance = 0) const;
   Manifold RemoveDegenerates() const;
   ///@}

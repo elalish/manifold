@@ -836,6 +836,7 @@ TEST(BooleanComplex, InterpolatedNormals) {
   b.runOriginalID = {Manifold::ReserveIDs(1)};
 
   Manifold aManifold(a);
+
   Manifold bManifold(b);
 
   auto aMinusB = aManifold - bManifold;

@@ -150,6 +150,7 @@ struct Manifold::Impl {
   size_t NumPropVert() const {
     return NumProp() == 0 ? NumVert() : properties_.size() / NumProp();
   }
+  double Epsilon() const { return kPrecision * bBox_.Scale(); }
 
   // properties.cpp
   enum class Property { Volume, SurfaceArea };
@@ -217,11 +218,9 @@ struct Manifold::Impl {
   };
 
   TriResult IsDegenerate(int tri) const;
-
-  double MaxCost() const { return tolerance_ * tolerance_; }
   void CleanupTopology();
   void RemoveDegenerates(int firstNewVert = 0);
-  void Decimate();
+  void Decimate(double tolerance);
   Merger CheckEdge(int edge) const;
   bool Continuous(int edge) const;
   bool Swappable(int edge) const;

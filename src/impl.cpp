@@ -622,7 +622,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
  * by the optional input.
  */
 void Manifold::Impl::SetEpsilon(double minEpsilon, bool useSingle) {
-  epsilon_ = MaxEpsilon(minEpsilon, bBox_);
+  epsilon_ = std::max(minEpsilon, Epsilon());
   double minTol = epsilon_;
   if (useSingle)
     minTol =

@@ -78,7 +78,7 @@ TEST(Properties, ToleranceSphere) {
   Manifold sphere = Manifold::Sphere(1, 4 * n);
   EXPECT_EQ(sphere.NumTri(), 8 * n * n);
 
-  Manifold sphere2 = sphere.SetTolerance(0.01);
+  Manifold sphere2 = sphere.Simplify(0.01);
   EXPECT_LT(sphere2.NumTri(), 1250);
   EXPECT_EQ(sphere2.Genus(), 0);
   EXPECT_NEAR(sphere.Volume(), sphere2.Volume(), 0.002);

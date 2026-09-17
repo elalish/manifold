@@ -352,7 +352,7 @@ void Manifold::Impl::SwapEdge(int edge, double a) {
   }
 }
 
-void Manifold::Impl::Decimate() {
+void Manifold::Impl::Decimate(double tolerance) {
   if (!halfedge_.size()) return;
   halfedge_.MakeUnique();
 
@@ -366,7 +366,8 @@ void Manifold::Impl::Decimate() {
   Vec<double> totalCost(vertPos_.size(), 0);
   size_t totalCollapsed = 0;
   Vec<Merger> merger(edges.size(), {});
-  const double maxCost = MaxCost();
+  tolerance = std::max(tolerance, Epsilon());
+  const double maxCost = tolerance * tolerance;
   Vec<int> scratchBuffer;
   scratchBuffer.reserve(10);
 
