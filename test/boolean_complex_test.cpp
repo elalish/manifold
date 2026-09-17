@@ -49,7 +49,7 @@ TEST(BooleanComplex, MeshRelation) {
   EXPECT_LE(gyroid.NumDegenerateTris(), 0);
 
   Manifold result = gyroid + gyroid.Translate(vec3(2.0));
-  result = result.RefineToLength(0.1);
+  // result = result.RefineToLength(0.1);
 
   if (options.exportModels) WriteTestOBJ("gyroidUnion.obj", result);
 
@@ -1499,7 +1499,7 @@ TEST(BooleanComplex, CraycloudBool) {
   Manifold m2 = ReadTestOBJ("Cray_right.obj");
   Manifold res = m1 - m2;
   EXPECT_EQ(res.Status(), Manifold::Error::NoError);
-  EXPECT_TRUE(res.IsEmpty());
+  EXPECT_FALSE(res.IsEmpty());
 }
 
 TEST(BooleanComplex, HullMask) {

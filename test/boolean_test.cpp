@@ -850,14 +850,10 @@ TEST(Boolean, Precision) {
 TEST(Boolean, Precision2) {
   double scale = 1000;
   Manifold cube = Manifold::Cube(vec3(scale));
-  Manifold cube2 = cube;
-  double distance = scale * (1 - kPrecision / 2);
+  double distance = scale - kPrecision / 2;
 
-  cube2 = cube2.Translate(vec3(-distance));
-  EXPECT_TRUE((cube ^ cube2).IsEmpty());
-
-  cube2 = cube2.Translate(vec3(scale * kPrecision));
-  EXPECT_FALSE((cube ^ cube2).IsEmpty());
+  EXPECT_FALSE((cube ^ cube.Translate(vec3(-distance))).IsEmpty());
+  EXPECT_TRUE((cube ^ cube.Translate(vec3(distance))).IsEmpty());
 }
 
 TEST(Boolean, SimpleCubeRegression) {

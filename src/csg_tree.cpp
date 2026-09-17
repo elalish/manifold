@@ -238,14 +238,6 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
       impl.status_ = node->pImpl_->status_;
       return ImplToLeaf(std::move(impl));
     }
-    double nodeOldScale = node->pImpl_->bBox_.Scale();
-    double nodeNewScale =
-        node->pImpl_->bBox_.Transform(node->transform_).Scale();
-    double nodeEpsilon = node->pImpl_->epsilon_;
-    nodeEpsilon *= std::max(1.0, nodeNewScale / nodeOldScale);
-    nodeEpsilon = std::max(nodeEpsilon, kPrecision * nodeNewScale);
-    if (!std::isfinite(nodeEpsilon)) nodeEpsilon = -1;
-    epsilon = std::max(epsilon, nodeEpsilon);
     bbox = bbox.Union(node->GetBoundingBox());
 
     vertIndices.push_back(numVert);
@@ -262,8 +254,8 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
   }
 
   Manifold::Impl combined;
-  combined.epsilon_ = epsilon;
   combined.bBox_ = bbox;
+  combined.epsilon_ = kPrecision * combined.bBox_.Scale();
   combined.vertPos_.resize_nofill(numVert);
   combined.vertNormal_.resize_nofill(numVert);
   combined.halfedge_.resize_nofill(2 * numEdge);
