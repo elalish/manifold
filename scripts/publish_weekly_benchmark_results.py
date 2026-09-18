@@ -69,6 +69,13 @@ def sanitizer_summary(args: argparse.Namespace) -> dict | None:
     return summary or None
 
 
+def wasm_summary(args: argparse.Namespace) -> dict | None:
+    """The built size of bindings/wasm/manifold.wasm, the file npm publishes."""
+    if not args.wasm_size_bytes:
+        return None
+    return {"size_bytes": int(args.wasm_size_bytes)}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Publish weekly benchmark result files.")
     parser.add_argument("suite_dir", type=Path)
@@ -79,6 +86,7 @@ def main() -> int:
     parser.add_argument("--sanitizer-test-result")
     parser.add_argument("--sanitizer-runner")
     parser.add_argument("--sanitizer-os")
+    parser.add_argument("--wasm-size-bytes")
     args = parser.parse_args()
 
     result_path = args.suite_dir / "result.json"
@@ -118,6 +126,10 @@ def main() -> int:
     sanitizer = sanitizer_summary(args)
     if sanitizer:
         entry["sanitizer"] = sanitizer
+    # Absent when the wasm job failed; the week's timings still publish.
+    wasm = wasm_summary(args)
+    if wasm:
+        entry["wasm"] = wasm
     entry["trigger"] = "release" if args.release_tag else "weekly"
 
     result_dest = dated_dir / "result.json"

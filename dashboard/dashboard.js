@@ -40,6 +40,13 @@ const CHARTS = [
     unit: 'Milliseconds',
     valueSuffix: ' ms',
   },
+  {
+    element: 'wasm-size-chart',
+    metric: 'wasm_size',
+    title: 'manifold.wasm built size',
+    unit: 'KB',
+    valueSuffix: ' KB',
+  },
 ];
 
 const state = {
@@ -204,6 +211,12 @@ function metricItems(record, metricId, stat) {
              }));
   }
 
+  if (metricId === 'wasm_size') {
+    // Deterministic, so `stat` is deliberately unused here.
+    const bytes = record.entry.wasm?.size_bytes;
+    return bytes == null ? [] : [{name: 'manifold.wasm', value: bytes / 1024}];
+  }
+
   return [];
 }
 
@@ -244,13 +257,10 @@ function buildSeries(metricId, stat, maxSeries) {
   return {categories, series, totalSeries: sortedNames.length};
 }
 
-function renderHighchartsChart(config) {
+function renderHighchartsChart(config, data) {
   const stat = currentStat();
-  const {categories, series, totalSeries} = buildSeries(
-      config.metric,
-      stat,
-      config.maxSeries,
-  );
+  const {categories, series, totalSeries} =
+      data ?? buildSeries(config.metric, stat, config.maxSeries);
 
   Highcharts.chart({
     chart: {
@@ -264,10 +274,11 @@ function renderHighchartsChart(config) {
       text: config.title,
     },
     subtitle: {
-      text: totalSeries > series.length ?
-          `Showing top ${series.length} of ${totalSeries} series by latest ${
-              stat}` :
-          `${stat} across ${categories.length} loaded runs`,
+      text: config.subtitle ??
+          (totalSeries > series.length ?
+               `Showing top ${series.length} of ${
+                   totalSeries} series by latest ${stat}` :
+               `${stat} across ${categories.length} loaded runs`),
     },
     yAxis: {
       title: {text: config.unit},
@@ -276,7 +287,7 @@ function renderHighchartsChart(config) {
     },
     xAxis: {
       categories,
-      title: {text: 'Run date'},
+      title: {text: config.xTitle ?? 'Run date'},
     },
     tooltip: {
       shared: false,
@@ -286,7 +297,46 @@ function renderHighchartsChart(config) {
   });
 }
 
+async function renderReleaseSizeChart() {
+  const element = qs('wasm-release-chart');
+  if (!element || !window.Highcharts) {
+    return;
+  }
+
+  let releases;
+  try {
+    const payload =
+        await fetchJson(`${state.branchRoot}/weekly/wasm-release-sizes.json`);
+    releases = payload.releases || [];
+  } catch (error) {
+    // Written by the weekly publish step; absent until that has run once.
+    element.textContent = 'Release size history is not available yet.';
+    return;
+  }
+
+  renderHighchartsChart(
+      {
+        element: 'wasm-release-chart',
+        title: 'manifold.wasm published size',
+        subtitle: `${releases.length} releases published to npm`,
+        unit: 'KB',
+        valueSuffix: ' KB',
+        xTitle: 'Release',
+      },
+      {
+        categories: releases.map((release) => release.version),
+        series: [{
+          type: 'line',
+          name: 'manifold.wasm',
+          animation: false,
+          data: releases.map((release) => release.size_bytes / 1024),
+        }],
+        totalSeries: 1,
+      });
+}
+
 function renderCharts() {
+  renderReleaseSizeChart();
   const chartsOnPage = CHARTS.filter((chart) => qs(chart.element));
   if (!chartsOnPage.length) {
     return;
