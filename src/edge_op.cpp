@@ -536,7 +536,7 @@ int Manifold::Impl::RecursiveEdgeSwap(const int tri, const int firstNewVert,
 
   SwapEdge(edge, dot(a, edgeVec) / length2(edgeVec));
 
-  if (length2(next - last) < epsilon_ * epsilon_) {
+  if (length2(next - last) < length2(edgeVec)) {
     CollapseDegenerate(PrevHalfedge(edge), scratch);
   }
   int swaps = 1;
