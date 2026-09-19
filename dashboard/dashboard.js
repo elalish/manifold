@@ -43,7 +43,7 @@ const CHARTS = [
   {
     element: 'wasm-size-chart',
     metric: 'wasm_size',
-    title: 'manifold.wasm built size',
+    title: 'manifold.wasm built size (gzipped)',
     unit: 'KB',
     valueSuffix: ' KB',
   },
@@ -213,7 +213,7 @@ function metricItems(record, metricId, stat) {
 
   if (metricId === 'wasm_size') {
     // Deterministic, so `stat` is deliberately unused here.
-    const bytes = record.entry.wasm?.size_bytes;
+    const bytes = record.entry.wasm?.gzip_bytes;
     return bytes == null ? [] : [{name: 'manifold.wasm', value: bytes / 1024}];
   }
 
@@ -317,7 +317,7 @@ async function renderReleaseSizeChart() {
   renderHighchartsChart(
       {
         element: 'wasm-release-chart',
-        title: 'manifold.wasm published size',
+        title: 'manifold.wasm published size (gzipped)',
         subtitle: `${releases.length} releases published to npm`,
         unit: 'KB',
         valueSuffix: ' KB',
@@ -329,7 +329,7 @@ async function renderReleaseSizeChart() {
           type: 'line',
           name: 'manifold.wasm',
           animation: false,
-          data: releases.map((release) => release.size_bytes / 1024),
+          data: releases.map((release) => release.gzip_bytes / 1024),
         }],
         totalSeries: 1,
       });

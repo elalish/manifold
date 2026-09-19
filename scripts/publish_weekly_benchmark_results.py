@@ -70,10 +70,10 @@ def sanitizer_summary(args: argparse.Namespace) -> dict | None:
 
 
 def wasm_summary(args: argparse.Namespace) -> dict | None:
-    """The built size of bindings/wasm/manifold.wasm, the file npm publishes."""
-    if not args.wasm_size_bytes:
+    """Gzipped size of bindings/wasm/manifold.wasm, the file npm publishes."""
+    if not args.wasm_gzip_bytes:
         return None
-    return {"size_bytes": int(args.wasm_size_bytes)}
+    return {"gzip_bytes": int(args.wasm_gzip_bytes)}
 
 
 def main() -> int:
@@ -86,7 +86,7 @@ def main() -> int:
     parser.add_argument("--sanitizer-test-result")
     parser.add_argument("--sanitizer-runner")
     parser.add_argument("--sanitizer-os")
-    parser.add_argument("--wasm-size-bytes")
+    parser.add_argument("--wasm-gzip-bytes")
     args = parser.parse_args()
 
     result_path = args.suite_dir / "result.json"
