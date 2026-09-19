@@ -31,7 +31,9 @@
       <p>
         The dashboard reads weekly benchmark JSON files from the <code>benchmark-data</code>
         branch. It shows the <code>perfTest</code> size sweep, selected Ember phase
-        timings, and selected existing gtests. The charts use Highcharts line graphs,
+        timings, and selected existing gtests. It also tracks the size of
+        <code>manifold.wasm</code>, both as built each week and as published to
+        npm for every release. The charts use Highcharts line graphs,
         matching the approach used by the rustc-perf dashboard.
       </p>
     </details>
@@ -63,6 +65,8 @@
       <div id="ember-full-chart" class="chart-box"></div>
       <div id="ember-phase-chart" class="chart-box"></div>
       <div id="gtest-time-chart" class="chart-box"></div>
+      <div id="wasm-size-chart" class="chart-box"></div>
+      <div id="wasm-release-chart" class="chart-box"></div>
     </div>
   </section>
 
