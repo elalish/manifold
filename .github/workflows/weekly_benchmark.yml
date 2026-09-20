@@ -21,9 +21,65 @@ jobs:
       subset: extended
       retention-days: 1
 
+  wasm_size:
+    name: WASM size
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      bytes: ${{ steps.measure.outputs.bytes }}
+    env:
+      EMSDK_VERSION: 5.0.2
+    steps:
+    - uses: actions/checkout@v6
+    - run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake
+    - name: Setup EMSDK
+      uses: mymindstorm/setup-emsdk@v14
+      with:
+        version: ${{ env.EMSDK_VERSION }}
+    - uses: ./.github/actions/git-clone
+      with:
+        name: tbb
+        url: https://github.com/oneapi-src/oneTBB.git
+        tag: v2022.3.0
+    - uses: ./.github/actions/git-clone
+      with:
+        name: gtest
+        url: https://github.com/google/googletest.git
+        tag: v1.17.0
+
+    # These flags mirror publish_npm.yml exactly
+    - name: Build WASM
+      run: |
+        emcmake cmake \
+          -DCMAKE_BUILD_TYPE=MinSizeRel \
+          -DMANIFOLD_STRICT=ON \
+          -DMANIFOLD_PAR=OFF \
+          -DMANIFOLD_USE_BUILTIN_TBB=ON \
+          -DMANIFOLD_DEBUG=OFF \
+          -DMANIFOLD_ASSERT=OFF \
+          -DFETCHCONTENT_SOURCE_DIR_TBB=tbb \
+          -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=gtest \
+          . -B build
+        cd build
+        emmake make
+
+    # bindings/wasm/CMakeLists.txt copies the build output back here for npm,
+    # so this path is the file that ships. Gzipped, because that is what a
+    # browser waits for. Python's gzip rather than the gzip binary, to match
+    # collect_wasm_release_sizes.py: the two disagree by ~0.4% at the same
+    # level, which would offset the two series against each other.
+    - name: Measure
+      id: measure
+      run: |
+        bytes=$(python3 -c "import gzip; print(len(gzip.compress(open('bindings/wasm/manifold.wasm','rb').read(), 9)))")
+        echo "bytes=$bytes" >> "$GITHUB_OUTPUT"
+        echo "manifold.wasm: $bytes bytes gzipped" | tee -a "$GITHUB_STEP_SUMMARY"
+
   weekly_benchmark:
     name: Weekly benchmarks
-    needs: sanitizer
+    needs: [sanitizer, wasm_size]
     if: ${{ !cancelled() }}
     timeout-minutes: 60
     runs-on: macos-15
@@ -41,6 +97,7 @@ jobs:
       SANITIZER_SUMMARY_OS: Linux
       SANITIZER_BUILD_RESULT: ${{ needs.sanitizer.outputs.build-result }}
       SANITIZER_TEST_RESULT: ${{ needs.sanitizer.outputs.test-result }}
+      WASM_GZIP_BYTES: ${{ needs.wasm_size.outputs.bytes }}
     steps:
     - uses: actions/checkout@v6
       with:
@@ -73,7 +130,12 @@ jobs:
           --sanitizer-build-result "${SANITIZER_BUILD_RESULT}" \
           --sanitizer-test-result "${SANITIZER_TEST_RESULT}" \
           --sanitizer-runner "${SANITIZER_SUMMARY_RUNNER}" \
-          --sanitizer-os "${SANITIZER_SUMMARY_OS}"
+          --sanitizer-os "${SANITIZER_SUMMARY_OS}" \
+          --wasm-gzip-bytes "${WASM_GZIP_BYTES}"
+
+        # Rebuilt in full each time, so this doubles as the backfill.
+        python3 ./scripts/collect_wasm_release_sizes.py \
+          ./benchmark-data/weekly/wasm-release-sizes.json
 
         git -C benchmark-data add weekly
         git -C benchmark-data commit -m "add weekly benchmark result ${GITHUB_RUN_ID}"
