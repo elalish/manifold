@@ -1548,6 +1548,16 @@ TEST(BooleanComplex, OffsetSelfIntersect) {
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
 }
 
+TEST(BooleanComplex, InfiniteRecursion) {
+  // ManifoldParamGuard guard;
+  // ManifoldParams().selfIntersectionChecks = true;
+  // manifold::ManifoldParams().verifyNoDegenerates = false;
+  Manifold a = ReadTestOBJ("r1.obj");
+  Manifold b = ReadTestOBJ("r2.obj");
+  Manifold result = a ^ b;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+}
+
 TEST(BooleanComplex, OpenscadCrash) {
   ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
