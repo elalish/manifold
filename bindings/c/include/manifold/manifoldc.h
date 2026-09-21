@@ -428,6 +428,8 @@ int manifold_box_is_finite(ManifoldBox* b);
 
 // Static Quality Globals
 
+void manifold_set_relative_precision(double precision);
+double manifold_get_relative_precision();
 void manifold_set_min_circular_angle(double degrees);
 void manifold_set_min_circular_edge_length(double length);
 void manifold_set_circular_segments(int number);

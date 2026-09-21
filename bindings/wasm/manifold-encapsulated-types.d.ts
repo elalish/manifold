@@ -37,6 +37,9 @@ export {ExecutionContext} from './manifold-global-types';
 export function triangulate(
     polygons: Polygons, epsilon?: number, allowConvex?: boolean): Vec3[];
 
+export function setRelativePrecision(precision: number): void;
+export function getRelativePrecision(): number;
+
 /**
  * Sets an angle constraint the default number of circular segments for the
  * {@link CrossSection.circle}, {@link Manifold.cylinder}, {@link

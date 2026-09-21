@@ -203,6 +203,11 @@ const std::string manifold__rotate__v =
 NB_MODULE(manifold3d, m) {
   m.doc() = "Python binding for the Manifold library.";
 
+  m.def("set_relative_precision", Quality::SetRelativePrecision,
+        nb::arg("precision"));
+
+  m.def("get_relative_precision", Quality::GetRelativePrecision);
+
   m.def("set_min_circular_angle", Quality::SetMinCircularAngle,
         nb::arg("angle"), quality__set_min_circular_angle__angle);
 

@@ -909,6 +909,14 @@ ManifoldManifold* manifold_calculate_normals(void* mem, ManifoldManifold* m,
 
 // Static Quality Globals
 
+void manifold_set_relative_precision(double precision) {
+  Quality::SetRelativePrecision(precision);
+}
+
+double manifold_get_relative_precision() {
+  return Quality::GetRelativePrecision();
+}
+
 void manifold_set_min_circular_angle(double degrees) {
   Quality::SetMinCircularAngle(degrees);
 }

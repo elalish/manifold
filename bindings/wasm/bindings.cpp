@@ -225,6 +225,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
       select_overload<Manifold(const std::vector<vec3>&)>(&Manifold::Hull));
 
   // Quality Globals
+  function("setRelativePrecision", &Quality::SetRelativePrecision);
+  function("getRelativePrecision", &Quality::GetRelativePrecision);
   function("setMinCircularAngle", &Quality::SetMinCircularAngle);
   function("setMinCircularEdgeLength", &Quality::SetMinCircularEdgeLength);
   function("setCircularSegments", &Quality::SetCircularSegments);
