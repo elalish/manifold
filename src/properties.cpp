@@ -405,7 +405,7 @@ void Manifold::Impl::CalculateBBox() {
     // Decimated out of existence - early out.
     MakeEmpty(Error::NoError);
   }
-  epsilon_ = kPrecision * bBox_.Scale();
+  epsilon_ = Quality::GetRelativePrecision() * bBox_.Scale();
 }
 
 /**

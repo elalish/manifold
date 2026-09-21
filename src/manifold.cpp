@@ -41,9 +41,21 @@ Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
 
 namespace manifold {
 
-static int circularSegments_ = DEFAULT_SEGMENTS;
-static double circularAngle_ = DEFAULT_ANGLE;
-static double circularEdgeLength_ = DEFAULT_LENGTH;
+static std::atomic<double> relativePrecision_ = kPrecision;
+static std::atomic<int> circularSegments_ = DEFAULT_SEGMENTS;
+static std::atomic<double> circularAngle_ = DEFAULT_ANGLE;
+static std::atomic<double> circularEdgeLength_ = DEFAULT_LENGTH;
+
+/**
+ * Sets the relative precision for geometric computations.
+ *
+ * @param p The relative precision value.
+ */
+void Quality::SetRelativePrecision(double p) {
+  relativePrecision_ = std::max(p, kPrecision);
+}
+
+double Quality::GetRelativePrecision() { return relativePrecision_; }
 
 /**
  * Sets an angle constraint the default number of circular segments for the
@@ -112,6 +124,7 @@ int Quality::GetCircularSegments(double radius) {
  * been called.
  */
 void Quality::ResetToDefaults() {
+  relativePrecision_ = kPrecision;
   circularSegments_ = DEFAULT_SEGMENTS;
   circularAngle_ = DEFAULT_ANGLE;
   circularEdgeLength_ = DEFAULT_LENGTH;

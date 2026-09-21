@@ -255,7 +255,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
 
   Manifold::Impl combined;
   combined.bBox_ = bbox;
-  combined.epsilon_ = kPrecision * combined.bBox_.Scale();
+  combined.epsilon_ = Quality::GetRelativePrecision() * combined.bBox_.Scale();
   combined.vertPos_.resize_nofill(numVert);
   combined.vertNormal_.resize_nofill(numVert);
   combined.halfedge_.resize_nofill(2 * numEdge);

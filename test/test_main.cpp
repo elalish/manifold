@@ -485,7 +485,6 @@ void CheckGL(const Manifold& manifold, bool noMerge) {
   if (!meshGL.runTransform.empty()) {
     EXPECT_EQ(meshGL.runTransform.size(), 12 * meshGL.runOriginalID.size());
   }
-  EXPECT_EQ(meshGL.faceID.size(), meshGL.NumTri());
   CheckFinite(meshGL);
 }
 

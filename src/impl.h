@@ -416,15 +416,13 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
     runIndex.push_back(runEnd);
   }
 
-  const auto startID =
-      Impl::ReserveIDs(std::max(1_uz, meshGL.runOriginalID.size()));
   auto runOriginalID = meshGL.runOriginalID;
   if (runOriginalID.empty()) {
-    runOriginalID.push_back(startID);
+    runOriginalID.push_back(0);  // untracked
   }
   for (size_t i = 0; i < runOriginalID.size(); ++i) {
-    const int meshID = startID + i;
     const int originalID = runOriginalID[i];
+    const int meshID = originalID == 0 ? 0 : Impl::ReserveIDs(1);
     const bool backside = meshGL.Backside(i);
     // Per-run hasNormals (runFlags bit 1). Defensively require numProp >= 3
     // so a caller setting the bit on a too-small MeshGL doesn't make us read
@@ -552,7 +550,6 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     out.halfedgeTangent[4 * i + 3] = t.w;
   }
   // Sort the triangles into runs
-  out.faceID.resize(numTri);
   std::vector<int> triNew2Old(numTri);
   std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
   VecView<const TriRef> triRef = impl.meshRelation_.triRef;
@@ -587,6 +584,11 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     }
   };
 
+  // only create the faceID array if the mesh relation faceIDs are not all -1.
+  if (std::any_of(triRef.begin(), triRef.end(),
+                  [](const TriRef& ref) { return ref.faceID != -1; })) {
+    out.faceID.resize(numTri);
+  }
   auto meshIDtransform = impl.meshRelation_.meshIDtransform;
   int lastID = -1;
   for (int tri = 0; tri < numTri; ++tri) {
@@ -594,7 +596,9 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     const auto ref = triRef[oldTri];
     const int meshID = ref.meshID;
 
-    out.faceID[tri] = std::max(ref.faceID, 0);
+    if (!out.faceID.empty()) {
+      out.faceID[tri] = std::max(ref.faceID, 0);
+    }
     for (const int i : {0, 1, 2})
       out.triVerts[3 * tri + i] = impl.halfedge_.Start(3 * oldTri + i);
 
