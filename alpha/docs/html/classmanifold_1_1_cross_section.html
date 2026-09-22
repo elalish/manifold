@@ -153,8 +153,6 @@ Information</h2></td></tr>
 <tr class="memitem:a87c531d99cd313aeb513cd8cfee1641c" id="r_a87c531d99cd313aeb513cd8cfee1641c"><td class="memItemLeft">size_t&#160;</td><td class="memItemRight"><a class="el" href="#a87c531d99cd313aeb513cd8cfee1641c">NumContour</a> () const</td></tr>
 <tr class="memitem:ae69af2b193a98c4adc6f613a7463482c" id="r_ae69af2b193a98c4adc6f613a7463482c"><td class="memItemLeft"><a class="el" href="structmanifold_1_1_rect.html">Rect</a>&#160;</td><td class="memItemRight"><a class="el" href="#ae69af2b193a98c4adc6f613a7463482c">Bounds</a> () const</td></tr>
 <tr class="memitem:ac84b151a969c68d662637e8245548666" id="r_ac84b151a969c68d662637e8245548666"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#ac84b151a969c68d662637e8245548666">Area</a> () const</td></tr>
-<tr class="memitem:ad0aca9cc3556131463233df83b7cf4aa" id="r_ad0aca9cc3556131463233df83b7cf4aa"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#ad0aca9cc3556131463233df83b7cf4aa">GetTolerance</a> () const</td></tr>
-<tr class="memitem:a99eed7ec04db59e8a0fa5c0c497cffbb" id="r_a99eed7ec04db59e8a0fa5c0c497cffbb"><td class="memItemLeft"><a class="el" href="#acbed403d82ee8d55f3be2c9a5f963ec0">CrossSection</a>&#160;</td><td class="memItemRight"><a class="el" href="#a99eed7ec04db59e8a0fa5c0c497cffbb">SetTolerance</a> (double tolerance) const</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-member-group" class="groupheader"><a id="member-group" name="member-group"></a>
 Transformation</h2></td></tr>
@@ -581,42 +579,6 @@ Convex Hull</h2></td></tr>
 
 </div>
 </div>
-<a id="ad0aca9cc3556131463233df83b7cf4aa" name="ad0aca9cc3556131463233df83b7cf4aa"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ad0aca9cc3556131463233df83b7cf4aa">&#9670;&#160;</a></span>GetTolerance()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">double GetTolerance </td>
-          <td>(</td>
-          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
-          <td> const</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-<p>Return the cross-section's tolerance: the propagated drift budget, analogous to <a class="el" href="classmanifold_1_1_manifold.html#ad0aca9cc3556131463233df83b7cf4aa">Manifold::GetTolerance</a>. </p>
-
-</div>
-</div>
-<a id="a99eed7ec04db59e8a0fa5c0c497cffbb" name="a99eed7ec04db59e8a0fa5c0c497cffbb"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a99eed7ec04db59e8a0fa5c0c497cffbb">&#9670;&#160;</a></span>SetTolerance()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="#acbed403d82ee8d55f3be2c9a5f963ec0">CrossSection</a> SetTolerance </td>
-          <td>(</td>
-          <td class="paramtype">double</td>          <td class="paramname"><span class="paramname"><em>tolerance</em></span></td><td>)</td>
-          <td> const</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-<p>Return a copy with the given tolerance. Raising it decimates the geometry to the new tolerance (via Simplify); lowering it floors at the geometry's epsilon. Mirrors <a class="el" href="classmanifold_1_1_manifold.html#a80cc9e5711781e87ab04f159f271e8bc">Manifold::SetTolerance</a>. </p>
-
-</div>
-</div>
 <a id="a38bcb89b28140acbceca56f0bbda67b9" name="a38bcb89b28140acbceca56f0bbda67b9"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a38bcb89b28140acbceca56f0bbda67b9">&#9670;&#160;</a></span>Translate()</h2>
 
@@ -803,7 +765,7 @@ Convex Hull</h2></td></tr>
 <p>It is recommended to apply this function following Offset, in order to clean up any spurious tiny line segments introduced that do not improve quality in any meaningful way. This is particularly important if further offseting operations are to be performed, which would compound the issue.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">tolerance</td><td>Default 0 uses the cross-section's own tolerance (from <a class="el" href="#ad0aca9cc3556131463233df83b7cf4aa">GetTolerance()</a>), which is geometry-scale-derived and may be larger than a fixed epsilon for large-coordinate geometry. Pass an explicit value to override. </td></tr>
+    <tr><td class="paramname">tolerance</td><td>Default 0 uses the cross-section's own tolerance, which is geometry-scale-derived and may be larger than a fixed epsilon for large-coordinate geometry. Pass an explicit value to override. </td></tr>
   </table>
   </dd>
 </dl>

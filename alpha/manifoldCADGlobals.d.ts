@@ -9,6 +9,8 @@
  */
 export declare type AnimationMode = 'loop' | 'ping-pong';
 
+export declare function getRelativePrecision(): number;
+
 /**
  * Reset the circular construction parameters to their defaults if
  * `setMinCircularAngle()`, `setMinCircularEdgeLength()`, or
@@ -67,5 +69,7 @@ export declare function setMinCircularAngle(angle: number): void;
  * increase if the the segments hit the minimum angle. Default is 1.0.
  */
 export declare function setMinCircularEdgeLength(length: number): void;
+
+export declare function setRelativePrecision(precision: number): void;
 
 export { }

@@ -17,8 +17,6 @@ var classmanifold_1_1_cross_section =
     [ "NumContour", "classmanifold_1_1_cross_section.html#a87c531d99cd313aeb513cd8cfee1641c", null ],
     [ "Bounds", "classmanifold_1_1_cross_section.html#ae69af2b193a98c4adc6f613a7463482c", null ],
     [ "Area", "classmanifold_1_1_cross_section.html#ac84b151a969c68d662637e8245548666", null ],
-    [ "GetTolerance", "classmanifold_1_1_cross_section.html#ad0aca9cc3556131463233df83b7cf4aa", null ],
-    [ "SetTolerance", "classmanifold_1_1_cross_section.html#a99eed7ec04db59e8a0fa5c0c497cffbb", null ],
     [ "Translate", "classmanifold_1_1_cross_section.html#a38bcb89b28140acbceca56f0bbda67b9", null ],
     [ "Rotate", "classmanifold_1_1_cross_section.html#a794f36c935736ecf71806fb3ccd46956", null ],
     [ "Scale", "classmanifold_1_1_cross_section.html#ad0f8a0ea9c4e2394bc4808dfb7ae1c69", null ],

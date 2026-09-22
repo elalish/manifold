@@ -246,8 +246,6 @@ export declare class CrossSection {
      * @group Transformations
      */
     simplify(tolerance?: number): CrossSection;
-    tolerance(): number;
-    setTolerance(tolerance: number): CrossSection;
 
     // Clipping Operations
 
@@ -1309,24 +1307,6 @@ export declare class Manifold {
      * @group Information
      */
     boundingBox(): Box;
-
-    /**
-     * Returns the tolerance of this Manifold's vertices, which tracks the
-     * approximate rounding error over all the transforms and operations that have
-     * led to this state. Any triangles that are colinear within this tolerance
-     * are considered degenerate and removed. This is the value of &epsilon;
-     * defining
-     * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
-     * @group Information
-     */
-    tolerance(): number;
-
-    /**
-     * Return a copy of the manifold with the set tolerance value.
-     * This performs mesh simplification when the tolerance value is increased.
-     * @group Transformations
-     */
-    setTolerance(tolerance: number): Manifold;
 
     /**
      * Return a copy of the manifold simplified to the given tolerance, but with

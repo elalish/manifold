@@ -112,9 +112,12 @@ document.addEventListener('DOMContentLoaded',() => { initNavTree('classmanifold_
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-pub-static-methods" class="groupheader"><a id="pub-static-methods" name="pub-static-methods"></a>
 Static Public Member Functions</h2></td></tr>
+<tr class="memitem:a0b788f3338b1e3a4728dc61e3b00c583" id="r_a0b788f3338b1e3a4728dc61e3b00c583"><td class="memItemLeft">static void&#160;</td><td class="memItemRight"><a class="el" href="#a0b788f3338b1e3a4728dc61e3b00c583">SetRelativePrecision</a> (double p)</td></tr>
 <tr class="memitem:a0c2040a91412e38387568d9886dc0a0d" id="r_a0c2040a91412e38387568d9886dc0a0d"><td class="memItemLeft">static void&#160;</td><td class="memItemRight"><a class="el" href="#a0c2040a91412e38387568d9886dc0a0d">SetMinCircularAngle</a> (double angle)</td></tr>
 <tr class="memitem:a83bab95001e6106324ec1da89b916518" id="r_a83bab95001e6106324ec1da89b916518"><td class="memItemLeft">static void&#160;</td><td class="memItemRight"><a class="el" href="#a83bab95001e6106324ec1da89b916518">SetMinCircularEdgeLength</a> (double length)</td></tr>
 <tr class="memitem:a6333f6c738389041fd0fe9ac6575dc3e" id="r_a6333f6c738389041fd0fe9ac6575dc3e"><td class="memItemLeft">static void&#160;</td><td class="memItemRight"><a class="el" href="#a6333f6c738389041fd0fe9ac6575dc3e">SetCircularSegments</a> (int number)</td></tr>
+<tr class="memitem:ad8d080345133353602c84c04ba69b1ba" id="r_ad8d080345133353602c84c04ba69b1ba"><td class="memItemLeft"><a id="ad8d080345133353602c84c04ba69b1ba" name="ad8d080345133353602c84c04ba69b1ba"></a>
+static double&#160;</td><td class="memItemRight"><b>GetRelativePrecision</b> ()</td></tr>
 <tr class="memitem:a76616b17d51c30b88fabe3d66cdb2aa1" id="r_a76616b17d51c30b88fabe3d66cdb2aa1"><td class="memItemLeft">static int&#160;</td><td class="memItemRight"><a class="el" href="#a76616b17d51c30b88fabe3d66cdb2aa1">GetCircularSegments</a> (double radius)</td></tr>
 <tr class="memitem:a44e4d5610bee38664e43a437892aa0c0" id="r_a44e4d5610bee38664e43a437892aa0c0"><td class="memItemLeft">static void&#160;</td><td class="memItemRight"><a class="el" href="#a44e4d5610bee38664e43a437892aa0c0">ResetToDefaults</a> ()</td></tr>
 </table>
@@ -122,6 +125,38 @@ Static Public Member Functions</h2></td></tr>
 <div class="textblock"><p>These static properties control how circular shapes are quantized by default on construction. </p>
 <p>If circularSegments is specified, it takes precedence. If it is zero, then instead the minimum is used of the segments calculated based on edge length and angle, rounded up to the nearest multiple of four. To get numbers not divisible by four, circularSegments must be specified. </p>
 </div><a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
+<a id="a0b788f3338b1e3a4728dc61e3b00c583" name="a0b788f3338b1e3a4728dc61e3b00c583"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0b788f3338b1e3a4728dc61e3b00c583">&#9670;&#160;</a></span>SetRelativePrecision()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void SetRelativePrecision </td>
+          <td>(</td>
+          <td class="paramtype">double</td>          <td class="paramname"><span class="paramname"><em>p</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Sets the relative precision for geometric computations, defining what counts as coplanar or degenerate, and therefore how much simplification can occur.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">p</td><td>The relative precision value. The default is 1e-12 for double precision, and smaller values will be clamped to this minimum. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
 <a id="a0c2040a91412e38387568d9886dc0a0d" name="a0c2040a91412e38387568d9886dc0a0d"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#a0c2040a91412e38387568d9886dc0a0d">&#9670;&#160;</a></span>SetMinCircularAngle()</h2>
 

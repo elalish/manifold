@@ -7,7 +7,7 @@ var searchData=
   ['setmincircularangle_4',['SetMinCircularAngle',['../classmanifold_1_1_quality.html#a0c2040a91412e38387568d9886dc0a0d',1,'manifold::Quality']]],
   ['setmincircularedgelength_5',['SetMinCircularEdgeLength',['../classmanifold_1_1_quality.html#a83bab95001e6106324ec1da89b916518',1,'manifold::Quality']]],
   ['setproperties_6',['SetProperties',['../classmanifold_1_1_manifold.html#ab2942ad196fd238a45667fda1f33ec0e',1,'manifold::Manifold']]],
-  ['settolerance_7',['SetTolerance',['../classmanifold_1_1_manifold.html#a80cc9e5711781e87ab04f159f271e8bc',1,'manifold::Manifold::SetTolerance()'],['../classmanifold_1_1_cross_section.html#a99eed7ec04db59e8a0fa5c0c497cffbb',1,'manifold::CrossSection::SetTolerance()']]],
+  ['setrelativeprecision_7',['SetRelativePrecision',['../classmanifold_1_1_quality.html#a0b788f3338b1e3a4728dc61e3b00c583',1,'manifold::Quality']]],
   ['simplify_8',['Simplify',['../classmanifold_1_1_manifold.html#ae1d9b86f7268b531161eb7d510ed90a7',1,'manifold::Manifold::Simplify()'],['../classmanifold_1_1_cross_section.html#aa98324971640547bf6f056c0ae1c4909',1,'manifold::CrossSection::Simplify()']]],
   ['sind_9',['sind',['../group___scalar.html#gacbb1fe7fd1a4e41a0754ed80abaa593d',1,'manifold']]],
   ['size_10',['Size',['../structmanifold_1_1_box.html#abfdbdbb0e4c3b36182fa38bf8ae34eb6',1,'manifold::Box::Size()'],['../structmanifold_1_1_rect.html#a6eea4bf264c80146b7f56fa78b97b218',1,'manifold::Rect::Size()']]],

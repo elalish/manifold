@@ -25,7 +25,7 @@ var searchData=
   ['setmincircularangle_22',['SetMinCircularAngle',['../classmanifold_1_1_quality.html#a0c2040a91412e38387568d9886dc0a0d',1,'manifold::Quality']]],
   ['setmincircularedgelength_23',['SetMinCircularEdgeLength',['../classmanifold_1_1_quality.html#a83bab95001e6106324ec1da89b916518',1,'manifold::Quality']]],
   ['setproperties_24',['SetProperties',['../classmanifold_1_1_manifold.html#ab2942ad196fd238a45667fda1f33ec0e',1,'manifold::Manifold']]],
-  ['settolerance_25',['SetTolerance',['../classmanifold_1_1_manifold.html#a80cc9e5711781e87ab04f159f271e8bc',1,'manifold::Manifold::SetTolerance()'],['../classmanifold_1_1_cross_section.html#a99eed7ec04db59e8a0fa5c0c497cffbb',1,'manifold::CrossSection::SetTolerance()']]],
+  ['setrelativeprecision_25',['SetRelativePrecision',['../classmanifold_1_1_quality.html#a0b788f3338b1e3a4728dc61e3b00c583',1,'manifold::Quality']]],
   ['shenanigans_26',['Windows Shenanigans',['../index.html#autotoc_md13',1,'']]],
   ['simplepolygon_27',['SimplePolygon',['../group___structs.html#gac63dd7235f7caf5698ab44acb83ba362',1,'manifold']]],
   ['simplepolygonidx_28',['SimplePolygonIdx',['../group___structs.html#gae59111461370c22408ad3690c1844555',1,'manifold']]],

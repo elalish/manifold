@@ -59,6 +59,7 @@ var group___structs =
       [ "Transform", "structmanifold_1_1_rect.html#a9e0b6af248c25d0154dbf0d0b1cddb1c", null ]
     ] ],
     [ "Quality", "classmanifold_1_1_quality.html", [
+      [ "SetRelativePrecision", "classmanifold_1_1_quality.html#a0b788f3338b1e3a4728dc61e3b00c583", null ],
       [ "SetMinCircularAngle", "classmanifold_1_1_quality.html#a0c2040a91412e38387568d9886dc0a0d", null ],
       [ "SetMinCircularEdgeLength", "classmanifold_1_1_quality.html#a83bab95001e6106324ec1da89b916518", null ],
       [ "SetCircularSegments", "classmanifold_1_1_quality.html#a6333f6c738389041fd0fe9ac6575dc3e", null ],

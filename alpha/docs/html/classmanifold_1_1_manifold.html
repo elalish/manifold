@@ -197,7 +197,6 @@ Information</h2></td></tr>
 <tr class="memitem:a35df8a9a52cf7dbd13265446d5993db9" id="r_a35df8a9a52cf7dbd13265446d5993db9"><td class="memItemLeft">size_t&#160;</td><td class="memItemRight"><a class="el" href="#a35df8a9a52cf7dbd13265446d5993db9">NumPropVert</a> () const</td></tr>
 <tr class="memitem:a3d711d458596b520edd4cd7948a53e67" id="r_a3d711d458596b520edd4cd7948a53e67"><td class="memItemLeft"><a class="el" href="structmanifold_1_1_box.html">Box</a>&#160;</td><td class="memItemRight"><a class="el" href="#a3d711d458596b520edd4cd7948a53e67">BoundingBox</a> () const</td></tr>
 <tr class="memitem:a4b1e9ca27fc618965d0bbbc9d29fb5c1" id="r_a4b1e9ca27fc618965d0bbbc9d29fb5c1"><td class="memItemLeft">int&#160;</td><td class="memItemRight"><a class="el" href="#a4b1e9ca27fc618965d0bbbc9d29fb5c1">Genus</a> () const</td></tr>
-<tr class="memitem:ad0aca9cc3556131463233df83b7cf4aa" id="r_ad0aca9cc3556131463233df83b7cf4aa"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#ad0aca9cc3556131463233df83b7cf4aa">GetTolerance</a> () const</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-member-group" class="groupheader"><a id="member-group" name="member-group"></a>
 Measurement</h2></td></tr>
@@ -224,7 +223,6 @@ Transformations</h2></td></tr>
 <tr class="memitem:a69976677a7a332a1ad69c3fcf216e2bf" id="r_a69976677a7a332a1ad69c3fcf216e2bf"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a69976677a7a332a1ad69c3fcf216e2bf">Transform</a> (const mat3x4 &amp;) const</td></tr>
 <tr class="memitem:a5366f7082adcbb2be63fcf2b4c57eb51" id="r_a5366f7082adcbb2be63fcf2b4c57eb51"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a5366f7082adcbb2be63fcf2b4c57eb51">Warp</a> (std::function&lt; void(vec3 &amp;)&gt;) const</td></tr>
 <tr class="memitem:a7825d52e3102cc6e7d48a19f9ea0b468" id="r_a7825d52e3102cc6e7d48a19f9ea0b468"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a7825d52e3102cc6e7d48a19f9ea0b468">WarpBatch</a> (std::function&lt; void(<a class="el" href="classmanifold_1_1_vec_view.html">VecView</a>&lt; vec3 &gt;)&gt;) const</td></tr>
-<tr class="memitem:a80cc9e5711781e87ab04f159f271e8bc" id="r_a80cc9e5711781e87ab04f159f271e8bc"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a80cc9e5711781e87ab04f159f271e8bc">SetTolerance</a> (double) const</td></tr>
 <tr class="memitem:ae1d9b86f7268b531161eb7d510ed90a7" id="r_ae1d9b86f7268b531161eb7d510ed90a7"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#ae1d9b86f7268b531161eb7d510ed90a7">Simplify</a> (double tolerance=0) const</td></tr>
 <tr class="memitem:a10c9279f88f8ef7a396a04baad480076" id="r_a10c9279f88f8ef7a396a04baad480076"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a10c9279f88f8ef7a396a04baad480076">RemoveDegenerates</a> () const</td></tr>
 </table><table class="memberdecls">
@@ -284,8 +282,8 @@ I/O</h2></td></tr>
 <div class="line">  }</div>
 <div class="line">  ifile.close();</div>
 <div class="line">}</div>
-<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:303</div></div>
-<div class="ttc" id="aclassmanifold_1_1_manifold_html_ad5f60691d05e3402630122740cdf3a0b"><div class="ttname"><a href="#ad5f60691d05e3402630122740cdf3a0b">manifold::Manifold::Manifold</a></div><div class="ttdeci">Manifold()</div><div class="ttdef"><b>Definition</b> manifold.cpp:124</div></div>
+<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:318</div></div>
+<div class="ttc" id="aclassmanifold_1_1_manifold_html_ad5f60691d05e3402630122740cdf3a0b"><div class="ttname"><a href="#ad5f60691d05e3402630122740cdf3a0b">manifold::Manifold::Manifold</a></div><div class="ttdeci">Manifold()</div><div class="ttdef"><b>Definition</b> manifold.cpp:139</div></div>
 </div><!-- fragment --><p>Writing: </p><div class="fragment"><div class="line">std::ofstream ofile;</div>
 <div class="line">ofile.open(filename);</div>
 <div class="line"><span class="keywordflow">if</span> (ofile.is_open()) {</div>
@@ -867,7 +865,7 @@ Testing Hooks</h2></td></tr>
       </table>
 </div><div class="memdoc">
 <p>Returns a copy of this <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with the given <a class="el" href="classmanifold_1_1_execution_context.html" title="Observe and control a long-running Manifold evaluation.">ExecutionContext</a> attached. The attachment is consumed only by <span class="tt"><a class="el" href="#a423e2f2a67ccc0662a97e018b2c3886d">Status()</a></span> (for deferred CSG trees) and the eager ops (<span class="tt"><a class="el" href="#a5d9227a2d10d8ad7b005555213ecd1ac">Refine</a></span> / <span class="tt"><a class="el" href="#a1381728e52975862d954032f717106d5">RefineToLength</a></span> / <span class="tt"><a class="el" href="#a723efa99b25f74d4099f004a47313be1">RefineToTolerance</a></span>, <span class="tt"><a class="el" href="#a9dc9e00112e2b063cfa6fe8482b1afe8">Hull</a></span>, <span class="tt"><a class="el" href="#ae174a8240802779eca5a0416af7ea78b">MinkowskiSum</a></span> / <span class="tt"><a class="el" href="#a47715067c292eeaafdc48aab3a604829">MinkowskiDifference</a></span>); those snapshot the ctx and report progress / observe cancellation through it. Other queries that force evaluation (<span class="tt"><a class="el" href="#a678f606b1ff10c8959240d2985e022ad">Volume</a></span>, <span class="tt"><a class="el" href="#a70f13b1aa67f6face29ade0b74777ee5">GetMeshGL</a></span>, <span class="tt"><a class="el" href="#a3d711d458596b520edd4cd7948a53e67">BoundingBox</a></span>, etc.) do not currently observe attached ctx.</p>
-<p>Deferred ops (Boolean operators, Translate / Rotate / Scale / Transform / Mirror / Warp / SetTolerance / Simplify, BatchBoolean, the vector-of-Manifold Hull) ignore any attached ctx and produce a result with no attached ctx. Inputs are not mutated. The idiom for observing a deferred tree is therefore:</p>
+<p>Deferred ops (Boolean operators, Translate / Rotate / Scale / Transform / Mirror / Warp / Simplify, BatchBoolean, the vector-of-Manifold Hull) ignore any attached ctx and produce a result with no attached ctx. Inputs are not mutated. The idiom for observing a deferred tree is therefore:</p>
 <p>(a + b - c).WithContext(ctx).<a class="el" href="#a423e2f2a67ccc0662a97e018b2c3886d">Status()</a>;</p>
 <p>while the idiom for observing an eager op is:</p>
 <p>m.WithContext(ctx).Refine(n); m.WithContext(ctx).MinkowskiSum(other);</p>
@@ -1017,24 +1015,6 @@ Testing Hooks</h2></td></tr>
       </table>
 </div><div class="memdoc">
 <p>The genus is a topological property of the manifold, representing the number of "handles". A sphere is 0, torus 1, etc. It is only meaningful for a single mesh, so it is best to call <a class="el" href="#a7f20b130779680156ce0d28d91e5d106">Decompose()</a> first. </p>
-
-</div>
-</div>
-<a id="ad0aca9cc3556131463233df83b7cf4aa" name="ad0aca9cc3556131463233df83b7cf4aa"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ad0aca9cc3556131463233df83b7cf4aa">&#9670;&#160;</a></span>GetTolerance()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname">double GetTolerance </td>
-          <td>(</td>
-          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
-          <td> const</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-<p>Returns the tolerance value of this <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>. Triangles that are coplanar within tolerance tend to be merged and edges shorter than tolerance tend to be collapsed. </p>
 
 </div>
 </div>
@@ -1407,24 +1387,6 @@ Testing Hooks</h2></td></tr>
   </table>
   </dd>
 </dl>
-
-</div>
-</div>
-<a id="a80cc9e5711781e87ab04f159f271e8bc" name="a80cc9e5711781e87ab04f159f271e8bc"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a80cc9e5711781e87ab04f159f271e8bc">&#9670;&#160;</a></span>SetTolerance()</h2>
-
-<div class="memitem">
-<div class="memproto">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> SetTolerance </td>
-          <td>(</td>
-          <td class="paramtype">double</td>          <td class="paramname"><span class="paramname"><em>tolerance</em></span></td><td>)</td>
-          <td> const</td>
-        </tr>
-      </table>
-</div><div class="memdoc">
-<p>Return a copy of the manifold with the set tolerance value. This performs mesh simplification when the tolerance value is increased. </p>
 
 </div>
 </div>

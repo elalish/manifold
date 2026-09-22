@@ -13,8 +13,7 @@ var searchData=
   ['getter_3c_201_20_3e_10',['getter&lt; 1 &gt;',['../structlinalg_1_1detail_1_1getter_3_011_01_4.html',1,'linalg::detail']]],
   ['getter_3c_202_20_3e_11',['getter&lt; 2 &gt;',['../structlinalg_1_1detail_1_1getter_3_012_01_4.html',1,'linalg::detail']]],
   ['getter_3c_203_20_3e_12',['getter&lt; 3 &gt;',['../structlinalg_1_1detail_1_1getter_3_013_01_4.html',1,'linalg::detail']]],
-  ['gettolerance_13',['GetTolerance',['../classmanifold_1_1_manifold.html#ad0aca9cc3556131463233df83b7cf4aa',1,'manifold::Manifold::GetTolerance()'],['../classmanifold_1_1_cross_section.html#ad0aca9cc3556131463233df83b7cf4aa',1,'manifold::CrossSection::GetTolerance()']]],
-  ['gettriverts_14',['GetTriVerts',['../structmanifold_1_1_mesh_g_l_p.html#a0d413b0c710e37a4e5a9fbaebe74b93f',1,'manifold::MeshGLP']]],
-  ['getvertpos_15',['GetVertPos',['../structmanifold_1_1_mesh_g_l_p.html#ad7bfcdc27db8d7486f016bf63052625d',1,'manifold::MeshGLP']]],
-  ['gyroidmodule_16',['GyroidModule',['../group___samples.html#ga5141b952c15a0aa27af95791a65455d2',1,'manifold']]]
+  ['gettriverts_13',['GetTriVerts',['../structmanifold_1_1_mesh_g_l_p.html#a0d413b0c710e37a4e5a9fbaebe74b93f',1,'manifold::MeshGLP']]],
+  ['getvertpos_14',['GetVertPos',['../structmanifold_1_1_mesh_g_l_p.html#ad7bfcdc27db8d7486f016bf63052625d',1,'manifold::MeshGLP']]],
+  ['gyroidmodule_15',['GyroidModule',['../group___samples.html#ga5141b952c15a0aa27af95791a65455d2',1,'manifold']]]
 ];
