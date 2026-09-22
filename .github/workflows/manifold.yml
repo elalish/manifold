@@ -604,17 +604,17 @@ jobs:
     steps:
     - uses: actions/checkout@v6
     - name: Download Linux meshes
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: meshes-linux
         path: meshes/linux
     - name: Download macOS meshes
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: meshes-mac
         path: meshes/mac
     - name: Download Windows meshes
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: meshes-windows
         path: meshes/windows
