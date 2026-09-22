@@ -1550,9 +1550,6 @@ TEST(BooleanComplex, OffsetSelfIntersect) {
 }
 
 TEST(BooleanComplex, InfiniteRecursion) {
-  // ManifoldParamGuard guard;
-  // ManifoldParams().selfIntersectionChecks = true;
-  // manifold::ManifoldParams().verifyNoDegenerates = false;
   Manifold a = ReadTestOBJ("r1.obj");
   Manifold b = ReadTestOBJ("r2.obj");
   Manifold result = a ^ b;
