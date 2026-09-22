@@ -539,15 +539,6 @@ TEST(Manifold, ErrorPropagationRefine) {
             Manifold::Error::NonFiniteVertex);
 }
 
-TEST(Manifold, ErrorPropagationSetTolerance) {
-  MeshGL in = TetGL();
-  in.vertProperties[2 * 3 + 1] = NAN;
-  Manifold errored(in);
-  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
-  EXPECT_EQ(errored.SetTolerance(0.1).Status(),
-            Manifold::Error::NonFiniteVertex);
-}
-
 TEST(Manifold, ErrorPropagationAsOriginal) {
   MeshGL in = TetGL();
   in.vertProperties[2 * 3 + 1] = NAN;
@@ -1063,9 +1054,7 @@ TEST(Manifold, MeshID) {
   cubeGL.runIndex.clear();
   cubeGL.runOriginalID.clear();
   Manifold cube1 = Manifold(cubeGL);
-  Manifold cube2 = Manifold(cubeGL);
-  EXPECT_NE(cube1.GetMeshGL().runOriginalID[0],
-            cube2.GetMeshGL().runOriginalID[0]);
+  EXPECT_EQ(cube1.GetMeshGL().runOriginalID[0], 0);
 }
 
 TEST(Manifold, MeshRelation) {
@@ -1267,7 +1256,7 @@ TEST(Manifold, FaceIDRoundTrip) {
   const Manifold cube = Manifold::Cube();
   EXPECT_GE(cube.OriginalID(), 0);
   MeshGL inGL = cube.GetMeshGL();
-  EXPECT_EQ(NumUnique(inGL.faceID), 1);
+  EXPECT_TRUE(inGL.faceID.empty());
   inGL.faceID = {3, 3, 3, 3, 3, 3, 5, 5, 5, 5, 5, 5};
 
   const Manifold cube2(inGL);

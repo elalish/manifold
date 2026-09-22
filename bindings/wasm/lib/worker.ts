@@ -230,6 +230,7 @@ export async function evaluate(
     setCircularSegments: levelOfDetail.setCircularSegments,
     setMinCircularAngle: levelOfDetail.setMinCircularAngle,
     setMinCircularEdgeLength: levelOfDetail.setMinCircularEdgeLength,
+    setRelativePrecision: levelOfDetail.setRelativePrecision,
     resetToCircularDefaults: levelOfDetail.resetToCircularDefaults,
     setAnimationDuration: animation.setAnimationDuration,
     setAnimationFPS: animation.setAnimationFPS,

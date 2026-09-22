@@ -657,9 +657,11 @@ constexpr double DEFAULT_LENGTH = 1.0;
  */
 class Quality {
  public:
+  static void SetRelativePrecision(double p);
   static void SetMinCircularAngle(double angle);
   static void SetMinCircularEdgeLength(double length);
   static void SetCircularSegments(int number);
+  static double GetRelativePrecision();
   static int GetCircularSegments(double radius);
   static void ResetToDefaults();
 };

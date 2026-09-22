@@ -138,8 +138,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("numContour", &CrossSection::NumContour)
       .function("_Bounds", &CrossSection::Bounds)
       .function("_Simplify", &CrossSection::Simplify)
-      .function("tolerance", &CrossSection::GetTolerance)
-      .function("setTolerance", &CrossSection::SetTolerance)
       .function("_Offset", &cross_js::Offset)
       .function("_ToPolygons", &CrossSection::ToPolygons)
       .function("hull",
@@ -194,8 +192,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("numProp", &Manifold::NumProp)
       .function("numPropVert", &Manifold::NumPropVert)
       .function("_boundingBox", &Manifold::BoundingBox)
-      .function("tolerance", &Manifold::GetTolerance)
-      .function("setTolerance", &Manifold::SetTolerance)
       .function("_Simplify", &Manifold::Simplify)
       .function("genus", &Manifold::Genus)
       .function("volume", &Manifold::Volume)
@@ -229,6 +225,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
       select_overload<Manifold(const std::vector<vec3>&)>(&Manifold::Hull));
 
   // Quality Globals
+  function("setRelativePrecision", &Quality::SetRelativePrecision);
+  function("getRelativePrecision", &Quality::GetRelativePrecision);
   function("setMinCircularAngle", &Quality::SetMinCircularAngle);
   function("setMinCircularEdgeLength", &Quality::SetMinCircularEdgeLength);
   function("setCircularSegments", &Quality::SetCircularSegments);

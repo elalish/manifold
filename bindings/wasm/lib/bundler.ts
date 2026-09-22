@@ -110,13 +110,14 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       'importModel', 'importManifold',
       // Getters for global properties
       'getCircularSegments', 'getMinCircularAngle', 'getMinCircularEdgeLength',
-      'getAnimationDuration', 'getAnimationFPS', 'getAnimationMode',
+      'getRelativePrecision', 'getAnimationDuration', 'getAnimationFPS',
+      'getAnimationMode',
       // Setters for global properties.
       // These will only be defined for top level scripts
       'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-      'resetToCircularDefaults', 'setMorphStart', 'setMorphEnd',
-      'setAnimationDuration', 'setAnimationFPS', 'setAnimationMode',
-      'resetGLTFNodes',
+      'setRelativePrecision', 'resetToCircularDefaults', 'setMorphStart',
+      'setMorphEnd', 'setAnimationDuration', 'setAnimationFPS',
+      'setAnimationMode', 'resetGLTFNodes',
 
       // ManifoldCAD specific exports.
       'isManifoldCAD'

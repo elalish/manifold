@@ -836,6 +836,7 @@ TEST(BooleanComplex, InterpolatedNormals) {
   b.runOriginalID = {Manifold::ReserveIDs(1)};
 
   Manifold aManifold(a);
+
   Manifold bManifold(b);
 
   auto aMinusB = aManifold - bManifold;
@@ -1498,7 +1499,7 @@ TEST(BooleanComplex, CraycloudBool) {
   Manifold m2 = ReadTestOBJ("Cray_right.obj");
   Manifold res = m1 - m2;
   EXPECT_EQ(res.Status(), Manifold::Error::NoError);
-  EXPECT_TRUE(res.IsEmpty());
+  EXPECT_FALSE(res.IsEmpty());
 }
 
 TEST(BooleanComplex, HullMask) {

@@ -45,7 +45,7 @@ export {getAnimationDuration, getAnimationFPS, getAnimationMode, setAnimationDur
 export {only, show} from './debug.ts';
 export type {GLTFAttribute, GLTFMaterial} from './gltf-node.ts';
 export {GLTFNode} from './gltf-node.ts';
-export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength, resetToCircularDefaults, setCircularSegments, setMinCircularAngle, setMinCircularEdgeLength} from './level-of-detail.ts';
+export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength, getRelativePrecision, resetToCircularDefaults, setCircularSegments, setMinCircularAngle, setMinCircularEdgeLength, setRelativePrecision} from './level-of-detail.ts';
 export {setMaterial} from './material.ts';
 
 type Cacheable = Manifold|CrossSection;

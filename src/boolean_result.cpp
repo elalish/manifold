@@ -822,9 +822,6 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     return outR;
   }
 
-  outR.epsilon_ = std::max(inP_.epsilon_, inQ_.epsilon_);
-  outR.tolerance_ = std::max(inP_.tolerance_, inQ_.tolerance_);
-
   outR.vertPos_.resize_nofill(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].
   // Retained vertices from P and Q:
@@ -923,6 +920,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   vP2R.clear();
   vQ2R.clear();
 
+  outR.CalculateBBox();
+
   // Level 6
   outR.Face2Tri(faceEdge, faceHalfedges, halfedgeRef, /*allowConvex=*/false,
                 ctx_);
@@ -955,7 +954,6 @@ Manifold::Impl Boolean3::Result(OpType op) const {
                  "simplified mesh has degenerate triangles!");
   }
 
-  outR.CalculateBBox();
   outR.SortGeometry(ctx_);
   outR.IncrementMeshIDs();
   if (auto c = phase(__LINE__)) return *c;
