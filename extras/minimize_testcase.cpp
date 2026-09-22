@@ -31,7 +31,8 @@ inline bool intersect(vec2 p0, vec2 p1, vec2 q0, vec2 q1, double precision) {
   //
   // note that this does not correspond to a fixed angle,
   // but seems to work well enough
-  if (rxs < kPrecision && rxs > -kPrecision) {
+  if (rxs < Quality::GetRelativePrecision() &&
+      rxs > -Quality::GetRelativePrecision()) {
     return false;
   }
   double u = cross(q0 - p0, r) / rxs;

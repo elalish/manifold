@@ -238,6 +238,7 @@ TEST(Boolean, Simplify) {
   const int n = 10;
   MeshGL cubeGL = Manifold::Cube().Refine(n).GetMeshGL();
   // Give unique face IDs to stop edge removal
+  cubeGL.faceID.resize(cubeGL.NumTri());
   std::iota(cubeGL.faceID.begin(), cubeGL.faceID.end(), 0);
   Manifold cube(cubeGL);
 
@@ -251,8 +252,8 @@ TEST(Boolean, Simplify) {
   resultGL.faceID.clear();
   Manifold result2(resultGL);
   EXPECT_EQ(result2.NumTri(), nStarting);
-  EXPECT_EQ(result2.RemoveDegenerates().NumTri(), 42);
-  EXPECT_EQ(result2.Simplify().NumTri(), 20);
+  EXPECT_EQ(result2.RemoveDegenerates().NumTri(), 36);
+  EXPECT_EQ(result2.Simplify().NumTri(), 12);
 }
 
 TEST(Boolean, SimplifyCracks) {
@@ -834,7 +835,7 @@ TEST(Boolean, Precision) {
   Manifold cube2 = cube;
   Manifold cube3 = cube;
   double distance = 100;
-  double scale = distance * kPrecision;
+  double scale = distance * Quality::GetRelativePrecision();
   cube2 = cube2.Scale(vec3(scale)).Translate({distance, 0, 0});
 
   cube += cube2;
@@ -850,14 +851,29 @@ TEST(Boolean, Precision) {
 TEST(Boolean, Precision2) {
   double scale = 1000;
   Manifold cube = Manifold::Cube(vec3(scale));
-  Manifold cube2 = cube;
-  double distance = scale * (1 - kPrecision / 2);
+  double distance = scale - Quality::GetRelativePrecision() / 2;
 
-  cube2 = cube2.Translate(vec3(-distance));
-  EXPECT_TRUE((cube ^ cube2).IsEmpty());
+  EXPECT_FALSE((cube ^ cube.Translate(vec3(-distance))).IsEmpty());
+  EXPECT_TRUE((cube ^ cube.Translate(vec3(distance))).IsEmpty());
+}
 
-  cube2 = cube2.Translate(vec3(scale * kPrecision));
-  EXPECT_FALSE((cube ^ cube2).IsEmpty());
+TEST(Boolean, Precision3) {
+  Manifold cube1 = Manifold::Cube().Rotate(45);
+  Manifold cube2 = Manifold::Cube().Translate({0, 0.5, 0}).Rotate(45);
+  Manifold result = cube1 + cube2;
+  ExpectMeshes(result, {{8, 12}});
+  // Double precision round-trips through MeshGL64
+  Manifold result2 =
+      Manifold(cube1.GetMeshGL64()) + Manifold(cube2.GetMeshGL64());
+  EXPECT_EQ(result2.NumTri(), result.NumTri());
+  // MeshGL rounds to single precision, so the results are no longer coplanar.
+  Manifold result3 = Manifold(cube1.GetMeshGL()) + Manifold(cube2.GetMeshGL());
+  EXPECT_GT(result3.NumTri(), result.NumTri());
+  // Setting the precision to reflect this makes the faces coplanar again.
+  Quality::SetRelativePrecision(1e-7);
+  Manifold result4 = Manifold(cube1.GetMeshGL()) + Manifold(cube2.GetMeshGL());
+  EXPECT_EQ(result4.NumTri(), result.NumTri());
+  Quality::ResetToDefaults();
 }
 
 TEST(Boolean, SimpleCubeRegression) {

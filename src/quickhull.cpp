@@ -849,7 +849,6 @@ void Manifold::Impl::Hull(VecView<const vec3> vertPos,
     return;
   }
   CalculateBBox();
-  SetEpsilon();
   InitializeOriginal();
   SetFaceAndVertNormals();
   RemoveDegenerates();

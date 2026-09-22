@@ -24,7 +24,7 @@ using namespace manifold;
 // ref and altIn.
 vec3 OrthogonalTo(vec3 in, vec3 altIn, vec3 ref) {
   vec3 out = in - la::dot(in, ref) * ref;
-  if (la::dot(out, out) < kPrecision * la::dot(in, in)) {
+  if (la::dot(out, out) < Quality::GetRelativePrecision() * la::dot(in, in)) {
     out = altIn - la::dot(altIn, ref) * ref;
   }
   return SafeNormalize(out);

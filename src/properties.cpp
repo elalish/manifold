@@ -195,7 +195,8 @@ bool Manifold::Impl::IsSelfIntersecting() const {
  */
 bool Manifold::Impl::MatchesTriNormals() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
-  return all_of(countAt(0_uz), countAt(NumTri()), [this](size_t face) {
+  const double tol = 1000 * epsilon_;
+  return all_of(countAt(0_uz), countAt(NumTri()), [&](size_t face) {
     if (halfedge_.Pair(3 * face) < 0) return true;
 
     const mat2x3 projection = GetAxisAlignedProjection(faceNormal_[face]);
@@ -210,15 +211,15 @@ bool Manifold::Impl::MatchesTriNormals() const {
       max = std::max(max, d);
       min = std::min(min, d);
     }
-    if (max - min > 2 * tolerance_) return false;
+    if (max - min > tol) return false;
 
-    const int ccw = CCW(v[0], v[1], v[2], epsilon_ * 2);
+    const int ccw = CCW(v[0], v[1], v[2], tol);
     return ccw >= 0;
   });
 }
 
 /**
- * Returns the number of triangles that are colinear within tolerance_.
+ * Returns the number of triangles that are colinear.
  */
 int Manifold::Impl::NumDegenerateTris() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return 0;
@@ -404,6 +405,7 @@ void Manifold::Impl::CalculateBBox() {
     // Decimated out of existence - early out.
     MakeEmpty(Error::NoError);
   }
+  epsilon_ = Quality::GetRelativePrecision() * bBox_.Scale();
 }
 
 /**

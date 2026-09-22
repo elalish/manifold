@@ -122,7 +122,6 @@ Manifold::Impl::Impl(Shape shape, const mat3x4 m) {
   for (auto& v : vertPos_) v = m * vec4(v, 1.0);
   CreateHalfedges(triVerts);
   CalculateBBox();
-  SetEpsilon();
   SortGeometry();
   SetFaceAndVertNormals();
   InitializeOriginal();
@@ -532,7 +531,6 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
     MakeEmpty(Error::NonFiniteVertex);
     return;
   }
-  SetEpsilon();
   SortGeometry();
   SetFaceAndVertNormals();
   meshRelation_.originalID = -1;
@@ -552,8 +550,6 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
     return result;
   }
   result.meshRelation_ = meshRelation_;
-  result.epsilon_ = epsilon_;
-  result.tolerance_ = tolerance_;
   result.numProp_ = numProp_;
   result.properties_ = properties_;
   result.bBox_ = bBox_;
@@ -597,10 +593,6 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   }
 
   result.CalculateBBox();
-  // Scale epsilon by the norm of the 3x3 portion of the transform.
-  result.epsilon_ *= SpectralNorm(mat3(transform_));
-  // Maximum of inherited epsilon loss and translational epsilon loss.
-  result.SetEpsilon(result.epsilon_);
 
   if (!result.IsEmpty()) {
     if (Collider::IsAxisAligned(transform_)) {
@@ -615,19 +607,6 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
     }
   }
   return result;
-}
-
-/**
- * Sets epsilon based on the bounding box, and limits its minimum value
- * by the optional input.
- */
-void Manifold::Impl::SetEpsilon(double minEpsilon, bool useSingle) {
-  epsilon_ = MaxEpsilon(minEpsilon, bBox_);
-  double minTol = epsilon_;
-  if (useSingle)
-    minTol =
-        std::max(minTol, std::numeric_limits<float>::epsilon() * bBox_.Scale());
-  tolerance_ = std::max(tolerance_, minTol);
 }
 
 /**
@@ -844,7 +823,6 @@ Manifold Manifold::ReadOBJ(std::istream& stream) {
   if (!stream.good()) return Invalid();
   auto [mesh, epsilon] = ReadOBJWithEpsilon(stream);
   auto impl = std::make_shared<Impl>(mesh);
-  if (epsilon) impl->SetEpsilon(epsilon.value());
   return Manifold(impl);
 }
 

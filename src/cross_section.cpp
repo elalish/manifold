@@ -204,7 +204,6 @@ CrossSection::CrossSection(CrossSection&& other) noexcept {
   std::lock_guard<std::mutex> lock(other.pathsMutex_);
   paths_ = std::move(other.paths_);
   transform_ = other.transform_;
-  tolerance_ = other.tolerance_;
 }
 
 CrossSection& CrossSection::operator=(CrossSection&& other) noexcept {
@@ -212,7 +211,6 @@ CrossSection& CrossSection::operator=(CrossSection&& other) noexcept {
   std::scoped_lock lock(pathsMutex_, other.pathsMutex_);
   paths_ = std::move(other.paths_);
   transform_ = other.transform_;
-  tolerance_ = other.tolerance_;
   return *this;
 }
 
@@ -227,7 +225,6 @@ CrossSection::CrossSection(const CrossSection& other) {
   std::lock_guard<std::mutex> lock(other.pathsMutex_);
   paths_ = other.paths_;
   transform_ = other.transform_;
-  tolerance_ = other.tolerance_;
 }
 
 CrossSection& CrossSection::operator=(const CrossSection& other) {
@@ -235,7 +232,6 @@ CrossSection& CrossSection::operator=(const CrossSection& other) {
   std::scoped_lock lock(pathsMutex_, other.pathsMutex_);
   paths_ = other.paths_;
   transform_ = other.transform_;
-  tolerance_ = other.tolerance_;
   return *this;
 }
 
@@ -262,8 +258,8 @@ CrossSection::CrossSection(const SimplePolygon& contour)
  * polygons.
  */
 CrossSection::CrossSection(const Polygons& contours) {
-  tolerance_ = InferEps(contours, {});
-  paths_ = shared_paths(ApplyFillRule(contours, tolerance_, WindRule::Add));
+  const double eps = InferEps(contours, {});
+  paths_ = shared_paths(ApplyFillRule(contours, eps, WindRule::Add));
 }
 
 /**
@@ -298,10 +294,8 @@ CrossSection CrossSection::EvenOdd(const SimplePolygon& contour) {
  */
 CrossSection CrossSection::EvenOdd(const Polygons& contours) {
   const double eps = InferEps(contours, {});
-  CrossSection out(
+  return CrossSection(
       shared_paths(ApplyFillRule(contours, eps, WindRule::EvenOdd)));
-  out.tolerance_ = eps;
-  return out;
 }
 
 /**
@@ -318,21 +312,11 @@ CrossSection::CrossSection(const Rect& rect) {
                           {rect.max.x, rect.min.y},
                           {rect.max.x, rect.max.y},
                           {rect.min.x, rect.max.y}}});
-  tolerance_ = InferEps(paths_->paths_, {});
 }
 
 std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
   std::lock_guard<std::mutex> lock(pathsMutex_);
   if (transform_ == mat2x3(la::identity)) return paths_;
-  // Scale tolerance once from the composed transform, not per Transform call:
-  // spectral norm is sub-multiplicative, so per-step scaling would inflate it
-  // super-linearly under chained shears. Floor at the translated scale so large
-  // translations stay above post-materialization FP noise.
-  const double translationScale =
-      std::max(std::fabs(transform_[2][0]), std::fabs(transform_[2][1]));
-  tolerance_ =
-      std::max(SpectralNorm(mat2(transform_[0], transform_[1])) * tolerance_,
-               EpsilonFromScale(translationScale));
   paths_ = shared_paths(TransformPolygons(paths_->paths_, transform_));
   transform_ = mat2x3(la::identity);
   return paths_;
@@ -371,9 +355,7 @@ CrossSection CrossSection::Circle(double radius, int circularSegments) {
   for (int i = 0; i < n; ++i)
     circle[i] = {radius * cosd(dPhi * i), radius * sind(dPhi * i)};
   const double tol = InferEps({circle}, {});
-  CrossSection cs(shared_paths({std::move(circle)}));
-  cs.tolerance_ = tol;
-  return cs;
+  return CrossSection(shared_paths({std::move(circle)}));
 }
 
 /**
@@ -386,10 +368,7 @@ CrossSection CrossSection::Boolean(const CrossSection& second,
   const Polygons& a = GetPaths()->paths_;
   const Polygons& b = second.GetPaths()->paths_;
   const double eps = InferEps(a, b);
-  const double tolerance = std::max({tolerance_, second.tolerance_, eps});
-  CrossSection result(shared_paths(Boolean2D(a, b, op, eps)));
-  result.tolerance_ = tolerance;
-  return result;
+  return CrossSection(shared_paths(Boolean2D(a, b, op, eps)));
 }
 
 /**
@@ -403,34 +382,22 @@ CrossSection CrossSection::BatchBoolean(
 
   if (op == OpType::Intersect) {
     Polygons result = crossSections[0].GetPaths()->paths_;
-    double tol = crossSections[0].tolerance_;
     for (size_t i = 1; i < crossSections.size(); ++i) {
       const auto& clip = crossSections[i].GetPaths()->paths_;
       const double eps = InferEps(result, clip);
-      const double tolerance =
-          std::max({tol, crossSections[i].tolerance_, eps});
       result = Boolean2D(result, clip, OpType::Intersect, eps);
-      tol = tolerance;
     }
-    CrossSection out(shared_paths(std::move(result)));
-    out.tolerance_ = tol;
-    return out;
+    return CrossSection(shared_paths(std::move(result)));
   }
 
   Polygons clips;
-  double clipsTol = 0.0;
   for (size_t i = 1; i < crossSections.size(); ++i) {
     const auto& paths = crossSections[i].GetPaths()->paths_;
     clips.insert(clips.end(), paths.begin(), paths.end());
-    clipsTol = std::max(clipsTol, crossSections[i].tolerance_);
   }
   const auto& subject = crossSections[0].GetPaths()->paths_;
   const double eps = InferEps(subject, clips);
-  const double tolerance =
-      std::max({crossSections[0].tolerance_, clipsTol, eps});
-  CrossSection out(shared_paths(Boolean2D(subject, clips, op, eps)));
-  out.tolerance_ = tolerance;
-  return out;
+  return CrossSection(shared_paths(Boolean2D(subject, clips, op, eps)));
 }
 
 /**
@@ -494,9 +461,7 @@ std::vector<CrossSection> CrossSection::Decompose() const {
   std::vector<CrossSection> out;
   out.reserve(components.size());
   for (auto& component : components) {
-    CrossSection piece(shared_paths(std::move(component)));
-    piece.tolerance_ = tolerance_;
-    out.push_back(std::move(piece));
+    out.push_back(CrossSection(shared_paths(std::move(component))));
   }
   return out;
 }
@@ -559,15 +524,12 @@ CrossSection CrossSection::Mirror(const vec2 ax) const {
  * @param m The affine transform matrix to apply to all the vertices.
  */
 CrossSection CrossSection::Transform(const mat2x3& m) const {
-  // A non-finite transform is a no-op rather than poisoning coords/tolerance_.
+  // A non-finite transform is a no-op rather than poisoning coords.
   if (!AllFinite(m)) return *this;
   std::lock_guard<std::mutex> lock(pathsMutex_);
   CrossSection transformed;
   transformed.transform_ = m * Mat3(transform_);
   transformed.paths_ = paths_;
-  // Carry tolerance unscaled; GetPaths() scales it once from the composed
-  // transform at materialization.
-  transformed.tolerance_ = tolerance_;
   return transformed;
 }
 
@@ -605,13 +567,11 @@ CrossSection CrossSection::WarpBatch(
     for (auto& v : path) v = *point++;
   }
   // Warping can self-intersect the rings, so re-apply the fill rule at machine
-  // eps (not the drift tolerance - this is regularization, not decimation).
+  // eps. This regularization step does not carry a persistent tolerance state.
   const double eps = InferEps(paths, {});
   // Positive regardless of how this section was originally read: a CrossSection
   // carries no fill rule, and its stored geometry is already regularized.
-  CrossSection out(shared_paths(ApplyFillRule(paths, eps, WindRule::Add)));
-  out.tolerance_ = std::max(tolerance_, eps);
-  return out;
+  return CrossSection(shared_paths(ApplyFillRule(paths, eps, WindRule::Add)));
 }
 
 /**
@@ -626,10 +586,9 @@ CrossSection CrossSection::WarpBatch(
  * quality in any meaningful way. This is particularly important if further
  * offseting operations are to be performed, which would compound the issue.
  *
- * @param tolerance Default 0 uses the cross-section's own tolerance (from
- * GetTolerance()), which is geometry-scale-derived and may be larger than a
- * fixed epsilon for large-coordinate geometry. Pass an explicit value to
- * override.
+ * @param tolerance Default 0 uses the cross-section's own tolerance, which is
+ * geometry-scale-derived and may be larger than a fixed epsilon for
+ * large-coordinate geometry. Pass an explicit value to override.
  */
 CrossSection CrossSection::Simplify(double tolerance) const {
   // Stored paths are already fill-rule-regularized, so Simplify only decimates:
@@ -638,7 +597,7 @@ CrossSection CrossSection::Simplify(double tolerance) const {
   // clipper2, the result is NOT re-regularized - a coarse tolerance can
   // self-intersect a ring, so healing is left to a later boolean. Tolerance 0
   // decimates at the cross-section's own tolerance, matching Manifold.
-  if (tolerance == 0) tolerance = tolerance_;
+  tolerance = std::max(tolerance, InferEps(GetPaths()->paths_, {}));
   const Polygons& paths = GetPaths()->paths_;
   const Polygons filtered = FilterSmallContours(paths, tolerance);
   Polygons out;
@@ -647,27 +606,7 @@ CrossSection CrossSection::Simplify(double tolerance) const {
     SimplePolygon simplified = SimplifyRing(ring, tolerance);
     if (simplified.size() >= 3) out.push_back(std::move(simplified));
   }
-  CrossSection result(shared_paths(std::move(out)));
-  result.tolerance_ = std::max(tolerance_, tolerance);
-  return result;
-}
-
-/**
- * Return the cross-section's tolerance: the propagated drift budget, analogous
- * to Manifold::GetTolerance.
- */
-double CrossSection::GetTolerance() const { return tolerance_; }
-
-/**
- * Return a copy with the given tolerance. Raising it decimates the geometry to
- * the new tolerance (via Simplify); lowering it floors at the geometry's
- * epsilon. Mirrors Manifold::SetTolerance.
- */
-CrossSection CrossSection::SetTolerance(double tolerance) const {
-  if (tolerance > tolerance_) return Simplify(tolerance);
-  CrossSection out = *this;
-  out.tolerance_ = std::max(InferEps(GetPaths()->paths_, {}), tolerance);
-  return out;
+  return CrossSection(shared_paths(std::move(out)));
 }
 
 /**
@@ -697,12 +636,7 @@ CrossSection CrossSection::Offset(double delta, JoinType jointype,
   // hides the namespace-scope polygon offset.
   Polygons offset = manifold::Offset(GetPaths()->paths_, delta, jointype,
                                      miterLimit, circularSegments);
-  CrossSection out(shared_paths(std::move(offset)));
-  // Round-join faceting (circularSegments) is a quality choice, not a drift
-  // budget, so it is not folded into tolerance_ - doing so would over-merge
-  // features downstream. Max, not sum, keeps chained Offset bounded.
-  out.tolerance_ = std::max(tolerance_, InferEps(out.GetPaths()->paths_, {}));
-  return out;
+  return CrossSection(shared_paths(std::move(offset)));
 }
 
 /**
@@ -714,10 +648,8 @@ CrossSection CrossSection::Offset(double delta, JoinType jointype,
 CrossSection CrossSection::Hull(
     const std::vector<CrossSection>& crossSections) {
   size_t numPoints = 0;
-  double maxTol = 0.0;
   for (const auto& cs : crossSections) {
     numPoints += cs.NumVert();
-    maxTol = std::max(maxTol, cs.tolerance_);
   }
 
   SimplePolygon points;
@@ -730,9 +662,7 @@ CrossSection CrossSection::Hull(
 
   SimplePolygon hull = HullImpl(points);
   if (hull.size() < 3) return CrossSection();
-  CrossSection out(shared_paths({std::move(hull)}));
-  out.tolerance_ = std::max(maxTol, InferEps(out.GetPaths()->paths_, {}));
-  return out;
+  return CrossSection(shared_paths({std::move(hull)}));
 }
 
 /**
@@ -751,10 +681,7 @@ CrossSection CrossSection::Hull(const SimplePolygon& pts) {
   SimplePolygon points = pts;  // HullImpl sorts in place
   SimplePolygon hull = HullImpl(points);
   if (hull.size() < 3) return CrossSection();
-  Polygons inputForEps{points};
-  CrossSection out(shared_paths({std::move(hull)}));
-  out.tolerance_ = InferEps(inputForEps, {});
-  return out;
+  return CrossSection(shared_paths({std::move(hull)}));
 }
 
 /**

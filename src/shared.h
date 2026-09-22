@@ -25,11 +25,6 @@ inline vec3 SafeNormalize(vec3 v) {
   return std::isfinite(v.x) ? v : vec3(0.0);
 }
 
-inline double MaxEpsilon(double minEpsilon, const Box& bBox) {
-  double epsilon = std::max(minEpsilon, kPrecision * bBox.Scale());
-  return std::isfinite(epsilon) ? epsilon : -1;
-}
-
 inline int NextHalfedge(int current) {
   current += current % 3 == 2 ? -2 : 1;
   return current;

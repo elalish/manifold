@@ -41,9 +41,23 @@ Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
 
 namespace manifold {
 
-static int circularSegments_ = DEFAULT_SEGMENTS;
-static double circularAngle_ = DEFAULT_ANGLE;
-static double circularEdgeLength_ = DEFAULT_LENGTH;
+static std::atomic<double> relativePrecision_ = kPrecision;
+static std::atomic<int> circularSegments_ = DEFAULT_SEGMENTS;
+static std::atomic<double> circularAngle_ = DEFAULT_ANGLE;
+static std::atomic<double> circularEdgeLength_ = DEFAULT_LENGTH;
+
+/**
+ * Sets the relative precision for geometric computations, defining what counts
+ * as coplanar or degenerate, and therefore how much simplification can occur.
+ *
+ * @param p The relative precision value. The default is 1e-12 for double
+ * precision, and smaller values will be clamped to this minimum.
+ */
+void Quality::SetRelativePrecision(double p) {
+  relativePrecision_ = std::max(p, kPrecision);
+}
+
+double Quality::GetRelativePrecision() { return relativePrecision_; }
 
 /**
  * Sets an angle constraint the default number of circular segments for the
@@ -112,6 +126,7 @@ int Quality::GetCircularSegments(double radius) {
  * been called.
  */
 void Quality::ResetToDefaults() {
+  relativePrecision_ = kPrecision;
   circularSegments_ = DEFAULT_SEGMENTS;
   circularAngle_ = DEFAULT_ANGLE;
   circularEdgeLength_ = DEFAULT_LENGTH;
@@ -355,37 +370,6 @@ double Manifold::GetEpsilon() const {
 }
 
 /**
- * Returns the tolerance value of this Manifold. Triangles that are coplanar
- * within tolerance tend to be merged and edges shorter than tolerance tend to
- * be collapsed.
- */
-double Manifold::GetTolerance() const {
-  return GetCsgLeafNode().GetImpl()->tolerance_;
-}
-
-/**
- * Return a copy of the manifold with the set tolerance value.
- * This performs mesh simplification when the tolerance value is increased.
- */
-Manifold Manifold::SetTolerance(double tolerance) const {
-  auto leafImpl = GetCsgLeafNode().GetImpl();
-  if (leafImpl->status_ != Error::NoError)
-    return PropagateStatus(leafImpl->status_);
-  auto impl = std::make_shared<Impl>(*leafImpl);
-  if (tolerance > impl->tolerance_) {
-    impl->tolerance_ = tolerance;
-    impl->SetFaceAndVertNormals();
-    impl->Decimate();
-    impl->SortGeometry();
-  } else {
-    // for reducing tolerance, we need to make sure it is still at least
-    // equal to epsilon.
-    impl->tolerance_ = std::max(impl->epsilon_, tolerance);
-  }
-  return Manifold(impl);
-}
-
-/**
  * Return a copy of the manifold simplified to the given tolerance, but with its
  * actual tolerance value unchanged. If the tolerance is not given or is less
  * than the current tolerance, the current tolerance is used for simplification.
@@ -398,10 +382,7 @@ Manifold Manifold::Simplify(double tolerance) const {
     return PropagateStatus(leafImpl->status_);
   auto impl = std::make_shared<Impl>(*leafImpl);
   impl->RemoveDegenerates();
-  const double oldTolerance = impl->tolerance_;
-  impl->tolerance_ = tolerance;
-  impl->Decimate();
-  impl->tolerance_ = oldTolerance;
+  impl->Decimate(tolerance);
   impl->SortGeometry();
   return Manifold(impl);
 }

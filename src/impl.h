@@ -55,7 +55,6 @@ struct Manifold::Impl {
 
   Box bBox_;
   double epsilon_ = -1;
-  double tolerance_ = -1;
   int numProp_ = 0;
   Error status_ = Error::NoError;
 
@@ -158,7 +157,6 @@ struct Manifold::Impl {
   void CalculateBBox();
   bool IsFinite() const;
   bool IsIndexInBounds(VecView<const ivec3> triVerts) const;
-  void SetEpsilon(double minEpsilon = -1, bool useSingle = false);
   bool IsManifold() const;
   bool Is2Manifold() const;
   bool IsSelfIntersecting() const;
@@ -217,11 +215,9 @@ struct Manifold::Impl {
   };
 
   TriResult IsDegenerate(int tri) const;
-
-  double MaxCost() const { return tolerance_ * tolerance_; }
   void CleanupTopology();
   void RemoveDegenerates(int firstNewVert = 0);
-  void Decimate();
+  void Decimate(double tolerance);
   Merger CheckEdge(int edge) const;
   bool Continuous(int edge) const;
   bool Swappable(int edge) const;
@@ -389,7 +385,6 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   const auto numProp = meshGL.numProp - 3;
   numProp_ = numProp;
   properties_.resize_nofill(meshGL.NumVert() * numProp);
-  tolerance_ = meshGL.tolerance;
   // This will have unreferenced duplicate positions that will be removed by
   // Impl::RemoveUnreferencedVerts().
   vertPos_.resize_nofill(meshGL.NumVert());
@@ -421,15 +416,13 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
     runIndex.push_back(runEnd);
   }
 
-  const auto startID =
-      Impl::ReserveIDs(std::max(1_uz, meshGL.runOriginalID.size()));
   auto runOriginalID = meshGL.runOriginalID;
   if (runOriginalID.empty()) {
-    runOriginalID.push_back(startID);
+    runOriginalID.push_back(0);  // untracked
   }
   for (size_t i = 0; i < runOriginalID.size(); ++i) {
-    const int meshID = startID + i;
     const int originalID = runOriginalID[i];
+    const int meshID = originalID == 0 ? 0 : Impl::ReserveIDs(1);
     const bool backside = meshGL.Backside(i);
     // Per-run hasNormals (runFlags bit 1). Defensively require numProp >= 3
     // so a caller setting the bit on a too-small MeshGL doesn't make us read
@@ -498,7 +491,6 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   ADVANCE_PHASE_OR_RETURN(ctx);
 
   CalculateBBox();
-  SetEpsilon(-1, std::is_same<Precision, float>::value);
 
   // we need to split pinched verts before calculating vertex normals, because
   // the algorithm doesn't work with pinched verts
@@ -540,7 +532,7 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
 
   MeshGLP<Precision, I> out;
   out.numProp = 3 + numProp;
-  out.tolerance = impl.tolerance_;
+  out.tolerance = impl.epsilon_;
   if (std::is_same<Precision, float>::value)
     out.tolerance =
         std::max(out.tolerance,
@@ -558,7 +550,6 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     out.halfedgeTangent[4 * i + 3] = t.w;
   }
   // Sort the triangles into runs
-  out.faceID.resize(numTri);
   std::vector<int> triNew2Old(numTri);
   std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
   VecView<const TriRef> triRef = impl.meshRelation_.triRef;
@@ -593,6 +584,11 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     }
   };
 
+  // only create the faceID array if the mesh relation faceIDs are not all -1.
+  if (std::any_of(triRef.begin(), triRef.end(),
+                  [](const TriRef& ref) { return ref.faceID != -1; })) {
+    out.faceID.resize(numTri);
+  }
   auto meshIDtransform = impl.meshRelation_.meshIDtransform;
   int lastID = -1;
   for (int tri = 0; tri < numTri; ++tri) {
@@ -600,7 +596,9 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     const auto ref = triRef[oldTri];
     const int meshID = ref.meshID;
 
-    out.faceID[tri] = std::max(ref.faceID, 0);
+    if (!out.faceID.empty()) {
+      out.faceID[tri] = std::max(ref.faceID, 0);
+    }
     for (const int i : {0, 1, 2})
       out.triVerts[3 * tri + i] = impl.halfedge_.Start(3 * oldTri + i);
 

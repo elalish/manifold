@@ -589,7 +589,6 @@ void Manifold::Impl::CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
   CleanupTopology();
   RemoveUnreferencedVerts();
   CalculateBBox();
-  SetEpsilon();
   SortGeometry(ctx);
   if (IsCancelled(ctx)) {
     MakeEmpty(Error::Cancelled);

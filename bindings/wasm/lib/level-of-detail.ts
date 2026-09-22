@@ -32,6 +32,14 @@ import {getManifoldModuleSync} from './wasm.ts';
 let minCircularAngle: number = 10.0;
 let minCircularEdgeLength: number = 1.0;
 
+export function setRelativePrecision(precision: number) {
+  getManifoldModuleSync()?.setRelativePrecision(precision);
+}
+
+export function getRelativePrecision() {
+  return getManifoldModuleSync()?.getRelativePrecision()!;
+}
+
 /**
  * Set an angle constraint when calculating the number of segments in a circle.
  * The number of segments will be rounded
