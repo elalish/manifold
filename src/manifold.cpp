@@ -47,9 +47,11 @@ static std::atomic<double> circularAngle_ = DEFAULT_ANGLE;
 static std::atomic<double> circularEdgeLength_ = DEFAULT_LENGTH;
 
 /**
- * Sets the relative precision for geometric computations.
+ * Sets the relative precision for geometric computations, defining what counts
+ * as coplanar or degenerate, and therefore how much simplification can occur.
  *
- * @param p The relative precision value.
+ * @param p The relative precision value. The default is 1e-12 for double
+ * precision, and smaller values will be clamped to this minimum.
  */
 void Quality::SetRelativePrecision(double p) {
   relativePrecision_ = std::max(p, kPrecision);
