@@ -508,6 +508,7 @@ void Manifold::Impl::Decimate(double tolerance) {
 int Manifold::Impl::RecursiveEdgeSwap(const int tri, const int firstNewVert,
                                       Vec<int>& scratch, int depth) {
   if (!halfedge_.Valid(tri * 3)) return 0;
+  if (depth > 100) return 0;  // Prevent infinite recursion.
 
   if (halfedge_.Start(3 * tri) < firstNewVert &&
       halfedge_.Start(3 * tri + 1) < firstNewVert &&
