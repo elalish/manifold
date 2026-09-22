@@ -30,7 +30,7 @@ jobs:
     env:
       EMSDK_VERSION: 5.0.2
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - run: |
         sudo apt-get update
         sudo apt-get install -y cmake
@@ -99,7 +99,7 @@ jobs:
       SANITIZER_TEST_RESULT: ${{ needs.sanitizer.outputs.test-result }}
       WASM_GZIP_BYTES: ${{ needs.wasm_size.outputs.bytes }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
     - uses: actions/setup-python@v7

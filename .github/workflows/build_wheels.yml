@@ -29,7 +29,7 @@ jobs:
         run: echo "CIBW_ARCHS=arm64 universal2" >> "$GITHUB_ENV"
       - if: matrix.os == 'windows-11-arm'
         run: echo "CIBW_BUILD=cp311-* cp312-* cp313-* cp314-*" >> $env:GITHUB_ENV
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.sha }}
       - name: Build wheels
@@ -43,7 +43,7 @@ jobs:
     name: Make SDist
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         ref: ${{ inputs.tag || github.sha }}
     - name: Build SDist
@@ -73,7 +73,7 @@ jobs:
     # already exists, which the next step enforces.
     if: ${{ github.event_name == 'release' || inputs.publish }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         ref: ${{ inputs.tag || github.sha }}
     - name: Check the tag is an already-published release

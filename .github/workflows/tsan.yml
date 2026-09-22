@@ -29,7 +29,7 @@ jobs:
       TBB_TAG: v2022.3.0
       TBB_PREFIX: ${{ github.workspace }}/.tbb-tsan
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install apt packages
         uses: awalsh128/cache-apt-pkgs-action@v1
