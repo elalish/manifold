@@ -48,7 +48,7 @@ jobs:
     # TypeScript docs would be absent, and publishing that silently is worse
     # than failing.
     - name: Download manifoldCAD editor, examples and documentation
-      uses: dawidd6/action-download-artifact@v6
+      uses: dawidd6/action-download-artifact@v24
       with:
         workflow: manifold.yml
         workflow_conclusion: success
