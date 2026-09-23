@@ -24,7 +24,7 @@ jobs:
         shared: [OFF, ON]
     runs-on: windows-2025
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: lukka/get-cmake@v4.4.2
       with:
         cmakeVersion: 4.3.3
@@ -132,7 +132,7 @@ jobs:
       CC: gcc-${{ matrix.gcc }}
       CXX: g++-${{ matrix.gcc }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - &setup-python
       uses: actions/setup-python@v7
       with:
@@ -189,7 +189,7 @@ jobs:
     timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Install apt packages
       uses: awalsh128/cache-apt-pkgs-action@v1
       with:
@@ -230,7 +230,7 @@ jobs:
       CXXFLAGS: "-D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE -stdlib=libc++"
       LDFLAGS: "-stdlib=libc++"
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Install apt packages
       uses: awalsh128/cache-apt-pkgs-action@v1
       with:
@@ -270,7 +270,7 @@ jobs:
       CXX: g++-14
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Install apt packages
       uses: awalsh128/cache-apt-pkgs-action@v1
       with:
@@ -314,7 +314,7 @@ jobs:
         parallelization: [OFF, ON]
         debug: [OFF, ON]
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: actions/setup-node@v6
       with:
         node-version: 24
@@ -417,7 +417,7 @@ jobs:
         os: [ubuntu-24.04, macos-latest]
     runs-on: ${{matrix.os}}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Install apt packages
       if: matrix.os == 'ubuntu-24.04'
       uses: awalsh128/cache-apt-pkgs-action@v1
@@ -462,7 +462,7 @@ jobs:
     # Resolved from openscad/mxe-x86_64-gui:latest on 2026-09-07.
     container: openscad/mxe-x86_64-gui@sha256:2df7d1c09a50192a523b4f9ea1f6155228a90e405545149d5bb3b41907f61b55
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Build
       run: |
         export MXEDIR=/mxe
@@ -494,7 +494,7 @@ jobs:
         os: [macos-15-intel, macos-latest]
     runs-on: ${{matrix.os}}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: actions/setup-python@v7
       with:
         python-version: '3.x'
@@ -547,7 +547,7 @@ jobs:
     timeout-minutes: 30
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: actions/setup-python@v7
       with:
         python-version: '3.x'
@@ -592,7 +592,7 @@ jobs:
         variant: [manifold-none, manifold-tbb, manifold-js, manifold-js-tbb, manifold3d]
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: DeterminateSystems/nix-installer-action@main
     - uses: DeterminateSystems/magic-nix-cache-action@main
     - run: nix build -L '.?submodules=1#${{matrix.variant}}'
@@ -602,7 +602,7 @@ jobs:
     needs: [build, build_windows, build_mac]
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Download Linux meshes
       uses: actions/download-artifact@v4
       with:
@@ -634,7 +634,7 @@ jobs:
       MEMORY_WARN_PERCENT: 20
       MEMORY_WARN_ABS_MB: 50
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
     - name: Install brew packages
