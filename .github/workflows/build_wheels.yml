@@ -92,7 +92,7 @@ jobs:
           echo "pyproject.toml says $version but the tag is $TAG"
           exit 1
         fi
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         pattern: python-*
         merge-multiple: true
