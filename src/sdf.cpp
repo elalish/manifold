@@ -215,6 +215,7 @@ struct GridVert {
 struct NearSurface {
   VecView<vec3> vertPos;
   VecView<int> vertIndex;
+  VecView<uint64_t> vertKey;
   HashTableD<GridVert> gridVerts;
   VecView<const double> voxels;
   const std::function<double(vec3)> sdf;
@@ -281,6 +282,7 @@ struct NearSurface {
       if (la::all(la::less(la::abs(pos - gridPos), kS * spacing))) {
         const int idx = AtomicAdd(vertIndex[0], 1);
         vertPos[idx] = Bound(pos, origin, spacing, gridSize);
+        vertKey[idx] = index * 8 + 7;
         gridVert.movedVert = idx;
         for (int j = 0; j < 7; ++j) {
           if (gridVert.edgeVerts[j] == kCrossing) gridVert.edgeVerts[j] = idx;
@@ -298,6 +300,7 @@ struct NearSurface {
 struct ComputeVerts {
   VecView<vec3> vertPos;
   VecView<int> vertIndex;
+  VecView<uint64_t> vertKey;
   HashTableD<GridVert> gridVerts;
   VecView<const double> voxels;
   const std::function<double(vec3)> sdf;
@@ -343,6 +346,7 @@ struct ComputeVerts {
                                    Position(neighborIndex, origin, spacing),
                                    val, tol, level, sdf);
       vertPos[idx] = Bound(pos, origin, spacing, gridSize);
+      vertKey[idx] = baseKey * 8 + i;
       gridVert.edgeVerts[i] = idx;
     }
   }
@@ -533,13 +537,14 @@ void Manifold::Impl::CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
   size_t tableSize = static_cast<size_t>(tableSize64);
   HashTable<GridVert> gridVerts(tableSize);
   vertPos.resize_nofill(gridVerts.Size() * 7);
+  Vec<uint64_t> vertKey(gridVerts.Size() * 7);
 
   while (1) {
     Vec<int> index(1, 0);
-    for_each_n(pol, countAt(0_uz), EncodeIndex(ivec4(gridSize, 1), gridPow),
-               ctx,
-               NearSurface({vertPos, index, gridVerts.D(), voxels, sdf, origin,
-                            gridSize, gridPow, spacing, level, tolerance}));
+    for_each_n(
+        pol, countAt(0_uz), EncodeIndex(ivec4(gridSize, 1), gridPow), ctx,
+        NearSurface({vertPos, index, vertKey, gridVerts.D(), voxels, sdf,
+                     origin, gridSize, gridPow, spacing, level, tolerance}));
 
     if (gridVerts.Full()) {  // Resize HashTable
       // Skip the reallocation and the NearSurface re-run if cancel landed
@@ -559,13 +564,14 @@ void Manifold::Impl::CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
         tableSize *= ratio;
       gridVerts = HashTable<GridVert>(tableSize);
       vertPos = Vec<vec3>(gridVerts.Size() * 7);
+      vertKey = Vec<uint64_t>(gridVerts.Size() * 7);
     } else {  // Success
       // NearSurface counts as one phase regardless of resize iterations.
       ADVANCE_PHASE_OR_RETURN(ctx);
       for_each_n(
           pol, countAt(0), gridVerts.Size(), ctx,
-          ComputeVerts({vertPos, index, gridVerts.D(), voxels, sdf, origin,
-                        gridSize, gridPow, spacing, level, tolerance}));
+          ComputeVerts({vertPos, index, vertKey, gridVerts.D(), voxels, sdf,
+                        origin, gridSize, gridPow, spacing, level, tolerance}));
       ADVANCE_PHASE_OR_RETURN(ctx);
       vertPos.resize(index[0]);
       break;
@@ -579,6 +585,40 @@ void Manifold::Impl::CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
              BuildTris({triVerts, index, gridVerts.D(), gridPow}));
   ADVANCE_PHASE_OR_RETURN(ctx);
   triVerts.resize(index[0]);
+
+  {
+    const int numVert = vertPos.size();
+    Vec<int> vertNew2Old(numVert);
+    sequence(vertNew2Old.begin(), vertNew2Old.end());
+    stable_sort(vertNew2Old.begin(), vertNew2Old.end(),
+                [&vertKey](const int a, const int b) {
+                  return vertKey[a] < vertKey[b];
+                });
+    Vec<int> vertOld2New(numVert);
+    Vec<vec3> sortedPos(numVert);
+    for_each_n(pol, countAt(0), numVert,
+               [&vertOld2New, &sortedPos, &vertNew2Old, &vertPos](const int i) {
+                 vertOld2New[vertNew2Old[i]] = i;
+                 sortedPos[i] = vertPos[vertNew2Old[i]];
+               });
+    vertPos = std::move(sortedPos);
+    for_each_n(pol, countAt(0_uz), triVerts.size(),
+               [&triVerts, &vertOld2New](const size_t t) {
+                 const ivec3 tri(vertOld2New[triVerts[t][0]],
+                                 vertOld2New[triVerts[t][1]],
+                                 vertOld2New[triVerts[t][2]]);
+                 const int first = tri[0] < tri[1] ? (tri[0] < tri[2] ? 0 : 2)
+                                                   : (tri[1] < tri[2] ? 1 : 2);
+                 triVerts[t] = ivec3(tri[first], tri[(first + 1) % 3],
+                                     tri[(first + 2) % 3]);
+               });
+    stable_sort(triVerts.begin(), triVerts.end(),
+                [](const ivec3& a, const ivec3& b) {
+                  if (a[0] != b[0]) return a[0] < b[0];
+                  if (a[1] != b[1]) return a[1] < b[1];
+                  return a[2] < b[2];
+                });
+  }
 
   // Finalize, lumped as one phase. (This sequence differs from the
   // Manifold(MeshGL) ingest pipeline; do not route through that.) SortGeometry
