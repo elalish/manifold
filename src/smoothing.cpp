@@ -400,19 +400,23 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
 
   const int oldNumProp = NumProp();
 
+  // Mark sharp edges and count them per vertex; the walks below reuse these
+  // flags.
+  Vec<bool> sharpEdge(halfedge_.size(), false);
   Vec<int> vertNumSharp(NumVert(), 0);
-  for (size_t e = 0; e < halfedge_.size(); ++e) {
-    if (!halfedge_.IsForward(e)) continue;
-    const int pair = halfedge_.Pair(e);
-    const int tri1 = e / 3;
-    const int tri2 = pair / 3;
-    const double dihedral =
-        degrees(AngleBetween(faceNormal_[tri1], faceNormal_[tri2]));
-    if (dihedral > minSharpAngle) {
-      ++vertNumSharp[halfedge_.Start(e)];
-      ++vertNumSharp[halfedge_.End(e)];
-    }
-  }
+  for_each_n(autoPolicy(halfedge_.size(), 1e5), countAt(0), halfedge_.size(),
+             [&](const int e) {
+               if (!halfedge_.IsForward(e)) return;
+               const int pair = halfedge_.Pair(e);
+               const double dihedral = degrees(
+                   AngleBetween(faceNormal_[e / 3], faceNormal_[pair / 3]));
+               if (dihedral > minSharpAngle) {
+                 sharpEdge[e] = true;
+                 sharpEdge[pair] = true;
+                 AtomicAdd(vertNumSharp[halfedge_.Start(e)], 1);
+                 AtomicAdd(vertNumSharp[halfedge_.End(e)], 1);
+               }
+             });
 
   const int numProp = std::max(oldNumProp, normalIdx + 3);
   Vec<double> oldProperties(numProp * NumPropVert(), 0);
@@ -439,6 +443,13 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
     }
     return meshIDtoNormalTransform[meshID];
   };
+
+  // Scratch buffers for multi-normal verts, cleared per vert to keep their
+  // allocations. groups: length degree; normals, meshIds: length number of
+  // normals.
+  std::vector<int> groups;
+  std::vector<vec3> normals;
+  std::vector<int> meshIds;
 
   const int numEdge = halfedge_.size();
   for (int startEdge = 0; startEdge < numEdge; ++startEdge) {
@@ -479,25 +490,14 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
 
     // vertex has multiple normals
     const vec3 centerPos = vertPos_[vert];
-    // Length degree
-    std::vector<int> groups;
-    // Length number of normals
-    std::vector<vec3> normals;
-    std::vector<int> meshIds;
+    groups.clear();
+    normals.clear();
+    meshIds.clear();
     int current = startEdge;
-    int prevFace = current / 3;
 
     do {  // find a sharp edge to start on
-      int next = NextHalfedge(halfedge_.Pair(current));
-      const int face = next / 3;
-
-      const double dihedral =
-          degrees(AngleBetween(faceNormal_[face], faceNormal_[prevFace]));
-      if (dihedral > minSharpAngle) {
-        break;
-      }
-      current = next;
-      prevFace = face;
+      if (sharpEdge[current]) break;
+      current = NextHalfedge(halfedge_.Pair(current));
     } while (current != startEdge);
 
     const int endEdge = current;
@@ -515,10 +515,8 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
           return FaceEdge(
               {current / 3, SafeNormalize(vertPos_[vert] - centerPos)});
         },
-        [&](int, const FaceEdge& here, FaceEdge& next) {
-          const double dihedral = degrees(
-              AngleBetween(faceNormal_[here.face], faceNormal_[next.face]));
-          if (dihedral > minSharpAngle) {
+        [&](int edge, const FaceEdge& here, FaceEdge& next) {
+          if (sharpEdge[edge]) {
             normals.push_back(vec3(0.0));
             meshIds.push_back(meshRelation_.triRef[next.face].meshID);
           }
@@ -552,7 +550,11 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
         // split property vertex, duplicating but with an updated normal
         lastGroup = groups[idx];
         newProp = NumPropVert();
-        properties_.resize(properties_.size() + numProp);
+        // Grow geometrically so the total cost of splits stays linear in the
+        // number of property verts.
+        properties_.extend(numProp);
+        std::fill(properties_.begin() + newProp * numProp, properties_.end(),
+                  0.0);
         std::copy(start, start + oldNumProp,
                   properties_.begin() + newProp * numProp);
         for (const int i : {0, 1, 2}) {
@@ -574,6 +576,8 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
       ++idx;
     });
   }
+  // Release the spare capacity left by geometric growth.
+  if (properties_.capacity() > properties_.size()) properties_.shrink_to_fit();
 }
 
 /**
