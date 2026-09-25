@@ -1,6 +1,6 @@
 [project]
 name = "manifold3d"
-version = "3.5.3"
+version = "3.5.4"
 authors = [
   { name="Emmett Lalish", email="elalish@gmail.com" },
 ]
