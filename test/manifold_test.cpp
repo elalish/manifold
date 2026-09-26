@@ -15,8 +15,11 @@
 #include "manifold/manifold.h"
 
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
 
 #include "../src/execution_impl.h"
+#include "../src/impl.h"
 #include "gtest/gtest.h"
 #include "manifold/cross_section.h"
 #include "test.h"
@@ -1631,3 +1634,100 @@ TEST(Manifold, DeepChainDoesNotOverflowNumLeaves) {
   auto& privateCtx = *ctx.impl_;
   EXPECT_EQ(privateCtx.totalBooleans.load(), kDepth);
 }
+
+#ifndef MANIFOLD_NO_FILESYSTEM
+// DedupeEdges collects every duplicated edge in one pass and then repairs
+// them in turn. An earlier repair can resolve a later entry; repairing that
+// stale entry relabelled an orbit to a copy of the wrong vertex, moving
+// triangle corners (and removing solid from a Boolean that reported NoError).
+// Splitting duplicate edges only relabels vertices and adds zero-area
+// triangles, so no pre-existing triangle corner may move.
+//
+// The fixture is the halfedge state right before DedupeEdges, cut from a
+// 28060-triangle union within three vertex rings of its 16 duplicate edges:
+// "numVert numTri", one "x y z" per vertex, then one line per triangle of
+// three (start, end, pair) halfedges, pair -1 where it fell outside the cut.
+// Each boundary loop of the cut is closed with a fan to a new apex vertex so
+// the mesh is closed, as DedupeEdges requires.
+TEST(Manifold, DedupeEdgesNeverMovesACorner) {
+#ifdef __EMSCRIPTEN__
+  std::string path = "/models/dedupe_stale_duplicate.txt";
+#else
+  std::filesystem::path path(__FILE__);
+  path = path.parent_path();
+  path.append("models");
+  path.append("dedupe_stale_duplicate.txt");
+#endif
+  std::ifstream f(path);
+  ASSERT_TRUE(f.is_open());
+  size_t numVert, numTri;
+  f >> numVert >> numTri;
+
+  Manifold::Impl impl;
+  for (size_t v = 0; v < numVert; ++v) {
+    vec3 p;
+    f >> p.x >> p.y >> p.z;
+    impl.vertPos_.push_back(p);
+  }
+  for (size_t t = 0; t < numTri; ++t) {
+    for (int k : {0, 1, 2}) {
+      int start, end, pair;
+      f >> start >> end >> pair;
+      impl.halfedge_.push_back(start, pair, start);
+    }
+  }
+  ASSERT_FALSE(f.fail());
+
+  // Close each boundary loop with a fan: cap triangle (end, start, apex) per
+  // boundary halfedge. The next boundary halfedge of a loop is found by
+  // rotating around the end vertex, so pinched boundary verts stay distinct.
+  const int numHalfedge = impl.halfedge_.size();
+  std::vector<bool> capped(numHalfedge, false);
+  for (int first = 0; first < numHalfedge; ++first) {
+    if (impl.halfedge_.Pair(first) != -1 || capped[first]) continue;
+    std::vector<int> loop;
+    vec3 center(0.0);
+    int edge = first;
+    do {
+      capped[edge] = true;
+      loop.push_back(edge);
+      center += impl.vertPos_[impl.halfedge_.Start(edge)];
+      edge = NextHalfedge(edge);
+      while (impl.halfedge_.Pair(edge) != -1)
+        edge = NextHalfedge(impl.halfedge_.Pair(edge));
+    } while (edge != first);
+
+    const int apex = impl.vertPos_.size();
+    impl.vertPos_.push_back(center / static_cast<double>(loop.size()));
+    const int firstCap = impl.halfedge_.size();
+    const int n = loop.size();
+    for (int i = 0; i < n; ++i) {
+      const int boundary = loop[i];
+      const int cap = firstCap + 3 * i;
+      const int prevCap = firstCap + 3 * ((i + n - 1) % n);
+      const int nextCap = firstCap + 3 * ((i + 1) % n);
+      impl.halfedge_.push_back(impl.halfedge_.End(boundary), boundary, -1);
+      impl.halfedge_.push_back(impl.halfedge_.Start(boundary), prevCap + 2, -1);
+      impl.halfedge_.push_back(apex, nextCap + 1, -1);
+      impl.halfedge_.SetPair(boundary, cap);
+    }
+  }
+  for (size_t i = 0; i < impl.halfedge_.size(); ++i) {
+    const int pair = impl.halfedge_.Pair(i);
+    ASSERT_EQ(impl.halfedge_.Pair(pair), static_cast<int>(i));
+    ASSERT_EQ(impl.halfedge_.Start(i), impl.halfedge_.End(pair));
+  }
+
+  std::vector<vec3> before;
+  for (int i = 0; i < numHalfedge; ++i)
+    before.push_back(impl.vertPos_[impl.halfedge_.Start(i)]);
+
+  impl.DedupeEdges();
+
+  int moved = 0;
+  for (int i = 0; i < numHalfedge; ++i) {
+    if (impl.vertPos_[impl.halfedge_.Start(i)] != before[i]) ++moved;
+  }
+  EXPECT_EQ(moved, 0);
+}
+#endif

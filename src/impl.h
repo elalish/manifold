@@ -223,6 +223,7 @@ struct Manifold::Impl {
   bool Swappable(int edge) const;
   bool Colinear(int edge) const;
   void SwapEdge(int edge, double a);
+  bool IsDuplicated(int edge) const;
   void DedupeEdge(int edge);
   void CollapseDegenerate(int edge, Vec<int>& scratch);
   bool CollapseEdge(int edge, Vec<int>& scratch, const Merger& merger);
