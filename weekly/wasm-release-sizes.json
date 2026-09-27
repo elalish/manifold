@@ -1,0 +1,141 @@
+{
+  "generated_at": "2026-09-27T08:10:44Z",
+  "releases": [
+    {
+      "date": "2022-10-23",
+      "gzip_bytes": 176517,
+      "version": "1.0.0"
+    },
+    {
+      "date": "2023-03-02",
+      "gzip_bytes": 187187,
+      "version": "2.1.0"
+    },
+    {
+      "date": "2023-11-03",
+      "gzip_bytes": 276772,
+      "version": "2.2.1"
+    },
+    {
+      "date": "2023-11-17",
+      "gzip_bytes": 277474,
+      "version": "2.2.2"
+    },
+    {
+      "date": "2024-01-08",
+      "gzip_bytes": 281790,
+      "version": "2.3.1"
+    },
+    {
+      "date": "2024-03-04",
+      "gzip_bytes": 292098,
+      "version": "2.4.0"
+    },
+    {
+      "date": "2024-03-04",
+      "gzip_bytes": 292098,
+      "version": "2.4.1"
+    },
+    {
+      "date": "2024-03-04",
+      "gzip_bytes": 292098,
+      "version": "2.4.2"
+    },
+    {
+      "date": "2024-03-05",
+      "gzip_bytes": 292098,
+      "version": "2.4.4"
+    },
+    {
+      "date": "2024-03-05",
+      "gzip_bytes": 292098,
+      "version": "2.4.5"
+    },
+    {
+      "date": "2024-06-12",
+      "gzip_bytes": 315195,
+      "version": "2.5.0"
+    },
+    {
+      "date": "2024-06-14",
+      "gzip_bytes": 315929,
+      "version": "2.5.1"
+    },
+    {
+      "date": "2024-11-18",
+      "gzip_bytes": 218618,
+      "version": "3.0.0"
+    },
+    {
+      "date": "2024-12-27",
+      "gzip_bytes": 191084,
+      "version": "3.0.1"
+    },
+    {
+      "date": "2025-05-14",
+      "gzip_bytes": 189222,
+      "version": "3.1.0"
+    },
+    {
+      "date": "2025-06-01",
+      "gzip_bytes": 189224,
+      "version": "3.1.1"
+    },
+    {
+      "date": "2025-07-15",
+      "gzip_bytes": 191024,
+      "version": "3.2.0"
+    },
+    {
+      "date": "2025-08-06",
+      "gzip_bytes": 191056,
+      "version": "3.2.1"
+    },
+    {
+      "date": "2025-11-14",
+      "gzip_bytes": 191077,
+      "version": "3.3.0"
+    },
+    {
+      "date": "2025-11-14",
+      "gzip_bytes": 191077,
+      "version": "3.3.1"
+    },
+    {
+      "date": "2025-11-15",
+      "gzip_bytes": 191077,
+      "version": "3.3.2"
+    },
+    {
+      "date": "2026-03-14",
+      "gzip_bytes": 183737,
+      "version": "3.4.0"
+    },
+    {
+      "date": "2026-03-26",
+      "gzip_bytes": 189343,
+      "version": "3.4.1"
+    },
+    {
+      "date": "2026-05-23",
+      "gzip_bytes": 203737,
+      "version": "3.5.0"
+    },
+    {
+      "date": "2026-06-04",
+      "gzip_bytes": 204610,
+      "version": "3.5.1"
+    },
+    {
+      "date": "2026-09-07",
+      "gzip_bytes": 204610,
+      "version": "3.5.3"
+    },
+    {
+      "date": "2026-09-25",
+      "gzip_bytes": 204610,
+      "version": "3.5.4"
+    }
+  ],
+  "schema_version": 2
+}
