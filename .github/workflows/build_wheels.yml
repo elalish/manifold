@@ -34,7 +34,7 @@ jobs:
           ref: ${{ inputs.tag || github.sha }}
       - name: Build wheels
         uses: pypa/cibuildwheel@v3.4.0
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: python-${{ matrix.os }}
           path: ./wheelhouse/*.whl
@@ -54,7 +54,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install ninja-build libtbb-dev
         pip wheel dist/*.tar.gz
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: python-sdist
         path: dist/*.tar.gz
