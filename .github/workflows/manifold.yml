@@ -326,7 +326,7 @@ jobs:
         packages: cmake
         version: 1
     - name: Setup EMSDK
-      uses: mymindstorm/setup-emsdk@v14
+      uses: mymindstorm/setup-emsdk@v16
       with:
         version: 5.0.2
     - *clone-tbb
