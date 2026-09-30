@@ -33,7 +33,7 @@ jobs:
         with:
           ref: ${{ inputs.tag || github.sha }}
       - name: Build wheels
-        uses: pypa/cibuildwheel@v3.4.0
+        uses: pypa/cibuildwheel@v4.2.1
       - uses: actions/upload-artifact@v7
         with:
           name: python-${{ matrix.os }}
