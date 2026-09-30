@@ -1631,3 +1631,22 @@ TEST(Manifold, DeepChainDoesNotOverflowNumLeaves) {
   auto& privateCtx = *ctx.impl_;
   EXPECT_EQ(privateCtx.totalBooleans.load(), kDepth);
 }
+
+#ifndef MANIFOLD_NO_FILESYSTEM
+// DedupeEdges collects every duplicated edge in one pass and then repairs
+// them in turn. An earlier repair can resolve a later entry; repairing that
+// stale entry relabelled an orbit to a copy of the wrong vertex, moving
+// triangle corners and removing solid while reporting NoError. Splitting
+// duplicate edges only relabels vertices and adds zero-area triangles, so the
+// volume must not change.
+//
+// The fixture is cut from a 28060-triangle union around its duplicate edges,
+// with each cut boundary closed by a fan. Its triangle order sets how the
+// 4-way edges pair up on load, which is what reproduces the stale entry.
+TEST(Manifold, DedupeEdgesNeverMovesACorner) {
+  Manifold m = ReadTestOBJ("dedupe_stale_duplicate.obj");
+  EXPECT_EQ(m.Status(), Manifold::Error::NoError);
+  // Signed volume of the fixture's triangles, computed exactly.
+  EXPECT_NEAR(m.Volume(), 0.00099963253073879, 1e-12);
+}
+#endif

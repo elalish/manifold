@@ -29,12 +29,12 @@ jobs:
         run: echo "CIBW_ARCHS=arm64 universal2" >> "$GITHUB_ENV"
       - if: matrix.os == 'windows-11-arm'
         run: echo "CIBW_BUILD=cp311-* cp312-* cp313-* cp314-*" >> $env:GITHUB_ENV
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.sha }}
       - name: Build wheels
-        uses: pypa/cibuildwheel@v3.4.0
-      - uses: actions/upload-artifact@v4
+        uses: pypa/cibuildwheel@v4.2.1
+      - uses: actions/upload-artifact@v7
         with:
           name: python-${{ matrix.os }}
           path: ./wheelhouse/*.whl
@@ -43,7 +43,7 @@ jobs:
     name: Make SDist
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         ref: ${{ inputs.tag || github.sha }}
     - name: Build SDist
@@ -54,7 +54,7 @@ jobs:
         sudo apt-get update
         sudo apt-get install ninja-build libtbb-dev
         pip wheel dist/*.tar.gz
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@v7
       with:
         name: python-sdist
         path: dist/*.tar.gz
@@ -73,7 +73,7 @@ jobs:
     # already exists, which the next step enforces.
     if: ${{ github.event_name == 'release' || inputs.publish }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         ref: ${{ inputs.tag || github.sha }}
     - name: Check the tag is an already-published release
@@ -92,7 +92,7 @@ jobs:
           echo "pyproject.toml says $version but the tag is $TAG"
           exit 1
         fi
-    - uses: actions/download-artifact@v4
+    - uses: actions/download-artifact@v8
       with:
         pattern: python-*
         merge-multiple: true

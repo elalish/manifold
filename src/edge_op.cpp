@@ -105,6 +105,8 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
   }
 #endif
 
+  Vec<uint32_t> visited(halfedge_.size(), 0);
+  uint32_t visitEpoch = 0;
   const int numTri = NumTri();
   int swapped = 0;
   for (int tri = 0; tri < numTri; ++tri) {
@@ -112,7 +114,10 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
         halfedge_.Start(3 * tri + 1) < firstNewVert &&
         halfedge_.Start(3 * tri + 2) < firstNewVert)
       continue;
-    swapped += RecursiveEdgeSwap(tri, firstNewVert, scratch, 0);
+
+    ++visitEpoch;
+    swapped +=
+        RecursiveEdgeSwap(tri, firstNewVert, scratch, 0, visited, visitEpoch);
   }
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose >= 2) {
@@ -522,7 +527,9 @@ void Manifold::Impl::Decimate(double tolerance) {
 }
 
 int Manifold::Impl::RecursiveEdgeSwap(const int tri, const int firstNewVert,
-                                      Vec<int>& scratch, int depth) {
+                                      Vec<int>& scratch, int depth,
+                                      Vec<uint32_t>& visited,
+                                      uint32_t& visitEpoch) {
   if (!halfedge_.Valid(tri * 3)) return 0;
   if (depth > 10) return 0;  // Prevent infinite recursion.
 
@@ -550,6 +557,12 @@ int Manifold::Impl::RecursiveEdgeSwap(const int tri, const int firstNewVert,
   if (!folded && pairResult.colinear && pairResult.longEdge != pair % 3)
     return 0;
 
+  // Swap each edge at most once per traversal; a new starting triangle or a
+  // collapse begins a fresh one.
+  if (visited[edge] == visitEpoch && visited[pair] == visitEpoch) return 0;
+  visited[edge] = visitEpoch;
+  visited[pair] = visitEpoch;
+
   const ivec4 neighborTris = ivec4(halfedge_.Pair(NextHalfedge(edge)),
                                    halfedge_.Pair(PrevHalfedge(edge)),
                                    halfedge_.Pair(NextHalfedge(pair)),
@@ -566,20 +579,37 @@ int Manifold::Impl::RecursiveEdgeSwap(const int tri, const int firstNewVert,
 
   if (length2(next - last) < epsilon_ * epsilon_) {
     CollapseDegenerate(PrevHalfedge(edge), scratch);
+    ++visitEpoch;
   }
   int swaps = 1;
   if (pairResult.colinear) {
-    swaps +=
-        RecursiveEdgeSwap(neighborTris[2], firstNewVert, scratch, depth + 1) +
-        RecursiveEdgeSwap(neighborTris[3], firstNewVert, scratch, depth + 1);
+    swaps += RecursiveEdgeSwap(neighborTris[2], firstNewVert, scratch,
+                               depth + 1, visited, visitEpoch) +
+             RecursiveEdgeSwap(neighborTris[3], firstNewVert, scratch,
+                               depth + 1, visited, visitEpoch);
   }
   if (folded) {
-    swaps += RecursiveEdgeSwap(tri, firstNewVert, scratch, depth + 1) +
-             RecursiveEdgeSwap(pair / 3, firstNewVert, scratch, depth + 1);
+    swaps += RecursiveEdgeSwap(tri, firstNewVert, scratch, depth + 1, visited,
+                               visitEpoch) +
+             RecursiveEdgeSwap(pair / 3, firstNewVert, scratch, depth + 1,
+                               visited, visitEpoch);
   }
   return swaps +
-         RecursiveEdgeSwap(neighborTris[0], firstNewVert, scratch, depth + 1) +
-         RecursiveEdgeSwap(neighborTris[1], firstNewVert, scratch, depth + 1);
+         RecursiveEdgeSwap(neighborTris[0], firstNewVert, scratch, depth + 1,
+                           visited, visitEpoch) +
+         RecursiveEdgeSwap(neighborTris[1], firstNewVert, scratch, depth + 1,
+                           visited, visitEpoch);
+}
+
+// Returns true if another halfedge leaving this edge's startVert also ends at
+// its endVert.
+bool Manifold::Impl::IsDuplicated(const int edge) const {
+  const int endVert = halfedge_.End(edge);
+  bool duplicated = false;
+  ForVert(edge, [&](int current) {
+    if (current != edge && halfedge_.End(current) == endVert) duplicated = true;
+  });
+  return duplicated;
 }
 
 // Deduplicate the given 4-manifold edge by duplicating endVert, thus making the
@@ -1149,6 +1179,11 @@ void Manifold::Impl::DedupeEdges() {
 
     size_t numFlagged = 0;
     for (size_t i : duplicates) {
+      // An earlier repair in this pass may already have resolved this entry.
+      // Repairing it anyway would relabel an orbit to a copy of the wrong
+      // vertex, moving triangle corners. The outer loop collects again, so
+      // skipping it loses nothing.
+      if (!IsDuplicated(i)) continue;
       DedupeEdge(i);
       numFlagged++;
     }

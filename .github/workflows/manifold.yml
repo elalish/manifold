@@ -24,7 +24,7 @@ jobs:
         shared: [OFF, ON]
     runs-on: windows-2025
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: lukka/get-cmake@v4.4.2
       with:
         cmakeVersion: 4.3.3
@@ -86,7 +86,7 @@ jobs:
         bash ./scripts/export_determinism_meshes.sh build/bin/Release ./manifold_test.exe meshes-windows
     - name: Upload determinism meshes (Windows)
       if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: meshes-windows
         path: meshes-windows/
@@ -132,7 +132,7 @@ jobs:
       CC: gcc-${{ matrix.gcc }}
       CXX: g++-${{ matrix.gcc }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - &setup-python
       uses: actions/setup-python@v7
       with:
@@ -175,7 +175,7 @@ jobs:
         bash ./scripts/export_determinism_meshes.sh build/test ./manifold_test meshes-linux
     - name: Upload determinism meshes (Linux)
       if: matrix.parallelization == 'OFF' && matrix.gcc == 14 && matrix.os == 'ubuntu-24.04'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: meshes-linux
         path: meshes-linux/
@@ -189,7 +189,7 @@ jobs:
     timeout-minutes: 20
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Install apt packages
       uses: awalsh128/cache-apt-pkgs-action@v1
       with:
@@ -230,7 +230,7 @@ jobs:
       CXXFLAGS: "-D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_EXTENSIVE -stdlib=libc++"
       LDFLAGS: "-stdlib=libc++"
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Install apt packages
       uses: awalsh128/cache-apt-pkgs-action@v1
       with:
@@ -270,7 +270,7 @@ jobs:
       CXX: g++-14
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Install apt packages
       uses: awalsh128/cache-apt-pkgs-action@v1
       with:
@@ -296,7 +296,7 @@ jobs:
         lcov --capture --gcov-tool gcov-14 --ignore-errors mismatch --directory . --output-file ./code_coverage_test.info
         lcov --add-tracefile ./code_coverage_init.info --add-tracefile ./code_coverage_test.info --output-file ./code_coverage_total.info
         lcov --extract ./code_coverage_total.info "/*/manifold/src/*" --output-file ./code_coverage.info
-    - uses: codecov/codecov-action@v6
+    - uses: codecov/codecov-action@v7
       with:
         disable_search: true
         files: build/code_coverage.info
@@ -314,8 +314,8 @@ jobs:
         parallelization: [OFF, ON]
         debug: [OFF, ON]
     steps:
-    - uses: actions/checkout@v6
-    - uses: actions/setup-node@v6
+    - uses: actions/checkout@v7
+    - uses: actions/setup-node@v7
       with:
         node-version: 24
         cache: 'npm'
@@ -326,7 +326,7 @@ jobs:
         packages: cmake
         version: 1
     - name: Setup EMSDK
-      uses: mymindstorm/setup-emsdk@v14
+      uses: mymindstorm/setup-emsdk@v16
       with:
         version: 5.0.2
     - *clone-tbb
@@ -393,7 +393,7 @@ jobs:
         npm run docs
         npm run public
     - name: Upload manifoldCAD editor, examples and documentation
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: github.event_name == 'push' && matrix.parallelization == 'OFF' && matrix.debug == 'OFF'
       with:
         name: wasmpublic
@@ -401,7 +401,7 @@ jobs:
         retention-days: 90
         overwrite: true
     - name: Upload complete wasm build.
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: github.event_name == 'push' && matrix.parallelization == 'OFF' && matrix.debug == 'OFF'
       with:
         name: wasm
@@ -417,7 +417,7 @@ jobs:
         os: [ubuntu-24.04, macos-latest]
     runs-on: ${{matrix.os}}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Install apt packages
       if: matrix.os == 'ubuntu-24.04'
       uses: awalsh128/cache-apt-pkgs-action@v1
@@ -462,7 +462,7 @@ jobs:
     # Resolved from openscad/mxe-x86_64-gui:latest on 2026-09-07.
     container: openscad/mxe-x86_64-gui@sha256:2df7d1c09a50192a523b4f9ea1f6155228a90e405545149d5bb3b41907f61b55
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Build
       run: |
         export MXEDIR=/mxe
@@ -494,7 +494,7 @@ jobs:
         os: [macos-15-intel, macos-latest]
     runs-on: ${{matrix.os}}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: actions/setup-python@v7
       with:
         python-version: '3.x'
@@ -530,7 +530,7 @@ jobs:
         bash ./scripts/export_determinism_meshes.sh build/test ./manifold_test meshes-mac
     - name: Upload determinism meshes (macOS)
       if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF' && matrix.os == 'macos-latest'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: meshes-mac
         path: meshes-mac/
@@ -547,7 +547,7 @@ jobs:
     timeout-minutes: 30
     runs-on: macos-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: actions/setup-python@v7
       with:
         python-version: '3.x'
@@ -592,7 +592,7 @@ jobs:
         variant: [manifold-none, manifold-tbb, manifold-js, manifold-js-tbb, manifold3d]
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: DeterminateSystems/nix-installer-action@main
     - uses: DeterminateSystems/magic-nix-cache-action@main
     - run: nix build -L '.?submodules=1#${{matrix.variant}}'
@@ -602,19 +602,19 @@ jobs:
     needs: [build, build_windows, build_mac]
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - name: Download Linux meshes
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: meshes-linux
         path: meshes/linux
     - name: Download macOS meshes
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: meshes-mac
         path: meshes/mac
     - name: Download Windows meshes
-      uses: actions/download-artifact@v4
+      uses: actions/download-artifact@v8
       with:
         name: meshes-windows
         path: meshes/windows
@@ -634,7 +634,7 @@ jobs:
       MEMORY_WARN_PERCENT: 20
       MEMORY_WARN_ABS_MB: 50
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
     - name: Install brew packages

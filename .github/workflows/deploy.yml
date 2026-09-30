@@ -23,7 +23,7 @@ jobs:
     if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
       with:
         ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.ref) || (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || github.ref }}
 
@@ -48,7 +48,7 @@ jobs:
     # TypeScript docs would be absent, and publishing that silently is worse
     # than failing.
     - name: Download manifoldCAD editor, examples and documentation
-      uses: dawidd6/action-download-artifact@v6
+      uses: dawidd6/action-download-artifact@v25
       with:
         workflow: manifold.yml
         workflow_conclusion: success
