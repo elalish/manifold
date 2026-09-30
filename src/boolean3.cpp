@@ -550,6 +550,7 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   }
 #endif
 }
+
 Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
   ZoneScoped;
   Vec<int> winding(points.size(), 0);

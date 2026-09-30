@@ -277,6 +277,14 @@ TEST(Boolean, SimplifyCracks) {
   if (options.exportModels) WriteTestOBJ("cracks.obj", simplified);
 }
 
+TEST(Boolean, SimplifyShards) {
+  Manifold a = Manifold::Sphere(40, 10);
+  Manifold b = a.Translate({0, 0, 40}) ^ a;
+  Manifold result = a - b;
+  Box bounds = result.BoundingBox();
+  EXPECT_FLOAT_EQ(bounds.max.z, 20);
+}
+
 TEST(Boolean, NoRetainedVerts) {
   Manifold cube = Manifold::Cube(vec3(1), true);
   Manifold oct = Manifold::Sphere(1, 4);
