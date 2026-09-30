@@ -552,6 +552,17 @@ int Manifold::Impl::RecursiveEdgeSwap(const int tri, const int firstNewVert,
          RecursiveEdgeSwap(neighborTris[1], firstNewVert, scratch, depth + 1);
 }
 
+// Returns true if another halfedge leaving this edge's startVert also ends at
+// its endVert.
+bool Manifold::Impl::IsDuplicated(const int edge) const {
+  const int endVert = halfedge_.End(edge);
+  bool duplicated = false;
+  ForVert(edge, [&](int current) {
+    if (current != edge && halfedge_.End(current) == endVert) duplicated = true;
+  });
+  return duplicated;
+}
+
 // Deduplicate the given 4-manifold edge by duplicating endVert, thus making the
 // edges distinct. Also duplicates startVert if it becomes pinched.
 void Manifold::Impl::DedupeEdge(const int edge) {
@@ -1119,6 +1130,11 @@ void Manifold::Impl::DedupeEdges() {
 
     size_t numFlagged = 0;
     for (size_t i : duplicates) {
+      // An earlier repair in this pass may already have resolved this entry.
+      // Repairing it anyway would relabel an orbit to a copy of the wrong
+      // vertex, moving triangle corners. The outer loop collects again, so
+      // skipping it loses nothing.
+      if (!IsDuplicated(i)) continue;
       DedupeEdge(i);
       numFlagged++;
     }
