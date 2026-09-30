@@ -21,6 +21,7 @@
 #include "impl.h"
 #include "parallel.h"
 #include "shared.h"
+#include "manifold/version.h"
 
 namespace {
 using namespace manifold;
@@ -40,6 +41,10 @@ Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
 }  // namespace
 
 namespace manifold {
+
+std::string Version() {
+  return MANIFOLD_VERSION_STRING;
+}
 
 static std::atomic<double> relativePrecision_ = kPrecision;
 static std::atomic<int> circularSegments_ = DEFAULT_SEGMENTS;
