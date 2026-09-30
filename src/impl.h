@@ -228,7 +228,8 @@ struct Manifold::Impl {
   void CollapseDegenerate(int edge, Vec<int>& scratch);
   bool CollapseEdge(int edge, Vec<int>& scratch, const Merger& merger);
   int RecursiveEdgeSwap(int tri, const int firstNewVert, Vec<int>& scratch,
-                        int depth);
+                        int depth, Vec<uint32_t>& visited,
+                        uint32_t& visitEpoch);
   void RemoveIfFolded(int edge);
   void PairUp(int edge0, int edge1);
   void UpdateVert(int vert, int startEdge, int endEdge);

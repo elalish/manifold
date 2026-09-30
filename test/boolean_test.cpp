@@ -17,6 +17,7 @@
 #include <thread>
 
 #include "../src/utils.h"
+#include "degenerate_swap_cycle_data.h"
 #include "gtest/gtest.h"
 #include "manifold/common.h"
 #include "manifold/manifold.h"
@@ -275,6 +276,32 @@ TEST(Boolean, SimplifyCracks) {
   EXPECT_NEAR(simplified.SurfaceArea(), deformed.SurfaceArea(), 1);
 
   if (options.exportModels) WriteTestOBJ("cracks.obj", simplified);
+}
+
+// Regression test for #1857: unioning the meshes attached there made
+// RemoveDegenerates cycle edge swaps for ~3e8 iterations.
+TEST(Boolean, DegenerateSwapCycle) {
+  ManifoldParamGuard guard;
+  ManifoldParams().verifyNoDegenerates = false;
+  ManifoldParams().intermediateChecks = false;
+  std::vector<Manifold> parts;
+  for (const auto& input : test::kSwapCycleInputs) {
+    MeshGL mesh;
+    mesh.numProp = 3;
+    mesh.vertProperties = input.vertProperties;
+    mesh.triVerts = input.triVerts;
+    parts.emplace_back(mesh);
+    ASSERT_EQ(parts.back().Status(), Manifold::Error::NoError);
+  }
+
+  Manifold result = parts[0] + parts[1] + parts[2];
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_GT(result.NumTri(), 0u);
+  EXPECT_GT(result.Volume(), 0);
+
+  // The public entry point must stay bounded too.
+  Manifold cleaned = result.RemoveDegenerates();
+  EXPECT_EQ(cleaned.Status(), Manifold::Error::NoError);
 }
 
 TEST(Boolean, NoRetainedVerts) {
