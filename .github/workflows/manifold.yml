@@ -86,7 +86,7 @@ jobs:
         bash ./scripts/export_determinism_meshes.sh build/bin/Release ./manifold_test.exe meshes-windows
     - name: Upload determinism meshes (Windows)
       if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: meshes-windows
         path: meshes-windows/
@@ -175,7 +175,7 @@ jobs:
         bash ./scripts/export_determinism_meshes.sh build/test ./manifold_test meshes-linux
     - name: Upload determinism meshes (Linux)
       if: matrix.parallelization == 'OFF' && matrix.gcc == 14 && matrix.os == 'ubuntu-24.04'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: meshes-linux
         path: meshes-linux/
@@ -393,7 +393,7 @@ jobs:
         npm run docs
         npm run public
     - name: Upload manifoldCAD editor, examples and documentation
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: github.event_name == 'push' && matrix.parallelization == 'OFF' && matrix.debug == 'OFF'
       with:
         name: wasmpublic
@@ -401,7 +401,7 @@ jobs:
         retention-days: 90
         overwrite: true
     - name: Upload complete wasm build.
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       if: github.event_name == 'push' && matrix.parallelization == 'OFF' && matrix.debug == 'OFF'
       with:
         name: wasm
@@ -530,7 +530,7 @@ jobs:
         bash ./scripts/export_determinism_meshes.sh build/test ./manifold_test meshes-mac
     - name: Upload determinism meshes (macOS)
       if: matrix.parallelization == 'OFF' && matrix.shared == 'OFF' && matrix.os == 'macos-latest'
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: meshes-mac
         path: meshes-mac/
