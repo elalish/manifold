@@ -543,21 +543,23 @@ void Manifold::Impl::Decimate(double tolerance) {
 #endif
 }
 
-int Manifold::Impl::RecursiveEdgeSwap(const int edge, const int firstNewVert,
+int Manifold::Impl::RecursiveEdgeSwap(const int edgeIn, const int firstNewVert,
                                       Vec<int>& scratch, int depth,
                                       Vec<uint32_t>& visited,
                                       uint32_t& visitEpoch) {
-  if (!halfedge_.Valid(edge)) return 0;
+  if (!halfedge_.Valid(edgeIn)) return 0;
+
+  // The incoming edge may not be the triangle's long edge; recompute it so
+  // degenerate triangles reached via a non-long edge are still found.
+  const auto triResult = IsDegenerate(edgeIn / 3);
+  const int edge = 3 * (edgeIn / 3) + triResult.longEdge;
+  const bool folded = false;  // IsFolded(edge);
+  if (!triResult.colinear && !folded) return 0;
   const int pair = halfedge_.Pair(edge);
 
   // Swap each edge at most once per traversal; a new starting triangle or a
   // collapse begins a fresh one.
   if (visited[edge] == visitEpoch && visited[pair] == visitEpoch) return 0;
-
-  const auto triResult = IsDegenerate(edge / 3);
-  if (triResult.longEdge != edge % 3) return 0;
-  const bool folded = false;  // IsFolded(edge);
-  if (!triResult.colinear && !folded) return 0;
 
   const auto pairResult = IsDegenerate(pair / 3);
   if (!folded && pairResult.colinear && pairResult.longEdge != pair % 3)
