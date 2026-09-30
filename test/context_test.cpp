@@ -20,6 +20,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <functional>
 #include <thread>
 
 #include "../src/execution_impl.h"
@@ -30,6 +31,32 @@
 #include "test.h"
 
 using namespace manifold;
+
+#if MANIFOLD_PAR == 1
+// Runs `evalFn` on a worker thread, sleeps `delay`, fires `ctx.Cancel()`,
+// then joins. An exception escaping a std::thread's entry function calls
+// std::terminate() and aborts the whole process instead of failing just
+// the one test, so this captures it with std::exception_ptr and rethrows
+// on the caller's (test) thread where gtest can catch and report it.
+Manifold::Error RunConcurrentEvalAndCancel(
+    ExecutionContext& ctx, std::chrono::microseconds delay,
+    const std::function<Manifold::Error()>& evalFn) {
+  std::atomic<Manifold::Error> result{Manifold::Error::NoError};
+  std::exception_ptr eptr;
+  std::thread evalThread([&] {
+    try {
+      result.store(evalFn());
+    } catch (...) {
+      eptr = std::current_exception();
+    }
+  });
+  std::this_thread::sleep_for(delay);
+  ctx.Cancel();
+  evalThread.join();
+  if (eptr) std::rethrow_exception(eptr);
+  return result.load();
+}
+#endif  // MANIFOLD_PAR == 1
 
 // A CSG tree with N leaves reduces to 1 result in N-1 combinations.
 TEST(Context, ExecutionContextProgress) {
@@ -92,20 +119,17 @@ TEST(Context, ExecutionContextCancelConcurrent) {
   Manifold u = Manifold::BatchBoolean(items, OpType::Add);
 
   ExecutionContext ctx;
-  std::atomic<Manifold::Error> result{Manifold::Error::NoError};
-  std::thread evalThread([&] { result.store(u.WithContext(ctx).Status()); });
-
   // Yield briefly so evaluation starts, then request cancel.
-  std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  ctx.Cancel();
-  evalThread.join();
+  Manifold::Error result =
+      RunConcurrentEvalAndCancel(ctx, std::chrono::milliseconds(1),
+                                 [&] { return u.WithContext(ctx).Status(); });
 
   // Cancel may have fired between ops or after the whole eval finished
   // (depending on timing). Either Cancelled (expected) or NoError (raced
   // past us) is acceptable.
-  EXPECT_TRUE(result.load() == Manifold::Error::Cancelled ||
-              result.load() == Manifold::Error::NoError);
-  if (result.load() == Manifold::Error::Cancelled) {
+  EXPECT_TRUE(result == Manifold::Error::Cancelled ||
+              result == Manifold::Error::NoError);
+  if (result == Manifold::Error::Cancelled) {
     EXPECT_LT(ctx.impl_->doneBooleans.load(), ctx.impl_->totalBooleans.load());
     // Sub-Boolean granularity: PhaseBalance skips its top-up on cancel, so
     // donePhases must reflect partial work (strictly less than the full
@@ -130,19 +154,16 @@ TEST(Context, ExecutionContextCancelMidBoolean) {
   Manifold u = a + b;
 
   ExecutionContext ctx;
-  std::atomic<Manifold::Error> result{Manifold::Error::NoError};
-  std::thread evalThread([&] { result.store(u.WithContext(ctx).Status()); });
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  ctx.Cancel();
-  evalThread.join();
+  Manifold::Error result =
+      RunConcurrentEvalAndCancel(ctx, std::chrono::milliseconds(1),
+                                 [&] { return u.WithContext(ctx).Status(); });
 
   // Either outcome is acceptable. NoError: eval raced past the 1ms sleep
   // before cancel fired. Cancelled: caught by an inner Boolean3 phase
   // check or by the outer CsgOpNode::ToLeafNode check after a fast
   // SimpleBoolean — we can't cheaply distinguish those paths.
-  EXPECT_TRUE(result.load() == Manifold::Error::Cancelled ||
-              result.load() == Manifold::Error::NoError);
+  EXPECT_TRUE(result == Manifold::Error::Cancelled ||
+              result == Manifold::Error::NoError);
 }
 #endif  // MANIFOLD_PAR == 1
 
@@ -715,17 +736,14 @@ TEST(Context, ManifoldContextCancelConcurrentHull) {
   Manifold sphere = Manifold::Sphere(1.0, 256);
 
   ExecutionContext ctx;
-  std::atomic<Manifold::Error> result{Manifold::Error::NoError};
-  std::thread evalThread(
-      [&] { result.store(sphere.WithContext(ctx).Hull().Status()); });
-  std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  ctx.Cancel();
-  evalThread.join();
+  Manifold::Error result = RunConcurrentEvalAndCancel(
+      ctx, std::chrono::milliseconds(1),
+      [&] { return sphere.WithContext(ctx).Hull().Status(); });
 
   // Either NoError (eval raced past the 1ms sleep) or Cancelled
   // (caught at one of the Hull cancel checkpoints).
-  EXPECT_TRUE(result.load() == Manifold::Error::Cancelled ||
-              result.load() == Manifold::Error::NoError);
+  EXPECT_TRUE(result == Manifold::Error::Cancelled ||
+              result == Manifold::Error::NoError);
 }
 #endif  // MANIFOLD_PAR == 1
 
@@ -752,18 +770,14 @@ TEST(Context, ManifoldContextCancelConcurrentMinkowski) {
   Manifold other = nonConvex.Scale(vec3(0.5));
 
   ExecutionContext ctx;
-  std::atomic<Manifold::Error> result{Manifold::Error::NoError};
-  std::thread evalThread([&] {
-    result.store(nonConvex.WithContext(ctx).MinkowskiSum(other).Status());
-  });
-  std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  ctx.Cancel();
-  evalThread.join();
+  Manifold::Error result = RunConcurrentEvalAndCancel(
+      ctx, std::chrono::milliseconds(1),
+      [&] { return nonConvex.WithContext(ctx).MinkowskiSum(other).Status(); });
 
   // Either NoError (eval raced past the 1ms sleep) or Cancelled
   // (caught mid-Boolean inside Minkowski) is acceptable.
-  EXPECT_TRUE(result.load() == Manifold::Error::Cancelled ||
-              result.load() == Manifold::Error::NoError);
+  EXPECT_TRUE(result == Manifold::Error::Cancelled ||
+              result == Manifold::Error::NoError);
 }
 #endif  // MANIFOLD_PAR == 1
 
@@ -860,15 +874,11 @@ TEST(Context, MeshGLCancelConcurrent) {
   auto sleep = std::chrono::microseconds(100);
   for (int attempt = 0; attempt < 12 && cancelledHits == 0; ++attempt) {
     ExecutionContext ctx;
-    std::atomic<Manifold::Error> result{Manifold::Error::NoError};
-    std::thread evalThread(
-        [&] { result.store(ctx.FromMeshGL(mesh).Status()); });
-    std::this_thread::sleep_for(sleep);
-    ctx.Cancel();
-    evalThread.join();
-    EXPECT_TRUE(result.load() == Manifold::Error::Cancelled ||
-                result.load() == Manifold::Error::NoError);
-    if (result.load() == Manifold::Error::Cancelled) {
+    Manifold::Error result = RunConcurrentEvalAndCancel(
+        ctx, sleep, [&] { return ctx.FromMeshGL(mesh).Status(); });
+    EXPECT_TRUE(result == Manifold::Error::Cancelled ||
+                result == Manifold::Error::NoError);
+    if (result == Manifold::Error::Cancelled) {
       ++cancelledHits;
       EXPECT_LT(ctx.impl_->donePhases.load(), ctx.impl_->totalPhases.load());
       EXPECT_LT(ctx.Progress(), 1.0);
@@ -970,17 +980,12 @@ TEST(Context, LevelSetCancelConcurrent) {
   auto sleep = std::chrono::microseconds(100);
   for (int attempt = 0; attempt < 12 && cancelledHits == 0; ++attempt) {
     ExecutionContext ctx;
-    std::atomic<Manifold::Error> result{Manifold::Error::NoError};
-    std::thread evalThread([&] {
-      result.store(
-          ctx.LevelSet(slowSphere, {vec3(-1), vec3(1)}, 0.05).Status());
+    Manifold::Error result = RunConcurrentEvalAndCancel(ctx, sleep, [&] {
+      return ctx.LevelSet(slowSphere, {vec3(-1), vec3(1)}, 0.05).Status();
     });
-    std::this_thread::sleep_for(sleep);
-    ctx.Cancel();
-    evalThread.join();
-    EXPECT_TRUE(result.load() == Manifold::Error::Cancelled ||
-                result.load() == Manifold::Error::NoError);
-    if (result.load() == Manifold::Error::Cancelled) {
+    EXPECT_TRUE(result == Manifold::Error::Cancelled ||
+                result == Manifold::Error::NoError);
+    if (result == Manifold::Error::Cancelled) {
       ++cancelledHits;
       EXPECT_LT(ctx.impl_->donePhases.load(), ctx.impl_->totalPhases.load());
       EXPECT_LT(ctx.Progress(), 1.0);
