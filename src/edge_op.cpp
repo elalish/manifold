@@ -105,10 +105,14 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
   }
 #endif
 
+  Vec<uint32_t> visited(halfedge_.size(), 0);
+  uint32_t visitEpoch = 0;
   const int numTri = NumTri();
   int swapped = 0;
   for (int tri = 0; tri < numTri; ++tri) {
-    swapped += RecursiveEdgeSwap(tri, firstNewVert, scratch, 0);
+    ++visitEpoch;
+    swapped +=
+        RecursiveEdgeSwap(tri, firstNewVert, scratch, 0, visited, visitEpoch);
   }
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose >= 2) {
@@ -506,7 +510,9 @@ void Manifold::Impl::Decimate(double tolerance) {
 }
 
 int Manifold::Impl::RecursiveEdgeSwap(const int tri, const int firstNewVert,
-                                      Vec<int>& scratch, int depth) {
+                                      Vec<int>& scratch, int depth,
+                                      Vec<uint32_t>& visited,
+                                      uint32_t& visitEpoch) {
   if (!halfedge_.Valid(tri * 3)) return 0;
   if (depth > 100) return 0;  // Prevent infinite recursion.
 
@@ -524,6 +530,12 @@ int Manifold::Impl::RecursiveEdgeSwap(const int tri, const int firstNewVert,
 
   if (pairResult.colinear && pairResult.longEdge != pair % 3) return 0;
 
+  // Swap each edge at most once per traversal; a new starting triangle or a
+  // collapse begins a fresh one.
+  if (visited[edge] == visitEpoch && visited[pair] == visitEpoch) return 0;
+  visited[edge] = visitEpoch;
+  visited[pair] = visitEpoch;
+
   const ivec4 neighborTris = ivec4(halfedge_.Pair(NextHalfedge(edge)),
                                    halfedge_.Pair(PrevHalfedge(edge)),
                                    halfedge_.Pair(NextHalfedge(pair)),
@@ -540,16 +552,20 @@ int Manifold::Impl::RecursiveEdgeSwap(const int tri, const int firstNewVert,
 
   if (length2(next - last) < epsilon_ * epsilon_) {
     CollapseDegenerate(PrevHalfedge(edge), scratch);
+    ++visitEpoch;
   }
   int swaps = 1;
   if (pairResult.colinear) {
-    swaps +=
-        RecursiveEdgeSwap(neighborTris[2], firstNewVert, scratch, depth + 1) +
-        RecursiveEdgeSwap(neighborTris[3], firstNewVert, scratch, depth + 1);
+    swaps += RecursiveEdgeSwap(neighborTris[2], firstNewVert, scratch,
+                               depth + 1, visited, visitEpoch) +
+             RecursiveEdgeSwap(neighborTris[3], firstNewVert, scratch,
+                               depth + 1, visited, visitEpoch);
   }
   return swaps +
-         RecursiveEdgeSwap(neighborTris[0], firstNewVert, scratch, depth + 1) +
-         RecursiveEdgeSwap(neighborTris[1], firstNewVert, scratch, depth + 1);
+         RecursiveEdgeSwap(neighborTris[0], firstNewVert, scratch, depth + 1,
+                           visited, visitEpoch) +
+         RecursiveEdgeSwap(neighborTris[1], firstNewVert, scratch, depth + 1,
+                           visited, visitEpoch);
 }
 
 // Deduplicate the given 4-manifold edge by duplicating endVert, thus making the
