@@ -300,7 +300,9 @@ TEST(Boolean, DegenerateSwapCycle) {
   EXPECT_GT(result.Volume(), 0);
   Manifold cleaned = result.RemoveDegenerates();
   EXPECT_EQ(cleaned.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(cleaned.NumDegenerateTris(), 0);
 }
+
 #endif
 
 TEST(Boolean, NoRetainedVerts) {
@@ -392,7 +394,7 @@ TEST(Boolean, SimpleProperties) {
   Manifold result = cube + flange;
   EXPECT_EQ(result.NumProp(), 3);
   EXPECT_NEAR(result.Volume(), 22.6666, 0.0001);
-  EXPECT_EQ(result.NumVert(), 16);
+  EXPECT_EQ(result.NumVert(), 12);
   EXPECT_TRUE(result.HasSimpleProps());
 }
 

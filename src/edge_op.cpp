@@ -543,12 +543,21 @@ int Manifold::Impl::RecursiveEdgeSwap(const int edgeIn, const int firstNewVert,
   // Swap each edge at most once per traversal; a new starting triangle or a
   // collapse begins a fresh one.
   if (visited[edge] == visitEpoch && visited[pair] == visitEpoch) return 0;
-  visited[edge] = visitEpoch;
-  visited[pair] = visitEpoch;
 
+  // A swap is only allowed if it either reduces the number of degenerate
+  // triangles, or both stay degenerate but their longest edges get shorter.
+  // This ensures progress is always being made.
   const auto pairResult = IsDegenerate(pair / 3);
-  if (!folded && pairResult.colinear && pairResult.longEdge != pair % 3)
-    return 0;
+  if (!folded && pairResult.colinear && pairResult.longEdge != pair % 3) {
+    const int neighborLongEdge = 3 * (pair / 3) + pairResult.longEdge;
+    const double sharedLength =
+        length(vertPos_[halfedge_.End(pair)] - vertPos_[halfedge_.Start(pair)]);
+    const double neighborLongLength =
+        length(vertPos_[halfedge_.End(neighborLongEdge)] -
+               vertPos_[halfedge_.Start(neighborLongEdge)]);
+    // Edge lengths within the positional error bound have no reliable order.
+    if (neighborLongLength - sharedLength > 4 * epsilon_) return 0;
+  }
 
   const ivec4 neighborEdges = ivec4(
       halfedge_.Pair(NextHalfedge(edge)), halfedge_.Pair(PrevHalfedge(edge)),
@@ -564,6 +573,9 @@ int Manifold::Impl::RecursiveEdgeSwap(const int edgeIn, const int firstNewVert,
   const vec3 edgeVec = vertPos_[halfedge_.End(edge)] - base;
 
   SwapEdge(edge, dot(a, edgeVec) / length2(edgeVec));
+
+  visited[newCenter] = visitEpoch;
+  visited[newCenterPair] = visitEpoch;
 
   if (length2(next - last) < epsilon_ * epsilon_) {
     CollapseDegenerate(newCenter, scratch);
