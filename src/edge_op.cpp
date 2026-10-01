@@ -115,26 +115,9 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
         halfedge_.Start(3 * tri + 2) < firstNewVert)
       continue;
 
-    const auto triResult = IsDegenerate(tri);
-    int edge = 3 * tri + triResult.longEdge;
-
-    // bool folded = false;
-    // if (!triResult.colinear) {
-    //   folded = IsFolded(edge);
-    //   if (!folded) {
-    //     edge = NextHalfedge(edge);
-    //     folded = IsFolded(edge);
-    //   }
-    //   if (!folded) {
-    //     edge = NextHalfedge(edge);
-    //     folded = IsFolded(edge);
-    //   }
-    //   if (!folded) continue;
-    // }
-
     ++visitEpoch;
-    swapped +=
-        RecursiveEdgeSwap(edge, firstNewVert, scratch, 0, visited, visitEpoch);
+    swapped += RecursiveEdgeSwap(3 * tri, firstNewVert, scratch, 0, visited,
+                                 visitEpoch);
   }
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose >= 2) {
@@ -560,6 +543,8 @@ int Manifold::Impl::RecursiveEdgeSwap(const int edgeIn, const int firstNewVert,
   // Swap each edge at most once per traversal; a new starting triangle or a
   // collapse begins a fresh one.
   if (visited[edge] == visitEpoch && visited[pair] == visitEpoch) return 0;
+  visited[edge] = visitEpoch;
+  visited[pair] = visitEpoch;
 
   const auto pairResult = IsDegenerate(pair / 3);
   if (!folded && pairResult.colinear && pairResult.longEdge != pair % 3)
@@ -579,9 +564,6 @@ int Manifold::Impl::RecursiveEdgeSwap(const int edgeIn, const int firstNewVert,
   const vec3 edgeVec = vertPos_[halfedge_.End(edge)] - base;
 
   SwapEdge(edge, dot(a, edgeVec) / length2(edgeVec));
-
-  visited[newCenter] = visitEpoch;
-  visited[newCenterPair] = visitEpoch;
 
   if (length2(next - last) < epsilon_ * epsilon_) {
     CollapseDegenerate(newCenter, scratch);

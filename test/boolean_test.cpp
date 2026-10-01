@@ -765,7 +765,6 @@ TEST(Boolean, NonConvexConvexMinkowskiSum) {
 TEST(Boolean, NonConvexConvexMinkowskiDifference) {
   ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
-  ManifoldParams().verifyNoDegenerates = false;
 
   Manifold sphere = Manifold::Sphere(1.2, 20);
   Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
@@ -781,9 +780,6 @@ TEST(Boolean, NonConvexConvexMinkowskiDifference) {
 }
 
 TEST(Boolean, NonConvexNonConvexMinkowskiSum) {
-  ManifoldParamGuard guard;
-  ManifoldParams().processOverlaps = true;
-
   Manifold tet = Manifold::Tetrahedron();
   Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
 
@@ -797,10 +793,6 @@ TEST(Boolean, NonConvexNonConvexMinkowskiSum) {
 }
 
 TEST(Boolean, NonConvexNonConvexMinkowskiDifference) {
-  ManifoldParamGuard guard;
-  ManifoldParams().processOverlaps = true;
-  ManifoldParams().verifyNoDegenerates = false;
-
   Manifold tet = Manifold::Tetrahedron();
   Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
 
