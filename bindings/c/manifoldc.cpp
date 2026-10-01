@@ -907,6 +907,13 @@ ManifoldManifold* manifold_calculate_normals(void* mem, ManifoldManifold* m,
   return to_c(new (mem) Manifold(man));
 }
 
+// Version
+
+const char* manifold_version() {
+  static const std::string version = manifold::Version();
+  return version.c_str();
+}
+
 // Static Quality Globals
 
 void manifold_set_relative_precision(double precision) {
