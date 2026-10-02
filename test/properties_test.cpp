@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cmath>
+
 #include "../src/utils.h"
 #include "gtest/gtest.h"
 #include "manifold/manifold.h"
@@ -30,6 +32,36 @@ TEST(Properties, Measurements) {
   cube = cube.Scale(vec3(-1.0));
   EXPECT_FLOAT_EQ(cube.Volume(), 1.0);
   EXPECT_FLOAT_EQ(cube.SurfaceArea(), 6.0);
+}
+
+TEST(Properties, BooleanBarycentricWeightsRemainFinite) {
+  const double height = std::sqrt(3.0);
+  const Manifold prism =
+      Manifold::Extrude(Polygons{{{0, 0}, {2, 0}, {1, height}}}, 2)
+          .SetProperties(3, [height](double* color, vec3 p, const double*) {
+            color[2] = p.y / height;
+            color[1] = (p.x - color[2]) / 2;
+            color[0] = 1 - color[1] - color[2];
+          });
+  // A distant component raises epsilon to about 0.7. Interpolation at newly
+  // created vertices can then snap every weight to zero.
+  const Manifold input =
+      prism + Manifold::Cube({10, 10, 10}, true).Translate({7e11, 0, 0});
+  const Manifold tool = Manifold::Cube({2, 2, 4}).Translate({0.7, 0.7, -1});
+  ASSERT_EQ(prism.Status(), Manifold::Error::NoError);
+  ASSERT_EQ(input.Status(), Manifold::Error::NoError);
+  ASSERT_EQ(tool.Status(), Manifold::Error::NoError);
+
+  const Manifold result = input - tool;
+  ASSERT_EQ(result.Status(), Manifold::Error::NoError);
+  ASSERT_GT(result.NumTri(), 0);
+  const MeshGL64 mesh = result.GetMeshGL64();
+  ASSERT_EQ(mesh.numProp, 6);
+  for (size_t i = 0; i < mesh.vertProperties.size(); ++i) {
+    EXPECT_TRUE(std::isfinite(mesh.vertProperties[i]))
+        << "property index " << i;
+  }
+  EXPECT_EQ(Manifold(mesh).Status(), Manifold::Error::NoError);
 }
 
 TEST(Properties, Epsilon) {

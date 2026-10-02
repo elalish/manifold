@@ -13,12 +13,68 @@
 // limitations under the License.
 
 #include <atomic>
+#include <cmath>
 #include <cstdint>
 
 #include "../src/atomic_compat.h"
+#include "../src/shared.h"
 #include "gtest/gtest.h"
 
 using namespace manifold;
+
+TEST(Utils, BarycentricAllWeightsSnappedToZero) {
+  // Both points are within tolerance of every edge, but not any vertex.
+  // Scaling both the triangle and tolerance must preserve the weights.
+  for (const double scale : {1e-50, 1e-12, 1.0, 1e12, 1e50}) {
+    SCOPED_TRACE(testing::Message() << "scale = " << scale);
+    const mat3 tri(vec3(0, 0, 0), vec3(2, 0, 0), vec3(1, std::sqrt(3.0), 0));
+    for (const bool reversed : {false, true}) {
+      SCOPED_TRACE(testing::Message() << "reversed = " << reversed);
+      const mat3 scaled =
+          scale * (reversed ? mat3(tri[0], tri[2], tri[1]) : tri);
+      for (const vec3 expected : {vec3(1.0 / 3.0), vec3(0.30, 0.34, 0.36)}) {
+        SCOPED_TRACE(testing::Message() << "weights = " << expected.x << ", "
+                                        << expected.y << ", " << expected.z);
+        const vec3 point = expected.x * scaled[0] + expected.y * scaled[1] +
+                           expected.z * scaled[2];
+        const double tolerance = expected.x == expected.y ? 0.6 : 0.65;
+        const vec3 weights = GetBarycentric(point, scaled, tolerance * scale);
+        for (int i : {0, 1, 2}) {
+          EXPECT_TRUE(std::isfinite(weights[i]));
+          EXPECT_NEAR(weights[i], expected[i], 1e-12);
+        }
+        EXPECT_NEAR(weights.x + weights.y + weights.z, 1.0, 1e-12);
+      }
+    }
+  }
+}
+
+TEST(Utils, BarycentricRetainsSnapping) {
+  const mat3 tri(vec3(0, 0, 0), vec3(2, 0, 0), vec3(1, std::sqrt(3.0), 0));
+  const vec3 vertex = GetBarycentric(tri[0], tri, 1e-8);
+  EXPECT_DOUBLE_EQ(vertex.x, 1.0);
+  EXPECT_DOUBLE_EQ(vertex.y, 0.0);
+  EXPECT_DOUBLE_EQ(vertex.z, 0.0);
+
+  const vec3 edge = GetBarycentric(vec3(0.8, 1e-9, 0), tri, 1e-8);
+  EXPECT_NEAR(edge.x, 0.6, 1e-9);
+  EXPECT_NEAR(edge.y, 0.4, 1e-9);
+  EXPECT_DOUBLE_EQ(edge.z, 0.0);
+
+  const vec3 interior =
+      GetBarycentric(0.25 * tri[0] + 0.25 * tri[1] + 0.5 * tri[2], tri, 1e-8);
+  EXPECT_NEAR(interior.x, 0.25, 1e-12);
+  EXPECT_NEAR(interior.y, 0.25, 1e-12);
+  EXPECT_NEAR(interior.z, 0.5, 1e-12);
+}
+
+TEST(Utils, BarycentricNearDegenerateTriangle) {
+  const mat3 tri(vec3(0, 0, 0), vec3(2, 0, 0), vec3(1, 1e-8, 0));
+  const vec3 weights = GetBarycentric(vec3(0.5, 0, 0), tri, 1e-7);
+  EXPECT_DOUBLE_EQ(weights.x, 0.75);
+  EXPECT_DOUBLE_EQ(weights.y, 0.25);
+  EXPECT_DOUBLE_EQ(weights.z, 0.0);
+}
 
 // Which backend this build selected is not otherwise visible. Report it so a
 // CI log says whether the lane covered the std::atomic_ref path or a fallback.
