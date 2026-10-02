@@ -1,14 +1,13 @@
-// Separate library compilation
-import path from 'path';
-
 import type {Program, ScopeStmt, Statement} from './ast.js';
+import {asyncModuleBindings, externalAsyncModules, findAsyncModules} from './async-modules.js';
 import {bindLibrary, lookup} from './binder.js';
 import {BUILTIN_MODULES, BUILTIN_SIGNATURES, BUILTIN_VAR_CONSTANTS, RUNTIME_SYMBOLS,} from './builtins.js';
 import {formatCode} from './format.js';
 import {compileDeclaration, PRE_DECLARED_VARS} from './geometry.js';
 import {assignPrettyNames, bindJsName, buildRuntimeImport, builtinConstantsFor, builtinSymbolNames, declJsName, globalJsName, namesBlockingRuntimeLocals, namesInUse, reservedNames, resetTempNames, resolveRuntimeLocals, T,} from './naming.js';
 import {collectDeclarations, paramUsesNoArg, scanProgram,} from './scan.js';
-import {cpsTransformedFunctions, currentBindOptions, currentMainFilename, currentScope, currentSourceFilename, dynamicScopeVars, externalFunctionNames, externalModuleNames, externalVariableNames, localDecls, noArgDemotions, resetTailTemps, RT, setBindResult, setCurrentRuntimePath, setCurrentScope, setCurrentSourceFilename, setGlobalVarDeclKeyword, setMainFilename, setModuleDecls, setParentModulesReadInFunction, signatures,} from './state.js';
+import {cpsTransformedFunctions, currentBindOptions, currentMainFilename, currentScope, currentSourceFilename, dynamicScopeVars, externalFunctionNames, externalModuleNames, externalVariableNames, localDecls, noArgDemotions, resetTailTemps, RT, setBindResult, setCurrentRuntimePath, setCurrentScope, setCurrentSourceFilename, setGlobalVarDeclKeyword, setMainFilename, setModuleDecls, setParentModulesReadInFunction, signatures, globalPathResolver} from './state.js';
+import {hasSelfTailCall} from './tailcall.js';
 import type {Binding, CompiledLibrary, CompiledLibraryFile, LibraryClosure, LibraryManifest, Namespace, Scope,} from './types.js';
 
 // Separate library compilation
@@ -73,6 +72,7 @@ export async function compileLibrary(
   externalModuleNames.clear();
   externalFunctionNames.clear();
   externalVariableNames.clear();
+  externalAsyncModules.clear();
   const allStatements: Statement[] = [];
   for (const rel of sourceRels)
     allStatements.push(...closure.files.get(rel)!.statements);
@@ -88,6 +88,7 @@ export async function compileLibrary(
                      })),
       closure.entryRels, currentBindOptions);
   setBindResult(libBind);
+  findAsyncModules(libBind);
 
   const scan = scanProgram(allStatements);
   setParentModulesReadInFunction(scan.parentModulesInFunction);
@@ -97,6 +98,15 @@ export async function compileLibrary(
       libBind,
       {reserved: reservedNames(), builtinSymbols: builtinSymbolNames()});
   resetTempNames(namesInUse(libBind, scan.unresolved));
+
+  // Calls can cross files, so identify trampoline functions before emitting any file
+  for (const stmt of allStatements) {
+    if (stmt.kind === 'functionDecl' &&
+        !stmt.params.some(p => p.name === stmt.name) &&
+        hasSelfTailCall(stmt.body, stmt.name)) {
+      cpsTransformedFunctions.add(declJsName(stmt, 'fn'));
+    }
+  }
 
 
   // Build the per-kind export map (name -> owning source file), last-wins with
@@ -114,6 +124,7 @@ export async function compileLibrary(
     variables: {} as Record<string, string>,
   };
   const manifestSignatureNoArg: Record<string, boolean[]> = {};
+  const manifestAsyncModules = new Set<string>();
   const perFileDecls = new Map < string, {
     modules: string[];
     functions: string[];
@@ -149,6 +160,10 @@ export async function compileLibrary(
             (stmt as any).params.map((p: any) => p.name);
         manifestSignatureNoArg[sigKey] =
             (stmt as any).params.map(paramUsesNoArg);
+      }
+      if (stmt.kind === 'moduleDecl' && stmt.binding &&
+          asyncModuleBindings.has(stmt.binding.id)) {
+        manifestAsyncModules.add(stmt.name);
       }
     }
     perFileDecls.set(rel, lists);
@@ -192,6 +207,10 @@ export async function compileLibrary(
     symbols: manifestSymbols,
     signatures: manifestSignatures,
     signatureNoArg: manifestSignatureNoArg,
+    asyncModules: [...manifestAsyncModules],
+    cpsFunctions: Object.entries(manifestSymbols.functions)
+                      .filter(([, jsName]) => cpsTransformedFunctions.has(jsName))
+                      .map(([name]) => name),
   };
 
   setGlobalVarDeclKeyword('let');
@@ -212,7 +231,6 @@ async function emitLibraryFile(
   setCurrentScope(ctx.scope);
   resetTailTemps();
   dynamicScopeVars.clear();
-  cpsTransformedFunctions.clear();
   setCurrentRuntimePath(ctx.runtimePath);
   setMainFilename(program.filename ?? '');
   setCurrentSourceFilename(currentMainFilename);
@@ -350,7 +368,7 @@ async function emitLibraryFile(
 export function relImportSpecifier(
     fromOutRel: string, toOutRel: string): string {
   let rel =
-      path.relative(path.dirname(fromOutRel), toOutRel).replace(/\\/g, '/');
+      globalPathResolver?.path.relative(globalPathResolver?.path.dirname(fromOutRel), toOutRel).replace(/\\/g, '/')!;
   rel = rel.replace(/\.ts$/i, '.js');
   if (!rel.startsWith('.')) rel = './' + rel;
   return rel;

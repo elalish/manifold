@@ -3,8 +3,8 @@ import fs from 'fs';
 import path from 'path';
 
 import {compileConsumer} from '../core/orchestrate.js';
-import {setGlobalFileResolver} from '../core/state.js';
-import {nodeFileResolver} from '../host/node.js'
+import {setGlobalFileResolver, setGlobalPathResolver} from '../core/state.js';
+import {nodeFileResolver, nodePathResolver} from '../host/node.js'
 
 import {getExternalLibraries} from './util/library_compilation.js';
 
@@ -49,6 +49,7 @@ compileAllCommand.name('compile-all')
                 path.join(outputDir, path.dirname(file), basename + '.ts');
 
             setGlobalFileResolver(nodeFileResolver);
+            setGlobalPathResolver(nodePathResolver);
 
             const {externalLibraries, resolved} =
                 await getExternalLibraries(absFile, outputFile);

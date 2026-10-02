@@ -1,11 +1,9 @@
-import path from 'path';
-
 import {walk} from './ast.js';
 import type {Argument, ASTNode, BinaryExpr, Expr, FunctionCallExpr, KindedNode, ListCompGenerator, Parameter,} from './ast.js';
 import {isLexicalVar} from './binder.js';
 import {BUILTIN_FUNCTIONS, EXPERIMENTAL_BUILTIN_FUNCTIONS, NUMERIC_BUILTINS,} from './builtins.js';
 import {bindJsName, escapeName, svTarget, T} from './naming.js';
-import {currentMainFilename, noArgDemotions, RT, signatures, cpsTransformedFunctions} from './state.js';
+import {currentMainFilename, noArgDemotions, RT, signatures, cpsTransformedFunctions, globalPathResolver} from './state.js';
 import type {Binding, CallRef} from './types.js';
 
 // Type for folded initializers; use a specific type only when certain,
@@ -880,7 +878,7 @@ function compileListComp(gen: ListCompGenerator): string {
       for (const name of new Set(gen.updates.map(bindJsName)))
         if (!loopNames.has(name)) inits.push(`${name} = undefined`);
       // Abort the loop once its counter exceeds the limit
-      const base = currentMainFilename ? path.basename(currentMainFilename) :
+      const base = currentMainFilename ? globalPathResolver?.path.basename(currentMainFilename) :
                                          '<unknown>';
       const line = gen.loc?.start.line ?? 0;
       const errMsg =

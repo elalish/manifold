@@ -1,6 +1,5 @@
-import path from 'path';
-
 import type {Expr, Program, Statement,} from './ast.js';
+import {externalAsyncModules, findAsyncModules} from './async-modules.js';
 import {bindProgram} from './binder.js';
 import {BUILTIN_FUNCTIONS, BUILTIN_SIGNATURES} from './builtins.js';
 import {namesNeedingPredeclaration,} from './expr.js';
@@ -9,17 +8,16 @@ import {compileDeclaration, compileGeometry, GEOMETRY_TYPE, hasBackgroundModifie
 import {compileUsedFileScope, declKey, isDecl} from './library.js';
 import {assignPrettyNames, buildRuntimeImport, builtinConstantsFor, builtinSymbolNames, declJsName, escapeName, globalJsName, namesBlockingRuntimeLocals, namesInUse, reservedNames, resetTempNames, resolveRuntimeLocals, svTarget, T,} from './naming.js';
 import {collectDeclarations, openNoArgSlots, scanProgram} from './scan.js';
-import {cpsTransformedFunctions, setModuleDecls} from './state.js';
+import {cpsTransformedFunctions, setModuleDecls, globalPathResolver} from './state.js';
 import type {Signature} from './state.js';
 import {currentBindOptions, currentMainFilename, currentScope, dynamicScopeVars, externalFunctionNames, externalModuleNames, externalVariableNames, globalVarDeclKeyword, localDecls, moduleDeclRegistry, noArgDemotions, resetTailTemps, RT, setBindResult, setCurrentRuntimePath, setCurrentScope, setCurrentSourceFilename, setMainFilename, setParentModulesReadInFunction, signatures} from './state.js';
 import type {CompileOptions, ModuleDeclStmtType} from './types.js';
 
-
 // Path used in emitted `// <source>` comments, anchored to the entry file so
 // output stays consistent regardless of the working directory
 function sourceComment(filename: string): string {
-  const base = currentMainFilename ? path.dirname(currentMainFilename) : '';
-  const rel = base ? path.relative(base, filename) : filename;
+  const base = currentMainFilename ? globalPathResolver?.path.dirname(currentMainFilename) : '';
+  const rel = base ? globalPathResolver?.path.relative(base, filename)! : filename;
   return rel.replace(/\\/g, '/');
 }
 
@@ -129,6 +127,7 @@ export async function compile(
   externalModuleNames.clear();
   externalFunctionNames.clear();
   externalVariableNames.clear();
+  externalAsyncModules.clear();
   resetTailTemps();
   signatures.clear();
   localDecls.clear();
@@ -157,8 +156,14 @@ export async function compile(
       externalModuleNames.add(name);
     for (const name of Object.keys(lib.manifest.exports.functions))
       externalFunctionNames.add(name);
+    for (const name of lib.manifest.cpsFunctions ?? []) {
+      const jsName = lib.manifest.symbols?.functions[name];
+      if (jsName) cpsTransformedFunctions.add(jsName);
+    }
     for (const name of Object.keys(lib.manifest.exports.variables))
       externalVariableNames.add(name);
+    for (const name of lib.manifest.asyncModules ?? [])
+      externalAsyncModules.add(name);
 
     // record external symbols
     const syms = lib.manifest.symbols;
@@ -174,6 +179,7 @@ export async function compile(
 
   const bind = bindProgram(program, currentBindOptions);
   setBindResult(bind);
+  findAsyncModules(bind);
 
   const openSlots = openNoArgSlots();
 

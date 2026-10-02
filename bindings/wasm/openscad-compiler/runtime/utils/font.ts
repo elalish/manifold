@@ -1,6 +1,5 @@
-import path from 'path';
-
-import {runtimeFileResolver} from './host.js';
+import path from 'path-browserify';
+import {environmentResolver, runtimeFileResolver} from './host.js';
 
 // Font directory listing
 const fontDirListings = new Map<string, Map<string, string>>();
@@ -42,8 +41,60 @@ function fontDirListing(fontDir: string): Map<string, string> {
   return listing;
 }
 
-function resolveFontFile(fontDir: string, basename: string):
-    {filePath: string; mimeType: string}|undefined {
+async function fetchAndStoreFontFile(fontSpec: string) {
+  const [family, ...props] = fontSpec.split(":");
+
+  const style = props
+    .find(p => p.startsWith("style="))
+    ?.split("=")[1]
+    ?.toLowerCase() === "italic"
+    ? "italic"
+    : "normal";
+
+  const weight = Number(props.find(p => p.startsWith("weight="))?.split("=")[1]) || 400;
+
+  // resolve font through fontsource
+  const url = `https://api.fontsource.org/v1/fonts?family=${encodeURIComponent(family.trim())}`;
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Failed to resolve font: ${family}`);
+  }
+
+  const fonts = await response.json();
+
+  if (!fonts.length) {
+    throw new Error(`Font not found: ${family}`);
+  }
+
+  const font = fonts[0];
+  const variant = font.variants?.[weight]?.[style];
+
+  if (!variant?.url?.ttf) {
+    throw new Error(
+      `Variant not found: ${family} ${weight} ${style}`,
+    );
+  }
+
+  // download font
+  const fontResponse = await fetch(variant.url.ttf);
+
+  if (!fontResponse.ok) {
+    throw new Error(`Failed to download font: ${variant.url.ttf}`);
+  }
+
+  const blob = await fontResponse.blob();
+
+  // save the downloaded font file
+  const fontPath = `/fonts/${font.id}-${weight}-${style}.ttf`;
+
+  runtimeFileResolver.writeFile(fontPath, Buffer.from(await blob.arrayBuffer()));
+
+  return { filePath: fontPath, mimeType: 'font/ttf' };
+}
+
+async function resolveFontFile(fontDir: string, basename: string):
+    Promise<{filePath: string; mimeType: string}|undefined> {
   const listing = fontDirListing(fontDir);
   const candidates: ReadonlyArray<[string, string]> =
       [['.ttf', 'font/ttf'], ['.otf', 'font/otf']];
@@ -52,21 +103,28 @@ function resolveFontFile(fontDir: string, basename: string):
     const file = listing.get(`${basename}${ext}`.toLowerCase());
     if (file) return {filePath: path.join(fontDir, file), mimeType};
   }
+
+  // if font is not found then fetch the font and store it into VFS if in web mode
+  if (environmentResolver.mode == "web") {
+    return await fetchAndStoreFontFile(basename);
+  }
+
   return undefined;
 }
 
 // Reads the font file a text() spec names from FONTPATH and returns it as a
 // base64 data URL
-export function computeFontData(fontSpec: string): string|undefined {
+export async function computeFontData(fontSpec: string): Promise<string|undefined> {
   if (fontDataCache.has(fontSpec)) return fontDataCache.get(fontSpec);
 
-  let data = loadFontData(fontSpec);
+  let data = await loadFontData(fontSpec);
   fontDataCache.set(fontSpec, data);
   return data;
 }
 
-function loadFontData(fontSpec: string): string|undefined {
-  const fontDir = process.env.FONTPATH?.trim();
+async function loadFontData(fontSpec: string): Promise<string|undefined> {
+  // const fontDir = process.env.FONTPATH?.trim();
+  const fontDir = environmentResolver.fontDir;
   if (!fontDir || !runtimeFileResolver.exists(fontDir)) {
     console.warn(
         `Warning: FONTPATH environment variable not set — cannot load font "${
@@ -76,7 +134,7 @@ function loadFontData(fontSpec: string): string|undefined {
 
   const canonical = fontSpecToFilename(fontSpec);
   const resolved =
-      resolveFontFile(fontDir, fontSpec) ?? resolveFontFile(fontDir, canonical);
+      await resolveFontFile(fontDir, fontSpec) ?? await resolveFontFile(fontDir, canonical);
 
   if (!resolved) {
     console.warn(`Warning: No "${fontSpec}" or "${canonical}" .ttf/.otf in "${

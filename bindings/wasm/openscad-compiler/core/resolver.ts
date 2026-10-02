@@ -1,9 +1,7 @@
-import path from 'path';
-
 import type {Program, Statement} from './ast.js';
 import {Lexer} from './lexer.js';
 import {Parser} from './parser.js';
-import {globalFileResolver} from './state.js';
+import {globalFileResolver, globalPathResolver} from './state.js';
 import type {ExternalLibraryRef, LibraryClosure, LibraryEdge, ResolvedProgram, ResolvedProgramWithLibraries, ScadFileHit} from './types.js';
 
 // FONTPATH as set in the user's shell/OS environment
@@ -58,11 +56,11 @@ export async function resolveProgram(entryFile: string):
     Promise<ResolvedProgram> {
   const resolvedFiles: string[] = [];
   const visited = new Set<string>();
-  const entryAbsPath = path.resolve(entryFile);
+  const entryAbsPath = globalPathResolver?.path.resolve(entryFile)!;
 
   const statements = await resolveFile(
       entryAbsPath, 'include', visited, resolvedFiles,
-      path.dirname(entryAbsPath));
+      globalPathResolver?.path.dirname(entryAbsPath)!);
 
   return {statements, resolvedFiles};
 }
@@ -74,7 +72,7 @@ async function resolveFile(
     resolvedFiles: string[],
     entryDir: string,
     ): Promise<Statement[]> {
-  const absPath = path.resolve(filePath);
+  const absPath = globalPathResolver?.path.resolve(filePath)!;
 
   // Prevent circular includes
   if (visited.has(absPath)) return [];
@@ -93,7 +91,7 @@ async function resolveFile(
   // Declarations forming THIS file's own scope (its own plus those of files it
   // `include`s), collected in `use` mode so they can be wrapped as one scope.
   const ownScope: Statement[] = [];
-  const fileDir = path.dirname(absPath);
+  const fileDir = globalPathResolver?.path.dirname(absPath)!;
 
   for (const stmt of program.statements) {
     if (stmt.kind === 'include' || stmt.kind === 'use') {
@@ -134,11 +132,11 @@ export async function resolveProgramWithLibraries(entryFile: string):
   const resolvedFiles: string[] = [];
   const visited = new Set<string>();
   const externalLibraries = new Map<string, ExternalLibraryRef>();
-  const entryAbsPath = path.resolve(entryFile);
+  const entryAbsPath = globalPathResolver?.path.resolve(entryFile)!;
 
   const statements = await resolveConsumerFile(
       entryAbsPath, 'include', visited, resolvedFiles,
-      path.dirname(entryAbsPath), externalLibraries);
+      globalPathResolver?.path.dirname(entryAbsPath)!, externalLibraries);
 
   return {statements, resolvedFiles, externalLibraries};
 }
@@ -161,7 +159,7 @@ async function resolveConsumerFile(
     filePath: string, mode: 'include'|'use', visited: Set<string>,
     resolvedFiles: string[], entryDir: string,
     externalLibraries: Map<string, ExternalLibraryRef>): Promise<Statement[]> {
-  const absPath = path.resolve(filePath);
+  const absPath = globalPathResolver?.path.resolve(filePath)!;
   if (visited.has(absPath)) return [];
   visited.add(absPath);
 
@@ -176,7 +174,7 @@ async function resolveConsumerFile(
 
   const result: Statement[] = [];
   const ownScope: Statement[] = [];
-  const fileDir = path.dirname(absPath);
+  const fileDir = globalPathResolver?.path.dirname(absPath)!;
 
   for (const stmt of program.statements) {
     if (stmt.kind === 'include' || stmt.kind === 'use') {
@@ -221,21 +219,21 @@ async function resolveConsumerFile(
 export async function resolveLibraryClosure(
     name: string, libraryRoot: string, entryFiles: string[],
     entryDir: string): Promise<LibraryClosure> {
-  const root = path.resolve(libraryRoot);
+  const root = globalPathResolver?.path.resolve(libraryRoot)!;
   const files = new Map<string, Program>();
   const deps = new Map<string, string[]>();
   const edges = new Map<string, LibraryEdge[]>();
   const visited = new Set<string>();
 
-  const relOf = (abs: string) => path.relative(root, abs).replace(/\\/g, '/');
+  const relOf = (abs: string) => globalPathResolver?.path.relative(root, abs).replace(/\\/g, '/');
   const underRoot = (abs: string) => {
-    const rel = path.relative(root, abs);
-    return rel !== '' && !rel.startsWith('..') && !path.isAbsolute(rel);
+    const rel = globalPathResolver?.path.relative(root, abs)!;
+    return rel !== '' && !rel.startsWith('..') && !globalPathResolver?.path.isAbsolute(rel);
   };
 
   const walk = async (absPath: string) => {
-    const abs = path.resolve(absPath);
-    const rel = relOf(abs);
+    const abs = globalPathResolver?.path.resolve(absPath)!;
+    const rel = relOf(abs)!;
     if (visited.has(abs)) return;
     visited.add(abs);
     if (!await globalFileResolver?.exists(abs)) {
@@ -248,13 +246,13 @@ export async function resolveLibraryClosure(
 
     const fileDeps: string[] = [];
     const fileEdges: LibraryEdge[] = [];
-    const fileDir = path.dirname(abs);
+    const fileDir = globalPathResolver?.path.dirname(abs)!;
     for (const stmt of program.statements) {
       if (stmt.kind === 'include' || stmt.kind === 'use') {
         const hit = await globalFileResolver?.findScadFile(
             stmt.path, fileDir, entryDir);
         if (hit && underRoot(hit.path)) {
-          const depRel = relOf(path.resolve(hit.path));
+          const depRel = relOf(globalPathResolver?.path.resolve(hit.path)!)!;
           if (!fileDeps.includes(depRel)) fileDeps.push(depRel);
           if (!fileEdges.some(e => e.rel === depRel && e.mode === stmt.kind))
             fileEdges.push({rel: depRel, mode: stmt.kind});
@@ -268,7 +266,7 @@ export async function resolveLibraryClosure(
 
   const entryRels: string[] = [];
   for (const entry of entryFiles) {
-    entryRels.push(relOf(path.resolve(entry)));
+    entryRels.push(relOf(globalPathResolver?.path.resolve(entry)!)!);
     await walk(entry);
   }
   return {name, root, files, deps, edges, entryRels};

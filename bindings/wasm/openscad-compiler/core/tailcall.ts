@@ -1,6 +1,6 @@
 import type {Argument, Expr, Parameter, Statement,} from './ast.js';
 import {compileCallExpr, compileExpr} from './expr.js';
-import {bindJsName, T} from './naming.js';
+import {T} from './naming.js';
 import {nextTailTemp, RT,} from './state.js';
 
 // Tail-recursion elimination

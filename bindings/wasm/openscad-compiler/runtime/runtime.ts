@@ -936,9 +936,15 @@ function with_children(
     fn: ChildrenFrame['fn'], count: number, call: () => any, name?: string) {
   children_stack.push({fn: fn, count: count, name: name});
   try {
-    return call();
-  } finally {
+    const result = call();
+    if (result && typeof result.then === 'function') {
+      return Promise.resolve(result).finally(() => children_stack.pop());
+    }
     children_stack.pop();
+    return result;
+  } catch (error) {
+    children_stack.pop();
+    throw error;
   }
 }
 
@@ -2311,10 +2317,10 @@ function canvasTextContours(
   return contours;
 }
 
-function text(
+async function text(
     text: string, size: number = 10, font: string, halign: string = 'left',
     valign: string = 'baseline', spacing: number = 1, direction: string = 'ltr',
-    fn: number = 0): any {
+    fn: number = 0): Promise<any> {
   if (!text || text.length === 0)
     return CrossSection.square([0.001, 0.001], false);
 
@@ -2332,7 +2338,7 @@ function text(
   contours = canvasTextContours(chars, size, spacing, dir, font);
 
   if (!contours) {
-    const base64 = computeFontData(font);
+    const base64 = await computeFontData(font);
     if (base64) {
       contours = opentypeTextContours(chars, size, spacing, dir, base64, fn);
     }
@@ -3045,7 +3051,7 @@ function gridFromText(text: string): {
 
 // The source file is read here: text matrices are parsed, PNGs decoded to
 // pixels
-function surface(filePath: string, opts: {
+async function surface(filePath: string, opts: {
   center?: boolean;
   invert?: boolean;
   kind?: 'image' | 'text';
@@ -3054,7 +3060,7 @@ function surface(filePath: string, opts: {
   fs?: number
 } = {}) {
   const {center = false, invert = false, kind = 'image'} = opts;
-  const source = computeSurfaceData(filePath);
+  const source = await computeSurfaceData(filePath);
   // A missing or undecodable file is warned about and ignored
   if (source === undefined) return Manifold.union([]);
   // OpenSCAD only honors a bool invert, and only for images

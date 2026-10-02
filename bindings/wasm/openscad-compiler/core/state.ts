@@ -1,6 +1,6 @@
 import type {Expr, Parameter} from './ast.js';
 import {BUILTIN_FUNCTIONS, BUILTIN_MODULES, BUILTIN_VAR_CONSTANTS, RUNTIME_SYMBOLS,} from './builtins.js';
-import type {BindOptions, BindResult, FileResolver, ModuleDeclStmtType, Scope,} from './types.js';
+import type {BindOptions, BindResult, FileResolver, ModuleDeclStmtType, PathResolver, Scope,} from './types.js';
 
 // Signatures
 export interface Signature {
@@ -16,6 +16,7 @@ export interface LocalDecl {
 }
 
 export let globalFileResolver: FileResolver|undefined;
+export let globalPathResolver: PathResolver|undefined;
 
 export const signatures = new Map<string, Signature>();
 export const localDecls = new Map<string, LocalDecl>();
@@ -73,6 +74,10 @@ export const currentBindOptions: BindOptions = {
 
 export function setGlobalFileResolver(fileResolver: FileResolver): void {
   globalFileResolver = fileResolver;
+}
+
+export function setGlobalPathResolver(pathResolver: PathResolver): void {
+  globalPathResolver = pathResolver;
 }
 
 export function setModuleDecls(decls: Map<string, ModuleDeclStmtType>): void {

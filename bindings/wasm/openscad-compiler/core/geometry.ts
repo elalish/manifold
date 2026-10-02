@@ -1,12 +1,11 @@
-import path from 'path';
-
 import type {Argument, ASTNode, BlockStmt, Expr, ForStmt, ForVariable, IfStmt, ModuleCallStmt, Parameter, Statement} from './ast.js';
+import {isAsyncModuleCall, moduleBodyNeedsAsync} from './async-modules.js';
 import {shadowsOuterVar} from './binder.js';
 import {BUILTIN_VAR_CONSTANTS} from './builtins.js';
 import {compileArgList, compileExpr, findArg, inferDeclaredType, isIndexRange, locTag, namesNeedingPredeclaration, numericTypeOf} from './expr.js';
 import {bindJsName, declJsName, escapeName, svTarget, T,} from './naming.js';
 import {nodeReferencesIdentifier, slotUsesNoArg} from './scan.js';
-import {cpsTransformedFunctions, currentMainFilename, currentSourceFilename, dynamicScopeVars, externalModuleNames, globalVarDeclKeyword, moduleDeclRegistry, parentModulesReadInFunction, RT, signatures} from './state.js';
+import {cpsTransformedFunctions, currentMainFilename, currentSourceFilename, dynamicScopeVars, externalModuleNames, globalVarDeclKeyword, moduleDeclRegistry, parentModulesReadInFunction, RT, signatures, globalPathResolver} from './state.js';
 import {compileSurface} from './surface.js';
 import {deduplicateParams, emitTailBody, hasSelfTailCall, moduleAlwaysRecurses, tailAlwaysRecurses} from './tailcall.js';
 import type {Binding, ModuleDeclStmtType} from './types.js';
@@ -115,7 +114,7 @@ export async function compileDeclaration(
       const defaultsPrologue = emitNoArgDefaults(declKey, dedup, '  ');
       if (!dedup.some(p => p.name === stmt.name) &&
           moduleAlwaysRecurses(stmt.body, stmt.name)) {
-        const base = currentMainFilename ? path.basename(currentMainFilename) :
+        const base = currentMainFilename ? globalPathResolver?.path.basename(currentMainFilename) :
                                            '<unknown>';
         const line = stmt.loc?.start.line ?? 0;
         throw new Error(`Recursion detected calling module '${
@@ -125,8 +124,11 @@ export async function compileDeclaration(
       const dollarParams = dedup.filter(p => isDyn(p.name)).map(bindJsName);
       const body = await compileModuleBody(
           stmt.body, stmt.name, localParams, dollarParams, renamedParams);
-      return withLeading(`function ${declJsName(stmt, 'mod')}(${params}): ${
-          GEOMETRY_TYPE} {\n${defaultsPrologue}${body}\n}`);
+      const isAsync = moduleBodyNeedsAsync(stmt);
+      return withLeading(`${isAsync ? 'async ' : ''}function ${
+          declJsName(stmt, 'mod')}(${params}): ${
+          isAsync ? `Promise<${GEOMETRY_TYPE}>` : GEOMETRY_TYPE} {\n${
+          defaultsPrologue}${body}\n}`);
     }
 
     case 'functionDecl': {
@@ -162,7 +164,7 @@ export async function compileDeclaration(
           hasSelfTailCall(stmt.body, stmt.name)) {
         if (tailAlwaysRecurses(stmt.body, stmt.name)) {
           const base = currentMainFilename ?
-              path.basename(currentMainFilename) :
+              globalPathResolver?.path.basename(currentMainFilename) :
               '<unknown>';
           const line = stmt.loc?.start.line ?? 0;
           throw new Error(`Recursion detected calling function '${
@@ -332,8 +334,9 @@ export async function compileModuleBody(
   if (usesChildrenCount)
     lines.push(`  let $children: number = ${T('c')}.count;`);
   if (usesChildrenFn) {
-    lines.push(`  function children(i: any): ${GEOMETRY_TYPE} { return ${
-        T('c')}.fn ? ${T('c')}.fn(i) : Manifold.union([]); }`);
+    lines.push(`  async function children(i?: any): Promise<${
+        GEOMETRY_TYPE}> { return ${T('c')}.fn ? await ${
+        T('c')}.fn(i) : Manifold.union([]); }`);
   }
   if (usesParentModules) {
     lines.push(
@@ -421,6 +424,10 @@ export function isModuleCallBackgroundOnly(
 function buildWithChildrenCall(
     callExpr: string, children: string[], moduleName: string): string {
   if (children.length === 0) {
+    if (callExpr.includes('await ')) {
+      return `await ${RT.with_children}(() => Manifold.union([]), 0, ` +
+          `async () => ${callExpr}, ${JSON.stringify(moduleName)})`;
+    }
     return `${RT.with_children}(() => Manifold.union([]), 0, () => ${
         callExpr}, ${JSON.stringify(moduleName)})`;
   }
@@ -434,10 +441,12 @@ function buildWithChildrenCall(
         `const ${T('childFns')} = [\n  ${
                children.map(child => `async () => (${child})`)
                    .join(',\n  ')}\n]; ` +
-        `return ${RT.with_children}(async (i) => ` +
-        `${RT.union}(await Promise.all(${RT.pick_children}(${
-               T('childFns')}, i).map(fn => fn())))` +
-        `, ${T('childFns')}.length, async () => await ${callExpr}, ${
+        `return ${RT.with_children}(async (i) => { ` +
+        `const ${T('picked')}: ${GEOMETRY_TYPE}[] = []; ` +
+        `for (const fn of ${RT.pick_children}(${T('childFns')}, i)) ` +
+        `${T('picked')}.push(await fn()); ` +
+        `return ${RT.union}(${T('picked')}); }` +
+        `, ${T('childFns')}.length, async () => ${callExpr}, ${
                JSON.stringify(moduleName)}); ` +
         `})()`;
   }
@@ -529,11 +538,11 @@ async function compileModuleCall(stmt: ModuleCallStmt): Promise<string> {
         result = compilePolyhedron(stmt.args);
         break;
       case 'text':
-        result = compileText(stmt.args);
+        result = `await ${compileText(stmt.args)}`;
         break;
       case 'surface':
-        result = await compileSurface(
-            stmt.args, currentSourceFilename || currentMainFilename);
+        result = `await ${await compileSurface(
+            stmt.args, currentSourceFilename || currentMainFilename)}`;
         break;
 
       // Transforms
@@ -718,9 +727,9 @@ async function compileLetModule(stmt: ModuleCallStmt): Promise<string> {
 
 function compileChildrenModule(stmt: ModuleCallStmt): string {
   if (stmt.args.length > 0) {
-    return `children(${compileExpr(stmt.args[0]!.value)})`;
+    return `await children(${compileExpr(stmt.args[0]!.value)})`;
   }
-  return `children()`;
+  return `await children()`;
 }
 
 // Primitive compilation
@@ -1446,6 +1455,10 @@ async function compileIfGeometry(stmt: IfStmt): Promise<string> {
         lines, stmt.elseBody, `    return ${returnExpr(els, '    ')};`, '    ');
     lines.push('  }');
     lines.push('})()');
+    if (lines.join('\n').includes('await ')) {
+      lines[0] = '(async () => {';
+      return 'await ' + lines.join('\n');
+    }
     return lines.join('\n');
   }
   const lines = [
@@ -1457,6 +1470,10 @@ async function compileIfGeometry(stmt: IfStmt): Promise<string> {
   lines.push('  }');
   lines.push('  return Manifold.union([]);');
   lines.push('})()');
+  if (lines.join('\n').includes('await ')) {
+    lines[0] = '(async () => {';
+    return 'await ' + lines.join('\n');
+  }
   return lines.join('\n');
 }
 
@@ -1475,8 +1492,9 @@ async function compileUserModuleCall(stmt: ModuleCallStmt): Promise<string> {
   const {decls, geos, dollars} = stmt.child && stmt.child.kind !== 'empty' ?
       await collectChildrenWithDecls(stmt, true) :
       {decls: [], geos: [], dollars: []};
+  const callExpr = `${isAsyncModuleCall(stmt) ? 'await ' : ''}${name}(${argList})`;
   const result = wrapDollarScope(
-      buildWithChildrenCall(`${name}(${argList})`, geos, stmt.name), dollars);
+      buildWithChildrenCall(callExpr, geos, stmt.name), dollars);
 
   if (decls.length > 0) {
     if (result.includes('await ')) {

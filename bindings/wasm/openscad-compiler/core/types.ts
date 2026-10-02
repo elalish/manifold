@@ -10,6 +10,10 @@ export interface FileResolver {
   getSurfaceFilePath(filenameStr: string, sourceFile: string): Promise<string>;
 }
 
+export interface PathResolver {
+  path: typeof import('path-browserify') | typeof import('path');
+}
+
 export interface ScadFileHit {
   path: string;
   libraryName?: string;
@@ -205,6 +209,8 @@ export interface LibraryManifest {
   };
   signatures: Record<string, string[]>;
   signatureNoArg?: Record<string, boolean[]>;
+  asyncModules?: string[];
+  cpsFunctions?: string[];
 }
 
 export interface ResolvedExternalLib {

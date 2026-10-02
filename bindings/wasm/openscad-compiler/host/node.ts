@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-import type {FileResolver, ScadFileHit} from '../core/types.js';
+import type {FileResolver, PathResolver, ScadFileHit} from '../core/types.js';
 
 
 // Directories searched for include <...>/use <...>: the file's folder, working
@@ -63,3 +63,5 @@ export const nodeFileResolver: FileResolver = {
     return Promise.resolve(path.resolve(basePath, filenameStr));
   }
 }
+
+export const nodePathResolver: PathResolver = {path};
