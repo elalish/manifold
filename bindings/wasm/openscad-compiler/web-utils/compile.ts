@@ -12,10 +12,8 @@ import {rewriteImports, runtimeUrl, stripTypes} from './utils/import_handler.js'
 export async function compile(
     inputCode: string,
     options: {runtimeUrl?: string; esbuildWasmUrl?: string} = {}) {
-  try {
-    if (!inputCode) {
-      console.log('Error: Input code is required');
-      return;
+    if (!inputCode.trim()) {
+      throw new Error('OpenSCAD code is required');
     }
 
     const randomId = crypto.randomUUID();
@@ -106,7 +104,7 @@ export async function compile(
           new Blob([executableCode], {type: 'application/javascript'});
       const consumerUrl = URL.createObjectURL(consumerBlob);
       createdUrls.push(consumerUrl);
-      await import(/* @vite-ignore */ consumerUrl);
+      const module = await import(/* @vite-ignore */ consumerUrl);
 
       if (resolvedFiles.length > 1) {
         console.log(`Resolved ${resolvedFiles.length} local files`);
@@ -117,15 +115,13 @@ export async function compile(
       }
       console.log(`Generated TypeScript (${js.length.toLocaleString()} chars)`);
       console.log(`Output written to ${outputPath}`);
+      return {module, code: js, outputPath};
     } catch (err) {
       console.error(`Error: ${(err as Error).message}`);
+      throw err;
     } finally {
       for (const url of createdUrls) URL.revokeObjectURL(url);
     }
-  } catch (error) {
-    console.log('An error occurred: ' + error);
-    return;
-  }
 }
 
 export default compile;

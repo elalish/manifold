@@ -41,11 +41,10 @@ async function findScadFile(includePath: string, fromDir: string, entryDir: stri
   if (!path.isAbsolute(normalized) && segments.length > 1 && libraryName &&
       !segments.some(part => part === '.' || part === '..')) {
     const libRoot = path.join('/openscad_libs', libraryName);
-    if (!vfs.existsSync(libRoot) &&
-        await fetchAndSaveLibrary(libraryName)) {
-      const candidate = path.resolve('/openscad_libs', normalized);
-      if (vfs.isFileSync(candidate)) return fileHit(candidate);
-    }
+    if (!vfs.existsSync(libRoot)) await fetchAndSaveLibrary(libraryName);
+    const candidate = path.resolve('/openscad_libs', normalized);
+    if (vfs.isFileSync(candidate)) return fileHit(candidate);
+    throw new Error(`Library file not found: ${includePath}`);
   }
 
   return undefined;
@@ -78,4 +77,15 @@ export const webFileResolver: FileResolver = {
   }
 }
 
-export const webPathResolver: PathResolver = {path};
+// in web mode all compiler paths are rooted at the VFS root
+const vfsPath: typeof path = {
+  ...path,
+  resolve(...paths: string[]) {
+    return path.resolve('/', ...paths);
+  },
+  relative(from: string, to: string) {
+    return path.relative(path.resolve('/', from), path.resolve('/', to));
+  },
+};
+
+export const webPathResolver: PathResolver = {path: vfsPath};

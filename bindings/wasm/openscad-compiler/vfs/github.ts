@@ -1,5 +1,11 @@
-import { unzipSync } from "fflate";
 import { vfs } from "./vfs.js";
+
+interface GitHubTreeEntry {
+  path: string;
+  type: string;
+}
+
+const MAX_PARALLEL_DOWNLOADS = 10;
 
 async function findGitHubRepository(repoName: string) {
   const res = await fetch(
@@ -28,79 +34,67 @@ async function findGitHubRepository(repoName: string) {
 
 
 export async function fetchAndSaveLibrary(libName: string): Promise<boolean> {
+  if (!/^[A-Za-z0-9_.-]+$/.test(libName) || libName === '.' || libName === '..') {
+    throw new Error(`Invalid library name: ${libName}`);
+  }
   const libRoot = `/openscad_libs/${libName}`;
   if (vfs.existsSync(libRoot)) return true;
   try {
-    // libname is the repo name
     const { owner, repo, branch } = await findGitHubRepository(libName);
-
     console.log(`Found GitHub repository: ${owner}/${repo} (${branch})`);
-
-    // download repo zip
-    const url = `https://api.github.com/repos/${owner}/${repo}/zipball/${encodeURIComponent(branch)}`;
-
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(`Failed to download repository: ${response.status}`);
+    // The archive redirects to codeload.github.com, which blocks browser requests - Use the tree API and raw file host instead
+    const treeUrl = `https://api.github.com/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/trees/${encodeURIComponent(branch)}?recursive=1`;
+    const treeResponse = await fetch(treeUrl);
+    if (!treeResponse.ok) {
+      throw new Error(`Failed to list ${owner}/${repo}: ${treeResponse.status}`);
+    }
+    const tree: {tree?: GitHubTreeEntry[]; truncated?: boolean} =
+      await treeResponse.json();
+    if (tree.truncated) {
+      throw new Error(`GitHub returned an incomplete file list for ${owner}/${repo}`);
+    }
+    const files = tree.tree?.filter(entry => entry.type === 'blob') ?? [];
+    if (files.length === 0) {
+      throw new Error(`GitHub repository ${owner}/${repo} has no files`);
     }
 
-    const archive = new Uint8Array(await response.arrayBuffer());
-
-    // extract the zip
-    const files = unzipSync(archive);
-
-
-    // GitHub's zipball uses a generated top-level directory, which does not
-    // necessarily match either the repository name or its branch.
-    const rootPrefix = Object.keys(files)[0]?.replace(/\\/g, '/').split('/')[0];
-    if (!rootPrefix) throw new Error('GitHub archive is empty');
-
-    let savedFiles = 0;
-    for (const [filePath, data] of Object.entries(files)) {
-      const normalizedPath = filePath.replace(/\\/g, '/');
-      // ignore directories
-      if (normalizedPath.endsWith("/")) {
-        continue;
+    for (const file of files) {
+      if (!file.path || file.path.includes('\\') || file.path.split('/').some(
+            part => !part || part === '.' || part === '..')) {
+        throw new Error(`Unsafe GitHub repository path: ${file.path}`);
       }
-
-      if (!normalizedPath.startsWith(`${rootPrefix}/`)) {
-        throw new Error(`Unexpected GitHub archive path: ${filePath}`);
-      }
-      const relativePath = normalizedPath.slice(rootPrefix.length + 1);
-
-      if (!relativePath) {
-        continue;
-      }
-      if (relativePath.split('/').some(
-              part => !part || part === '.' || part === '..')) {
-        throw new Error(`Unsafe GitHub archive path: ${filePath}`);
-      }
-
-      const vfsPath = `${libRoot}/${relativePath}`;
-
-      // ensure parent directories exist
-      const dirPath = vfsPath.split("/").slice(0, -1).join("/");
-      if (dirPath) {
-        vfs.mkdirSync(dirPath, {recursive: true});
-      }
-
-      vfs.writeFileSync(vfsPath, data);
-      savedFiles++;
     }
-    if (savedFiles === 0) throw new Error('GitHub archive has no files');
 
-    console.log(
-      `Saved ${savedFiles} files from ${repo} to ${libRoot}`
-    );
+    let nextFile = 0;
+    let failure: Error|undefined;
+    const download = async () => {
+      while (!failure && nextFile < files.length) {
+        const file = files[nextFile++]!;
+        try {
+          const rawPath = file.path.split('/').map(encodeURIComponent).join('/');
+          const rawUrl = `https://raw.githubusercontent.com/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/${encodeURIComponent(branch)}/${rawPath}`;
+          const response = await fetch(rawUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to download ${file.path}: ${response.status}`);
+          }
+          const vfsPath = `${libRoot}/${file.path}`;
+          vfs.mkdirSync(vfsPath.slice(0, vfsPath.lastIndexOf('/')),
+                        {recursive: true});
+          vfs.writeFileSync(vfsPath, new Uint8Array(await response.arrayBuffer()));
+        } catch (error) {
+          failure = error instanceof Error ? error : new Error(String(error));
+        }
+      }
+    };
+    await Promise.all(Array.from({length: Math.min(MAX_PARALLEL_DOWNLOADS, files.length)},
+                                 () => download()));
+    if (failure) throw failure;
+
+    console.log(`Saved ${files.length} files from ${repo} to ${libRoot}`);
     return true;
   } catch (err) {
     // An incomplete download must not block a later retry.
     vfs.rmSync(libRoot, {recursive: true, force: true});
-    console.error(
-      "Failed to fetch and save library",
-      err
-    );
-    return false;
+    throw err;
   }
 }

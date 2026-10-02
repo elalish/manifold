@@ -50,7 +50,7 @@ export const viewport = {vpr: ctx.$vpr, vpt: ctx.$vpt, vpd: ctx.$vpd, vpf: ctx.$
 | `runtime/runtime.ts` | The runtime every compiled file imports: primitives, transforms, booleans, extrusions, OpenSCAD value semantics (`add`, `eq`, `index`, …), `echo`, `rands`, `text`, `surface`. |
 | `commands/` | `commander` subcommands (`compile`, `compile-all`). |
 | `index.ts` | CLI entry point (`openscad-to-manifold`). |
-| `viewer.html` | Three.js viewer that loads a compiled `.ts` module in the browser. |
+| `viewer.html` | Three.js viewer that compiles pasted OpenSCAD code in the browser. |
 
 Source locations survive the whole pipeline: the emitted TypeScript is annotated with the
 originating `.scad` file and comments, which is what `test/source-location.test.ts`
@@ -212,12 +212,18 @@ Named exports:
 ### View in the browser
 
 ```bash
-npm run serve
+npm run viewer
 ```
 
-Then open `viewer.html` and enter a path to a compiled module (e.g. `test/out/cube.ts`).
-The viewer strips TypeScript annotations on the fly, imports the module, renders it with
-Three.js, and applies the exported viewport variables.
+Open `http://127.0.0.1:5173/viewer.html`, paste OpenSCAD code, and click
+**Compile and view**. The viewer compiles in the browser, shows the generated
+TypeScript in an editable middle panel, renders the result with Three.js in the
+right panel, and applies the exported viewport variables. Editing the
+TypeScript panel does not change the preview. The default example uses
+`smiley.png`, which the viewer downloads into the root of the in-memory VFS
+before compilation. The runtime file and canvas resolvers read from that VFS,
+and `/fonts` is created for web font loading. The page uses Vite to serve the
+TypeScript modules and the bundler's WASM asset during manual testing.
 
 ## Language support
 

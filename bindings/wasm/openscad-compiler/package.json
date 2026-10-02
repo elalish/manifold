@@ -8,6 +8,7 @@
   },
   "scripts": {
     "build": "tsup index.ts --format cjs && tsup runtime/runtime.ts --format esm --target esnext --outDir runtime --external manifold-3d --external opentype.js --external fs --no-splitting",
+    "viewer": "vite --host 127.0.0.1",
     "serve": "npx serve .",
     "compile-all": "npx tsx index.ts compile-all",
     "unzip-and-run-test": "npx tsx run-test.ts",
@@ -26,6 +27,7 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
+    "buffer": "^5.7.1",
     "canvas": "^3.2.3",
     "commander": "^14.0.3",
     "dxf-parser": "^1.1.2",
@@ -45,6 +47,7 @@
     "tsup": "^8.5.1",
     "tsx": "^4.21.0",
     "typescript": "^6.0.3",
+    "vite": "^8.1.5",
     "vitest": "^4.1.10"
   }
 }
