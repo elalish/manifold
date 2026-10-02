@@ -168,21 +168,17 @@ inline vec3 GetBarycentric(const vec3& v, const mat3& triPos,
   if (d2[longSide] < tol2) {  // point
     return vec3(1, 0, 0);
   } else if (area2 > d2[longSide] * tol2) {  // triangle
-    vec3 raw(0.0);
     for (const int i : {0, 1, 2}) {
       const int j = Next3(i);
       const vec3 crossPv = la::cross(edges[i], v - triPos[j]);
       const double area2v = la::dot(crossPv, crossPv);
-      raw[i] = la::dot(crossPv, crossP);
       // Return exactly equal if within tolerance of edge.
-      uvw[i] = area2v < d2[i] * tol2 ? 0 : raw[i];
+      uvw[i] = area2v < d2[i] * tol2 ? 0 : la::dot(crossPv, crossP);
     }
     const double sum = uvw[0] + uvw[1] + uvw[2];
-    // A point can be within tolerance of all three edges. In that case,
-    // preserve its unsnapped barycentric coordinates instead of dividing by
-    // zero.
-    uvw = sum == 0 ? raw / (raw[0] + raw[1] + raw[2]) : uvw / sum;
-    return uvw;
+    // If all weights are zero, give each corner equal weight rather than
+    // dividing by zero.
+    return sum == 0 ? vec3(1.0 / 3.0) : uvw / sum;
   } else {  // line
     const int nextV = Next3(longSide);
     const double alpha =

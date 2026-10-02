@@ -24,7 +24,7 @@ using namespace manifold;
 
 TEST(Utils, BarycentricAllWeightsSnappedToZero) {
   // Both points are within tolerance of every edge, but not any vertex.
-  // Scaling both the triangle and tolerance must preserve the weights.
+  // Scaling both the triangle and tolerance must preserve the equal fallback.
   for (const double scale : {1e-50, 1e-12, 1.0, 1e12, 1e50}) {
     SCOPED_TRACE(testing::Message() << "scale = " << scale);
     const mat3 tri(vec3(0, 0, 0), vec3(2, 0, 0), vec3(1, std::sqrt(3.0), 0));
@@ -32,21 +32,52 @@ TEST(Utils, BarycentricAllWeightsSnappedToZero) {
       SCOPED_TRACE(testing::Message() << "reversed = " << reversed);
       const mat3 scaled =
           scale * (reversed ? mat3(tri[0], tri[2], tri[1]) : tri);
-      for (const vec3 expected : {vec3(1.0 / 3.0), vec3(0.30, 0.34, 0.36)}) {
-        SCOPED_TRACE(testing::Message() << "weights = " << expected.x << ", "
-                                        << expected.y << ", " << expected.z);
-        const vec3 point = expected.x * scaled[0] + expected.y * scaled[1] +
-                           expected.z * scaled[2];
-        const double tolerance = expected.x == expected.y ? 0.6 : 0.65;
+      for (const vec3 inputWeights :
+           {vec3(1.0 / 3.0), vec3(0.30, 0.34, 0.36)}) {
+        SCOPED_TRACE(testing::Message()
+                     << "weights = " << inputWeights.x << ", " << inputWeights.y
+                     << ", " << inputWeights.z);
+        const vec3 point = inputWeights.x * scaled[0] +
+                           inputWeights.y * scaled[1] +
+                           inputWeights.z * scaled[2];
+        const double tolerance = inputWeights.x == inputWeights.y ? 0.6 : 0.65;
         const vec3 weights = GetBarycentric(point, scaled, tolerance * scale);
         for (int i : {0, 1, 2}) {
           EXPECT_TRUE(std::isfinite(weights[i]));
-          EXPECT_NEAR(weights[i], expected[i], 1e-12);
+          EXPECT_DOUBLE_EQ(weights[i], 1.0 / 3.0);
         }
         EXPECT_NEAR(weights.x + weights.y + weights.z, 1.0, 1e-12);
       }
     }
   }
+}
+
+TEST(Utils, BarycentricRawWeightsUnderflowToZero) {
+  const double scale = 68 * 1e-83;
+  const mat3 tri(vec3(0, 0, 0), vec3(2 * scale, 0, 0),
+                 vec3(scale, std::sqrt(3.0) * scale, 0));
+  const vec3 point = (tri[0] + tri[1] + tri[2]) / 3.0;
+  const double tolerance = 0.6 * scale;
+
+  // The triangle passes the area check, but all three raw weights underflow
+  // to zero. Normalizing those raw weights would still divide by zero.
+  const mat3 edges(tri[2] - tri[1], tri[0] - tri[2], tri[1] - tri[0]);
+  const vec3 crossP = la::cross(edges[0], edges[1]);
+  const double area2 = la::dot(crossP, crossP);
+  double longestSide2 = 0;
+  for (const int i : {0, 1, 2}) {
+    longestSide2 = std::max(longestSide2, la::dot(edges[i], edges[i]));
+    const vec3 crossPv = la::cross(edges[i], point - tri[Next3(i)]);
+    ASSERT_DOUBLE_EQ(la::dot(crossPv, crossP), 0.0);
+  }
+  ASSERT_GT(area2, longestSide2 * (tolerance * tolerance));
+
+  const vec3 weights = GetBarycentric(point, tri, tolerance);
+  for (const int i : {0, 1, 2}) {
+    EXPECT_TRUE(std::isfinite(weights[i]));
+    EXPECT_DOUBLE_EQ(weights[i], 1.0 / 3.0);
+  }
+  EXPECT_NEAR(weights.x + weights.y + weights.z, 1.0, 1e-12);
 }
 
 TEST(Utils, BarycentricRetainsSnapping) {
