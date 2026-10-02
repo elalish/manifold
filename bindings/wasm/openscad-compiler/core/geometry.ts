@@ -5,7 +5,7 @@ import {BUILTIN_VAR_CONSTANTS} from './builtins.js';
 import {compileArgList, compileExpr, findArg, inferDeclaredType, isIndexRange, locTag, namesNeedingPredeclaration, numericTypeOf} from './expr.js';
 import {bindJsName, declJsName, escapeName, svTarget, T,} from './naming.js';
 import {nodeReferencesIdentifier, slotUsesNoArg} from './scan.js';
-import {cpsTransformedFunctions, currentMainFilename, currentSourceFilename, dynamicScopeVars, externalModuleNames, globalVarDeclKeyword, moduleDeclRegistry, parentModulesReadInFunction, RT, signatures, globalPathResolver} from './state.js';
+import {cpsTransformedFunctions, currentMainFilename, currentSourceFilename, dynamicScopeVars, externalModuleNames, globalPathResolver, globalVarDeclKeyword, moduleDeclRegistry, parentModulesReadInFunction, RT, signatures} from './state.js';
 import {compileSurface} from './surface.js';
 import {deduplicateParams, emitTailBody, hasSelfTailCall, moduleAlwaysRecurses, tailAlwaysRecurses} from './tailcall.js';
 import type {Binding, ModuleDeclStmtType} from './types.js';
@@ -114,8 +114,9 @@ export async function compileDeclaration(
       const defaultsPrologue = emitNoArgDefaults(declKey, dedup, '  ');
       if (!dedup.some(p => p.name === stmt.name) &&
           moduleAlwaysRecurses(stmt.body, stmt.name)) {
-        const base = currentMainFilename ? globalPathResolver?.path.basename(currentMainFilename) :
-                                           '<unknown>';
+        const base = currentMainFilename ?
+            globalPathResolver?.path.basename(currentMainFilename) :
+            '<unknown>';
         const line = stmt.loc?.start.line ?? 0;
         throw new Error(`Recursion detected calling module '${
             stmt.name}' in file ${base}, line ${line}`);
@@ -127,8 +128,8 @@ export async function compileDeclaration(
       const isAsync = moduleBodyNeedsAsync(stmt);
       return withLeading(`${isAsync ? 'async ' : ''}function ${
           declJsName(stmt, 'mod')}(${params}): ${
-          isAsync ? `Promise<${GEOMETRY_TYPE}>` : GEOMETRY_TYPE} {\n${
-          defaultsPrologue}${body}\n}`);
+          isAsync ? `Promise<${GEOMETRY_TYPE}>` :
+                    GEOMETRY_TYPE} {\n${defaultsPrologue}${body}\n}`);
     }
 
     case 'functionDecl': {
@@ -159,7 +160,8 @@ export async function compileDeclaration(
       const defaultsPrologue = emitNoArgDefaults(declKey, dedup, '  ');
       const fnJsName = declJsName(stmt, 'fn');
 
-      // Lower self tail calls to CPS tc() thunks for iterative trampoline execution
+      // Lower self tail calls to CPS tc() thunks for iterative trampoline
+      // execution
       if (!dedup.some(p => p.name === stmt.name) &&
           hasSelfTailCall(stmt.body, stmt.name)) {
         if (tailAlwaysRecurses(stmt.body, stmt.name)) {
@@ -174,14 +176,12 @@ export async function compileDeclaration(
         cpsTransformedFunctions.add(fnJsName);
         const loopBody =
             emitTailBody(stmt.body, stmt.name, fnJsName, dedup, '  ');
-        return withLeading(
-            `function ${fnJsName}(${params}): any {\n${rebinds}${
-                defaultsPrologue}${loopBody}\n}`);
+        return withLeading(`function ${fnJsName}(${params}): any {\n${rebinds}${
+            defaultsPrologue}${loopBody}\n}`);
       }
       const bodyExpr = (compileExpr(stmt.body));
-      return withLeading(
-          `function ${fnJsName}(${params}): any {\n${rebinds}${
-              defaultsPrologue}  return ${bodyExpr};\n}`);
+      return withLeading(`function ${fnJsName}(${params}): any {\n${rebinds}${
+          defaultsPrologue}  return ${bodyExpr};\n}`);
     }
 
     default:
@@ -541,8 +541,9 @@ async function compileModuleCall(stmt: ModuleCallStmt): Promise<string> {
         result = `await ${compileText(stmt.args)}`;
         break;
       case 'surface':
-        result = `await ${await compileSurface(
-            stmt.args, currentSourceFilename || currentMainFilename)}`;
+        result = `await ${
+            await compileSurface(
+                stmt.args, currentSourceFilename || currentMainFilename)}`;
         break;
 
       // Transforms
@@ -1492,7 +1493,8 @@ async function compileUserModuleCall(stmt: ModuleCallStmt): Promise<string> {
   const {decls, geos, dollars} = stmt.child && stmt.child.kind !== 'empty' ?
       await collectChildrenWithDecls(stmt, true) :
       {decls: [], geos: [], dollars: []};
-  const callExpr = `${isAsyncModuleCall(stmt) ? 'await ' : ''}${name}(${argList})`;
+  const callExpr =
+      `${isAsyncModuleCall(stmt) ? 'await ' : ''}${name}(${argList})`;
   const result = wrapDollarScope(
       buildWithChildrenCall(callExpr, geos, stmt.name), dollars);
 

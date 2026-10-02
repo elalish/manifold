@@ -33,7 +33,8 @@ export const externalVariableNames: Set<string> = new Set();
 // Track special variables that need module-level declarations for dynamic
 // scoping
 export const dynamicScopeVars: Set<string> = new Set();
-// JS functions transformed to CPS. Calls must use call() to trampoline tc() thunks
+// JS functions transformed to CPS. Calls must use call() to trampoline tc()
+// thunks
 export const cpsTransformedFunctions = new Set<string>();
 // Names introduced by the emitter
 export const unitTakenNames = new Set<string>();

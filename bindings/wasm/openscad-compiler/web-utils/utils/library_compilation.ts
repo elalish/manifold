@@ -1,12 +1,12 @@
-import { vfs } from '../../vfs/vfs.js';
 import path from 'path-browserify';
 
 import {compileLibrary} from '../../core/library.js';
 import {resolveLibraryClosure, resolveProgramWithLibraries} from '../../core/resolver.js';
 import type {ExternalLibraryRef, LibraryManifest, ResolvedExternalLib, ResolvedProgramWithLibraries} from '../../core/types.js';
+import {vfs} from '../../vfs/vfs.js';
 
 const MANIFEST_VERSION = 1;
-const RUNTIME_VERSION = "1.0.0";
+const RUNTIME_VERSION = '1.0.0';
 
 function toPosixSpecifier(p: string): string {
   let rel = p.replace(/\\/g, '/').replace(/\.ts$/i, '.js');
@@ -14,8 +14,11 @@ function toPosixSpecifier(p: string): string {
   return rel;
 }
 
-async function ensureLibraryCompiled(ref: ExternalLibraryRef, entryDir: string, cwd: string): Promise<{manifest: LibraryManifest; libDir: string}> {
-  const libDir = '/' + path.join('runtime', 'libraries', ref.name.toLowerCase());
+async function ensureLibraryCompiled(
+    ref: ExternalLibraryRef, entryDir: string,
+    cwd: string): Promise<{manifest: LibraryManifest; libDir: string}> {
+  const libDir =
+      '/' + path.join('runtime', 'libraries', ref.name.toLowerCase());
   const manifestPath = path.join(libDir, '.manifest.json');
   const runtimeVersion = RUNTIME_VERSION;
 
@@ -24,8 +27,11 @@ async function ensureLibraryCompiled(ref: ExternalLibraryRef, entryDir: string, 
   let priorFiles: string[] = [];
   let staleRuntime = false;
   if (vfs.existsSync(libDir) && vfs.existsSync(manifestPath)) {
-    const manifest = JSON.parse(vfs.readFileSync(manifestPath, 'utf-8') as string) as LibraryManifest;
-    const relOf = (abs: string) => path.relative(ref.root, abs).replace(/\\/g, '/');
+    const manifest =
+        JSON.parse(vfs.readFileSync(manifestPath, 'utf-8') as string) as
+        LibraryManifest;
+    const relOf = (abs: string) =>
+        path.relative(ref.root, abs).replace(/\\/g, '/');
     const missing = ref.entries.filter(e => !(relOf(e.file) in manifest.files));
     // Emitted code is tied to the runtime it was compiled against, so a version
     // change invalidates every cached file regardless of coverage. The
@@ -55,11 +61,14 @@ async function ensureLibraryCompiled(ref: ExternalLibraryRef, entryDir: string, 
   for (const e of ref.entries) {
     if (!entryFiles.includes(e.file)) entryFiles.push(e.file);
   }
-  const closure = await resolveLibraryClosure(ref.name, ref.root, entryFiles, entryDir);
+  const closure =
+      await resolveLibraryClosure(ref.name, ref.root, entryFiles, entryDir);
   const runtimeJsAbs = path.join(cwd, 'runtime', 'runtime.js');
-  const runtimePathFor = (outRel: string) => toPosixSpecifier(path.relative(path.dirname(path.join(libDir, outRel)), runtimeJsAbs));
+  const runtimePathFor = (outRel: string) => toPosixSpecifier(
+      path.relative(path.dirname(path.join(libDir, outRel)), runtimeJsAbs));
 
-  const compiled = await compileLibrary(closure, {runtimeVersion, runtimePathFor});
+  const compiled =
+      await compileLibrary(closure, {runtimeVersion, runtimePathFor});
 
   // Clear out any output the new build does not overwrite by name, so nothing
   // emitted by the old version of compiler
@@ -76,14 +85,18 @@ async function ensureLibraryCompiled(ref: ExternalLibraryRef, entryDir: string, 
   return {manifest: compiled.manifest, libDir};
 }
 
-export async function getExternalLibraries(absFile: string, outputFile: any): Promise<{externalLibraries: ResolvedExternalLib[], resolved: ResolvedProgramWithLibraries}> {
-  const entryDir = "/";
+export async function getExternalLibraries(
+    absFile: string, outputFile: any): Promise<{
+  externalLibraries: ResolvedExternalLib[],
+  resolved: ResolvedProgramWithLibraries
+}> {
+  const entryDir = '/';
   const resolved = await resolveProgramWithLibraries(absFile);
-  const outDir = "/";
+  const outDir = '/';
   const externalLibraries: ResolvedExternalLib[] = [];
 
   for (const [name, ref] of resolved.externalLibraries) {
-    const {manifest} = await ensureLibraryCompiled(ref, entryDir, "/");
+    const {manifest} = await ensureLibraryCompiled(ref, entryDir, '/');
     const libDir = '/' + path.join('runtime', 'libraries', name.toLowerCase())
 
     const importSpecifierFor = (sourceRel: string): string => {

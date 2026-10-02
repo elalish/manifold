@@ -29,10 +29,11 @@ function decodeImagePixels(filePath: string): SurfaceImage|undefined {
 
 // Reads a `surface()` source file, decoding PNGs to pixels and returning any
 // other file as its raw text. Warns and returns undefined when unreadable.
-export function computeSurfaceData(filePath: string): string|SurfaceImage|undefined { 
+export function computeSurfaceData(filePath: string): string|SurfaceImage|
+    undefined {
   if (!runtimeFileResolver.exists(filePath)) {
     console.warn(`Warning: surface("${filePath}"): can't open file "${
-      filePath}", ignoring.`);
+        filePath}", ignoring.`);
     return undefined;
   }
 

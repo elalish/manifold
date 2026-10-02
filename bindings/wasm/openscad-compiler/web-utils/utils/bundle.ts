@@ -7,7 +7,8 @@ let initialized: Promise<void>|undefined;
 
 async function initializeBrowser(wasmUrl?: string): Promise<void> {
   if (!initialized) {
-    const url = wasmUrl ? new URL(wasmUrl, location.href).href :
+    const url = wasmUrl ?
+        new URL(wasmUrl, location.href).href :
         new URL('../../node_modules/esbuild-wasm/esbuild.wasm', import.meta.url)
             .href;
     initialized = esbuild.initialize({wasmURL: url}).catch(error => {
@@ -19,7 +20,8 @@ async function initializeBrowser(wasmUrl?: string): Promise<void> {
 }
 
 // bundle the VFS module graph into one ES module
-export async function bundleVfsEntry(entryPath: string, runtimeUrl: string, wasmUrl?: string): Promise<string> {
+export async function bundleVfsEntry(
+    entryPath: string, runtimeUrl: string, wasmUrl?: string): Promise<string> {
   if (typeof process === 'undefined') await initializeBrowser(wasmUrl);
 
   const result = await esbuild.build({
@@ -47,10 +49,12 @@ export async function bundleVfsEntry(entryPath: string, runtimeUrl: string, wasm
           }
           return {path: sourcePath, namespace: 'openscad-vfs'};
         });
-        build.onLoad({filter: /.*/, namespace: 'openscad-vfs'}, args => ({
-          contents: vfs.readFileSync(args.path, 'utf8') as string,
-          loader: 'ts',
-        }));
+        build.onLoad(
+            {filter: /.*/, namespace: 'openscad-vfs'},
+            args => ({
+              contents: vfs.readFileSync(args.path, 'utf8') as string,
+              loader: 'ts',
+            }));
       },
     }],
   });

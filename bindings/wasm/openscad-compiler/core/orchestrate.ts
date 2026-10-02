@@ -1,6 +1,6 @@
 import {compile} from './compiler.js';
+import {globalPathResolver} from './state.js';
 import type {ResolvedExternalLib, ResolvedProgramWithLibraries} from './types.js';
-import { globalPathResolver } from './state.js';
 
 export async function compileConsumer(
     entryFile: string, outputFile: string, cwd: string,
@@ -9,7 +9,8 @@ export async function compileConsumer(
     Promise<{code: string; resolvedFiles: string[]}> {
   const entryAbs = globalPathResolver?.path.resolve(entryFile);
 
-  const outDir = globalPathResolver?.path.dirname(globalPathResolver?.path.resolve(outputFile))!;
+  const outDir = globalPathResolver?.path.dirname(
+      globalPathResolver?.path.resolve(outputFile))!;
 
   let relPath = globalPathResolver?.path.relative(outDir, cwd)!;
   if (relPath === '') relPath = '.';

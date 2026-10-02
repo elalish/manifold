@@ -6,7 +6,7 @@ import {formatCode} from './format.js';
 import {compileDeclaration, PRE_DECLARED_VARS} from './geometry.js';
 import {assignPrettyNames, bindJsName, buildRuntimeImport, builtinConstantsFor, builtinSymbolNames, declJsName, globalJsName, namesBlockingRuntimeLocals, namesInUse, reservedNames, resetTempNames, resolveRuntimeLocals, T,} from './naming.js';
 import {collectDeclarations, paramUsesNoArg, scanProgram,} from './scan.js';
-import {cpsTransformedFunctions, currentBindOptions, currentMainFilename, currentScope, currentSourceFilename, dynamicScopeVars, externalFunctionNames, externalModuleNames, externalVariableNames, localDecls, noArgDemotions, resetTailTemps, RT, setBindResult, setCurrentRuntimePath, setCurrentScope, setCurrentSourceFilename, setGlobalVarDeclKeyword, setMainFilename, setModuleDecls, setParentModulesReadInFunction, signatures, globalPathResolver} from './state.js';
+import {cpsTransformedFunctions, currentBindOptions, currentMainFilename, currentScope, currentSourceFilename, dynamicScopeVars, externalFunctionNames, externalModuleNames, externalVariableNames, globalPathResolver, localDecls, noArgDemotions, resetTailTemps, RT, setBindResult, setCurrentRuntimePath, setCurrentScope, setCurrentSourceFilename, setGlobalVarDeclKeyword, setMainFilename, setModuleDecls, setParentModulesReadInFunction, signatures} from './state.js';
 import {hasSelfTailCall} from './tailcall.js';
 import type {Binding, CompiledLibrary, CompiledLibraryFile, LibraryClosure, LibraryManifest, Namespace, Scope,} from './types.js';
 
@@ -99,7 +99,8 @@ export async function compileLibrary(
       {reserved: reservedNames(), builtinSymbols: builtinSymbolNames()});
   resetTempNames(namesInUse(libBind, scan.unresolved));
 
-  // Calls can cross files, so identify trampoline functions before emitting any file
+  // Calls can cross files, so identify trampoline functions before emitting any
+  // file
   for (const stmt of allStatements) {
     if (stmt.kind === 'functionDecl' &&
         !stmt.params.some(p => p.name === stmt.name) &&
@@ -208,9 +209,10 @@ export async function compileLibrary(
     signatures: manifestSignatures,
     signatureNoArg: manifestSignatureNoArg,
     asyncModules: [...manifestAsyncModules],
-    cpsFunctions: Object.entries(manifestSymbols.functions)
-                      .filter(([, jsName]) => cpsTransformedFunctions.has(jsName))
-                      .map(([name]) => name),
+    cpsFunctions:
+        Object.entries(manifestSymbols.functions)
+            .filter(([, jsName]) => cpsTransformedFunctions.has(jsName))
+            .map(([name]) => name),
   };
 
   setGlobalVarDeclKeyword('let');
@@ -368,7 +370,9 @@ async function emitLibraryFile(
 export function relImportSpecifier(
     fromOutRel: string, toOutRel: string): string {
   let rel =
-      globalPathResolver?.path.relative(globalPathResolver?.path.dirname(fromOutRel), toOutRel).replace(/\\/g, '/')!;
+      globalPathResolver?.path
+          .relative(globalPathResolver?.path.dirname(fromOutRel), toOutRel)
+          .replace(/\\/g, '/')!;
   rel = rel.replace(/\.ts$/i, '.js');
   if (!rel.startsWith('.')) rel = './' + rel;
   return rel;

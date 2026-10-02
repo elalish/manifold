@@ -11,7 +11,7 @@ export interface FileResolver {
 }
 
 export interface PathResolver {
-  path: typeof import('path-browserify') | typeof import('path');
+  path: typeof import('path-browserify')|typeof import('path');
 }
 
 export interface ScadFileHit {

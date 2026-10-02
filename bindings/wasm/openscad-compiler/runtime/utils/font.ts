@@ -1,4 +1,5 @@
 import path from 'path-browserify';
+
 import {environmentResolver, runtimeFileResolver} from './host.js';
 
 // Font directory listing
@@ -42,19 +43,20 @@ function fontDirListing(fontDir: string): Map<string, string> {
 }
 
 async function fetchAndStoreFontFile(fontSpec: string) {
-  const [family, ...props] = fontSpec.split(":");
+  const [family, ...props] = fontSpec.split(':');
 
-  const style = props
-    .find(p => p.startsWith("style="))
-    ?.split("=")[1]
-    ?.toLowerCase() === "italic"
-    ? "italic"
-    : "normal";
+  const style =
+      props.find(p => p.startsWith('style='))?.split('=')[1]?.toLowerCase() ===
+          'italic' ?
+      'italic' :
+      'normal';
 
-  const weight = Number(props.find(p => p.startsWith("weight="))?.split("=")[1]) || 400;
+  const weight =
+      Number(props.find(p => p.startsWith('weight='))?.split('=')[1]) || 400;
 
   // resolve font through fontsource
-  const url = `https://api.fontsource.org/v1/fonts?family=${encodeURIComponent(family.trim())}`;
+  const url = `https://api.fontsource.org/v1/fonts?family=${
+      encodeURIComponent(family.trim())}`;
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -72,7 +74,7 @@ async function fetchAndStoreFontFile(fontSpec: string) {
 
   if (!variant?.url?.ttf) {
     throw new Error(
-      `Variant not found: ${family} ${weight} ${style}`,
+        `Variant not found: ${family} ${weight} ${style}`,
     );
   }
 
@@ -88,9 +90,10 @@ async function fetchAndStoreFontFile(fontSpec: string) {
   // save the downloaded font file
   const fontPath = `/fonts/${font.id}-${weight}-${style}.ttf`;
 
-  runtimeFileResolver.writeFile(fontPath, Buffer.from(await blob.arrayBuffer()));
+  runtimeFileResolver.writeFile(
+      fontPath, Buffer.from(await blob.arrayBuffer()));
 
-  return { filePath: fontPath, mimeType: 'font/ttf' };
+  return {filePath: fontPath, mimeType: 'font/ttf'};
 }
 
 async function resolveFontFile(fontDir: string, basename: string):
@@ -104,8 +107,9 @@ async function resolveFontFile(fontDir: string, basename: string):
     if (file) return {filePath: path.join(fontDir, file), mimeType};
   }
 
-  // if font is not found then fetch the font and store it into VFS if in web mode
-  if (environmentResolver.mode == "web") {
+  // if font is not found then fetch the font and store it into VFS if in web
+  // mode
+  if (environmentResolver.mode == 'web') {
     return await fetchAndStoreFontFile(basename);
   }
 
@@ -114,7 +118,8 @@ async function resolveFontFile(fontDir: string, basename: string):
 
 // Reads the font file a text() spec names from FONTPATH and returns it as a
 // base64 data URL
-export async function computeFontData(fontSpec: string): Promise<string|undefined> {
+export async function computeFontData(fontSpec: string):
+    Promise<string|undefined> {
   if (fontDataCache.has(fontSpec)) return fontDataCache.get(fontSpec);
 
   let data = await loadFontData(fontSpec);
@@ -133,8 +138,8 @@ async function loadFontData(fontSpec: string): Promise<string|undefined> {
   }
 
   const canonical = fontSpecToFilename(fontSpec);
-  const resolved =
-      await resolveFontFile(fontDir, fontSpec) ?? await resolveFontFile(fontDir, canonical);
+  const resolved = await resolveFontFile(fontDir, fontSpec) ??
+      await resolveFontFile(fontDir, canonical);
 
   if (!resolved) {
     console.warn(`Warning: No "${fontSpec}" or "${canonical}" .ttf/.otf in "${

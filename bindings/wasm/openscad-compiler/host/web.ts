@@ -1,15 +1,16 @@
 import path from 'path-browserify';
-import { vfs } from '../vfs/vfs.js';
-import { fetchAndSaveLibrary } from '../vfs/github.js';
+
 import type {FileResolver, PathResolver, ScadFileHit} from '../core/types.js';
+import {fetchAndSaveLibrary} from '../vfs/github.js';
+import {vfs} from '../vfs/vfs.js';
 
 // Directories searched for include <...>/use <...>: the file's folder, working
 // directory, then OPENSCADPATH
 function searchRoots(entryDir: string): string[] {
   return [
     entryDir,
-    "/",
-    "/openscad_libs",
+    '/',
+    '/openscad_libs',
   ];
 }
 
@@ -28,8 +29,9 @@ function fileHit(filePath: string): ScadFileHit {
 }
 
 // Resolves include/use paths
-async function findScadFile(includePath: string, fromDir: string, entryDir: string):
-    Promise<ScadFileHit|undefined> {
+async function findScadFile(
+    includePath: string, fromDir: string,
+    entryDir: string): Promise<ScadFileHit|undefined> {
   const normalized = includePath.replace(/\\/g, '/');
   for (const root of [fromDir, ...searchRoots(entryDir)]) {
     const candidate = path.resolve(root, normalized);
@@ -70,7 +72,7 @@ export const webFileResolver: FileResolver = {
     return findScadFile(includePath, fromDir, entryDir);
   },
   getSurfaceFilePath(filenameStr: string, sourceFile: string): Promise<string> {
-    const base = "/";
+    const base = '/';
     const basePath =
         sourceFile ? path.dirname(path.resolve(base, sourceFile)) : base;
     return Promise.resolve(path.resolve(basePath, filenameStr));
@@ -88,4 +90,6 @@ const vfsPath: typeof path = {
   },
 };
 
-export const webPathResolver: PathResolver = {path: vfsPath};
+export const webPathResolver: PathResolver = {
+  path: vfsPath
+};

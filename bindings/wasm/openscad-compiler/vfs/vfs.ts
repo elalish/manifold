@@ -1,32 +1,32 @@
 interface VFSFile {
   name: string;
-  type: "file";
-  parent: VFSDirectory | null;
+  type: 'file';
+  parent: VFSDirectory|null;
   data: Uint8Array;
 }
 
 interface VFSDirectory {
   name: string;
-  type: "directory";
-  parent: VFSDirectory | null;
+  type: 'directory';
+  parent: VFSDirectory|null;
   children: Map<string, VFSNode>;
 }
 
-type VFSNode = VFSFile | VFSDirectory;
+type VFSNode = VFSFile|VFSDirectory;
 
 export class VFS {
   private readonly root: VFSDirectory;
 
   constructor() {
     this.root = {
-      name: "",
-      type: "directory",
+      name: '',
+      type: 'directory',
       parent: null,
       children: new Map(),
     };
   }
 
-  mkdirSync(path: string, options: { recursive?: boolean } = {}): void {
+  mkdirSync(path: string, options: {recursive?: boolean} = {}): void {
     const parts = this.parsePath(path);
 
     if (parts.length === 0) return;
@@ -40,7 +40,7 @@ export class VFS {
       const existing = current.children.get(part);
 
       if (existing) {
-        if (existing.type !== "directory") {
+        if (existing.type !== 'directory') {
           throw new Error(`ENOTDIR: ${part} is not a directory`);
         }
 
@@ -59,7 +59,7 @@ export class VFS {
 
       const directory: VFSDirectory = {
         name: part,
-        type: "directory",
+        type: 'directory',
         parent: current,
         children: new Map(),
       };
@@ -74,22 +74,22 @@ export class VFS {
   }
 
   isFileSync(path: string): boolean {
-    return this.resolve(path)?.type === "file";
+    return this.resolve(path)?.type === 'file';
   }
 
-  readFileSync(path: string, encoding?: string): Uint8Array | string {
+  readFileSync(path: string, encoding?: string): Uint8Array|string {
     const node = this.resolve(path);
 
     if (!node) {
       throw new Error(`ENOENT: no such file or directory: ${path}`);
     }
 
-    if (node.type !== "file") {
+    if (node.type !== 'file') {
       throw new Error(`EISDIR: ${path} is a directory`);
     }
 
-    if (encoding === "utf8" || encoding === "utf-8") {
-      return new TextDecoder("utf-8").decode(node.data);
+    if (encoding === 'utf8' || encoding === 'utf-8') {
+      return new TextDecoder('utf-8').decode(node.data);
     }
 
     return node.data;
@@ -100,17 +100,18 @@ export class VFS {
     if (!node) {
       throw new Error(`ENOENT: no such directory: ${path}`);
     }
-    if (node.type !== "directory") {
+    if (node.type !== 'directory') {
       throw new Error(`ENOTDIR: ${path} is not a directory`);
     }
     return [...node.children.keys()];
   }
 
-  writeFileSync(path: string, data: string | Uint8Array, encoding?: string): void {
+  writeFileSync(path: string, data: string|Uint8Array, encoding?: string):
+      void {
     const parts = this.parsePath(path);
 
     if (parts.length === 0) {
-      throw new Error("Cannot write to root");
+      throw new Error('Cannot write to root');
     }
 
     const fileName = parts.pop()!;
@@ -125,25 +126,22 @@ export class VFS {
         throw new Error(`ENOENT: no such file or directory: ${part}`);
       }
 
-      if (node.type !== "directory") {
+      if (node.type !== 'directory') {
         throw new Error(`ENOTDIR: ${part} is not a directory`);
       }
 
       current = node;
     }
 
-    if (current.children.get(fileName)?.type === "directory") {
+    if (current.children.get(fileName)?.type === 'directory') {
       throw new Error(`EISDIR: ${path} is a directory`);
     }
 
     let fileData: Uint8Array;
 
-    if (typeof data === "string") {
-      if (
-        encoding !== undefined &&
-        encoding !== "utf8" &&
-        encoding !== "utf-8"
-      ) {
+    if (typeof data === 'string') {
+      if (encoding !== undefined && encoding !== 'utf8' &&
+          encoding !== 'utf-8') {
         throw new Error(`Unsupported encoding: ${encoding}`);
       }
 
@@ -154,7 +152,7 @@ export class VFS {
 
     const file: VFSFile = {
       name: fileName,
-      type: "file",
+      type: 'file',
       parent: current,
       data: fileData,
     };
@@ -162,12 +160,13 @@ export class VFS {
     current.children.set(fileName, file);
   }
 
-  rmSync(path: string, options: { recursive?: boolean; force?: boolean } = {}): void {
+  rmSync(path: string, options: {recursive?: boolean; force?: boolean} = {}):
+      void {
     const parts = this.parsePath(path);
 
     // don't allow deleting the root
     if (parts.length === 0) {
-      throw new Error("EPERM: cannot remove root directory");
+      throw new Error('EPERM: cannot remove root directory');
     }
 
     const name = parts.pop()!;
@@ -183,7 +182,7 @@ export class VFS {
         throw new Error(`ENOENT: no such file or directory: ${path}`);
       }
 
-      if (node.type !== "directory") {
+      if (node.type !== 'directory') {
         throw new Error(`ENOTDIR: ${part} is not a directory`);
       }
 
@@ -197,24 +196,21 @@ export class VFS {
       throw new Error(`ENOENT: no such file or directory: ${path}`);
     }
 
-    if (
-      node.type === "directory" &&
-      node.children.size > 0 &&
-      !options.recursive
-    ) {
+    if (node.type === 'directory' && node.children.size > 0 &&
+        !options.recursive) {
       throw new Error(`ENOTEMPTY: directory not empty: ${path}`);
     }
 
     parent.children.delete(name);
   }
 
-  private resolve(path: string): VFSNode | null {
+  private resolve(path: string): VFSNode|null {
     const parts = this.parsePath(path);
 
     let current: VFSNode = this.root;
 
     for (const part of parts) {
-      if (current.type !== "directory") {
+      if (current.type !== 'directory') {
         return null;
       }
 
@@ -232,9 +228,9 @@ export class VFS {
 
   private parsePath(path: string): string[] {
     const parts: string[] = [];
-    for (const part of path.replace(/\\/g, "/").split("/")) {
-      if (!part || part === ".") continue;
-      if (part === "..") {
+    for (const part of path.replace(/\\/g, '/').split('/')) {
+      if (!part || part === '.') continue;
+      if (part === '..') {
         parts.pop();
       } else {
         parts.push(part);

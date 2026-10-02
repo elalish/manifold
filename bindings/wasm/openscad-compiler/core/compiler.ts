@@ -8,7 +8,7 @@ import {compileDeclaration, compileGeometry, GEOMETRY_TYPE, hasBackgroundModifie
 import {compileUsedFileScope, declKey, isDecl} from './library.js';
 import {assignPrettyNames, buildRuntimeImport, builtinConstantsFor, builtinSymbolNames, declJsName, escapeName, globalJsName, namesBlockingRuntimeLocals, namesInUse, reservedNames, resetTempNames, resolveRuntimeLocals, svTarget, T,} from './naming.js';
 import {collectDeclarations, openNoArgSlots, scanProgram} from './scan.js';
-import {cpsTransformedFunctions, setModuleDecls, globalPathResolver} from './state.js';
+import {cpsTransformedFunctions, globalPathResolver, setModuleDecls} from './state.js';
 import type {Signature} from './state.js';
 import {currentBindOptions, currentMainFilename, currentScope, dynamicScopeVars, externalFunctionNames, externalModuleNames, externalVariableNames, globalVarDeclKeyword, localDecls, moduleDeclRegistry, noArgDemotions, resetTailTemps, RT, setBindResult, setCurrentRuntimePath, setCurrentScope, setCurrentSourceFilename, setMainFilename, setParentModulesReadInFunction, signatures} from './state.js';
 import type {CompileOptions, ModuleDeclStmtType} from './types.js';
@@ -16,8 +16,11 @@ import type {CompileOptions, ModuleDeclStmtType} from './types.js';
 // Path used in emitted `// <source>` comments, anchored to the entry file so
 // output stays consistent regardless of the working directory
 function sourceComment(filename: string): string {
-  const base = currentMainFilename ? globalPathResolver?.path.dirname(currentMainFilename) : '';
-  const rel = base ? globalPathResolver?.path.relative(base, filename)! : filename;
+  const base = currentMainFilename ?
+      globalPathResolver?.path.dirname(currentMainFilename) :
+      '';
+  const rel =
+      base ? globalPathResolver?.path.relative(base, filename)! : filename;
   return rel.replace(/\\/g, '/');
 }
 
@@ -183,8 +186,7 @@ export async function compile(
 
   const openSlots = openNoArgSlots();
 
-  const scan = scanProgram(
-      program.statements, {noArgSlots: openSlots});
+  const scan = scanProgram(program.statements, {noArgSlots: openSlots});
   for (const [key, slots] of openSlots) {
     if (slots.some(Boolean)) noArgDemotions.set(key, slots);
   }

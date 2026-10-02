@@ -225,10 +225,12 @@ export async function resolveLibraryClosure(
   const edges = new Map<string, LibraryEdge[]>();
   const visited = new Set<string>();
 
-  const relOf = (abs: string) => globalPathResolver?.path.relative(root, abs).replace(/\\/g, '/');
+  const relOf = (abs: string) =>
+      globalPathResolver?.path.relative(root, abs).replace(/\\/g, '/');
   const underRoot = (abs: string) => {
     const rel = globalPathResolver?.path.relative(root, abs)!;
-    return rel !== '' && !rel.startsWith('..') && !globalPathResolver?.path.isAbsolute(rel);
+    return rel !== '' && !rel.startsWith('..') &&
+        !globalPathResolver?.path.isAbsolute(rel);
   };
 
   const walk = async (absPath: string) => {

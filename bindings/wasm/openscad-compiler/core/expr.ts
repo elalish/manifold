@@ -3,7 +3,7 @@ import type {Argument, ASTNode, BinaryExpr, Expr, FunctionCallExpr, KindedNode, 
 import {isLexicalVar} from './binder.js';
 import {BUILTIN_FUNCTIONS, EXPERIMENTAL_BUILTIN_FUNCTIONS, NUMERIC_BUILTINS,} from './builtins.js';
 import {bindJsName, escapeName, svTarget, T} from './naming.js';
-import {currentMainFilename, noArgDemotions, RT, signatures, cpsTransformedFunctions, globalPathResolver} from './state.js';
+import {cpsTransformedFunctions, currentMainFilename, globalPathResolver, noArgDemotions, RT, signatures} from './state.js';
 import type {Binding, CallRef} from './types.js';
 
 // Type for folded initializers; use a specific type only when certain,
@@ -737,24 +737,24 @@ export function compileCallExpr(
       expr.args.filter(a => !dollarArgs.includes(a));
 
   const argList = compileArgList(`fn:${expr.name}`, positionalArgs);
-  // Route CPS-transformed calls through the trampoline: use tc() in tail position, otherwise call() to resolve the thunk chain
+  // Route CPS-transformed calls through the trampoline: use tc() in tail
+  // position, otherwise call() to resolve the thunk chain
   const isCpsCall = !isValueCall && cpsTransformedFunctions.has(name);
   const call = dualDispatch ? (() => {
     // A call through a value has no declared signature to match against
     const valueArgList = compileArgList(`var:${expr.name}`, positionalArgs);
-    const fnCall = isCpsCall ?
-        `${tail ? `${RT.tc}` : `${RT.call}`}(${name}${
-            argList ? `, ${argList}` : ''})` :
-        `${name}(${argList})`;
+    const fnCall = isCpsCall ? `${tail ? `${RT.tc}` : `${RT.call}`}(${name}${
+                                   argList ? `, ${argList}` : ''})` :
+                                             `${name}(${argList})`;
     return `(typeof ${valueName} === "function" ? ${
         tail ? `${RT.tc}` : `${RT.call}`}(${valueName}${
         valueArgList ? `, ${valueArgList}` : ''}) : ${fnCall})`;
   })() :
       isValueCall ? `${tail ? `${RT.tc}` : `${RT.call}`}(${name}${
                         argList ? `, ${argList}` : ''})` :
-      isCpsCall   ? `${tail ? `${RT.tc}` : `${RT.call}`}(${name}${
-                        argList ? `, ${argList}` : ''})` :
-                    `${name}(${argList})`;
+      isCpsCall                 ? `${tail ? `${RT.tc}` : `${RT.call}`                }(${name}${
+                      argList ? `, ${argList}` : ''                })` :
+                                                `${name}(${argList})`;
   if (dollarArgs.length === 0) {
     return call;
   }
@@ -878,8 +878,9 @@ function compileListComp(gen: ListCompGenerator): string {
       for (const name of new Set(gen.updates.map(bindJsName)))
         if (!loopNames.has(name)) inits.push(`${name} = undefined`);
       // Abort the loop once its counter exceeds the limit
-      const base = currentMainFilename ? globalPathResolver?.path.basename(currentMainFilename) :
-                                         '<unknown>';
+      const base = currentMainFilename ?
+          globalPathResolver?.path.basename(currentMainFilename) :
+          '<unknown>';
       const line = gen.loc?.start.line ?? 0;
       const errMsg =
           JSON.stringify(`ERROR: For loop counter exceeded limit in file ${

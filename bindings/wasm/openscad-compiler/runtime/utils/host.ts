@@ -13,7 +13,7 @@ export interface FileResolver {
 
 export interface EnvironmentResolver {
   fontDir: string;
-  mode: "web" | "node";
+  mode: 'web'|'node';
 }
 
 

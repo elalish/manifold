@@ -141,8 +141,8 @@ export function emitTailBody(
       return emitTailBody(expr.expr, funcName, funcJsName, params, indent);
     case 'ternary': {
       const cond = compileExpr(expr.condition);
-      const t =
-          emitTailBody(expr.ifTrue, funcName, funcJsName, params, indent + '  ');
+      const t = emitTailBody(
+          expr.ifTrue, funcName, funcJsName, params, indent + '  ');
       const f = emitTailBody(
           expr.ifFalse, funcName, funcJsName, params, indent + '  ');
       return `${indent}if (${RT.truthy}(${cond})) {\n${t}\n${indent}} else {\n${
@@ -175,7 +175,7 @@ export function emitTailBody(
       return (() => {
         const savedNames = expr.assignments.map(a => a.binding?.jsName);
         const lines: string[] = [];
-        
+
         for (const a of expr.assignments) {
           const tmp = `${T('tl')}${nextTailTemp()}`;
           if (a.value.kind === 'lambda' && a.binding) a.binding.jsName = tmp;

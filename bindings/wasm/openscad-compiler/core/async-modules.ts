@@ -18,10 +18,9 @@ export function isAsyncModuleCall(stmt: ModuleCallStmt): boolean {
 export function moduleBodyNeedsAsync(decl: ModuleDeclStmt): boolean {
   let needsAsync = false;
   walk(decl.body, node => {
-    if (needsAsync ||
-        node.kind === 'moduleDecl' || node.kind === 'functionDecl' ||
-        ('modifier' in node &&
-         typeof node.modifier === 'string' &&
+    if (needsAsync || node.kind === 'moduleDecl' ||
+        node.kind === 'functionDecl' ||
+        ('modifier' in node && typeof node.modifier === 'string' &&
          node.modifier.includes('*'))) {
       return false;
     }
@@ -33,7 +32,8 @@ export function moduleBodyNeedsAsync(decl: ModuleDeclStmt): boolean {
   return needsAsync;
 }
 
-// Bindings are hoisted before emission, so process each module until async calls stop adding callers
+// Bindings are hoisted before emission, so process each module until async
+// calls stop adding callers
 export function findAsyncModules(bind: BindResult): void {
   asyncModuleBindings.clear();
   const declarations = bind.bindings.flatMap(binding => {

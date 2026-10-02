@@ -1,6 +1,6 @@
 import type {Argument} from './ast.js';
 import {compileExpr, findArg} from './expr.js';
-import {globalFileResolver, RT, globalPathResolver} from './state.js';
+import {globalFileResolver, globalPathResolver, RT} from './state.js';
 
 // compile surface
 export async function compileSurface(
@@ -21,7 +21,8 @@ export async function compileSurface(
       await globalFileResolver?.getSurfaceFilePath(filenameStr, sourceFile) ??
       '';
 
-  const isImage = globalPathResolver?.path.extname(filePath).toLowerCase() === '.png';
+  const isImage =
+      globalPathResolver?.path.extname(filePath).toLowerCase() === '.png';
 
   const centerStr = center ? compileExpr(center.value) : 'false';
   // invert only reaches the image path; a text matrix has no pixels to flip
