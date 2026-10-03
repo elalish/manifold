@@ -175,8 +175,10 @@ inline vec3 GetBarycentric(const vec3& v, const mat3& triPos,
       // Return exactly equal if within tolerance of edge.
       uvw[i] = area2v < d2[i] * tol2 ? 0 : la::dot(crossPv, crossP);
     }
-    uvw /= (uvw[0] + uvw[1] + uvw[2]);
-    return uvw;
+    const double sum = uvw[0] + uvw[1] + uvw[2];
+    // If all weights are zero, give each corner equal weight rather than
+    // dividing by zero.
+    return sum == 0 ? vec3(1.0 / 3.0) : uvw / sum;
   } else {  // line
     const int nextV = Next3(longSide);
     const double alpha =
