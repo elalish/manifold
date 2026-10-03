@@ -17,12 +17,20 @@
 #include <functional>
 #include <memory>  // needed for shared_ptr
 #include <mutex>
+#include <string>
 
 #include "manifold/common.h"
 #include "manifold/mesh.h"
 #include "manifold/vec_view.h"
 
 namespace manifold {
+
+/**
+ * @brief Returns the version of the Manifold library.
+ *
+ * @return Version string in major.minor.patch format.
+ */
+std::string Version();
 
 /**
  * @ingroup Debug

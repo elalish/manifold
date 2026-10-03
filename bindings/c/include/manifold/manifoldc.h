@@ -426,6 +426,10 @@ int manifold_box_does_overlap_pt(ManifoldBox* b, double x, double y, double z);
 int manifold_box_does_overlap_box(ManifoldBox* a, ManifoldBox* b);
 int manifold_box_is_finite(ManifoldBox* b);
 
+// Version
+
+const char* manifold_version();
+
 // Static Quality Globals
 
 void manifold_set_relative_precision(double precision);
