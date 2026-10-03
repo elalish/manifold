@@ -214,10 +214,11 @@ struct Manifold::Impl {
     int longEdge;  // 0, 1, 2
   };
 
-  TriResult IsDegenerate(int tri) const;
   void CleanupTopology();
   void RemoveDegenerates(int firstNewVert = 0);
   void Decimate(double tolerance);
+  TriResult IsDegenerate(int tri) const;
+  bool IsFolded(int edge) const;
   Merger CheckEdge(int edge) const;
   bool Continuous(int edge) const;
   bool Swappable(int edge) const;

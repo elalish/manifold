@@ -278,6 +278,14 @@ TEST(Boolean, SimplifyCracks) {
   if (options.exportModels) WriteTestOBJ("cracks.obj", simplified);
 }
 
+TEST(Boolean, SimplifyShards) {
+  Manifold a = Manifold::Sphere(40, 10);
+  Manifold b = a.Translate({0, 0, 40}) ^ a;
+  Manifold result = a - b;
+  Box bounds = result.BoundingBox();
+  EXPECT_FLOAT_EQ(bounds.max.z, 20);
+}
+
 // Regression test for #1857: unioning the meshes attached there made
 // RemoveDegenerates cycle edge swaps for ~3e8 iterations.
 TEST(Boolean, DegenerateSwapCycle) {
