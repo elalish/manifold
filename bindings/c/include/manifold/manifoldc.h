@@ -197,8 +197,8 @@ ManifoldManifold* manifold_revolve(void* mem, ManifoldPolygons* cs,
 ManifoldManifold* manifold_compose(void* mem, ManifoldManifoldVec* ms);
 ManifoldManifoldVec* manifold_decompose(void* mem, ManifoldManifold* m);
 
-ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m,
-                                       int id = -1);
+// id: the original ID to assign; pass a negative value (e.g. -1) for a new one.
+ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m, int id);
 
 // Manifold Info
 
