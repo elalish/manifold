@@ -652,13 +652,13 @@ TEST(CBIND, meshgl_run_accessors) {
   ManifoldManifold* cube_tmp =
       manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 0);
   ManifoldManifold* cube =
-      manifold_as_original(alloc_manifold_buffer(), cube_tmp);
+      manifold_as_original(alloc_manifold_buffer(), cube_tmp, -1);
   ManifoldManifold* sphere_tmp =
       manifold_sphere(alloc_manifold_buffer(), 0.6, 32);
   ManifoldManifold* sphere_trans =
       manifold_translate(alloc_manifold_buffer(), sphere_tmp, 0.5, 0.5, 0.5);
   ManifoldManifold* sphere =
-      manifold_as_original(alloc_manifold_buffer(), sphere_trans);
+      manifold_as_original(alloc_manifold_buffer(), sphere_trans, -1);
   ManifoldManifold* result =
       manifold_union(alloc_manifold_buffer(), cube, sphere);
   EXPECT_EQ(manifold_status(result), MANIFOLD_NO_ERROR);
@@ -713,10 +713,10 @@ TEST(CBIND, run_flag_accessors) {
   // gets backside set. Exercise the C accessors for both bits.
   ManifoldManifold* cube = manifold_as_original(
       alloc_manifold_buffer(),
-      manifold_cube(alloc_manifold_buffer(), 2.0, 2.0, 2.0, 1));
-  ManifoldManifold* sphere =
-      manifold_as_original(alloc_manifold_buffer(),
-                           manifold_sphere(alloc_manifold_buffer(), 1.0, 32));
+      manifold_cube(alloc_manifold_buffer(), 2.0, 2.0, 2.0, 1), -1);
+  ManifoldManifold* sphere = manifold_as_original(
+      alloc_manifold_buffer(),
+      manifold_sphere(alloc_manifold_buffer(), 1.0, 32), -1);
   ManifoldManifold* cut =
       manifold_difference(alloc_manifold_buffer(), cube, sphere);
   ManifoldManifold* with_normals =
