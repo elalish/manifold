@@ -42,7 +42,10 @@ Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
 
 namespace manifold {
 
-std::string Version() { return MANIFOLD_VERSION_STRING; }
+std::array<int, 3> Version() {
+  return {MANIFOLD_VERSION_MAJOR, MANIFOLD_VERSION_MINOR,
+          MANIFOLD_VERSION_PATCH};
+}
 
 static std::atomic<double> relativePrecision_ = kPrecision;
 static std::atomic<int> circularSegments_ = DEFAULT_SEGMENTS;

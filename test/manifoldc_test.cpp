@@ -31,7 +31,12 @@ void* alloc_manifold_vec_buffer() {
 }
 
 TEST(CBIND, version) {
-  EXPECT_STREQ(manifold_version(), MANIFOLD_VERSION_STRING);
+  int version[3];
+  manifold_version(version);
+
+  EXPECT_EQ(version[0], MANIFOLD_VERSION_MAJOR);
+  EXPECT_EQ(version[1], MANIFOLD_VERSION_MINOR);
+  EXPECT_EQ(version[2], MANIFOLD_VERSION_PATCH);
 }
 
 TEST(CBIND, sphere) {

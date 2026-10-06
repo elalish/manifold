@@ -909,9 +909,11 @@ ManifoldManifold* manifold_calculate_normals(void* mem, ManifoldManifold* m,
 
 // Version
 
-const char* manifold_version() {
-  static const std::string version = manifold::Version();
-  return version.c_str();
+void manifold_version(int version[3]) {
+  const auto v = manifold::Version();
+  version[0] = v[0];
+  version[1] = v[1];
+  version[2] = v[2];
 }
 
 // Static Quality Globals

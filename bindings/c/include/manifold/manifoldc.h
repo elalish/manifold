@@ -428,7 +428,7 @@ int manifold_box_is_finite(ManifoldBox* b);
 
 // Version
 
-const char* manifold_version();
+void manifold_version(int version[3]);
 
 // Static Quality Globals
 
