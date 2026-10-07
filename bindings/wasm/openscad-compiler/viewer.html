@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>OpenSCAD Web Viewer</title>
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; }
+    body { box-sizing: border-box; overflow: hidden; padding: 8px; background: #edf2f7; color: #17263a; font-family: system-ui, sans-serif; }
+    #workspace { box-sizing: border-box; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr) minmax(0, 1.9fr); width: 100%; height: 100%; overflow: hidden; border: 1px solid #aebbc9; border-radius: 17px; background: #fff; }
+    .pane { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; }
+    .pane + .pane { border-left: 1px solid #aebbc9; }
+    .paneHeader { box-sizing: border-box; display: flex; align-items: center; justify-content: center; flex: 0 0 56px; border-bottom: 1px solid #dce4ec; }
+    .paneHeader h2 { margin: 0; font-size: 18px; font-weight: 650; }
+    .paneHeader label { cursor: text; }
+    .paneToolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 12px; border-bottom: 1px solid #dce4ec; }
+    .editorFrame { display: flex; flex: 1; min-height: 0; overflow: hidden; background: #fff; }
+    .editorFrame:focus-within { outline: 2px solid #4597da; outline-offset: -2px; }
+    .lineNumbers, .codeEditor { box-sizing: border-box; padding-top: 12px; padding-bottom: 12px; font: 13px/20px ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .lineNumbers { flex: 0 0 42px; overflow: hidden; padding-right: 9px; background: #eef3f8; color: #8294a8; text-align: right; white-space: pre; user-select: none; }
+    .codeEditor { flex: 1; min-width: 0; padding-right: 12px; padding-left: 12px; resize: none; border: 0; outline: 0; background: transparent; color: #17263a; white-space: pre; overflow: auto; tab-size: 2; }
+    .codeEditor::placeholder { color: #8b9aaa; }
+    button { padding: 8px 12px; cursor: pointer; background: #176eb6; border: none; color: white; border-radius: 7px; font-weight: 650; }
+    button:hover:not(:disabled) { background: #0e568f; }
+    button:disabled { cursor: wait; opacity: 0.65; }
+    #status { color: #496276; font-size: 12px; }
+    #errorMsg { display: none; margin: 10px 12px; padding: 10px; border-radius: 7px; background: #fff0ee; color: #a3261b; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+    #editorNote { margin: 0; padding: 10px 12px; border-top: 1px solid #dce4ec; color: #657b90; font-size: 12px; }
+    #viewport { position: relative; flex: 1; min-height: 0; overflow: hidden; background: #f4f7fb; }
+    #viewport > canvas { display: block; width: 100%; height: 100%; }
+    #axisIndicator { position: absolute; bottom: 16px; left: 16px; width: 100px; height: 100px; border: 1px solid #cbd8e7; border-radius: 8px; background: rgba(255,255,255,0.88); z-index: 5; box-shadow: 0 3px 12px rgba(33,55,79,0.1); }
+    #axisIndicator canvas { display: block; }
+    .axisLabel { position: absolute; font-weight: bold; font-size: 12px; pointer-events: none; }
+    #axisLabelX { color: #ff0000; bottom: 35px; left: 75px; }
+    #axisLabelY { color: #1b9a50; bottom: 75px; left: 45px; }
+    #axisLabelZ { color: #086bb0; bottom: 45px; left: 25px; }
+    @media (max-width: 800px) {
+      body { padding: 0; overflow: auto; }
+      #workspace { grid-template-columns: minmax(0, 1fr); height: auto; min-height: 100%; border: 0; border-radius: 0; }
+      .pane + .pane { border-left: 0; border-top: 1px solid #aebbc9; }
+      .editorFrame { flex: none; height: 280px; }
+      #viewport { flex: none; height: 440px; }
+    }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <main id="workspace">
+    <section id="scadPane" class="pane" aria-label="OpenSCAD editor">
+      <header class="paneHeader"><h2><label for="scadCode">OpenSCAD</label></h2></header>
+      <div class="paneToolbar">
+        <button id="compileBtn" type="button" disabled>Compile and view</button>
+        <span id="status">Initializing...</span>
+      </div>
+      <div id="errorMsg" role="alert"></div>
+      <div class="editorFrame">
+        <div id="scadLines" class="lineNumbers" aria-hidden="true"></div>
+        <textarea id="scadCode" class="codeEditor" spellcheck="false" wrap="off" aria-label="OpenSCAD code">surface(file = "smiley.png", center = true);</textarea>
+      </div>
+    </section>
+    <section id="tsPane" class="pane" aria-label="TypeScript editor">
+      <header class="paneHeader"><h2><label for="generatedCode">TypeScript</label></h2></header>
+      <div class="editorFrame">
+        <div id="tsLines" class="lineNumbers" aria-hidden="true"></div>
+        <textarea id="generatedCode" class="codeEditor" spellcheck="false" wrap="off" aria-label="Generated TypeScript" placeholder="Compiled TypeScript will appear here"></textarea>
+      </div>
+      <p id="editorNote">Editable output. Compiling OpenSCAD again replaces these edits.</p>
+    </section>
+    <section id="viewerPane" class="pane" aria-label="3D viewer">
+      <header class="paneHeader"><h2>Viewer</h2></header>
+      <div id="viewport">
+        <div id="axisIndicator">
+          <div id="axisLabelX" class="axisLabel">X</div>
+          <div id="axisLabelY" class="axisLabel">Y</div>
+          <div id="axisLabelZ" class="axisLabel">Z</div>
+        </div>
+      </div>
+    </section>
+  </main>
+  
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
+    import { OrbitControls } from 'https://unpkg.com/three@0.160.0/examples/jsm/controls/OrbitControls.js';
+    import { Buffer } from 'buffer';
+    import esbuildWasmUrl from 'esbuild-wasm/esbuild.wasm?url';
+    import { vfs } from './vfs/vfs.ts';
+    import { compile } from './web-utils/compile.ts';
+    import {
+      setRunTimeFileResolver,
+      setRunTimeCanvasResolver,
+      setEnvironmentResolver,
+    } from './runtime/utils/host.ts';
+
+    globalThis.Buffer = Buffer;
+
+    function setUpEditor(editorId, gutterId) {
+      const input = document.getElementById(editorId);
+      const gutter = document.getElementById(gutterId);
+      const refresh = () => {
+        const lineCount = input.value.split('\n').length;
+        gutter.textContent = Array.from({length: lineCount}, (_, index) => index + 1).join('\n');
+        gutter.scrollTop = input.scrollTop;
+      };
+
+      input.addEventListener('input', refresh);
+      input.addEventListener('scroll', () => { gutter.scrollTop = input.scrollTop; });
+      input.addEventListener('keydown', event => {
+        if (event.key === 'Tab' && !event.shiftKey) {
+          event.preventDefault();
+          input.setRangeText('  ', input.selectionStart, input.selectionEnd, 'end');
+        } else if (event.key === 'Enter' && !event.ctrlKey && !event.metaKey) {
+          const lineStart = input.value.lastIndexOf('\n', input.selectionStart - 1) + 1;
+          const indentation = input.value.slice(lineStart, input.selectionStart).match(/^[ \t]*/)[0];
+          if (indentation) {
+            event.preventDefault();
+            input.setRangeText('\n' + indentation, input.selectionStart, input.selectionEnd, 'end');
+          }
+        } else {
+          return;
+        }
+        refresh();
+      });
+      refresh();
+      return {input, refresh};
+    }
+
+    const scadEditor = setUpEditor('scadCode', 'scadLines');
+    const tsEditor = setUpEditor('generatedCode', 'tsLines');
+
+    // Scene setup
+    const viewport = document.getElementById('viewport');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xf4f7fb);
+    
+    // Keep reference to generated module and mesh
+    let currentMesh = null;
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 10000);
+    camera.up.set(0, 0, 1);
+    camera.position.set(50, 50, 50);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(1, 1, false);
+    viewport.appendChild(renderer.domElement);
+
+    // Axis indicator setup
+    const axisIndicatorElement = document.getElementById('axisIndicator');
+    const axisRenderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    axisRenderer.setSize(100, 100);
+    axisRenderer.setPixelRatio(window.devicePixelRatio);
+    axisRenderer.setClearColor(0x000000, 0);
+    axisRenderer.domElement.style.display = 'block';
+    axisRenderer.domElement.style.width = '100px';
+    axisRenderer.domElement.style.height = '100px';
+    axisIndicatorElement.appendChild(axisRenderer.domElement);
+
+    const axisScene = new THREE.Scene();
+    const axisCamera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
+    axisCamera.up.set(0, 0, 1);
+    axisCamera.position.set(0, 0, 2);
+
+    const axisHelper = new THREE.AxesHelper(1);
+    axisScene.add(axisHelper);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    // Lighting
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x8493a5, 1.1);
+    hemiLight.position.set(0, 200, 0);
+    scene.add(hemiLight);
+    
+    const dirLight = new THREE.DirectionalLight(0xffffff, 1.8);
+    dirLight.position.set(0, 100, 50);
+    scene.add(dirLight);
+
+    // Helpers
+    scene.add(new THREE.AxesHelper(20));
+    const gridHelper = new THREE.GridHelper(100, 100, 0xa9bed3, 0xd6e1ec);
+    // OpenSCAD is Z-up, so place the ground grid on the XY plane (z = 0).
+    gridHelper.rotation.x = Math.PI / 2;
+    scene.add(gridHelper);
+
+    const errorMsgInfo = document.getElementById('errorMsg');
+
+    function showError(msg) {
+      errorMsgInfo.textContent = msg;
+      errorMsgInfo.style.display = 'block';
+    }
+
+    function hideError() {
+      errorMsgInfo.style.display = 'none';
+      errorMsgInfo.textContent = '';
+    }
+
+    const decodedImages = new WeakMap();
+
+    async function initializeRuntime() {
+      setRunTimeFileResolver({
+        exists(filePath) { return vfs.existsSync(filePath); },
+        readText(filePath) {
+          try { return vfs.readFileSync(filePath, 'utf8'); } catch { return null; }
+        },
+        readBinary(filePath) {
+          try { return vfs.readFileSync(filePath); } catch { return null; }
+        },
+        writeFile(filePath, bytes) { vfs.writeFileSync(filePath, bytes); },
+        readDir(dirPath) {
+          try { return vfs.readdirSync(dirPath); } catch { return []; }
+        },
+      });
+
+      setRunTimeCanvasResolver({
+        createCanvas(width, height) {
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          return canvas;
+        },
+        image() {
+          // The runtime sets src to VFS bytes and reads width immediately.
+          // Copy the image decoded during preload into a drawable canvas.
+          const canvas = document.createElement('canvas');
+          Object.defineProperty(canvas, 'src', {
+            set(bytes) {
+              const image = decodedImages.get(bytes);
+              if (!image) throw new Error('PNG must be preloaded before surface() runs');
+              canvas.width = image.naturalWidth;
+              canvas.height = image.naturalHeight;
+              canvas.getContext('2d').drawImage(image, 0, 0);
+            },
+          });
+          return canvas;
+        },
+      });
+
+      vfs.mkdirSync('/fonts', {recursive: true});
+      setEnvironmentResolver({fontDir: '/fonts', mode: 'web'});
+
+      const response = await fetch('https://res.cloudinary.com/dmslu99ky/image/upload/v1790925955/smiley_e67e8b.png');
+      if (!response.ok) throw new Error(`Could not load smiley.png (HTTP ${response.status})`);
+      const bytes = Buffer.from(await response.arrayBuffer());
+      const objectUrl = URL.createObjectURL(new Blob([bytes], {type: 'image/png'}));
+      try {
+        const image = new Image();
+        image.src = objectUrl;
+        await image.decode();
+        decodedImages.set(bytes, image);
+        vfs.writeFileSync('/smiley.png', bytes);
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    }
+
+    async function loadMesh() {
+      const btn = document.getElementById('compileBtn');
+      if (btn.disabled) return;
+      hideError();
+      const status = document.getElementById('status');
+      btn.textContent = 'Compiling...';
+      btn.disabled = true;
+      const previousMesh = currentMesh;
+
+      try {
+        status.textContent = 'Compiling and evaluating...';
+        const {module, code} = await compile(scadEditor.input.value, {
+          runtimeUrl: new URL('./runtime/runtime.ts', window.location.href).href,
+          esbuildWasmUrl,
+        });
+        tsEditor.input.value = code;
+        tsEditor.refresh();
+        
+        if (!module.result) {
+          throw new Error('Compiled code did not export result');
+        }
+
+        let manifoldDef = module.result;
+        // CrossSection (2D) has extrude but not getMesh; extrude for display
+        if (manifoldDef && typeof manifoldDef.extrude === 'function' && typeof manifoldDef.getMesh !== 'function') {
+          manifoldDef = manifoldDef.extrude(0.1);
+        }
+        // Ensure we retrieve the mesh representation
+        const manifoldMesh = manifoldDef.getMesh();
+        if (!manifoldMesh || manifoldMesh.numVert === 0 || manifoldMesh.numTri === 0) {
+          throw new Error('The code produced empty geometry (0 vertices / 0 triangles)');
+        }
+
+        const geometry = new THREE.BufferGeometry();
+        
+        const numProp = manifoldMesh.numProp;
+        const positions = new Float32Array(manifoldMesh.numVert * 3);
+        
+        // Extract xyz from interleaved properties array
+        for (let i = 0; i < manifoldMesh.numVert; i++) {
+          positions[i * 3 + 0] = manifoldMesh.vertProperties[i * numProp + 0];
+          positions[i * 3 + 1] = manifoldMesh.vertProperties[i * numProp + 1];
+          positions[i * 3 + 2] = manifoldMesh.vertProperties[i * numProp + 2];
+        }
+
+        // Custom color layout is appended as [r,g,b,a,marker] at the end.
+        let hasVertexColor = numProp >= 5;
+        let averageAlpha = 1;
+        if (hasVertexColor) {
+          const colorOffset = numProp - 5;
+          const markerOffset = numProp - 1;
+          const colors = new Float32Array(manifoldMesh.numVert * 3);
+          let alphaSum = 0;
+          let markedColorCount = 0;
+          const fallbackColor = new THREE.Color(0x247db5);
+
+          const clamp01 = (v) => {
+            const n = Number(v);
+            if (!Number.isFinite(n)) return 0;
+            if (n <= 0) return 0;
+            if (n >= 1) return 1;
+            return n;
+          };
+
+          for (let i = 0; i < manifoldMesh.numVert; i++) {
+            const offset = i * numProp;
+            const marker = Number(manifoldMesh.vertProperties[offset + markerOffset]);
+            const hasMarkedColor = Number.isFinite(marker) && marker > 0.5;
+            const rawR = Number(manifoldMesh.vertProperties[offset + colorOffset]);
+            const rawG = Number(manifoldMesh.vertProperties[offset + colorOffset + 1]);
+            const rawB = Number(manifoldMesh.vertProperties[offset + colorOffset + 2]);
+            const hasFiniteRGB = Number.isFinite(rawR) && Number.isFinite(rawG) && Number.isFinite(rawB);
+            const useCustomColor = hasMarkedColor && hasFiniteRGB;
+            const r = useCustomColor ? clamp01(rawR) : fallbackColor.r;
+            const g = useCustomColor ? clamp01(rawG) : fallbackColor.g;
+            const b = useCustomColor ? clamp01(rawB) : fallbackColor.b;
+            if (useCustomColor) markedColorCount++;
+            colors[i * 3 + 0] = r;
+            colors[i * 3 + 1] = g;
+            colors[i * 3 + 2] = b;
+            const rawA = Number(manifoldMesh.vertProperties[offset + colorOffset + 3]);
+            alphaSum += useCustomColor && Number.isFinite(rawA) ? clamp01(rawA) : 1;
+          }
+
+          if (markedColorCount > 0) {
+            averageAlpha = manifoldMesh.numVert > 0 ? alphaSum / manifoldMesh.numVert : 1;
+            geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+          } else {
+            hasVertexColor = false;
+          }
+        }
+
+        geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        geometry.setIndex(new THREE.BufferAttribute(manifoldMesh.triVerts, 1));
+        geometry.computeVertexNormals();
+
+        // Keep the mesh and its edges visible against the light background.
+        const material = new THREE.MeshStandardMaterial({
+          color: hasVertexColor ? 0xffffff : 0x247db5,
+          vertexColors: hasVertexColor,
+          opacity: hasVertexColor ? averageAlpha : 1,
+          transparent: hasVertexColor && averageAlpha < 0.999,
+          roughness: 0.4,
+          metalness: 0.2,
+          side: THREE.DoubleSide,
+          flatShading: true
+        });
+        
+        const wireframeMaterial = new THREE.MeshBasicMaterial({
+          color: 0x254c68,
+          wireframe: true,
+          transparent: true,
+          opacity: 0.12
+        });
+
+        currentMesh = new THREE.Group();
+        currentMesh.add(new THREE.Mesh(geometry, material));
+        currentMesh.add(new THREE.Mesh(geometry, wireframeMaterial));
+
+        scene.add(currentMesh);
+        if (previousMesh) {
+          scene.remove(previousMesh);
+          previousMesh.children.forEach(child => {
+            child.geometry.dispose();
+            if (Array.isArray(child.material)) {
+              child.material.forEach(m => m.dispose());
+            } else {
+              child.material.dispose();
+            }
+          });
+        }
+
+        // Compute bounding geometry
+        geometry.computeBoundingBox();
+        if (!geometry.boundingBox) {
+          throw new Error('The model did not produce a valid bounding box');
+        }
+        const center = new THREE.Vector3();
+        geometry.boundingBox.getCenter(center);
+
+        geometry.computeBoundingSphere();
+        if (!geometry.boundingSphere) {
+          throw new Error('The model did not produce a valid bounding sphere');
+        }
+        const radius = geometry.boundingSphere.radius;
+
+        // Apply viewport variables exported by the compiled module
+        const vp = module.viewport;
+        const hasExplicitViewport = vp && (
+          vp.vpd !== 500 ||
+          vp.vpr[0] !== 0 || vp.vpr[1] !== 0 || vp.vpr[2] !== 0 ||
+          vp.vpt[0] !== 0 || vp.vpt[1] !== 0 || vp.vpt[2] !== 0
+        );
+
+        if (hasExplicitViewport) {
+          controls.target.set(vp.vpt[0], vp.vpt[1], vp.vpt[2]);
+
+          const euler = new THREE.Euler(
+            THREE.MathUtils.degToRad(vp.vpr[0]),
+            THREE.MathUtils.degToRad(vp.vpr[1]),
+            THREE.MathUtils.degToRad(vp.vpr[2]),
+            'ZYX'
+          );
+          const dir = new THREE.Vector3(0, 0, 1).applyEuler(euler);
+          camera.position.copy(controls.target).addScaledVector(dir, vp.vpd);
+          camera.fov = (vp.vpf > 0 && vp.vpf < 180) ? vp.vpf : 22.5;
+          camera.updateProjectionMatrix();
+        } else {
+          controls.target.copy(center);
+          camera.position.copy(center).add(new THREE.Vector3(radius * 1.5, radius * 1.5, radius * 1.5));
+          camera.fov = 45;
+          camera.updateProjectionMatrix();
+        }
+        controls.update();
+        status.textContent = 'Model ready';
+
+      } catch (err) {
+        currentMesh = previousMesh;
+        console.error(err);
+        showError(err.message);
+        status.textContent = 'Compilation failed';
+      } finally {
+        btn.textContent = 'Compile and view';
+        btn.disabled = false;
+      }
+    }
+
+    // Connect UI
+    document.getElementById('compileBtn').addEventListener('click', loadMesh);
+    document.getElementById('scadCode').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) loadMesh();
+    });
+
+    function resizeViewer() {
+      const width = Math.floor(viewport.clientWidth);
+      const height = Math.floor(viewport.clientHeight);
+      if (width === 0 || height === 0) return;
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height, false);
+    }
+    new ResizeObserver(resizeViewer).observe(viewport);
+    window.addEventListener('resize', resizeViewer);
+    resizeViewer();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      
+      // Sync axis indicator with main camera rotation
+      axisCamera.position.copy(camera.position);
+      axisCamera.position.sub(controls.target);
+      axisCamera.position.setLength(2);
+      axisCamera.lookAt(axisScene.position);
+      
+      renderer.render(scene, camera);
+      axisRenderer.render(axisScene, axisCamera);
+    }
+    animate();
+    
+    initializeRuntime().then(() => {
+      document.getElementById('status').textContent = 'smiley.png loaded';
+      document.getElementById('compileBtn').disabled = false;
+    }).catch(error => {
+      console.error(error);
+      showError(`smiley.png could not be preloaded: ${error.message}`);
+      document.getElementById('status').textContent = 'Ready without smiley.png';
+      document.getElementById('compileBtn').disabled = false;
+    });
+
+  </script>
+</body>
+</html>
