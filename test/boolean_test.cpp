@@ -1111,8 +1111,8 @@ TEST(Boolean, PartialCoincidentFaceUnion) {
   std::iota(cube.faceID.begin(), cube.faceID.end(), 0);
   const Manifold block(cube);
   const Manifold clipper = Manifold::Cube(vec3(150, 300, 200))
-                             .Translate(vec3(-150, -150, -50))
-                             .Rotate(0, 0, -30);
+                               .Translate(vec3(-150, -150, -50))
+                               .Rotate(0, 0, -30);
   const Manifold b1 = block - clipper;
   const Manifold b2 = block.Translate(vec3(0, 0, -30)) ^ clipper;
   const Manifold result = b1 + b2;
