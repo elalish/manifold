@@ -1105,7 +1105,7 @@ TEST(Boolean, SharedSubtreeAfterSiblingDestroyed) {
 //    |        |
 //    +--------+           z = -30
 //    : = shared internal face, should be removed by union
-TEST(Boolean, FaultOffsetUnion) {
+TEST(Boolean, PartialCoincidentFaceUnion) {
   MeshGL64 cube = Manifold::Cube(vec3(100)).Refine(8).GetMeshGL64();
   cube.faceID.resize(cube.NumTri());
   std::iota(cube.faceID.begin(), cube.faceID.end(), 0);
