@@ -30,7 +30,7 @@ function initNavTree(toroot,relpath,allMembersFile) {
   const ARROW_DOWN = '<span class="arrowhead opened"></span>';
   const ARROW_RIGHT = '<span class="arrowhead closed"></span>';
   const NAVPATH_COOKIE_NAME = ''+'navpath';
-  const fullSidebar = typeof page_layout!=='undefined' && page_layout==1;
+  const fullSidebar = document.querySelector('meta[name="doxygen-page-layout"]') !== null;
 
   // Helper functions to replace jQuery
   const $  = (selector) => document.querySelector(selector);
@@ -123,7 +123,9 @@ function initNavTree(toroot,relpath,allMembersFile) {
     const i = varName.lastIndexOf('/');
     const n = i>=0 ? varName.substring(i+1) : varName;
     const e = n.replace(/-/g,'_');
-    return window[e];
+    const r = (e[0] >= '0' && e[0] <= '9') ? '_' + e : e;
+
+    return window[r];
   }
 
   const stripPath = (uri) => uri.substring(uri.lastIndexOf('/')+1);
@@ -615,7 +617,7 @@ function initNavTree(toroot,relpath,allMembersFile) {
     let sidenav,mainnav,pagenav,container,navtree,content,header,footer,barWidth=6;
     const RESIZE_COOKIE_NAME = ''+'width';
     const PAGENAV_COOKIE_NAME = ''+'pagenav';
-    const fullSidebar = typeof page_layout!=='undefined' && page_layout==1;
+    const fullSidebar = document.querySelector('meta[name="doxygen-page-layout"]') !== null;
 
     function showHideNavBar() {
       const bar = document.querySelector('div.sm-dox');
@@ -927,7 +929,7 @@ function initNavTree(toroot,relpath,allMembersFile) {
           id = tr.getAttribute('id');
           let text = is_anon_enum ? 'anonymous enum' : (td.querySelector(':first-child') ? td.querySelector(':first-child').textContent : '');
           let isMemberGroupHeader = hasClass(tr, 'groupHeader');
-          if (tr.offsetParent !== null && last_id!=id && id!==undefined) {
+          if (tr.offsetParent !== null && last_id!=id && id!==undefined && id!==null) {
             if (isMemberGroupHeader && inMemberGroup) {
               ulStack.pop();
               inMemberGroup=false;
@@ -1098,7 +1100,7 @@ function initNavTree(toroot,relpath,allMembersFile) {
         }
         offsets.push({id:'',y:1e10});
         let scrollTarget = undefined, numItems=0;
-        for (let i=0;i<topMapping.length;i++) {
+        for (let i=0;i<offsets.length-1;i++) {
           const ys = offsets[i].y;
           const ye = offsets[i+1].y;
           const id = offsets[i].id;
