@@ -14,6 +14,7 @@
 
 #include <atomic>
 #include <limits>
+#include <numeric>
 #include <thread>
 
 #include "../src/utils.h"
@@ -1090,4 +1091,37 @@ TEST(Boolean, SharedSubtreeAfterSiblingDestroyed) {
                        Manifold::Cube(vec3(1)).Translate(vec3(1.0, 0, 0));
   EXPECT_EQ(tree2.Status(), Manifold::Error::NoError);
   EXPECT_EQ(tree2.NumTri(), reference.NumTri());
+}
+
+// Two cubes offset vertically and booleaned inside / outside a third cube.
+// A subsequent union of these two solids should not contain any internal
+// triangles along the shared internal face.
+//
+//             +--------+  z = 100
+//             |   b1   |
+//    +--------+        |  z = 70
+//    |   b2   :        |
+//    |        +--------+  z = 0
+//    |        |
+//    +--------+           z = -30
+//    : = shared internal face, should be removed by union
+TEST(Boolean, FaultOffsetUnion) {
+  MeshGL64 cube = Manifold::Cube(vec3(100)).Refine(8).GetMeshGL64();
+  cube.faceID.resize(cube.NumTri());
+  std::iota(cube.faceID.begin(), cube.faceID.end(), 0);
+  const Manifold block(cube);
+  const Manifold clipper = Manifold::Cube(vec3(150, 300, 200))
+                             .Translate(vec3(-150, -150, -50))
+                             .Rotate(0, 0, -30);
+  const Manifold b1 = block - clipper;
+  const Manifold b2 = block.Translate(vec3(0, 0, -30)) ^ clipper;
+  const Manifold result = b1 + b2;
+
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(result.Genus(), 0);
+  EXPECT_NEAR(result.Volume(), b1.Volume() + b2.Volume(), 1e-6);
+  // Check that the internal face is dropped
+  const double overlap = 100 / std::cos(kPi / 6) * 70;
+  EXPECT_NEAR(result.SurfaceArea(),
+              b1.SurfaceArea() + b2.SurfaceArea() - 2 * overlap, 1e-6);
 }

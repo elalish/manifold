@@ -29,6 +29,15 @@ using namespace manifold;
 
 namespace {
 
+// Coordinates that differ only by rounding (2 ulps of the smaller mesh's
+// scale) are ties broken by the symbolic perturbation, so surfaces that are
+// coincident up to rounding are treated as coincident.
+inline double TieTol(const Manifold::Impl& a, const Manifold::Impl& b) {
+  if (a.epsilon_ < 0 || b.epsilon_ < 0) return 0;  // point and ray queries
+  return 2 * std::numeric_limits<double>::epsilon() *
+         std::min(a.bBox_.Scale(), b.bBox_.Scale());
+}
+
 struct FaceEdge {
   int edge;
   int start;
@@ -60,22 +69,26 @@ inline std::pair<int, vec2> Shadow01(const int a0, const int b1, const int b1s,
   const double a0xp = inA.vertNormal_[a0].x;
   const double b1sxp = inB.vertNormal_[b1s].x;
   const double b1exp = inB.vertNormal_[b1e].x;
-  int s01 = forward ? Shadows(a0x, b1ex, withSign(expandP, a0xp) - b1exp) -
-                          Shadows(a0x, b1sx, withSign(expandP, a0xp) - b1sxp)
-                    : Shadows(b1sx, a0x, withSign(expandP, b1sxp) - a0xp) -
-                          Shadows(b1ex, a0x, withSign(expandP, b1exp) - a0xp);
+  const double tol = TieTol(inA, inB);
+  int s01 = forward
+                ? Shadows(a0x, b1ex, withSign(expandP, a0xp) - b1exp, tol) -
+                      Shadows(a0x, b1sx, withSign(expandP, a0xp) - b1sxp, tol)
+                : Shadows(b1sx, a0x, withSign(expandP, b1sxp) - a0xp, tol) -
+                      Shadows(b1ex, a0x, withSign(expandP, b1exp) - a0xp, tol);
   vec2 yz01(NAN);
 
   if (s01 != 0) {
+    // A tie can put a0x up to tol off the edge; clamp so we don't extrapolate.
     yz01 =
-        Interpolate(inB.vertPos_[b1s], inB.vertPos_[b1e], inA.vertPos_[a0].x);
+        Interpolate(inB.vertPos_[b1s], inB.vertPos_[b1e],
+                    la::clamp(a0x, std::min(b1sx, b1ex), std::max(b1sx, b1ex)));
     const int b1pair = inB.halfedge_.Pair(b1);
     const double dir =
         inB.faceNormal_[b1 / 3].y + inB.faceNormal_[b1pair / 3].y;
     if (forward) {
-      if (!Shadows(inA.vertPos_[a0].y, yz01[0], -dir)) s01 = 0;
+      if (!Shadows(inA.vertPos_[a0].y, yz01[0], -dir, tol)) s01 = 0;
     } else {
-      if (!Shadows(yz01[0], inA.vertPos_[a0].y, withSign(expandP, dir)))
+      if (!Shadows(yz01[0], inA.vertPos_[a0].y, withSign(expandP, dir), tol))
         s01 = 0;
     }
   }
@@ -136,6 +149,9 @@ struct Kernel11 {
       xyzz11 = vec4(NAN);
     } else {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s11");
+      const double tol = TieTol(inP, inQ);
+      for (int i : {0, 1})
+        if (std::abs(qRL[i].y - pRL[i].y) <= tol) qRL[i].y = pRL[i].y;
       xyzz11 = Intersect(pRL[0], pRL[1], qRL[0], qRL[1]);
 
       const int p1pair = inP.halfedge_.Pair(p1);
@@ -144,7 +160,8 @@ struct Kernel11 {
       const int q1pair = inQ.halfedge_.Pair(q1);
       const double dirQ =
           inQ.faceNormal_[q1 / 3].z + inQ.faceNormal_[q1pair / 3].z;
-      if (!Shadows(xyzz11.z, xyzz11.w, withSign(expandP, dirP) - dirQ)) s11 = 0;
+      if (!Shadows(xyzz11.z, xyzz11.w, withSign(expandP, dirP) - dirQ, tol))
+        s11 = 0;
     }
 
     return std::make_pair(s11, xyzz11);
@@ -193,11 +210,15 @@ struct Kernel02 {
     } else {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s02");
       vec3 vertPosA = inA.vertPos_[a0];
-      z02 = Interpolate(yzzRL[0], yzzRL[1], vertPosA.y)[1];
+      const double tol = TieTol(inA, inB);
+      z02 = Interpolate(yzzRL[0], yzzRL[1],
+                        la::clamp(vertPosA.y, std::min(yzzRL[0].x, yzzRL[1].x),
+                                  std::max(yzzRL[0].x, yzzRL[1].x)))[1];
       if (forward) {
-        if (!Shadows(vertPosA.z, z02, -inB.faceNormal_[b2].z)) s02 = 0;
+        if (!Shadows(vertPosA.z, z02, -inB.faceNormal_[b2].z, tol)) s02 = 0;
       } else {
-        if (!Shadows(z02, vertPosA.z, withSign(expandP, inB.faceNormal_[b2].z)))
+        if (!Shadows(z02, vertPosA.z, withSign(expandP, inB.faceNormal_[b2].z),
+                     tol))
           s02 = 0;
       }
     }
@@ -270,6 +291,10 @@ struct Kernel12 {
       v12 = vec3(NAN);
     } else {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: v12");
+      const double tol = TieTol(inA, inB);
+      for (int i : {0, 1})
+        if (std::abs(xzyLR1[i].y - xzyLR0[i].y) <= tol)
+          xzyLR1[i].y = xzyLR0[i].y;
       const vec4 xzyy = Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1]);
       v12.x = xzyy[0];
       v12.y = xzyy[2];
@@ -349,10 +374,13 @@ Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
   Kernel12<expandP, forward> k12{a, b, k02, k11};
   Kernel12Recorder<expandP, forward> recorder{k12, {}};
-  auto f = [&a](int i) {
+  const double tol = TieTol(inP, inQ);
+  auto f = [&a, tol](int i) {
     const int start = a.halfedge_.Start(i);
     const int end = a.halfedge_.End(i);
-    return start < end ? Box(a.vertPos_[start], a.vertPos_[end]) : Box();
+    return start < end ? Box(la::min(a.vertPos_[start], a.vertPos_[end]) - tol,
+                             la::max(a.vertPos_[start], a.vertPos_[end]) + tol)
+                       : Box();
   };
   b.collider_.Collisions<false>(recorder, f, a.halfedge_.size(), true, ctx);
   if (IsCancelled(ctx)) return Intersections{};
@@ -444,7 +472,13 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
     if (std::isfinite(z02)) w03[verts[i]] += s02 * (forward ? 1 : -1);
   };
   auto recorder = MakeSimpleRecorder(recorderf);
-  auto f = [&](int i) { return a.vertPos_[verts[i]]; };
+  const double tol = TieTol(inP, inQ);
+  auto f = [&](int i) {  // a vertical ray, widened by tol
+    const vec3 p = a.vertPos_[verts[i]];
+    const double inf = std::numeric_limits<double>::infinity();
+    return Box(vec3(p.x - tol, p.y - tol, -inf),
+               vec3(p.x + tol, p.y + tol, inf));
+  };
   b.collider_.Collisions<false>(recorder, f, verts.size(), true, ctx);
   if (IsCancelled(ctx)) return Vec<int>{};
   // flood fill
@@ -483,7 +517,9 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   constexpr size_t INT_MAX_SZ =
       static_cast<size_t>(std::numeric_limits<int>::max());
 
-  if (inP.IsEmpty() || inQ.IsEmpty() || !inP.bBox_.DoesOverlap(inQ.bBox_)) {
+  const double tol = TieTol(inP, inQ);
+  if (inP.IsEmpty() || inQ.IsEmpty() ||
+      !Box(inP.bBox_.min - tol, inP.bBox_.max + tol).DoesOverlap(inQ.bBox_)) {
     PRINT("No overlap, early out");
     w03_.resize(inP.NumVert(), 0);
     w30_.resize(inQ.NumVert(), 0);
