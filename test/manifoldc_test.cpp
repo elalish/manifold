@@ -7,6 +7,7 @@
 
 #include "gtest/gtest.h"
 #include "manifold/types.h"
+#include "manifold/version.h"
 #include "test.h"
 
 void* alloc_manifold_buffer() { return malloc(manifold_manifold_size()); }
@@ -27,6 +28,15 @@ void* alloc_polygons_buffer() { return malloc(manifold_polygons_size()); }
 
 void* alloc_manifold_vec_buffer() {
   return malloc(manifold_manifold_vec_size());
+}
+
+TEST(CBIND, version) {
+  int version[3];
+  manifold_version(version);
+
+  EXPECT_EQ(version[0], MANIFOLD_VERSION_MAJOR);
+  EXPECT_EQ(version[1], MANIFOLD_VERSION_MINOR);
+  EXPECT_EQ(version[2], MANIFOLD_VERSION_PATCH);
 }
 
 TEST(CBIND, sphere) {
