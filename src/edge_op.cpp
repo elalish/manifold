@@ -684,12 +684,17 @@ void Manifold::Impl::DedupeEdge(const int edge) {
   }
 }
 
-// halfedge0 and the opposite side of its quad (formed with the neighboring
-// triangle across nextDiag ? Next(halfedge0) : Prev(halfedge0)) are split: a
-// new vert is inserted along halfedge0, nearest to the center of the opposite
+// edge and the opposite side of its quad (formed with the neighboring
+// triangle across nextDiag ? Next(edge) : Prev(edge)) are split: a
+// new vert is inserted along edge, nearest to the center of the opposite
 // side. The quad becomes three triangles fanned around the new vert, and the
-// triangle across halfedge0 is split in two. Returns false, leaving the mesh
+// triangle across edge is split in two. Returns false, leaving the mesh
 // unchanged, if next is colinear with last-end.
+// This method is necessary because of a case of two tris where one is
+// degenerate and the other is not, yet when their shared edge is swapped, still
+// one of the two resulting tris is degenerate. None of the edges are short, so
+// there is no way to remove the degeneracy without inserting a new vert, which
+// is what we do here.
 bool Manifold::Impl::SplitQuad(int edge, bool nextDiag) {
   const int pair = halfedge_.Pair(edge);
   const int next0 = NextHalfedge(edge);
