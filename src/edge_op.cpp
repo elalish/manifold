@@ -105,26 +105,18 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
   }
 #endif
 
-  Vec<uint32_t> visited(halfedge_.size(), 0);
-  uint32_t visitEpoch = 0;
-  int swapped = 0;
-  // SplitQuad appends triangles, which must also be visited.
-  for (int tri = 0; tri < NumTri(); ++tri) {
-    // if (halfedge_.Start(3 * tri) < firstNewVert &&
-    //     halfedge_.Start(3 * tri + 1) < firstNewVert &&
-    //     halfedge_.Start(3 * tri + 2) < firstNewVert)
-    //   continue;
-
-    ++visitEpoch;
-    auto res = IsDegenerate(tri);
-    swapped += RecursiveEdgeSwap(3 * tri + res.longEdge, firstNewVert, scratch,
-                                 0, visited, visitEpoch);
-  }
+  const int swapped = SwapDegenerateEdges(scratch);
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose >= 2) {
     std::cout << "swapped " << swapped << " edges" << std::endl;
   }
 #endif
+
+  const int numDegenerateTris = NumDegenerateTris();
+  DEBUG_ASSERT(numDegenerateTris == 0, logicErr,
+               "There are still " + std::to_string(numDegenerateTris) +
+                   " degenerate triangles after edge collapse and "
+                   "swap operations.");
 
   int colinear = 0;
   for (int edge = 0; edge < static_cast<int>(halfedge_.size()); ++edge) {
@@ -527,100 +519,79 @@ void Manifold::Impl::Decimate(double tolerance) {
 #endif
 }
 
-int Manifold::Impl::RecursiveEdgeSwap(const int edgeIn, const int firstNewVert,
-                                      Vec<int>& scratch, int depth,
-                                      Vec<uint32_t>& visited,
-                                      uint32_t& visitEpoch) {
-  if (edgeIn < 0 || !halfedge_.Valid(edgeIn)) return 0;
+// Swaps the long edge of every degenerate triangle until none remain, using a
+// work stack of triangles. Any triangle touched by a swap or split is
+// re-queued, since its degeneracy or its neighbor's blocking condition may
+// have changed. Returns the number of swaps.
+int Manifold::Impl::SwapDegenerateEdges(Vec<int>& scratch) {
+  // Per-edge cap guards against swap cycles between coincident triangulations.
+  constexpr uint8_t kMaxSwapsPerEdge = 255;
+  std::vector<uint8_t> swapCount(halfedge_.size(), 0);
+  std::vector<int> stack;
+  for (int tri = NumTri() - 1; tri >= 0; --tri) stack.push_back(tri);
 
-  // The incoming edge may not be the triangle's long edge; recompute it so
-  // degenerate triangles reached via a non-long edge are still found.
-  const auto triResult = IsDegenerate(edgeIn / 3);
-  const int edge = edgeIn;
-  const bool folded = false;  // IsFolded(edge);
-  if (!triResult.colinear || triResult.longEdge != edgeIn % 3) return 0;
-  const int pair = halfedge_.Pair(edge);
+  int swaps = 0;
+  while (!stack.empty()) {
+    const int tri = stack.back();
+    stack.pop_back();
+    if (!halfedge_.Valid(3 * tri)) continue;
 
-  // Swap each edge at most once per traversal; a new starting triangle or a
-  // collapse begins a fresh one.
-  if (visited[edge] == visitEpoch && visited[pair] == visitEpoch) {
-    // std::cout << "tried to loop" << std::endl;
-    return 0;
-  }
+    const auto triResult = IsDegenerate(tri);
+    if (!triResult.colinear) continue;
+    const int edge = 3 * tri + triResult.longEdge;
+    const int pair = halfedge_.Pair(edge);
+    uint8_t& count = swapCount[std::min(edge, pair)];
+    if (count >= kMaxSwapsPerEdge) continue;
 
-  // A swap is only allowed if it either reduces the number of degenerate
-  // triangles, or both stay degenerate but their longest edges get shorter.
-  // This ensures progress is always being made.
-  const auto pairResult = IsDegenerate(pair / 3);
-  if (!folded && pairResult.colinear && pairResult.longEdge != pair % 3)
-    return 0;
+    // A swap is only allowed if it either reduces the number of degenerate
+    // triangles, or both stay degenerate but their longest edges get shorter.
+    const auto pairResult = IsDegenerate(pair / 3);
+    if (pairResult.colinear && pairResult.longEdge != pair % 3) continue;
 
-  const ivec4 neighborEdges = ivec4(
-      halfedge_.Pair(NextHalfedge(edge)), halfedge_.Pair(PrevHalfedge(edge)),
-      halfedge_.Pair(NextHalfedge(pair)), halfedge_.Pair(PrevHalfedge(pair)));
+    const int neighborTris[4] = {halfedge_.Pair(NextHalfedge(edge)) / 3,
+                                 halfedge_.Pair(PrevHalfedge(edge)) / 3,
+                                 halfedge_.Pair(NextHalfedge(pair)) / 3,
+                                 halfedge_.Pair(PrevHalfedge(pair)) / 3};
 
-  const int newCenter = PrevHalfedge(edge);
-  const int newCenterPair = PrevHalfedge(pair);
-  const vec3 next = vertPos_[halfedge_.Start(newCenter)];
-  const vec3 last = vertPos_[halfedge_.Start(newCenterPair)];
+    const int newCenter = PrevHalfedge(edge);
+    const int newCenterPair = PrevHalfedge(pair);
+    const vec3 next = vertPos_[halfedge_.Start(newCenter)];
+    const vec3 last = vertPos_[halfedge_.Start(newCenterPair)];
+    const vec3 base = vertPos_[halfedge_.Start(edge)];
+    const vec3 end = vertPos_[halfedge_.End(edge)];
+    const vec3 a = next - base;
+    const vec3 edgeVec = end - base;
 
-  const vec3 base = vertPos_[halfedge_.Start(edge)];
-  const vec3 end = vertPos_[halfedge_.End(edge)];
-  const vec3 a = next - base;
-  const vec3 edgeVec = end - base;
-
-  if (!folded && !pairResult.colinear) {
-    const vec3 newDiag = next - last;
-    if (IsColinear(newDiag, base - last, epsilon_) ||
-        IsColinear(newDiag, end - last, epsilon_)) {
-      const int longEdge = 3 * (pair / 3) + pairResult.longEdge;
-      if (longEdge != pair && dot(last - base, end - next) < 0 &&
-          SplitQuad(longEdge, NextHalfedge(longEdge) == pair)) {
-        for (int i : {0, 1, 2, 3, 4, 5}) visited.push_back(visitEpoch);
-        return 0;
+    if (!pairResult.colinear) {
+      const vec3 newDiag = next - last;
+      if (IsColinear(newDiag, base - last, epsilon_) ||
+          IsColinear(newDiag, end - last, epsilon_)) {
+        const int longEdge = 3 * (pair / 3) + pairResult.longEdge;
+        if (longEdge != pair && dot(last - base, end - next) < 0 &&
+            SplitQuad(longEdge, NextHalfedge(longEdge) == pair)) {
+          ++count;
+          swapCount.resize(halfedge_.size(), 0);
+          const int numTri = NumTri();
+          for (int t : {tri, pair / 3, numTri - 1, numTri - 2, neighborTris[0],
+                        neighborTris[1], neighborTris[2], neighborTris[3]})
+            stack.push_back(t);
+          continue;
+        }
       }
     }
+
+    SwapEdge(edge, dot(a, edgeVec) / length2(edgeVec));
+    ++count;
+    ++swaps;
+
+    if (length2(next - last) < epsilon_ * epsilon_)
+      CollapseDegenerate(newCenter, scratch);
+
+    for (int t : {tri, pair / 3, neighborTris[0], neighborTris[1],
+                  neighborTris[2], neighborTris[3]})
+      stack.push_back(t);
   }
-
-  SwapEdge(edge, dot(a, edgeVec) / length2(edgeVec));
-
-  // std::cout << "swapped edge " << edge << ", during epoch: " << visitEpoch
-  //           << ", at depth: " << depth << ", " << triResult.colinear << " "
-  //           << pairResult.colinear << std::endl;
-
-  visited[newCenter] = visitEpoch;
-  visited[newCenterPair] = visitEpoch;
-
-  int swaps = 1;
-  if (length2(next - last) < epsilon_ * epsilon_) {
-    CollapseDegenerate(newCenter, scratch);
-    ++visitEpoch;
-    return swaps +
-           RecursiveEdgeSwap(neighborEdges[0], firstNewVert, scratch, depth + 1,
-                             visited, visitEpoch) +
-           RecursiveEdgeSwap(neighborEdges[1], firstNewVert, scratch, depth + 1,
-                             visited, visitEpoch) +
-           RecursiveEdgeSwap(neighborEdges[2], firstNewVert, scratch, depth + 1,
-                             visited, visitEpoch) +
-           RecursiveEdgeSwap(neighborEdges[3], firstNewVert, scratch, depth + 1,
-                             visited, visitEpoch);
-  }
-
-  if (pairResult.colinear) {
-    const int idx = dot(next - last, edgeVec) > 0 ? 1 : 0;
-    return swaps +
-           RecursiveEdgeSwap(halfedge_.Pair(neighborEdges[idx]), firstNewVert,
-                             scratch, depth + 1, visited, visitEpoch) +
-           RecursiveEdgeSwap(halfedge_.Pair(neighborEdges[idx + 2]),
-                             firstNewVert, scratch, depth + 1, visited,
-                             visitEpoch);
-  } else {
-    return swaps +
-           RecursiveEdgeSwap(neighborEdges[0], firstNewVert, scratch, depth + 1,
-                             visited, visitEpoch) +
-           RecursiveEdgeSwap(neighborEdges[1], firstNewVert, scratch, depth + 1,
-                             visited, visitEpoch);
-  }
+  return swaps;
 }
 
 // Returns true if another halfedge leaving this edge's startVert also ends at
