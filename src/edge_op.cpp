@@ -114,10 +114,7 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
 
   int colinear = 0;
   for (int edge = 0; edge < static_cast<int>(halfedge_.size()); ++edge) {
-    if (!halfedge_.Valid(edge))
-      //  || (halfedge_.Start(edge) < firstNewVert &&
-      //                                halfedge_.End(edge) < firstNewVert))
-      continue;
+    if (!halfedge_.Valid(edge)) continue;
 
     if (Colinear(edge)) {
       CollapseDegenerate(edge, scratch);
@@ -522,7 +519,7 @@ int Manifold::Impl::SwapDegenerateEdges(Vec<int>& scratch) {
   constexpr uint8_t kMaxSwapsPerEdge = 255;
   std::vector<uint8_t> swapCount(halfedge_.size(), 0);
   std::vector<int> stack;
-  for (int tri = NumTri() - 1; tri >= 0; --tri) stack.push_back(tri);
+  for (int tri = 0; tri < NumTri(); ++tri) stack.push_back(tri);
 
   int swaps = 0;
   while (!stack.empty()) {
@@ -832,35 +829,6 @@ bool Manifold::Impl::SplitQuad(int edge, bool nextDiag) {
     PairUp(3 * triB + 2, extB0);
     PairUp(3 * triN + 1, extB1);
   }
-  // if (IsDegenerate(triA).colinear || IsDegenerate(triB).colinear ||
-  //     IsDegenerate(triN).colinear) {
-  //   std::cout << "SplitQuad nextDiag=" << nextDiag << " t=" << t
-  //             << " eps=" << epsilon_ << " |edge|=" << std::sqrt(len2)
-  //             << " |h1|="
-  //             << la::length(vertPos_[halfedge_.End(h1)] -
-  //                           vertPos_[halfedge_.Start(h1)])
-  //             << " degenerate A/B/N=" << IsDegenerate(triA).colinear
-  //             << IsDegenerate(triB).colinear << IsDegenerate(triN).colinear
-  //             << std::endl;
-  //   std::cout.precision(17);
-  //   for (auto [name, v] : {std::pair<const char*, int>{"base", base},
-  //                          {"end", end},
-  //                          {"last", last},
-  //                          {"next", next},
-  //                          {"m", m}})
-  //     std::cout << "  " << name << " = " << vertPos_[v][0] << " "
-  //               << vertPos_[v][1] << " " << vertPos_[v][2] << std::endl;
-  // }
-  // // assert that none of these five triangles are degenerate
-  // DEBUG_ASSERT(!IsDegenerate(triA).colinear, logicErr, "triA is
-  // degenerate!"); DEBUG_ASSERT(!IsDegenerate(triB).colinear, logicErr, "triB
-  // is degenerate!");
-  // // DEBUG_ASSERT(!IsDegenerate(triC).colinear, logicErr, "triC is
-  // // degenerate!"); DEBUG_ASSERT(!IsDegenerate(triS).colinear, logicErr,
-  // "triS
-  // // is degenerate!");
-  // DEBUG_ASSERT(!IsDegenerate(triN).colinear, logicErr, "triN is
-  // degenerate!");
   return true;
 }
 
