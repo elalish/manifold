@@ -20,6 +20,14 @@
 #include "parallel.h"
 
 namespace manifold {
+namespace {
+std::shared_ptr<Manifold::Impl> ExtrudeImpl(const Polygons& crossSection,
+                                            double height, int nDivisions,
+                                            double twistDegrees, vec2 scaleTop,
+                                            double zOffset = 0.0,
+                                            bool flipZ = false);
+}  // namespace
+
 /**
  * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
  * and the rest at similarly symmetric points.
@@ -64,16 +72,12 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
   if (height <= 0.0 || radiusLow < 0.0) {
     return Invalid();
   }
-  if (radiusLow == 0.0) {
+  const bool flip = radiusLow == 0.0;
+  if (flip) {
     if (radiusHigh <= 0.0) {
       return Invalid();
     }
-    // Cone with apex at bottom: create the centered apex-at-top version and
-    // mirror it
-    Manifold cone = Cylinder(height, radiusHigh, 0.0, circularSegments, true);
-    cone = cone.Mirror(vec3(0.0, 0.0, 1.0));
-    if (!center) cone = cone.Translate(vec3(0.0, 0.0, height / 2.0));
-    return cone.AsOriginal();
+    std::swap(radiusLow, radiusHigh);
   }
   const double scale = radiusHigh >= 0.0 ? radiusHigh / radiusLow : 1.0;
   const double radius = fmax(radiusLow, radiusHigh);
@@ -86,10 +90,9 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
     circle[i] = {radiusLow * cosd(dPhi * i), radiusLow * sind(dPhi * i)};
   }
 
-  Manifold cylinder = Manifold::Extrude({circle}, height, 0, 0.0, vec2(scale));
-  if (center)
-    cylinder = cylinder.Translate(vec3(0.0, 0.0, -height / 2.0)).AsOriginal();
-  return cylinder;
+  const double zOffset = (flip ? height : 0.0) - (center ? height / 2.0 : 0.0);
+  return Manifold(
+      ExtrudeImpl({circle}, height, 0, 0.0, vec2(scale), zOffset, flip));
 }
 
 /**
@@ -151,11 +154,19 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
   if (crossSection.size() == 0 || height <= 0.0) {
     return Invalid();
   }
+  return Manifold(
+      ExtrudeImpl(crossSection, height, nDivisions, twistDegrees, scaleTop));
+}
 
+namespace {
+std::shared_ptr<Manifold::Impl> ExtrudeImpl(const Polygons& crossSection,
+                                            double height, int nDivisions,
+                                            double twistDegrees, vec2 scaleTop,
+                                            double zOffset, bool flipZ) {
   scaleTop.x = std::max(scaleTop.x, 0.0);
   scaleTop.y = std::max(scaleTop.y, 0.0);
 
-  auto pImpl_ = std::make_shared<Impl>();
+  auto pImpl_ = std::make_shared<Manifold::Impl>();
   ++nDivisions;
   auto& vertPos = pImpl_->vertPos_;
   Vec<ivec3> triVertsDH;
@@ -213,13 +224,21 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
     if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
   }
 
+  if (flipZ) {
+    for (vec3& v : vertPos) v.z = zOffset - v.z;
+    for (ivec3& tri : triVerts) std::swap(tri[1], tri[2]);
+  } else if (zOffset != 0.0) {
+    for (vec3& v : vertPos) v.z += zOffset;
+  }
+
   pImpl_->CreateHalfedges(triVertsDH);
   pImpl_->CalculateBBox();
   pImpl_->SortGeometry();
   pImpl_->SetFaceAndVertNormals();
   pImpl_->InitializeOriginal();
-  return Manifold(pImpl_);
+  return pImpl_;
 }
+}  // namespace
 
 /**
  * Constructs a manifold from a set of polygons by revolving this cross-section
