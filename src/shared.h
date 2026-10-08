@@ -118,6 +118,15 @@ inline bool Shadows(double p, double q, double dir) {
 }
 
 /**
+ * The long edge and short edge vectors start from the same point. Returns true
+ * if they are colinear within epsilon.
+ */
+inline bool IsColinear(vec3 longEdge, vec3 shortEdge, double epsilon) {
+  return length2(cross(longEdge, shortEdge)) <=
+         length2(longEdge) * epsilon * epsilon;
+}
+
+/**
  * By using the closest axis-aligned projection to the normal instead of a
  * projection along the normal, we avoid introducing any rounding error.
  */

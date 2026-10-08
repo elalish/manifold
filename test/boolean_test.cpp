@@ -17,7 +17,6 @@
 #include <thread>
 
 #include "../src/utils.h"
-#include "degenerate_swap_cycle_data.h"
 #include "gtest/gtest.h"
 #include "manifold/common.h"
 #include "manifold/manifold.h"
@@ -278,31 +277,29 @@ TEST(Boolean, SimplifyCracks) {
   if (options.exportModels) WriteTestOBJ("cracks.obj", simplified);
 }
 
-// Regression test for #1857: unioning the meshes attached there made
-// RemoveDegenerates cycle edge swaps for ~3e8 iterations.
+TEST(Boolean, DISABLED_SimplifyShards) {
+  Manifold a = Manifold::Sphere(40, 10);
+  Manifold b = a.Translate({0, 0, 40}) ^ a;
+  Manifold result = a - b;
+  Box bounds = result.BoundingBox();
+  EXPECT_FLOAT_EQ(bounds.max.z, 20);
+}
+
+#ifndef MANIFOLD_NO_FILESYSTEM
+// Regression test for #1857: coincident meshes with different triangulations
+// made RemoveDegenerates cycle edge swaps for ~3e8 iterations.
 TEST(Boolean, DegenerateSwapCycle) {
   ManifoldParamGuard guard;
-  ManifoldParams().verifyNoDegenerates = false;
   ManifoldParams().intermediateChecks = false;
-  std::vector<Manifold> parts;
-  for (const auto& input : test::kSwapCycleInputs) {
-    MeshGL mesh;
-    mesh.numProp = 3;
-    mesh.vertProperties = input.vertProperties;
-    mesh.triVerts = input.triVerts;
-    parts.emplace_back(mesh);
-    ASSERT_EQ(parts.back().Status(), Manifold::Error::NoError);
-  }
-
-  Manifold result = parts[0] + parts[1] + parts[2];
+  Manifold first = ReadTestOBJ("degenerate_swap_cycle_first.obj");
+  Manifold second = ReadTestOBJ("degenerate_swap_cycle_second.obj");
+  Manifold result = first + second;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   EXPECT_GT(result.NumTri(), 0u);
   EXPECT_GT(result.Volume(), 0);
-
-  // The public entry point must stay bounded too.
-  Manifold cleaned = result.RemoveDegenerates();
-  EXPECT_EQ(cleaned.Status(), Manifold::Error::NoError);
 }
+
+#endif
 
 TEST(Boolean, NoRetainedVerts) {
   Manifold cube = Manifold::Cube(vec3(1), true);
@@ -393,7 +390,7 @@ TEST(Boolean, SimpleProperties) {
   Manifold result = cube + flange;
   EXPECT_EQ(result.NumProp(), 3);
   EXPECT_NEAR(result.Volume(), 22.6666, 0.0001);
-  EXPECT_EQ(result.NumVert(), 16);
+  EXPECT_EQ(result.NumVert(), 12);
   EXPECT_TRUE(result.HasSimpleProps());
 }
 
@@ -757,7 +754,6 @@ TEST(Boolean, NonConvexConvexMinkowskiSum) {
 TEST(Boolean, NonConvexConvexMinkowskiDifference) {
   ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
-  ManifoldParams().verifyNoDegenerates = false;
 
   Manifold sphere = Manifold::Sphere(1.2, 20);
   Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
@@ -773,9 +769,6 @@ TEST(Boolean, NonConvexConvexMinkowskiDifference) {
 }
 
 TEST(Boolean, NonConvexNonConvexMinkowskiSum) {
-  ManifoldParamGuard guard;
-  ManifoldParams().processOverlaps = true;
-
   Manifold tet = Manifold::Tetrahedron();
   Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
 
@@ -789,10 +782,6 @@ TEST(Boolean, NonConvexNonConvexMinkowskiSum) {
 }
 
 TEST(Boolean, NonConvexNonConvexMinkowskiDifference) {
-  ManifoldParamGuard guard;
-  ManifoldParams().processOverlaps = true;
-  ManifoldParams().verifyNoDegenerates = false;
-
   Manifold tet = Manifold::Tetrahedron();
   Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
 

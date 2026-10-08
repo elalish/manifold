@@ -1532,7 +1532,6 @@ TEST(BooleanComplex, LazyCollider) {
 TEST(BooleanComplex, OffsetTriangulationFailure) {
   ManifoldParamGuard guard;
   ManifoldParams().selfIntersectionChecks = true;
-  manifold::ManifoldParams().verifyNoDegenerates = false;
   Manifold a = ReadTestOBJ("Offset1.obj");
   Manifold b = ReadTestOBJ("Offset2.obj");
   Manifold result = a + b;
@@ -1542,7 +1541,6 @@ TEST(BooleanComplex, OffsetTriangulationFailure) {
 TEST(BooleanComplex, OffsetSelfIntersect) {
   ManifoldParamGuard guard;
   ManifoldParams().selfIntersectionChecks = true;
-  manifold::ManifoldParams().verifyNoDegenerates = false;
   Manifold a = ReadTestOBJ("Offset3.obj");
   Manifold b = ReadTestOBJ("Offset4.obj");
   Manifold result = a + b;
@@ -1559,7 +1557,6 @@ TEST(BooleanComplex, InfiniteRecursion) {
 TEST(BooleanComplex, OpenscadCrash) {
   ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
-  manifold::ManifoldParams().verifyNoDegenerates = false;
   Manifold m = ReadTestOBJ("openscad-nonmanifold-crash.obj");
   // m is not empty
   EXPECT_EQ(m.IsEmpty(), false);
