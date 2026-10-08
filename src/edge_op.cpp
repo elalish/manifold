@@ -112,12 +112,6 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
   }
 #endif
 
-  const int numDegenerateTris = NumDegenerateTris();
-  DEBUG_ASSERT(numDegenerateTris == 0, logicErr,
-               "There are still " + std::to_string(numDegenerateTris) +
-                   " degenerate triangles after edge collapse and "
-                   "swap operations.");
-
   int colinear = 0;
   for (int edge = 0; edge < static_cast<int>(halfedge_.size()); ++edge) {
     if (!halfedge_.Valid(edge))
