@@ -107,17 +107,18 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
 
   Vec<uint32_t> visited(halfedge_.size(), 0);
   uint32_t visitEpoch = 0;
-  const int numTri = NumTri();
   int swapped = 0;
-  for (int tri = 0; tri < numTri; ++tri) {
-    if (halfedge_.Start(3 * tri) < firstNewVert &&
-        halfedge_.Start(3 * tri + 1) < firstNewVert &&
-        halfedge_.Start(3 * tri + 2) < firstNewVert)
-      continue;
+  // SplitQuad appends triangles, which must also be visited.
+  for (int tri = 0; tri < NumTri(); ++tri) {
+    // if (halfedge_.Start(3 * tri) < firstNewVert &&
+    //     halfedge_.Start(3 * tri + 1) < firstNewVert &&
+    //     halfedge_.Start(3 * tri + 2) < firstNewVert)
+    //   continue;
 
     ++visitEpoch;
-    swapped += RecursiveEdgeSwap(3 * tri, firstNewVert, scratch, 0, visited,
-                                 visitEpoch);
+    auto res = IsDegenerate(tri);
+    swapped += RecursiveEdgeSwap(3 * tri + res.longEdge, firstNewVert, scratch,
+                                 0, visited, visitEpoch);
   }
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose >= 2) {
@@ -126,9 +127,10 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
 #endif
 
   int colinear = 0;
-  for (int edge = 0; edge < numHalfedge; ++edge) {
-    if (!halfedge_.Valid(edge) || (halfedge_.Start(edge) < firstNewVert &&
-                                   halfedge_.End(edge) < firstNewVert))
+  for (int edge = 0; edge < static_cast<int>(halfedge_.size()); ++edge) {
+    if (!halfedge_.Valid(edge))
+      //  || (halfedge_.Start(edge) < firstNewVert &&
+      //                                halfedge_.End(edge) < firstNewVert))
       continue;
 
     if (Colinear(edge)) {
@@ -261,6 +263,7 @@ bool Manifold::Impl::Continuous(int edge) const {
 }
 
 Manifold::Impl::TriResult Manifold::Impl::IsDegenerate(int tri) const {
+  if (!halfedge_.Valid(3 * tri)) return {true, -1};
   const mat3 v = {vertPos_[halfedge_.Start(3 * tri)],
                   vertPos_[halfedge_.Start(3 * tri + 1)],
                   vertPos_[halfedge_.Start(3 * tri + 2)]};
@@ -268,9 +271,7 @@ Manifold::Impl::TriResult Manifold::Impl::IsDegenerate(int tri) const {
   const vec3 edgeLen2 = {length2(edgeVec[0]), length2(edgeVec[1]),
                          length2(edgeVec[2])};
   const int edge = argmax(edgeLen2);
-  return {length2(cross(edgeVec[edge], edgeVec[Next3(edge)])) <=
-              edgeLen2[edge] * epsilon_ * epsilon_,
-          edge};
+  return {IsColinear(edgeVec[edge], edgeVec[Next3(edge)], epsilon_), edge};
 }
 
 bool Manifold::Impl::IsFolded(int edge) const {
@@ -530,34 +531,29 @@ int Manifold::Impl::RecursiveEdgeSwap(const int edgeIn, const int firstNewVert,
                                       Vec<int>& scratch, int depth,
                                       Vec<uint32_t>& visited,
                                       uint32_t& visitEpoch) {
-  if (!halfedge_.Valid(edgeIn)) return 0;
+  if (edgeIn < 0 || !halfedge_.Valid(edgeIn)) return 0;
 
   // The incoming edge may not be the triangle's long edge; recompute it so
   // degenerate triangles reached via a non-long edge are still found.
   const auto triResult = IsDegenerate(edgeIn / 3);
-  const int edge = 3 * (edgeIn / 3) + triResult.longEdge;
+  const int edge = edgeIn;
   const bool folded = false;  // IsFolded(edge);
-  if (!triResult.colinear && !folded) return 0;
+  if (!triResult.colinear || triResult.longEdge != edgeIn % 3) return 0;
   const int pair = halfedge_.Pair(edge);
 
   // Swap each edge at most once per traversal; a new starting triangle or a
   // collapse begins a fresh one.
-  if (visited[edge] == visitEpoch && visited[pair] == visitEpoch) return 0;
+  if (visited[edge] == visitEpoch && visited[pair] == visitEpoch) {
+    // std::cout << "tried to loop" << std::endl;
+    return 0;
+  }
 
   // A swap is only allowed if it either reduces the number of degenerate
   // triangles, or both stay degenerate but their longest edges get shorter.
   // This ensures progress is always being made.
   const auto pairResult = IsDegenerate(pair / 3);
-  if (!folded && pairResult.colinear && pairResult.longEdge != pair % 3) {
-    const int neighborLongEdge = 3 * (pair / 3) + pairResult.longEdge;
-    const double sharedLength =
-        length(vertPos_[halfedge_.End(pair)] - vertPos_[halfedge_.Start(pair)]);
-    const double neighborLongLength =
-        length(vertPos_[halfedge_.End(neighborLongEdge)] -
-               vertPos_[halfedge_.Start(neighborLongEdge)]);
-    // Edge lengths within the positional error bound have no reliable order.
-    if (neighborLongLength - sharedLength > 4 * epsilon_) return 0;
-  }
+  if (!folded && pairResult.colinear && pairResult.longEdge != pair % 3)
+    return 0;
 
   const ivec4 neighborEdges = ivec4(
       halfedge_.Pair(NextHalfedge(edge)), halfedge_.Pair(PrevHalfedge(edge)),
@@ -569,30 +565,62 @@ int Manifold::Impl::RecursiveEdgeSwap(const int edgeIn, const int firstNewVert,
   const vec3 last = vertPos_[halfedge_.Start(newCenterPair)];
 
   const vec3 base = vertPos_[halfedge_.Start(edge)];
+  const vec3 end = vertPos_[halfedge_.End(edge)];
   const vec3 a = next - base;
-  const vec3 edgeVec = vertPos_[halfedge_.End(edge)] - base;
+  const vec3 edgeVec = end - base;
+
+  if (!folded && !pairResult.colinear) {
+    const vec3 newDiag = next - last;
+    if (IsColinear(newDiag, base - last, epsilon_) ||
+        IsColinear(newDiag, end - last, epsilon_)) {
+      const int longEdge = 3 * (pair / 3) + pairResult.longEdge;
+      if (longEdge != pair && dot(last - base, end - next) < 0 &&
+          SplitQuad(longEdge, NextHalfedge(longEdge) == pair)) {
+        for (int i : {0, 1, 2, 3, 4, 5}) visited.push_back(visitEpoch);
+        return 0;
+      }
+    }
+  }
 
   SwapEdge(edge, dot(a, edgeVec) / length2(edgeVec));
+
+  // std::cout << "swapped edge " << edge << ", during epoch: " << visitEpoch
+  //           << ", at depth: " << depth << ", " << triResult.colinear << " "
+  //           << pairResult.colinear << std::endl;
 
   visited[newCenter] = visitEpoch;
   visited[newCenterPair] = visitEpoch;
 
+  int swaps = 1;
   if (length2(next - last) < epsilon_ * epsilon_) {
     CollapseDegenerate(newCenter, scratch);
     ++visitEpoch;
+    return swaps +
+           RecursiveEdgeSwap(neighborEdges[0], firstNewVert, scratch, depth + 1,
+                             visited, visitEpoch) +
+           RecursiveEdgeSwap(neighborEdges[1], firstNewVert, scratch, depth + 1,
+                             visited, visitEpoch) +
+           RecursiveEdgeSwap(neighborEdges[2], firstNewVert, scratch, depth + 1,
+                             visited, visitEpoch) +
+           RecursiveEdgeSwap(neighborEdges[3], firstNewVert, scratch, depth + 1,
+                             visited, visitEpoch);
   }
-  int swaps = 1;
-  if (pairResult.colinear || folded) {
-    swaps += RecursiveEdgeSwap(neighborEdges[2], firstNewVert, scratch,
-                               depth + 1, visited, visitEpoch) +
-             RecursiveEdgeSwap(neighborEdges[3], firstNewVert, scratch,
-                               depth + 1, visited, visitEpoch);
+
+  if (pairResult.colinear) {
+    const int idx = dot(next - last, edgeVec) > 0 ? 1 : 0;
+    return swaps +
+           RecursiveEdgeSwap(halfedge_.Pair(neighborEdges[idx]), firstNewVert,
+                             scratch, depth + 1, visited, visitEpoch) +
+           RecursiveEdgeSwap(halfedge_.Pair(neighborEdges[idx + 2]),
+                             firstNewVert, scratch, depth + 1, visited,
+                             visitEpoch);
+  } else {
+    return swaps +
+           RecursiveEdgeSwap(neighborEdges[0], firstNewVert, scratch, depth + 1,
+                             visited, visitEpoch) +
+           RecursiveEdgeSwap(neighborEdges[1], firstNewVert, scratch, depth + 1,
+                             visited, visitEpoch);
   }
-  return swaps +
-         RecursiveEdgeSwap(neighborEdges[0], firstNewVert, scratch, depth + 1,
-                           visited, visitEpoch) +
-         RecursiveEdgeSwap(neighborEdges[1], firstNewVert, scratch, depth + 1,
-                           visited, visitEpoch);
 }
 
 // Returns true if another halfedge leaving this edge's startVert also ends at
@@ -606,8 +634,8 @@ bool Manifold::Impl::IsDuplicated(const int edge) const {
   return duplicated;
 }
 
-// Deduplicate the given 4-manifold edge by duplicating endVert, thus making the
-// edges distinct. Also duplicates startVert if it becomes pinched.
+// Deduplicate the given 4-manifold edge by duplicating endVert, thus making
+// the edges distinct. Also duplicates startVert if it becomes pinched.
 void Manifold::Impl::DedupeEdge(const int edge) {
   // Orbit endVert
   const int nextEdge = NextHalfedge(edge);
@@ -694,6 +722,183 @@ void Manifold::Impl::DedupeEdge(const int edge) {
   }
 }
 
+// halfedge0 and the opposite side of its quad (formed with the neighboring
+// triangle across nextDiag ? Next(halfedge0) : Prev(halfedge0)) are split: a
+// new vert is inserted along halfedge0, nearest to the center of the opposite
+// side. The quad becomes three triangles fanned around the new vert, and the
+// triangle across halfedge0 is split in two. Returns false, leaving the mesh
+// unchanged, if next is colinear with last-end.
+bool Manifold::Impl::SplitQuad(int edge, bool nextDiag) {
+  const int pair = halfedge_.Pair(edge);
+  const int next0 = NextHalfedge(edge);
+  const int prev0 = PrevHalfedge(edge);
+  const int dp = halfedge_.Pair(nextDiag ? next0 : prev0);
+  const int h1 = nextDiag ? PrevHalfedge(dp) : NextHalfedge(dp);
+  const int nextP0 = NextHalfedge(pair);
+  const int prevP0 = PrevHalfedge(pair);
+
+  // Quad verts, named as at the call site: base->end is the diagonal, last is
+  // the apex of edge's triangle, and next is the apex of the other triangle.
+  const int edgeStart = halfedge_.Start(edge);
+  const int edgeEnd = halfedge_.End(edge);
+  const int base = nextDiag ? halfedge_.Start(prev0) : edgeStart;
+  const int end = nextDiag ? edgeEnd : halfedge_.Start(prev0);
+  const int last = nextDiag ? edgeStart : edgeEnd;
+  const int next = nextDiag ? halfedge_.Start(h1) : halfedge_.End(h1);
+  const int c = halfedge_.Start(prevP0);
+
+  // A colinear next would make the fan triangle containing it degenerate.
+  if (IsColinear(vertPos_[end] - vertPos_[last],
+                 vertPos_[next] - vertPos_[last], epsilon_))
+    return false;
+
+  // New vert along edge, nearest to the center of h1.
+  const vec3 ps = vertPos_[edgeStart];
+  const vec3 edgeVec = vertPos_[edgeEnd] - ps;
+  const vec3 center =
+      (vertPos_[halfedge_.Start(h1)] + vertPos_[halfedge_.End(h1)]) / 2;
+  const double len2 = la::dot(edgeVec, edgeVec);
+  const double t =
+      len2 > 0 ? la::clamp(la::dot(center - ps, edgeVec) / len2, 0.0, 1.0)
+               : 0.5;
+  const int m = vertPos_.size();
+  vertPos_.push_back(ps + t * edgeVec);
+  if (vertNormal_.size() > 0)
+    vertNormal_.push_back(SafeNormalize(vertNormal_[edgeStart] * (1 - t) +
+                                        vertNormal_[edgeEnd] * t));
+
+  // Gather everything needed before halfedges are overwritten.
+  const int extC0 = halfedge_.Pair(prevP0);  // c -> edgeEnd
+  const int extC1 = halfedge_.Pair(nextP0);  // edgeStart -> c
+  // Outer edges of the quad.
+  const int extA = halfedge_.Pair(nextDiag ? prev0 : next0);
+  const int extB0 =
+      halfedge_.Pair(nextDiag ? NextHalfedge(dp) : PrevHalfedge(dp));
+  const int extB1 = halfedge_.Pair(h1);
+
+  // Props of edgeStart/edgeEnd/the diagonal vert off edge, in each triangle.
+  int pStartA = -1, pEndA = -1, pDiagA = -1, pDiagB = -1, pNext = -1;
+  int pEndB = -1, pStartB = -1;
+  int pEndC = -1, pStartC = -1, pC = -1, pM = -1, pMC = -1;
+  const int numProp = NumProp();
+  if (numProp > 0) {
+    pStartA = halfedge_.Prop(edge);
+    pEndA = halfedge_.Prop(next0);
+    pDiagA = halfedge_.Prop(prev0);
+    pEndC = halfedge_.Prop(pair);
+    pStartC = halfedge_.Prop(nextP0);
+    pC = halfedge_.Prop(prevP0);
+    if (nextDiag) {
+      pDiagB = halfedge_.Prop(dp);
+      pEndB = halfedge_.Prop(NextHalfedge(dp));
+      pNext = halfedge_.Prop(h1);
+    } else {
+      pStartB = halfedge_.Prop(dp);
+      pDiagB = halfedge_.Prop(h1);
+      pNext = halfedge_.Prop(PrevHalfedge(dp));
+    }
+    auto interp = [&](int prop0, int prop1) {
+      const int newProp = properties_.size() / numProp;
+      for (int p = 0; p < numProp; ++p) {
+        properties_.push_back((1 - t) * properties_[numProp * prop0 + p] +
+                              t * properties_[numProp * prop1 + p]);
+      }
+      return newProp;
+    };
+    pM = interp(pStartA, pEndA);
+    pMC = (pStartA == pStartC && pEndA == pEndC) ? pM : interp(pStartC, pEndC);
+  }
+
+  const int triA = edge / 3;
+  const int triB = h1 / 3;
+  const int triC = pair / 3;
+  const int triN = NumTri();
+  const int triS = triN + 1;
+  for (int i = 0; i < 6; ++i) halfedge_.push_back(-1, -1, -1);
+  if (meshRelation_.triRef.size() > 0) {
+    const TriRef refB = meshRelation_.triRef[triB];
+    const TriRef refC = meshRelation_.triRef[triC];
+    meshRelation_.triRef.push_back(refB);
+    meshRelation_.triRef.push_back(refC);
+  }
+  if (faceNormal_.size() > 0) {
+    const vec3 normalB = faceNormal_[triB];
+    const vec3 normalC = faceNormal_[triC];
+    faceNormal_.push_back(normalB);
+    faceNormal_.push_back(normalC);
+  }
+
+  auto setTri = [&](int tri, ivec3 verts, ivec3 props) {
+    for (int i : {0, 1, 2}) {
+      halfedge_.SetStart(3 * tri + i, verts[i]);
+      halfedge_.SetProp(3 * tri + i, props[i]);
+    }
+  };
+
+  // The triangle across edge is split into (edgeEnd, m, c), (m, edgeStart, c).
+  setTri(triC, {edgeEnd, m, c}, {pEndC, pMC, pC});
+  setTri(triS, {m, edgeStart, c}, {pMC, pStartC, pC});
+  PairUp(3 * triC + 2, extC0);
+  PairUp(3 * triS + 1, extC1);
+  PairUp(3 * triC + 1, 3 * triS + 2);
+
+  if (nextDiag) {
+    // Fan: (last, m, base), (m, end, next), (m, next, base).
+    setTri(triA, {last, m, base}, {pStartA, pM, pDiagA});
+    setTri(triB, {m, end, next}, {pM, pEndB, pNext});
+    setTri(triN, {m, next, base}, {pM, pNext, pDiagB});
+    PairUp(3 * triA, 3 * triS);
+    PairUp(3 * triA + 1, 3 * triN + 2);
+    PairUp(3 * triA + 2, extA);
+    PairUp(3 * triB, 3 * triC);
+    PairUp(3 * triB + 1, extB0);
+    PairUp(3 * triB + 2, 3 * triN);
+    PairUp(3 * triN + 1, extB1);
+  } else {
+    // Fan: (m, last, end), (base, m, next), (m, end, next).
+    setTri(triA, {m, last, end}, {pM, pEndA, pDiagA});
+    setTri(triB, {base, m, next}, {pStartB, pM, pNext});
+    setTri(triN, {m, end, next}, {pM, pDiagB, pNext});
+    PairUp(3 * triA, 3 * triC);
+    PairUp(3 * triA + 1, extA);
+    PairUp(3 * triA + 2, 3 * triN);
+    PairUp(3 * triB, 3 * triS);
+    PairUp(3 * triB + 1, 3 * triN + 2);
+    PairUp(3 * triB + 2, extB0);
+    PairUp(3 * triN + 1, extB1);
+  }
+  // if (IsDegenerate(triA).colinear || IsDegenerate(triB).colinear ||
+  //     IsDegenerate(triN).colinear) {
+  //   std::cout << "SplitQuad nextDiag=" << nextDiag << " t=" << t
+  //             << " eps=" << epsilon_ << " |edge|=" << std::sqrt(len2)
+  //             << " |h1|="
+  //             << la::length(vertPos_[halfedge_.End(h1)] -
+  //                           vertPos_[halfedge_.Start(h1)])
+  //             << " degenerate A/B/N=" << IsDegenerate(triA).colinear
+  //             << IsDegenerate(triB).colinear << IsDegenerate(triN).colinear
+  //             << std::endl;
+  //   std::cout.precision(17);
+  //   for (auto [name, v] : {std::pair<const char*, int>{"base", base},
+  //                          {"end", end},
+  //                          {"last", last},
+  //                          {"next", next},
+  //                          {"m", m}})
+  //     std::cout << "  " << name << " = " << vertPos_[v][0] << " "
+  //               << vertPos_[v][1] << " " << vertPos_[v][2] << std::endl;
+  // }
+  // // assert that none of these five triangles are degenerate
+  // DEBUG_ASSERT(!IsDegenerate(triA).colinear, logicErr, "triA is
+  // degenerate!"); DEBUG_ASSERT(!IsDegenerate(triB).colinear, logicErr, "triB
+  // is degenerate!");
+  // // DEBUG_ASSERT(!IsDegenerate(triC).colinear, logicErr, "triC is
+  // // degenerate!"); DEBUG_ASSERT(!IsDegenerate(triS).colinear, logicErr,
+  // "triS
+  // // is degenerate!");
+  // DEBUG_ASSERT(!IsDegenerate(triN).colinear, logicErr, "triN is
+  // degenerate!");
+  return true;
+}
+
 void Manifold::Impl::PairUp(int edge0, int edge1) {
   halfedge_.SetPair(edge0, edge1);
   halfedge_.SetPair(edge1, edge0);
@@ -770,10 +975,10 @@ void Manifold::Impl::RemoveIfFolded(int edge) {
   }
 }
 
-// Collapses the given degenerate edge by removing startVert. May split the mesh
-// topologically if the collapse would have resulted in a 4-manifold edge. Do
-// not collapse an edge if startVert is pinched - the vert would be marked NaN,
-// but other edges could still be pointing to it.
+// Collapses the given degenerate edge by removing startVert. May split the
+// mesh topologically if the collapse would have resulted in a 4-manifold
+// edge. Do not collapse an edge if startVert is pinched - the vert would be
+// marked NaN, but other edges could still be pointing to it.
 void Manifold::Impl::CollapseDegenerate(const int edge, Vec<int>& edges) {
   const int pair = halfedge_.Pair(edge);
   if (pair < 0) return;
@@ -834,10 +1039,10 @@ void Manifold::Impl::CollapseDegenerate(const int edge, Vec<int>& edges) {
 }
 
 // Collapses the given edge by removing startVert and moving endVert to an
-// optimized location in the plane of the edge and its normal - returns false if
-// the edge is not collapsed, due to inverting a triangle or exceeding our
-// Delaunay metric. May split the mesh topologically if the collapse would have
-// resulted in a 4-manifold edge. Do not collapse an edge if startVert is
+// optimized location in the plane of the edge and its normal - returns false
+// if the edge is not collapsed, due to inverting a triangle or exceeding our
+// Delaunay metric. May split the mesh topologically if the collapse would
+// have resulted in a 4-manifold edge. Do not collapse an edge if startVert is
 // pinched - the vert would be marked NaN, but other edges could still be
 // pointing to it.
 bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges,
@@ -887,11 +1092,11 @@ bool Manifold::Impl::CollapseEdge(const int edge, Vec<int>& edges,
     ForVert(firstEdge, checkTri);
     if (!collapse) return false;
     // Reject a collapse that would worsen the Delaunay condition too much,
-    // which is equivalent to having no obtuse angles. This would be a threshold
-    // of zero on this dot product, but 0.5 is used to allow obtuse angles up to
-    // 120 degrees to allow more edges to collapse. Planar cases (small cost)
-    // relax this threshold to allow generic polygon triangulation, but not so
-    // much as to create new degenerate triangles.
+    // which is equivalent to having no obtuse angles. This would be a
+    // threshold of zero on this dot product, but 0.5 is used to allow obtuse
+    // angles up to 120 degrees to allow more edges to collapse. Planar cases
+    // (small cost) relax this threshold to allow generic polygon
+    // triangulation, but not so much as to create new degenerate triangles.
     const double threshold =
         merger.addedCost > epsilon_ * epsilon_ ? 0.5 : 0.99;
     if (newWorst > threshold && newWorst > oldWorst) return false;
@@ -970,12 +1175,12 @@ void Manifold::Impl::SplitPinchedVerts() {
     //
     // The idea here is to identify cycles of halfedges that can be iterated
     // through using ForVert. Pinched verts are vertices where there are
-    // multiple cycles associated with the vertex. Each cycle is identified with
-    // the smallest halfedge index within the cycle, and when there are multiple
-    // cycles associated with the same starting vertex but with different ids,
-    // it means we have a pinched vertex. This check is done by using a single
-    // atomic cas operation, the expected case is either invalid id (the vertex
-    // was not processed) or with the same id.
+    // multiple cycles associated with the vertex. Each cycle is identified
+    // with the smallest halfedge index within the cycle, and when there are
+    // multiple cycles associated with the same starting vertex but with
+    // different ids, it means we have a pinched vertex. This check is done by
+    // using a single atomic cas operation, the expected case is either
+    // invalid id (the vertex was not processed) or with the same id.
     //
     // The local store is to store the processed halfedges, so to avoid
     // repetitive processing. Note that it only approximates the processed
@@ -1077,10 +1282,10 @@ void Manifold::Impl::DedupeEdges() {
       // small because unordered_set requires allocations and is expensive.
       // We switch to unordered_set when the number of neighbor is
       // larger to avoid making things quadratic.
-      // We do it in two pass, the first pass to find the minimal halfedges with
-      // the target start and end verts, the second pass flag all the duplicated
-      // halfedges that are not having the minimal index as duplicates.
-      // This ensures deterministic result.
+      // We do it in two pass, the first pass to find the minimal halfedges
+      // with the target start and end verts, the second pass flag all the
+      // duplicated halfedges that are not having the minimal index as
+      // duplicates. This ensures deterministic result.
       //
       // The local store is to store the processed halfedges, so to avoid
       // repetitive processing. Note that it only approximates the processed

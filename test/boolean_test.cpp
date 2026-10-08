@@ -298,6 +298,7 @@ TEST(Boolean, DegenerateSwapCycle) {
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   EXPECT_GT(result.NumTri(), 0u);
   EXPECT_GT(result.Volume(), 0);
+  EXPECT_EQ(result.NumDegenerateTris(), 0);
   Manifold cleaned = result.RemoveDegenerates();
   EXPECT_EQ(cleaned.Status(), Manifold::Error::NoError);
   EXPECT_EQ(cleaned.NumDegenerateTris(), 0);

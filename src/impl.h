@@ -231,6 +231,7 @@ struct Manifold::Impl {
   int RecursiveEdgeSwap(int edge, const int firstNewVert, Vec<int>& scratch,
                         int depth, Vec<uint32_t>& visited,
                         uint32_t& visitEpoch);
+  bool SplitQuad(int edge, bool nextDiag);
   void RemoveIfFolded(int edge);
   void PairUp(int edge0, int edge1);
   void UpdateVert(int vert, int startEdge, int endEdge);
