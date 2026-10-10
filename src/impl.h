@@ -214,10 +214,11 @@ struct Manifold::Impl {
     int longEdge;  // 0, 1, 2
   };
 
-  TriResult IsDegenerate(int tri) const;
   void CleanupTopology();
   void RemoveDegenerates(int firstNewVert = 0);
   void Decimate(double tolerance);
+  TriResult IsDegenerate(int tri) const;
+  bool IsFolded(int edge) const;
   Merger CheckEdge(int edge) const;
   bool Continuous(int edge) const;
   bool Swappable(int edge) const;
@@ -227,9 +228,8 @@ struct Manifold::Impl {
   void DedupeEdge(int edge);
   void CollapseDegenerate(int edge, Vec<int>& scratch);
   bool CollapseEdge(int edge, Vec<int>& scratch, const Merger& merger);
-  int RecursiveEdgeSwap(int tri, const int firstNewVert, Vec<int>& scratch,
-                        int depth, Vec<uint32_t>& visited,
-                        uint32_t& visitEpoch);
+  int SwapDegenerateEdges(Vec<int>& scratch);
+  bool SplitQuad(int edge, bool nextDiag);
   void RemoveIfFolded(int edge);
   void PairUp(int edge0, int edge1);
   void UpdateVert(int vert, int startEdge, int endEdge);
