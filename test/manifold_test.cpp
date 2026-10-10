@@ -752,6 +752,54 @@ TEST(Manifold, CylinderZeroRadiusLow) {
   EXPECT_NEAR((coneApexTop ^ slicer).Volume(), 7.0 * totalVol / 8.0, 0.01);
 }
 
+TEST(Manifold, CylinderCenter) {
+  const int n = 256;
+  const double h = 5.0, r = 3.0;
+  const Manifold cylinder = Manifold::Cylinder(h, r, r, n, true);
+  const Manifold coneApexTop = Manifold::Cylinder(h, r, 0.0, n, true);
+  const Manifold coneApexBottom = Manifold::Cylinder(h, 0.0, r, n, true);
+
+  for (const Manifold& m : {cylinder, coneApexTop, coneApexBottom}) {
+    EXPECT_EQ(m.Status(), Manifold::Error::NoError);
+    const Box box = m.BoundingBox();
+    EXPECT_DOUBLE_EQ(box.min.z, -h / 2);
+    EXPECT_DOUBLE_EQ(box.max.z, h / 2);
+  }
+  EXPECT_NEAR(cylinder.Volume(), Manifold::Cylinder(h, r, r, n).Volume(), 1e-6);
+
+  // Same orientation check as CylinderZeroRadiusLow, on the centered cones.
+  const double totalVol = coneApexTop.Volume();
+  EXPECT_NEAR(coneApexBottom.Volume(), totalVol, 1e-6);
+  Manifold slicer = Manifold::Cube(vec3(2 * r + 1, 2 * r + 1, h / 2))
+                        .Translate(vec3(-(r + 0.5), -(r + 0.5), -h / 2));
+  EXPECT_NEAR((coneApexBottom ^ slicer).Volume(), totalVol / 8.0, 0.01);
+  EXPECT_NEAR((coneApexTop ^ slicer).Volume(), 7.0 * totalVol / 8.0, 0.01);
+}
+
+TEST(Manifold, ConstructorsOriginalID) {
+  // Every constructor returns an original with the shared ID 0, including
+  // the centered cylinder and the apex-at-bottom cone.
+  const Polygons square = {{{1, 0}, {2, 0}, {2, 1}, {1, 1}}};
+  const std::vector<Manifold> shapes = {
+      Manifold::Tetrahedron(),
+      Manifold::Cube(vec3(1.0), true),
+      Manifold::Sphere(1.0),
+      Manifold::Cylinder(2, 1),
+      Manifold::Cylinder(2, 1, 1, 0, true),
+      Manifold::Cylinder(2, 0, 1),
+      Manifold::Cylinder(2, 0, 1, 0, true),
+      Manifold::Extrude(square, 1.0),
+      Manifold::Revolve(square),
+      Manifold::Hull({vec3(0.0), vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)}),
+      Manifold::Cube().MinkowskiSum(Manifold::Sphere(0.1, 8)),
+  };
+  for (const Manifold& m : shapes) {
+    EXPECT_EQ(m.Status(), Manifold::Error::NoError);
+    EXPECT_EQ(m.OriginalID(), 0);
+    EXPECT_EQ(m.GetMeshGL().runOriginalID, std::vector<uint32_t>{0});
+  }
+}
+
 TEST(Manifold, Extrude) {
   Polygons polys = SquareHole();
   Manifold donut = Manifold::Extrude(polys, 1.0, 3);

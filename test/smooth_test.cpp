@@ -233,6 +233,7 @@ TEST(Smooth, Fillet) {
   float radius = 10;
   float filletScale = 1 + depth / radius;
   Manifold cylinder = Manifold::Cylinder(20, radius, radius, 6, true)
+                          .AsOriginal()
                           .CalculateNormals(0, 80)
                           .Rotate(20);
   CrossSection section = cylinder.Slice(0);
@@ -259,6 +260,7 @@ TEST(Smooth, Fillet2) {
   float radius = 10;
   float filletScale = 1 + depth / radius;
   Manifold cylinder = Manifold::Cylinder(40, radius, radius, 6, true)
+                          .AsOriginal()
                           .Rotate(0, 30)
                           .CalculateNormals(0, 80);
   CrossSection section = cylinder.Slice(0);

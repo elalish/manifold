@@ -194,7 +194,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
   if (IsCancelled(ctx)) return cancelled();
   return evalBatch(std::move(composedHulls),
                    inset ? manifold::OpType::Subtract : manifold::OpType::Add)
-      .AsOriginal();
+      .AsOriginal(0);
 }
 
 }  // namespace manifold
