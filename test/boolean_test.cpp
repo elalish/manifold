@@ -299,6 +299,20 @@ TEST(Boolean, DegenerateSwapCycle) {
   EXPECT_GT(result.Volume(), 0);
 }
 
+// Since #1869, SwapDegenerateEdges leaves a broken vertex orbit on these
+// coincident meshes, and a later orbit walk in RemoveDegenerates never ends.
+TEST(Boolean, DegenerateSwapLoop) {
+  ManifoldParamGuard guard;
+  ManifoldParams().intermediateChecks = false;
+  Manifold a = ReadTestOBJ("degenerate_swap_loop_a.obj");
+  Manifold b = ReadTestOBJ("degenerate_swap_loop_b.obj");
+  Manifold c = ReadTestOBJ("degenerate_swap_loop_c.obj");
+  Manifold result = (a + b) - c;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_GT(result.NumTri(), 0u);
+  EXPECT_GT(result.Volume(), 0);
+}
+
 #endif
 
 TEST(Boolean, NoRetainedVerts) {
