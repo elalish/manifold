@@ -111,10 +111,11 @@ inline vec4 Intersect(const vec3& aL, const vec3& aR, const vec3& bL,
 /**
  * `p < q` with symbolic perturbation: when `p == q` exactly, `dir < 0`
  * acts as the tiebreaker. Used to give consistent strict-ordering answers
- * regardless of which side of an FP equality we land on.
+ * regardless of which side of an FP equality we land on. Values within tol are
+ * treated as equal.
  */
-inline bool Shadows(double p, double q, double dir) {
-  return p == q ? dir < 0 : p < q;
+inline bool Shadows(double p, double q, double dir, double tol = 0) {
+  return std::abs(p - q) <= tol ? dir < 0 : p < q;
 }
 
 /**

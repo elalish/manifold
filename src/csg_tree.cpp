@@ -502,7 +502,11 @@ std::shared_ptr<CsgLeafNode> BatchUnion(
     Vec<Box> boxes;
     boxes.reserve(children.size() - start);
     for (size_t i = start; i < children.size(); i++) {
-      boxes.push_back(children[i]->GetBoundingBox());
+      // Children touching within rounding are booleaned, not composed.
+      Box box = children[i]->GetBoundingBox();
+      const double tol =
+          2 * std::numeric_limits<double>::epsilon() * box.Scale();
+      boxes.push_back(Box(box.min - tol, box.max + tol));
     }
     // partition the children into a set of disjoint sets
     // each set contains a set of children that are pairwise disjoint
