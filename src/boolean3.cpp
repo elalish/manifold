@@ -468,9 +468,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   };
   auto recorder = MakeSimpleRecorder(recorderf);
   const double tol = TieTol(inP, inQ);
-  auto f = [&](int i) {
-    return VerticalQueryBox(a.vertPos_[verts[i]], tol);
-  };
+  auto f = [&](int i) { return VerticalQueryBox(a.vertPos_[verts[i]], tol); };
   b.collider_.Collisions<false>(recorder, f, verts.size(), true, ctx);
   if (IsCancelled(ctx)) return Vec<int>{};
   // flood fill
