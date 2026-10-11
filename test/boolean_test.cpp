@@ -1122,3 +1122,25 @@ TEST(Boolean, PartialCoincidentFaceUnion) {
                 b1.SurfaceArea() + b2.SurfaceArea() - 2 * overlap, 1e-6);
   }
 }
+
+// A point outside but within tolerance of the surface counts as inside, before
+// and after a boolean operation, including along a coincident face.
+TEST(Boolean, PointWithinToleranceOfCoincidentEdge) {
+  const Manifold block = Manifold::Cube(vec3(100));
+  const Manifold clipper = Manifold::Cube(vec3(150, 300, 200))
+                               .Translate(vec3(-150, -150, -50))
+                               .Rotate(0, 0, -30);
+  const Manifold b1 = block - clipper;
+  const Manifold b2 = block.Translate(vec3(0, 0, -30)) ^ clipper;
+  const Manifold result = b1 + b2;
+  const double tol = 100 * Quality::GetRelativePrecision();
+  const vec3 edge(50 * std::tan(kPi / 6), 50, 70);
+  const vec3 out(-std::cos(kPi / 6), std::sin(kPi / 6), 1);
+  const vec3 within = edge + out * (tol / 4);
+  const vec3 beyond = edge + out * (4 * tol);
+  for (const Manifold& m : {b1, b2, result}) {
+    const auto w = m.WindingNumber({within, beyond});
+    EXPECT_NE(w[0], 0);
+    EXPECT_EQ(w[1], 0);
+  }
+}

@@ -31,8 +31,7 @@ namespace {
 
 // Coordinates within the smaller mesh's epsilon are ties broken by the
 // symbolic perturbation, so surfaces that are coincident up to rounding are
-// treated as coincident. The kernels take this as their explicit tol; the
-// point and ray queries pass 0 to keep exact comparisons.
+// treated as coincident.
 inline double TieTol(const Manifold::Impl& a, const Manifold::Impl& b) {
   return std::min(a.epsilon_, b.epsilon_);
 }
@@ -61,14 +60,14 @@ inline void LoadFaceEdges(const Halfedges& halfedges, int tri,
 template <bool expandP, bool forward>
 inline std::pair<int, vec2> Shadow01(const int a0, const int b1, const int b1s,
                                      const int b1e, const Manifold::Impl& inA,
-                                     const Manifold::Impl& inB,
-                                     const double tol) {
+                                     const Manifold::Impl& inB) {
   const double a0x = inA.vertPos_[a0].x;
   const double b1sx = inB.vertPos_[b1s].x;
   const double b1ex = inB.vertPos_[b1e].x;
   const double a0xp = inA.vertNormal_[a0].x;
   const double b1sxp = inB.vertNormal_[b1s].x;
   const double b1exp = inB.vertNormal_[b1e].x;
+  const double tol = TieTol(inA, inB);
   int s01 = forward
                 ? Shadows(a0x, b1ex, withSign(expandP, a0xp) - b1exp, tol) -
                       Shadows(a0x, b1sx, withSign(expandP, a0xp) - b1sxp, tol)
@@ -99,7 +98,6 @@ template <bool expandP>
 struct Kernel11 {
   const Manifold::Impl& inP;
   const Manifold::Impl& inQ;
-  const double tol;
 
   std::pair<int, vec4> operator()(int p1, int p1s, int p1e, int q1, int q1s,
                                   int q1e) {
@@ -117,7 +115,7 @@ struct Kernel11 {
     const int p0[2] = {p1s, p1e};
     for (int i : {0, 1}) {
       const auto [s01, yz01] =
-          Shadow01<expandP, true>(p0[i], q1, q1s, q1e, inP, inQ, tol);
+          Shadow01<expandP, true>(p0[i], q1, q1s, q1e, inP, inQ);
       // If the value is NaN, then these do not overlap.
       if (std::isfinite(yz01[0])) {
         s11 += s01 * (i == 0 ? -1 : 1);
@@ -133,7 +131,7 @@ struct Kernel11 {
     const int q0[2] = {q1s, q1e};
     for (int i : {0, 1}) {
       const auto [s10, yz10] =
-          Shadow01<expandP, false>(q0[i], p1, p1s, p1e, inQ, inP, tol);
+          Shadow01<expandP, false>(q0[i], p1, p1s, p1e, inQ, inP);
       // If the value is NaN, then these do not overlap.
       if (std::isfinite(yz10[0])) {
         s11 += s10 * (i == 0 ? -1 : 1);
@@ -150,6 +148,7 @@ struct Kernel11 {
       xyzz11 = vec4(NAN);
     } else {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s11");
+      const double tol = TieTol(inP, inQ);
       for (int i : {0, 1})
         if (std::abs(qRL[i].y - pRL[i].y) <= tol) qRL[i].y = pRL[i].y;
       xyzz11 = Intersect(pRL[0], pRL[1], qRL[0], qRL[1]);
@@ -172,7 +171,6 @@ template <bool expandP, bool forward>
 struct Kernel02 {
   const Manifold::Impl& inA;
   const Manifold::Impl& inB;
-  const double tol;
 
   std::pair<int, double> operator()(int a0, int b2) {
     FaceEdge edgeB[3];
@@ -193,7 +191,7 @@ struct Kernel02 {
 
     for (const int i : {0, 1, 2}) {
       const auto syz01 = Shadow01<expandP, forward>(
-          a0, edgeB[i].edge, edgeB[i].start, edgeB[i].end, inA, inB, tol);
+          a0, edgeB[i].edge, edgeB[i].start, edgeB[i].end, inA, inB);
       const int s01 = syz01.first;
       const vec2 yz01 = syz01.second;
       // If the value is NaN, then these do not overlap.
@@ -211,6 +209,7 @@ struct Kernel02 {
     } else {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s02");
       vec3 vertPosA = inA.vertPos_[a0];
+      const double tol = TieTol(inA, inB);
       const double y = la::clamp(vertPosA.y, std::min(yzzRL[0].x, yzzRL[1].x),
                                  std::max(yzzRL[0].x, yzzRL[1].x));
       DEBUG_ASSERT(std::abs(y - vertPosA.y) <= tol, logicErr,
@@ -234,7 +233,6 @@ struct Kernel12 {
   const Manifold::Impl& inB;
   Kernel02<expandP, forward> k02;
   Kernel11<expandP> k11;
-  const double tol;
 
   std::pair<int, vec3> operator()(int a1, int b2) {
     int x12 = 0;
@@ -294,6 +292,7 @@ struct Kernel12 {
       v12 = vec3(NAN);
     } else {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: v12");
+      const double tol = TieTol(inA, inB);
       for (int i : {0, 1})
         if (std::abs(xzyLR1[i].y - xzyLR0[i].y) <= tol)
           xzyLR1[i].y = xzyLR0[i].y;
@@ -371,12 +370,12 @@ Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   const Manifold::Impl& a = forward ? inP : inQ;
   const Manifold::Impl& b = forward ? inQ : inP;
 
-  const double tol = TieTol(inP, inQ);
-  Kernel02<expandP, forward> k02{a, b, tol};
-  Kernel11<expandP> k11{inP, inQ, tol};
+  Kernel02<expandP, forward> k02{a, b};
+  Kernel11<expandP> k11{inP, inQ};
 
-  Kernel12<expandP, forward> k12{a, b, k02, k11, tol};
+  Kernel12<expandP, forward> k12{a, b, k02, k11};
   Kernel12Recorder<expandP, forward> recorder{k12, {}};
+  const double tol = TieTol(inP, inQ);
   auto f = [&a, tol](int i) {
     const int start = a.halfedge_.Start(i);
     const int end = a.halfedge_.End(i);
@@ -466,8 +465,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   for (size_t c : components) verts.push_back(static_cast<int>(c));
 
   Vec<int> w03(a.NumVert(), 0);
-  const double tol = TieTol(inP, inQ);
-  Kernel02<expandP, forward> k02{a, b, tol};
+  Kernel02<expandP, forward> k02{a, b};
   auto recorderf = [&](int i, int b) {
     const auto [s02, z02] = k02(verts[i], b);
     // note that i is distinct on each thread, and verts contains unique
@@ -475,6 +473,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
     if (std::isfinite(z02)) w03[verts[i]] += s02 * (forward ? 1 : -1);
   };
   auto recorder = MakeSimpleRecorder(recorderf);
+  const double tol = TieTol(inP, inQ);
   auto f = [&](int i) {  // a vertical ray, widened by tol
     const vec3 p = a.vertPos_[verts[i]];
     const double inf = std::numeric_limits<double>::infinity();
@@ -595,15 +594,17 @@ Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
   if (points.empty() || IsEmpty()) return winding;
 
   // Points outside the bounding box have winding 0 for any closed manifold.
+  const Box tolBox(bBox_.min - epsilon_, bBox_.max + epsilon_);
   Vec<int> query2input;
   query2input.reserve(points.size());
   for (size_t i = 0; i < points.size(); ++i)
-    if (bBox_.Contains(points[i])) query2input.push_back(static_cast<int>(i));
+    if (tolBox.Contains(points[i])) query2input.push_back(static_cast<int>(i));
   if (query2input.empty()) return winding;
 
   // Build a minimal Impl for the query points. Kernel02 only reads vertPos_
   // and vertNormal_ from inA; halfedges and faces are not accessed.
   Impl pointImpl;
+  pointImpl.epsilon_ = epsilon_;  // same tie tolerance as the booleans
   pointImpl.vertPos_.resize(query2input.size());
   pointImpl.vertNormal_.resize(query2input.size(), vec3(0.0));
   for (size_t i = 0; i < query2input.size(); ++i)
@@ -614,14 +615,18 @@ Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
   // point. f returns vec3 → collider uses DoesOverlap(vec3), which is
   // XY-projected, so all faces with XY overlap are returned regardless of Z
   // (correct for +Z winding).
-  // tol = 0: no tie tolerance, so point queries compare exactly.
-  Kernel02<false, true> k02{pointImpl, *this, 0.0};
+  Kernel02<false, true> k02{pointImpl, *this};
   auto recorderf = [&](int localIdx, int tri) {
     const auto [s02, z02] = k02(localIdx, tri);
     if (std::isfinite(z02)) winding[query2input[localIdx]] += s02;
   };
   auto recorder = MakeSimpleRecorder(recorderf);
-  auto f = [&pointImpl](int i) { return pointImpl.vertPos_[i]; };
+  auto f = [&](int i) {  // a vertical ray, widened by epsilon_
+    const vec3 p = pointImpl.vertPos_[i];
+    const double inf = std::numeric_limits<double>::infinity();
+    return Box(vec3(p.x - epsilon_, p.y - epsilon_, -inf),
+               vec3(p.x + epsilon_, p.y + epsilon_, inf));
+  };
   // Each queryIdx is processed by at most one thread (for_each_n), so the
   // per-queryIdx accumulation into winding[] is race-free without atomics.
   collider_.Collisions<false>(recorder, f, static_cast<int>(query2input.size()),
@@ -643,6 +648,7 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
   // contributes nothing to perturbation tiebreakers; consistency at shared
   // edges/vertices depends entirely on the mesh's own normals.
   Impl rayImpl;
+  rayImpl.epsilon_ = epsilon_;  // same tie tolerance as the booleans
   rayImpl.vertPos_.resize(2);
   rayImpl.vertPos_[0] = origin;
   rayImpl.vertPos_[1] = endpoint;
@@ -659,10 +665,9 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
   // expandP=false with zero vertNormal means the ray-side perturbation is
   // zero. forward=true means we project along +Z for the lower-dimensional
   // kernel cascade (Shadow01 → Kernel02 → Kernel11 → Kernel12).
-  // tol = 0: no tie tolerance, so ray queries compare exactly.
-  Kernel02<false, true> k02{rayImpl, *this, 0.0};
-  Kernel11<false> k11{rayImpl, *this, 0.0};
-  Kernel12<false, true> k12{rayImpl, *this, k02, k11, 0.0};
+  Kernel02<false, true> k02{rayImpl, *this};
+  Kernel11<false> k11{rayImpl, *this};
+  Kernel12<false, true> k12{rayImpl, *this, k02, k11};
 
   // Use the component with largest magnitude for stable t computation.
   const vec3 absDir = la::abs(dir);
@@ -672,7 +677,8 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
 
   std::vector<RayHit> hits;
   // Query the BVH with the ray's AABB.
-  const Box rayBox(la::min(origin, endpoint), la::max(origin, endpoint));
+  const Box rayBox(la::min(origin, endpoint) - epsilon_,
+                   la::max(origin, endpoint) + epsilon_);
   auto recorderf = [&](int /*queryIdx*/, int tri) {
     const auto [s, v] = k12(0, tri);  // halfedge 0 vs triangle tri
     if (s != 0 && std::isfinite(v.x)) {
