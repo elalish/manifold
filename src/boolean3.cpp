@@ -29,13 +29,12 @@ using namespace manifold;
 
 namespace {
 
-// Coordinates that differ only by rounding (2 ulps of the smaller mesh's
-// scale) are ties broken by the symbolic perturbation, so surfaces that are
-// coincident up to rounding are treated as coincident.
+// Coordinates within the smaller mesh's epsilon are ties broken by the
+// symbolic perturbation, so surfaces that are coincident up to rounding are
+// treated as coincident.
 inline double TieTol(const Manifold::Impl& a, const Manifold::Impl& b) {
   if (a.epsilon_ < 0 || b.epsilon_ < 0) return 0;  // point and ray queries
-  return 2 * std::numeric_limits<double>::epsilon() *
-         std::min(a.bBox_.Scale(), b.bBox_.Scale());
+  return std::min(a.epsilon_, b.epsilon_);
 }
 
 struct FaceEdge {
@@ -79,9 +78,10 @@ inline std::pair<int, vec2> Shadow01(const int a0, const int b1, const int b1s,
 
   if (s01 != 0) {
     // A tie can put a0x up to tol off the edge; clamp so we don't extrapolate.
-    yz01 =
-        Interpolate(inB.vertPos_[b1s], inB.vertPos_[b1e],
-                    la::clamp(a0x, std::min(b1sx, b1ex), std::max(b1sx, b1ex)));
+    const double x = la::clamp(a0x, std::min(b1sx, b1ex), std::max(b1sx, b1ex));
+    DEBUG_ASSERT(std::abs(x - a0x) <= tol, logicErr,
+                 "Boolean manifold error: not in domain");
+    yz01 = Interpolate(inB.vertPos_[b1s], inB.vertPos_[b1e], x);
     const int b1pair = inB.halfedge_.Pair(b1);
     const double dir =
         inB.faceNormal_[b1 / 3].y + inB.faceNormal_[b1pair / 3].y;
@@ -211,9 +211,11 @@ struct Kernel02 {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s02");
       vec3 vertPosA = inA.vertPos_[a0];
       const double tol = TieTol(inA, inB);
-      z02 = Interpolate(yzzRL[0], yzzRL[1],
-                        la::clamp(vertPosA.y, std::min(yzzRL[0].x, yzzRL[1].x),
-                                  std::max(yzzRL[0].x, yzzRL[1].x)))[1];
+      const double y = la::clamp(vertPosA.y, std::min(yzzRL[0].x, yzzRL[1].x),
+                                 std::max(yzzRL[0].x, yzzRL[1].x));
+      DEBUG_ASSERT(std::abs(y - vertPosA.y) <= tol, logicErr,
+                   "Boolean manifold error: not in domain");
+      z02 = Interpolate(yzzRL[0], yzzRL[1], y)[1];
       if (forward) {
         if (!Shadows(vertPosA.z, z02, -inB.faceNormal_[b2].z, tol)) s02 = 0;
       } else {

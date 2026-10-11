@@ -278,7 +278,7 @@ TEST(Boolean, SimplifyCracks) {
   if (options.exportModels) WriteTestOBJ("cracks.obj", simplified);
 }
 
-TEST(Boolean, DISABLED_SimplifyShards) {
+TEST(Boolean, SimplifyShards) {
   Manifold a = Manifold::Sphere(40, 10);
   Manifold b = a.Translate({0, 0, 40}) ^ a;
   Manifold result = a - b;
@@ -868,10 +868,15 @@ TEST(Boolean, Precision) {
 TEST(Boolean, Precision2) {
   double scale = 1000;
   Manifold cube = Manifold::Cube(vec3(scale));
-  double distance = scale - Quality::GetRelativePrecision() / 2;
-
-  EXPECT_FALSE((cube ^ cube.Translate(vec3(-distance))).IsEmpty());
+  const double epsilon = scale * Quality::GetRelativePrecision();
+  // An overlap within epsilon is a tie, resolved as no intersection.
+  double distance = scale - epsilon / 2;
+  EXPECT_TRUE((cube ^ cube.Translate(vec3(-distance))).IsEmpty());
   EXPECT_TRUE((cube ^ cube.Translate(vec3(distance))).IsEmpty());
+  // An overlap beyond epsilon is an intersection.
+  distance = scale - 4 * epsilon;
+  EXPECT_FALSE((cube ^ cube.Translate(vec3(-distance))).IsEmpty());
+  EXPECT_FALSE((cube ^ cube.Translate(vec3(distance))).IsEmpty());
 }
 
 TEST(Boolean, Precision3) {
@@ -1099,18 +1104,21 @@ TEST(Boolean, PartialCoincidentFaceUnion) {
   cube.faceID.resize(cube.NumTri());
   std::iota(cube.faceID.begin(), cube.faceID.end(), 0);
   const Manifold block(cube);
-  const Manifold clipper = Manifold::Cube(vec3(150, 300, 200))
-                               .Translate(vec3(-150, -150, -50))
-                               .Rotate(0, 0, -30);
-  const Manifold b1 = block - clipper;
-  const Manifold b2 = block.Translate(vec3(0, 0, -30)) ^ clipper;
-  const Manifold result = b1 + b2;
+  for (int angle = 1; angle <= 45; ++angle) {
+    SCOPED_TRACE("angle = " + std::to_string(angle));
+    const Manifold clipper = Manifold::Cube(vec3(150, 300, 200))
+                                 .Translate(vec3(-150, -150, -50))
+                                 .Rotate(0, 0, -angle);
+    const Manifold b1 = block - clipper;
+    const Manifold b2 = block.Translate(vec3(0, 0, -30)) ^ clipper;
+    const Manifold result = b1 + b2;
 
-  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
-  EXPECT_EQ(result.Genus(), 0);
-  EXPECT_NEAR(result.Volume(), b1.Volume() + b2.Volume(), 1e-6);
-  // Check that the internal face is dropped
-  const double overlap = 100 / std::cos(kPi / 6) * 70;
-  EXPECT_NEAR(result.SurfaceArea(),
-              b1.SurfaceArea() + b2.SurfaceArea() - 2 * overlap, 1e-6);
+    EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+    EXPECT_EQ(result.Genus(), 0);
+    EXPECT_NEAR(result.Volume(), b1.Volume() + b2.Volume(), 1e-6);
+    // Check that the internal face is dropped
+    const double overlap = 100 / std::cos(angle * kPi / 180) * 70;
+    EXPECT_NEAR(result.SurfaceArea(),
+                b1.SurfaceArea() + b2.SurfaceArea() - 2 * overlap, 1e-6);
+  }
 }

@@ -502,11 +502,7 @@ std::shared_ptr<CsgLeafNode> BatchUnion(
     Vec<Box> boxes;
     boxes.reserve(children.size() - start);
     for (size_t i = start; i < children.size(); i++) {
-      // Children touching within rounding are booleaned, not composed.
-      Box box = children[i]->GetBoundingBox();
-      const double tol =
-          2 * std::numeric_limits<double>::epsilon() * box.Scale();
-      boxes.push_back(Box(box.min - tol, box.max + tol));
+      boxes.push_back(children[i]->GetBoundingBox());
     }
     // partition the children into a set of disjoint sets
     // each set contains a set of children that are pairwise disjoint
@@ -514,7 +510,13 @@ std::shared_ptr<CsgLeafNode> BatchUnion(
     for (size_t i = 0; i < boxes.size(); i++) {
       auto lambda = [&boxes, i](const Vec<size_t>& set) {
         return std::find_if(set.begin(), set.end(), [&boxes, i](size_t j) {
-                 return boxes[i].DoesOverlap(boxes[j]);
+                 // Children touching within the pair's tie tolerance
+                 // are booleaned, not composed.
+                 const double tol =
+                     Quality::GetRelativePrecision() *
+                     std::min(boxes[i].Scale(), boxes[j].Scale());
+                 return Box(boxes[i].min - tol, boxes[i].max + tol)
+                     .DoesOverlap(boxes[j]);
                }) == set.end();
       };
       auto it = std::find_if(disjointSets.begin(), disjointSets.end(), lambda);
