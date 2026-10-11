@@ -36,6 +36,12 @@ inline double TieTol(const Manifold::Impl& a, const Manifold::Impl& b) {
   return std::min(a.epsilon_, b.epsilon_);
 }
 
+inline Box VerticalQueryBox(const vec3& point, double tol) {
+  const double inf = std::numeric_limits<double>::infinity();
+  return Box(vec3(point.x - tol, point.y - tol, -inf),
+             vec3(point.x + tol, point.y + tol, inf));
+}
+
 struct FaceEdge {
   int edge;
   int start;
@@ -76,11 +82,7 @@ inline std::pair<int, vec2> Shadow01(const int a0, const int b1, const int b1s,
   vec2 yz01(NAN);
 
   if (s01 != 0) {
-    // A tie can put a0x up to tol off the edge; clamp so we don't extrapolate.
-    const double x = la::clamp(a0x, std::min(b1sx, b1ex), std::max(b1sx, b1ex));
-    DEBUG_ASSERT(std::abs(x - a0x) <= tol, logicErr,
-                 "Boolean manifold error: not in domain");
-    yz01 = Interpolate(inB.vertPos_[b1s], inB.vertPos_[b1e], x);
+    yz01 = Interpolate(inB.vertPos_[b1s], inB.vertPos_[b1e], a0x, tol);
     const int b1pair = inB.halfedge_.Pair(b1);
     const double dir =
         inB.faceNormal_[b1 / 3].y + inB.faceNormal_[b1pair / 3].y;
@@ -149,9 +151,7 @@ struct Kernel11 {
     } else {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s11");
       const double tol = TieTol(inP, inQ);
-      for (int i : {0, 1})
-        if (std::abs(qRL[i].y - pRL[i].y) <= tol) qRL[i].y = pRL[i].y;
-      xyzz11 = Intersect(pRL[0], pRL[1], qRL[0], qRL[1]);
+      xyzz11 = Intersect(pRL[0], pRL[1], qRL[0], qRL[1], tol);
 
       const int p1pair = inP.halfedge_.Pair(p1);
       const double dirP =
@@ -210,11 +210,7 @@ struct Kernel02 {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s02");
       vec3 vertPosA = inA.vertPos_[a0];
       const double tol = TieTol(inA, inB);
-      const double y = la::clamp(vertPosA.y, std::min(yzzRL[0].x, yzzRL[1].x),
-                                 std::max(yzzRL[0].x, yzzRL[1].x));
-      DEBUG_ASSERT(std::abs(y - vertPosA.y) <= tol, logicErr,
-                   "Boolean manifold error: not in domain");
-      z02 = Interpolate(yzzRL[0], yzzRL[1], y)[1];
+      z02 = Interpolate(yzzRL[0], yzzRL[1], vertPosA.y, tol)[1];
       if (forward) {
         if (!Shadows(vertPosA.z, z02, -inB.faceNormal_[b2].z, tol)) s02 = 0;
       } else {
@@ -293,10 +289,8 @@ struct Kernel12 {
     } else {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: v12");
       const double tol = TieTol(inA, inB);
-      for (int i : {0, 1})
-        if (std::abs(xzyLR1[i].y - xzyLR0[i].y) <= tol)
-          xzyLR1[i].y = xzyLR0[i].y;
-      const vec4 xzyy = Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1]);
+      const vec4 xzyy =
+          Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1], tol);
       v12.x = xzyy[0];
       v12.y = xzyy[2];
       v12.z = xzyy[1];
@@ -474,11 +468,8 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   };
   auto recorder = MakeSimpleRecorder(recorderf);
   const double tol = TieTol(inP, inQ);
-  auto f = [&](int i) {  // a vertical ray, widened by tol
-    const vec3 p = a.vertPos_[verts[i]];
-    const double inf = std::numeric_limits<double>::infinity();
-    return Box(vec3(p.x - tol, p.y - tol, -inf),
-               vec3(p.x + tol, p.y + tol, inf));
+  auto f = [&](int i) {
+    return VerticalQueryBox(a.vertPos_[verts[i]], tol);
   };
   b.collider_.Collisions<false>(recorder, f, verts.size(), true, ctx);
   if (IsCancelled(ctx)) return Vec<int>{};
@@ -612,20 +603,16 @@ Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
 
   // expandP=false: no symbolic perturbation from the query side (zero normals).
   // forward=true: project along +Z to count signed face crossings above each
-  // point. f returns vec3 → collider uses DoesOverlap(vec3), which is
-  // XY-projected, so all faces with XY overlap are returned regardless of Z
-  // (correct for +Z winding).
+  // point. The query box spans all Z and is widened by epsilon_ in XY,
+  // so all faces with XY overlap within tolerance are returned regardless of Z.
   Kernel02<false, true> k02{pointImpl, *this};
   auto recorderf = [&](int localIdx, int tri) {
     const auto [s02, z02] = k02(localIdx, tri);
     if (std::isfinite(z02)) winding[query2input[localIdx]] += s02;
   };
   auto recorder = MakeSimpleRecorder(recorderf);
-  auto f = [&](int i) {  // a vertical ray, widened by epsilon_
-    const vec3 p = pointImpl.vertPos_[i];
-    const double inf = std::numeric_limits<double>::infinity();
-    return Box(vec3(p.x - epsilon_, p.y - epsilon_, -inf),
-               vec3(p.x + epsilon_, p.y + epsilon_, inf));
+  auto f = [&](int i) {
+    return VerticalQueryBox(pointImpl.vertPos_[i], epsilon_);
   };
   // Each queryIdx is processed by at most one thread (for_each_n), so the
   // per-queryIdx accumulation into winding[] is race-free without atomics.
