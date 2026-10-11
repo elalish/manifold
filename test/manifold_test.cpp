@@ -191,6 +191,16 @@ TEST(Manifold, InvalidInput5) {
   EXPECT_EQ(tet.Status(), Manifold::Error::MergeIndexOutOfBounds);
 }
 
+TEST(Manifold, InvalidInputOddHalfedgeCount) {
+  // An odd number of triangles leaves one halfedge without a partner; the
+  // mesh must be rejected, not paired through an uninitialized index.
+  MeshGL in = TetGL();
+  in.triVerts.insert(in.triVerts.end(), {2, 0, 1});
+  Manifold tet(in);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::NotManifold);
+}
+
 TEST(Manifold, InvalidInput6) {
   MeshGL tetGL = TetGL();
   tetGL.triVerts[tetGL.triVerts.size() - 1] = 7;
