@@ -299,6 +299,19 @@ TEST(Boolean, DegenerateSwapCycle) {
   EXPECT_GT(result.Volume(), 0);
 }
 
+// Regression test: SplitQuad clamped its new vert onto an end of the edge,
+// which only added a zero-length edge, so SwapDegenerateEdges split the same
+// quad again and again, growing the mesh until it crashed.
+TEST(Boolean, DegenerateSplitQuadAtEnd) {
+  ManifoldParamGuard guard;
+  ManifoldParams().intermediateChecks = false;
+  Manifold first = ReadTestOBJ("degenerate_split_quad_first.obj");
+  Manifold second = ReadTestOBJ("degenerate_split_quad_second.obj");
+  Manifold result = first + second;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_NEAR(result.Volume(), 1.480266544, 1e-6);
+}
+
 #endif
 
 TEST(Boolean, NoRetainedVerts) {
