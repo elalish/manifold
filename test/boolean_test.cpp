@@ -14,6 +14,7 @@
 
 #include <atomic>
 #include <limits>
+#include <numeric>
 #include <thread>
 
 #include "../src/utils.h"
@@ -277,7 +278,7 @@ TEST(Boolean, SimplifyCracks) {
   if (options.exportModels) WriteTestOBJ("cracks.obj", simplified);
 }
 
-TEST(Boolean, DISABLED_SimplifyShards) {
+TEST(Boolean, SimplifyShards) {
   Manifold a = Manifold::Sphere(40, 10);
   Manifold b = a.Translate({0, 0, 40}) ^ a;
   Manifold result = a - b;
@@ -880,10 +881,15 @@ TEST(Boolean, Precision) {
 TEST(Boolean, Precision2) {
   double scale = 1000;
   Manifold cube = Manifold::Cube(vec3(scale));
-  double distance = scale - Quality::GetRelativePrecision() / 2;
-
-  EXPECT_FALSE((cube ^ cube.Translate(vec3(-distance))).IsEmpty());
+  const double epsilon = scale * Quality::GetRelativePrecision();
+  // An overlap within epsilon is a tie, resolved as no intersection.
+  double distance = scale - epsilon / 2;
+  EXPECT_TRUE((cube ^ cube.Translate(vec3(-distance))).IsEmpty());
   EXPECT_TRUE((cube ^ cube.Translate(vec3(distance))).IsEmpty());
+  // An overlap beyond epsilon is an intersection.
+  distance = scale - 4 * epsilon;
+  EXPECT_FALSE((cube ^ cube.Translate(vec3(-distance))).IsEmpty());
+  EXPECT_FALSE((cube ^ cube.Translate(vec3(distance))).IsEmpty());
 }
 
 TEST(Boolean, Precision3) {
@@ -1092,4 +1098,62 @@ TEST(Boolean, SharedSubtreeAfterSiblingDestroyed) {
                        Manifold::Cube(vec3(1)).Translate(vec3(1.0, 0, 0));
   EXPECT_EQ(tree2.Status(), Manifold::Error::NoError);
   EXPECT_EQ(tree2.NumTri(), reference.NumTri());
+}
+
+// Two cubes offset vertically and booleaned inside / outside a third cube.
+// A subsequent union of these two solids should not contain any internal
+// triangles along the shared internal face.
+//
+//             +--------+  z = 100
+//             |   b1   |
+//    +--------+        |  z = 70
+//    |   b2   :        |
+//    |        +--------+  z = 0
+//    |        |
+//    +--------+           z = -30
+//    : = shared internal face, should be removed by union
+TEST(Boolean, PartialCoincidentFaceUnion) {
+  MeshGL64 cube = Manifold::Cube(vec3(100)).Refine(8).GetMeshGL64();
+  cube.faceID.resize(cube.NumTri());
+  std::iota(cube.faceID.begin(), cube.faceID.end(), 0);
+  const Manifold block(cube);
+  for (int angle = 1; angle <= 45; ++angle) {
+    SCOPED_TRACE("angle = " + std::to_string(angle));
+    const Manifold clipper = Manifold::Cube(vec3(150, 300, 200))
+                                 .Translate(vec3(-150, -150, -50))
+                                 .Rotate(0, 0, -angle);
+    const Manifold b1 = block - clipper;
+    const Manifold b2 = block.Translate(vec3(0, 0, -30)) ^ clipper;
+    const Manifold result = b1 + b2;
+
+    EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+    EXPECT_EQ(result.Genus(), 0);
+    EXPECT_NEAR(result.Volume(), b1.Volume() + b2.Volume(), 1e-6);
+    // Check that the internal face is dropped
+    const double overlap = 100 / std::cos(angle * kPi / 180) * 70;
+    EXPECT_NEAR(result.SurfaceArea(),
+                b1.SurfaceArea() + b2.SurfaceArea() - 2 * overlap, 1e-6);
+  }
+}
+
+// A point outside but within tolerance of the surface counts as inside, before
+// and after a boolean operation, including along a coincident face.
+TEST(Boolean, PointWithinToleranceOfCoincidentEdge) {
+  const Manifold block = Manifold::Cube(vec3(100));
+  const Manifold clipper = Manifold::Cube(vec3(150, 300, 200))
+                               .Translate(vec3(-150, -150, -50))
+                               .Rotate(0, 0, -30);
+  const Manifold b1 = block - clipper;
+  const Manifold b2 = block.Translate(vec3(0, 0, -30)) ^ clipper;
+  const Manifold result = b1 + b2;
+  const double tol = 100 * Quality::GetRelativePrecision();
+  const vec3 edge(50 * std::tan(kPi / 6), 50, 70);
+  const vec3 out(-std::cos(kPi / 6), std::sin(kPi / 6), 1);
+  const vec3 within = edge + out * (tol / 4);
+  const vec3 beyond = edge + out * (4 * tol);
+  for (const Manifold& m : {b1, b2, result}) {
+    const auto w = m.WindingNumber({within, beyond});
+    EXPECT_NE(w[0], 0);
+    EXPECT_EQ(w[1], 0);
+  }
 }
