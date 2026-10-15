@@ -63,9 +63,17 @@ inline double withSign(bool pos, double v) { return pos ? v : -v; }
 /**
  * Interpolate the (y, z) of segment aL-aR at the given x. The choice of
  * (x - aL) vs (x - aR) is the smaller in magnitude, which keeps FP error
- * low near either endpoint. Domain check via DEBUG_ASSERT.
+ * low near either endpoint. Positive tol allows clamping x to the segment
+ * within that tolerance. Domain check via DEBUG_ASSERT.
  */
-inline vec2 Interpolate(vec3 aL, vec3 aR, double x) {
+inline vec2 Interpolate(vec3 aL, vec3 aR, double x, double tol = 0) {
+  if (tol > 0) {
+    const double clamped =
+        la::clamp(x, std::min(aL.x, aR.x), std::max(aL.x, aR.x));
+    DEBUG_ASSERT(std::abs(clamped - x) <= tol, logicErr,
+                 "Boolean manifold error: not in domain");
+    x = clamped;
+  }
   const double dxL = x - aL.x;
   const double dxR = x - aR.x;
   DEBUG_ASSERT(dxL * dxR <= 0, logicErr,
@@ -84,10 +92,15 @@ inline vec2 Interpolate(vec3 aL, vec3 aR, double x) {
 /**
  * Intersect two projected segments aL-aR and bL-bR. The segments are ordered
  * over the same x interval, and their y gaps must bracket zero. The returned
- * value is (x, y, a.z, b.z) at the crossing.
+ * value is (x, y, a.z, b.z) at the crossing. Positive tol snaps b's endpoint
+ * y coordinates to a's when they are within that tolerance.
  */
-inline vec4 Intersect(const vec3& aL, const vec3& aR, const vec3& bL,
-                      const vec3& bR) {
+inline vec4 Intersect(const vec3& aL, const vec3& aR, vec3 bL, vec3 bR,
+                      double tol = 0) {
+  if (tol > 0) {
+    if (std::abs(bL.y - aL.y) <= tol) bL.y = aL.y;
+    if (std::abs(bR.y - aR.y) <= tol) bR.y = aR.y;
+  }
   const double dyL = bL.y - aL.y;
   const double dyR = bR.y - aR.y;
   DEBUG_ASSERT(dyL * dyR <= 0, logicErr,
@@ -111,10 +124,11 @@ inline vec4 Intersect(const vec3& aL, const vec3& aR, const vec3& bL,
 /**
  * `p < q` with symbolic perturbation: when `p == q` exactly, `dir < 0`
  * acts as the tiebreaker. Used to give consistent strict-ordering answers
- * regardless of which side of an FP equality we land on.
+ * regardless of which side of an FP equality we land on. Values within tol are
+ * treated as equal.
  */
-inline bool Shadows(double p, double q, double dir) {
-  return p == q ? dir < 0 : p < q;
+inline bool Shadows(double p, double q, double dir, double tol = 0) {
+  return std::abs(p - q) <= tol ? dir < 0 : p < q;
 }
 
 /**

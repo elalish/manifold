@@ -29,6 +29,19 @@ using namespace manifold;
 
 namespace {
 
+// Coordinates within the smaller mesh's epsilon are ties broken by the
+// symbolic perturbation, so surfaces that are coincident up to rounding are
+// treated as coincident.
+inline double TieTol(const Manifold::Impl& a, const Manifold::Impl& b) {
+  return std::min(a.epsilon_, b.epsilon_);
+}
+
+inline Box VerticalQueryBox(const vec3& point, double tol) {
+  const double inf = std::numeric_limits<double>::infinity();
+  return Box(vec3(point.x - tol, point.y - tol, -inf),
+             vec3(point.x + tol, point.y + tol, inf));
+}
+
 struct FaceEdge {
   int edge;
   int start;
@@ -60,22 +73,23 @@ inline std::pair<int, vec2> Shadow01(const int a0, const int b1, const int b1s,
   const double a0xp = inA.vertNormal_[a0].x;
   const double b1sxp = inB.vertNormal_[b1s].x;
   const double b1exp = inB.vertNormal_[b1e].x;
-  int s01 = forward ? Shadows(a0x, b1ex, withSign(expandP, a0xp) - b1exp) -
-                          Shadows(a0x, b1sx, withSign(expandP, a0xp) - b1sxp)
-                    : Shadows(b1sx, a0x, withSign(expandP, b1sxp) - a0xp) -
-                          Shadows(b1ex, a0x, withSign(expandP, b1exp) - a0xp);
+  const double tol = TieTol(inA, inB);
+  int s01 = forward
+                ? Shadows(a0x, b1ex, withSign(expandP, a0xp) - b1exp, tol) -
+                      Shadows(a0x, b1sx, withSign(expandP, a0xp) - b1sxp, tol)
+                : Shadows(b1sx, a0x, withSign(expandP, b1sxp) - a0xp, tol) -
+                      Shadows(b1ex, a0x, withSign(expandP, b1exp) - a0xp, tol);
   vec2 yz01(NAN);
 
   if (s01 != 0) {
-    yz01 =
-        Interpolate(inB.vertPos_[b1s], inB.vertPos_[b1e], inA.vertPos_[a0].x);
+    yz01 = Interpolate(inB.vertPos_[b1s], inB.vertPos_[b1e], a0x, tol);
     const int b1pair = inB.halfedge_.Pair(b1);
     const double dir =
         inB.faceNormal_[b1 / 3].y + inB.faceNormal_[b1pair / 3].y;
     if (forward) {
-      if (!Shadows(inA.vertPos_[a0].y, yz01[0], -dir)) s01 = 0;
+      if (!Shadows(inA.vertPos_[a0].y, yz01[0], -dir, tol)) s01 = 0;
     } else {
-      if (!Shadows(yz01[0], inA.vertPos_[a0].y, withSign(expandP, dir)))
+      if (!Shadows(yz01[0], inA.vertPos_[a0].y, withSign(expandP, dir), tol))
         s01 = 0;
     }
   }
@@ -136,7 +150,8 @@ struct Kernel11 {
       xyzz11 = vec4(NAN);
     } else {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s11");
-      xyzz11 = Intersect(pRL[0], pRL[1], qRL[0], qRL[1]);
+      const double tol = TieTol(inP, inQ);
+      xyzz11 = Intersect(pRL[0], pRL[1], qRL[0], qRL[1], tol);
 
       const int p1pair = inP.halfedge_.Pair(p1);
       const double dirP =
@@ -144,7 +159,8 @@ struct Kernel11 {
       const int q1pair = inQ.halfedge_.Pair(q1);
       const double dirQ =
           inQ.faceNormal_[q1 / 3].z + inQ.faceNormal_[q1pair / 3].z;
-      if (!Shadows(xyzz11.z, xyzz11.w, withSign(expandP, dirP) - dirQ)) s11 = 0;
+      if (!Shadows(xyzz11.z, xyzz11.w, withSign(expandP, dirP) - dirQ, tol))
+        s11 = 0;
     }
 
     return std::make_pair(s11, xyzz11);
@@ -193,11 +209,13 @@ struct Kernel02 {
     } else {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s02");
       vec3 vertPosA = inA.vertPos_[a0];
-      z02 = Interpolate(yzzRL[0], yzzRL[1], vertPosA.y)[1];
+      const double tol = TieTol(inA, inB);
+      z02 = Interpolate(yzzRL[0], yzzRL[1], vertPosA.y, tol)[1];
       if (forward) {
-        if (!Shadows(vertPosA.z, z02, -inB.faceNormal_[b2].z)) s02 = 0;
+        if (!Shadows(vertPosA.z, z02, -inB.faceNormal_[b2].z, tol)) s02 = 0;
       } else {
-        if (!Shadows(z02, vertPosA.z, withSign(expandP, inB.faceNormal_[b2].z)))
+        if (!Shadows(z02, vertPosA.z, withSign(expandP, inB.faceNormal_[b2].z),
+                     tol))
           s02 = 0;
       }
     }
@@ -270,7 +288,9 @@ struct Kernel12 {
       v12 = vec3(NAN);
     } else {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: v12");
-      const vec4 xzyy = Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1]);
+      const double tol = TieTol(inA, inB);
+      const vec4 xzyy =
+          Intersect(xzyLR0[0], xzyLR0[1], xzyLR1[0], xzyLR1[1], tol);
       v12.x = xzyy[0];
       v12.y = xzyy[2];
       v12.z = xzyy[1];
@@ -349,10 +369,13 @@ Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
   Kernel12<expandP, forward> k12{a, b, k02, k11};
   Kernel12Recorder<expandP, forward> recorder{k12, {}};
-  auto f = [&a](int i) {
+  const double tol = TieTol(inP, inQ);
+  auto f = [&a, tol](int i) {
     const int start = a.halfedge_.Start(i);
     const int end = a.halfedge_.End(i);
-    return start < end ? Box(a.vertPos_[start], a.vertPos_[end]) : Box();
+    return start < end ? Box(la::min(a.vertPos_[start], a.vertPos_[end]) - tol,
+                             la::max(a.vertPos_[start], a.vertPos_[end]) + tol)
+                       : Box();
   };
   b.collider_.Collisions<false>(recorder, f, a.halfedge_.size(), true, ctx);
   if (IsCancelled(ctx)) return Intersections{};
@@ -444,7 +467,8 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
     if (std::isfinite(z02)) w03[verts[i]] += s02 * (forward ? 1 : -1);
   };
   auto recorder = MakeSimpleRecorder(recorderf);
-  auto f = [&](int i) { return a.vertPos_[verts[i]]; };
+  const double tol = TieTol(inP, inQ);
+  auto f = [&](int i) { return VerticalQueryBox(a.vertPos_[verts[i]], tol); };
   b.collider_.Collisions<false>(recorder, f, verts.size(), true, ctx);
   if (IsCancelled(ctx)) return Vec<int>{};
   // flood fill
@@ -483,7 +507,9 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   constexpr size_t INT_MAX_SZ =
       static_cast<size_t>(std::numeric_limits<int>::max());
 
-  if (inP.IsEmpty() || inQ.IsEmpty() || !inP.bBox_.DoesOverlap(inQ.bBox_)) {
+  const double tol = TieTol(inP, inQ);
+  if (inP.IsEmpty() || inQ.IsEmpty() ||
+      !Box(inP.bBox_.min - tol, inP.bBox_.max + tol).DoesOverlap(inQ.bBox_)) {
     PRINT("No overlap, early out");
     w03_.resize(inP.NumVert(), 0);
     w30_.resize(inQ.NumVert(), 0);
@@ -557,15 +583,17 @@ Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
   if (points.empty() || IsEmpty()) return winding;
 
   // Points outside the bounding box have winding 0 for any closed manifold.
+  const Box tolBox(bBox_.min - epsilon_, bBox_.max + epsilon_);
   Vec<int> query2input;
   query2input.reserve(points.size());
   for (size_t i = 0; i < points.size(); ++i)
-    if (bBox_.Contains(points[i])) query2input.push_back(static_cast<int>(i));
+    if (tolBox.Contains(points[i])) query2input.push_back(static_cast<int>(i));
   if (query2input.empty()) return winding;
 
   // Build a minimal Impl for the query points. Kernel02 only reads vertPos_
   // and vertNormal_ from inA; halfedges and faces are not accessed.
   Impl pointImpl;
+  pointImpl.epsilon_ = epsilon_;  // same tie tolerance as the booleans
   pointImpl.vertPos_.resize(query2input.size());
   pointImpl.vertNormal_.resize(query2input.size(), vec3(0.0));
   for (size_t i = 0; i < query2input.size(); ++i)
@@ -573,16 +601,17 @@ Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
 
   // expandP=false: no symbolic perturbation from the query side (zero normals).
   // forward=true: project along +Z to count signed face crossings above each
-  // point. f returns vec3 → collider uses DoesOverlap(vec3), which is
-  // XY-projected, so all faces with XY overlap are returned regardless of Z
-  // (correct for +Z winding).
+  // point. The query box spans all Z and is widened by epsilon_ in XY,
+  // so all faces with XY overlap within tolerance are returned regardless of Z.
   Kernel02<false, true> k02{pointImpl, *this};
   auto recorderf = [&](int localIdx, int tri) {
     const auto [s02, z02] = k02(localIdx, tri);
     if (std::isfinite(z02)) winding[query2input[localIdx]] += s02;
   };
   auto recorder = MakeSimpleRecorder(recorderf);
-  auto f = [&pointImpl](int i) { return pointImpl.vertPos_[i]; };
+  auto f = [&](int i) {
+    return VerticalQueryBox(pointImpl.vertPos_[i], epsilon_);
+  };
   // Each queryIdx is processed by at most one thread (for_each_n), so the
   // per-queryIdx accumulation into winding[] is race-free without atomics.
   collider_.Collisions<false>(recorder, f, static_cast<int>(query2input.size()),
@@ -604,6 +633,7 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
   // contributes nothing to perturbation tiebreakers; consistency at shared
   // edges/vertices depends entirely on the mesh's own normals.
   Impl rayImpl;
+  rayImpl.epsilon_ = epsilon_;  // same tie tolerance as the booleans
   rayImpl.vertPos_.resize(2);
   rayImpl.vertPos_[0] = origin;
   rayImpl.vertPos_[1] = endpoint;
@@ -632,7 +662,8 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
 
   std::vector<RayHit> hits;
   // Query the BVH with the ray's AABB.
-  const Box rayBox(la::min(origin, endpoint), la::max(origin, endpoint));
+  const Box rayBox(la::min(origin, endpoint) - epsilon_,
+                   la::max(origin, endpoint) + epsilon_);
   auto recorderf = [&](int /*queryIdx*/, int tri) {
     const auto [s, v] = k12(0, tri);  // halfedge 0 vs triangle tri
     if (s != 0 && std::isfinite(v.x)) {

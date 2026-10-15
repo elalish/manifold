@@ -20,6 +20,89 @@
 #include "parallel.h"
 
 namespace manifold {
+namespace {
+std::shared_ptr<Manifold::Impl> ExtrudeImpl(const Polygons& crossSection,
+                                            double height, int nDivisions,
+                                            double twistDegrees, vec2 scaleTop,
+                                            double zOffset = 0.0,
+                                            bool flipZ = false) {
+  scaleTop.x = std::max(scaleTop.x, 0.0);
+  scaleTop.y = std::max(scaleTop.y, 0.0);
+
+  auto pImpl_ = std::make_shared<Manifold::Impl>();
+  ++nDivisions;
+  auto& vertPos = pImpl_->vertPos_;
+  Vec<ivec3> triVertsDH;
+  auto& triVerts = triVertsDH;
+  int nCrossSection = 0;
+  bool isCone = scaleTop.x == 0.0 && scaleTop.y == 0.0;
+  size_t idx = 0;
+  PolygonsIdx polygonsIndexed;
+  for (auto& poly : crossSection) {
+    nCrossSection += poly.size();
+    SimplePolygonIdx simpleIndexed;
+    for (const vec2& polyVert : poly) {
+      vertPos.push_back({polyVert.x, polyVert.y, 0.0});
+      simpleIndexed.push_back({polyVert, static_cast<int>(idx++)});
+    }
+    polygonsIndexed.push_back(simpleIndexed);
+  }
+  for (int i = 1; i < nDivisions + 1; ++i) {
+    double alpha = i / double(nDivisions);
+    double phi = alpha * twistDegrees;
+    vec2 scale = la::lerp(vec2(1.0), scaleTop, alpha);
+    mat2 rotation({cosd(phi), sind(phi)}, {-sind(phi), cosd(phi)});
+    mat2 transform = mat2({scale.x, 0.0}, {0.0, scale.y}) * rotation;
+    size_t j = 0;
+    size_t idx = 0;
+    for (const auto& poly : crossSection) {
+      for (size_t vert = 0; vert < poly.size(); ++vert) {
+        size_t offset = idx + nCrossSection * i;
+        size_t thisVert = vert + offset;
+        size_t lastVert = (vert == 0 ? poly.size() : vert) - 1 + offset;
+        if (i == nDivisions && isCone) {
+          triVerts.push_back(ivec3(nCrossSection * i + j,
+                                   lastVert - nCrossSection,
+                                   thisVert - nCrossSection));
+        } else {
+          vec2 pos = transform * poly[vert];
+          vertPos.push_back({pos.x, pos.y, height * alpha});
+          triVerts.push_back(
+              ivec3(thisVert, lastVert, thisVert - nCrossSection));
+          triVerts.push_back(ivec3(lastVert, lastVert - nCrossSection,
+                                   thisVert - nCrossSection));
+        }
+      }
+      ++j;
+      idx += poly.size();
+    }
+  }
+  if (isCone)
+    for (size_t j = 0; j < crossSection.size();
+         ++j)  // Duplicate vertex for Genus
+      vertPos.push_back({0.0, 0.0, height});
+  std::vector<ivec3> top = TriangulateIdx(polygonsIndexed);
+  for (const ivec3& tri : top) {
+    triVerts.push_back({tri[0], tri[2], tri[1]});
+    if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
+  }
+
+  if (flipZ) {
+    for (vec3& v : vertPos) v.z = zOffset - v.z;
+    for (ivec3& tri : triVerts) std::swap(tri[1], tri[2]);
+  } else if (zOffset != 0.0) {
+    for (vec3& v : vertPos) v.z += zOffset;
+  }
+
+  pImpl_->CreateHalfedges(triVertsDH);
+  pImpl_->CalculateBBox();
+  pImpl_->SortGeometry();
+  pImpl_->SetFaceAndVertNormals();
+  pImpl_->InitializeOriginal();
+  return pImpl_;
+}
+}  // namespace
+
 /**
  * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
  * and the rest at similarly symmetric points.
@@ -64,16 +147,12 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
   if (height <= 0.0 || radiusLow < 0.0) {
     return Invalid();
   }
-  if (radiusLow == 0.0) {
+  const bool flip = radiusLow == 0.0;
+  if (flip) {
     if (radiusHigh <= 0.0) {
       return Invalid();
     }
-    // Cone with apex at bottom: create the centered apex-at-top version and
-    // mirror it
-    Manifold cone = Cylinder(height, radiusHigh, 0.0, circularSegments, true);
-    cone = cone.Mirror(vec3(0.0, 0.0, 1.0));
-    if (!center) cone = cone.Translate(vec3(0.0, 0.0, height / 2.0));
-    return cone.AsOriginal();
+    std::swap(radiusLow, radiusHigh);
   }
   const double scale = radiusHigh >= 0.0 ? radiusHigh / radiusLow : 1.0;
   const double radius = fmax(radiusLow, radiusHigh);
@@ -86,10 +165,9 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
     circle[i] = {radiusLow * cosd(dPhi * i), radiusLow * sind(dPhi * i)};
   }
 
-  Manifold cylinder = Manifold::Extrude({circle}, height, 0, 0.0, vec2(scale));
-  if (center)
-    cylinder = cylinder.Translate(vec3(0.0, 0.0, -height / 2.0)).AsOriginal();
-  return cylinder;
+  const double zOffset = (flip ? height : 0.0) - (center ? height / 2.0 : 0.0);
+  return Manifold(
+      ExtrudeImpl({circle}, height, 0, 0.0, vec2(scale), zOffset, flip));
 }
 
 /**
@@ -151,74 +229,8 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
   if (crossSection.size() == 0 || height <= 0.0) {
     return Invalid();
   }
-
-  scaleTop.x = std::max(scaleTop.x, 0.0);
-  scaleTop.y = std::max(scaleTop.y, 0.0);
-
-  auto pImpl_ = std::make_shared<Impl>();
-  ++nDivisions;
-  auto& vertPos = pImpl_->vertPos_;
-  Vec<ivec3> triVertsDH;
-  auto& triVerts = triVertsDH;
-  int nCrossSection = 0;
-  bool isCone = scaleTop.x == 0.0 && scaleTop.y == 0.0;
-  size_t idx = 0;
-  PolygonsIdx polygonsIndexed;
-  for (auto& poly : crossSection) {
-    nCrossSection += poly.size();
-    SimplePolygonIdx simpleIndexed;
-    for (const vec2& polyVert : poly) {
-      vertPos.push_back({polyVert.x, polyVert.y, 0.0});
-      simpleIndexed.push_back({polyVert, static_cast<int>(idx++)});
-    }
-    polygonsIndexed.push_back(simpleIndexed);
-  }
-  for (int i = 1; i < nDivisions + 1; ++i) {
-    double alpha = i / double(nDivisions);
-    double phi = alpha * twistDegrees;
-    vec2 scale = la::lerp(vec2(1.0), scaleTop, alpha);
-    mat2 rotation({cosd(phi), sind(phi)}, {-sind(phi), cosd(phi)});
-    mat2 transform = mat2({scale.x, 0.0}, {0.0, scale.y}) * rotation;
-    size_t j = 0;
-    size_t idx = 0;
-    for (const auto& poly : crossSection) {
-      for (size_t vert = 0; vert < poly.size(); ++vert) {
-        size_t offset = idx + nCrossSection * i;
-        size_t thisVert = vert + offset;
-        size_t lastVert = (vert == 0 ? poly.size() : vert) - 1 + offset;
-        if (i == nDivisions && isCone) {
-          triVerts.push_back(ivec3(nCrossSection * i + j,
-                                   lastVert - nCrossSection,
-                                   thisVert - nCrossSection));
-        } else {
-          vec2 pos = transform * poly[vert];
-          vertPos.push_back({pos.x, pos.y, height * alpha});
-          triVerts.push_back(
-              ivec3(thisVert, lastVert, thisVert - nCrossSection));
-          triVerts.push_back(ivec3(lastVert, lastVert - nCrossSection,
-                                   thisVert - nCrossSection));
-        }
-      }
-      ++j;
-      idx += poly.size();
-    }
-  }
-  if (isCone)
-    for (size_t j = 0; j < crossSection.size();
-         ++j)  // Duplicate vertex for Genus
-      vertPos.push_back({0.0, 0.0, height});
-  std::vector<ivec3> top = TriangulateIdx(polygonsIndexed);
-  for (const ivec3& tri : top) {
-    triVerts.push_back({tri[0], tri[2], tri[1]});
-    if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
-  }
-
-  pImpl_->CreateHalfedges(triVertsDH);
-  pImpl_->CalculateBBox();
-  pImpl_->SortGeometry();
-  pImpl_->SetFaceAndVertNormals();
-  pImpl_->InitializeOriginal();
-  return Manifold(pImpl_);
+  return Manifold(
+      ExtrudeImpl(crossSection, height, nDivisions, twistDegrees, scaleTop));
 }
 
 /**

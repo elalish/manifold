@@ -473,6 +473,16 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
 
   halfedge_.clear(true);
   halfedge_.resize_nofill(numHalfedge);
+  // With an odd number of halfedges (e.g. after degenerate triangles were
+  // dropped from the input) the pairing below leaves the last sorted one
+  // unset. Give it no pair, so IsManifold() rejects the mesh instead of
+  // following an uninitialized pair index.
+  if (numHalfedge % 2 != 0) {
+    const int leftover = ids[numHalfedge - 1];
+    halfedge_.SetStart(leftover, halfedge[leftover].startVert);
+    halfedge_.SetProp(leftover, halfedge[leftover].propVert);
+    halfedge_.SetPair(leftover, -1);
+  }
   for_each_n(policy, countAt(0), numEdge,
              [this, &halfedge, &ids, &removed, numEdge](int i) {
                const int pair0 = ids[i];

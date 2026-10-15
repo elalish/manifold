@@ -728,6 +728,12 @@ bool Manifold::Impl::SplitQuad(int edge, bool nextDiag) {
   const double t =
       len2 > 0 ? la::clamp(la::dot(center - ps, edgeVec) / len2, 0.0, 1.0)
                : 0.5;
+  // A new vert at (or within epsilon of) either end of edge would only add a
+  // zero-length edge, leaving the degeneracy in place to be split again
+  // without end.
+  if (t * t * len2 <= epsilon_ * epsilon_ ||
+      (1 - t) * (1 - t) * len2 <= epsilon_ * epsilon_)
+    return false;
   const int m = vertPos_.size();
   vertPos_.push_back(ps + t * edgeVec);
   if (vertNormal_.size() > 0)

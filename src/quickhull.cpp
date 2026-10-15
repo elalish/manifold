@@ -388,7 +388,11 @@ void QuickHull::createConvexHalfedgeMesh() {
         const Plane& P = pvf.P;
         pvf.visibilityCheckedOnIteration = iter;
         const double d = la::dot(P.N, activePoint) + P.D;
-        if (d > 0) {
+        // Visible only if the point is more than epsilon above the face, the
+        // same test addPointToFace() uses. A face the point lies on (within
+        // rounding) must stay: replacing it builds the new face from three
+        // nearly collinear points, whose normal can point anywhere.
+        if (d > 0 && d * d > epsilonSquared * P.sqrNLength) {
           pvf.isVisibleFaceOnCurrentIteration = 1;
           pvf.horizonEdgesOnCurrentIteration = 0;
           visibleFaces.push_back(faceData.faceIndex);
