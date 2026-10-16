@@ -1120,6 +1120,20 @@ TEST(Boolean, Offset1) {
   }
 }
 
+TEST(Boolean, Offset2) {
+  SimplePolygon sq = {{1, -0.25}, {1.5, -0.25}, {1.5, 0.25}, {1, 0.25}};
+  Manifold rounded =
+      Manifold::Revolve({sq}, 6).Rotate(10, 25, 40).Offset(-0.1, 16);
+  // 2 components, one with 4 triangles, area 0.076, volume ~0
+
+  EXPECT_EQ(rounded.Genus(), 1);
+  EXPECT_FLOAT_EQ(rounded.Volume(), 0.52548647);
+  EXPECT_LT(rounded.SurfaceArea(), 8);
+  if (options.exportModels) {
+    WriteTestOBJ("offset2.obj", rounded);
+  }
+}
+
 // Regression for #1672: a sub-tree shared between two trees must survive when
 // one of those trees is destroyed without being evaluated. Previously the
 // CsgOpNode destructor emptied descendant impls regardless of whether they

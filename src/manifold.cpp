@@ -1232,7 +1232,8 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
   // Find convex edges and vertices
   std::vector<int> convexEdges;
   std::vector<bool> vertConvex(numVert, false);
-  std::vector<bool> halfedgeConvex(pImpl->halfedge_.size(), false);
+  std::vector<bool> vertSharp(numVert, false);
+  std::vector<bool> halfedgeSharp(pImpl->halfedge_.size(), false);
 
   for (size_t idx = 0; idx < pImpl->halfedge_.size(); idx++) {
     const Halfedge& edge = pImpl->halfedge_.Get(idx);
@@ -1248,10 +1249,15 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
     const double convexity =
         (inset ? -1.0 : 1.0) * la::dot(edgeVec, la::cross(normal0, normal1));
 
-    if (convexity > 0 && dot(normal0, normal1) < maxDot) {
+    if (dot(normal0, normal1) >= maxDot) continue;
+
+    halfedgeSharp[idx] = true;
+    halfedgeSharp[edge.pairedHalfedge] = true;
+    vertSharp[edge.startVert] = true;
+    vertSharp[edge.endVert] = true;
+
+    if (convexity > 0) {
       convexEdges.push_back(idx);
-      halfedgeConvex[idx] = true;
-      halfedgeConvex[edge.pairedHalfedge] = true;
       vertConvex[edge.startVert] = true;
       vertConvex[edge.endVert] = true;
     }
@@ -1262,16 +1268,16 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
     if (vertConvex[i]) convexVerts.push_back(i);
   }
 
-  // Convex edges split a vertex's faces into sets; the normal for a corner is
-  // the angle-weighted normal of only its own set.
+  // Sharp edges (of either sign) split a vertex's faces into sets; the normal
+  // for a corner is the angle-weighted normal of only its own set.
   auto next = [&](int e) { return NextHalfedge(pImpl->halfedge_.Pair(e)); };
   auto prev = [](int e) { return 3 * (e / 3) + (e + 2) % 3; };
 
-  // Each convex halfedge is the last halfedge (going around its start vertex)
+  // Each sharp halfedge is the last halfedge (going around its start vertex)
   // of exactly one face set; sum the angle-weighted normals backward from it.
   std::vector<vec3> faceSetNormal(pImpl->halfedge_.size(), vec3(0.0));
-  for (int h = 0; h < static_cast<int>(halfedgeConvex.size()); h++) {
-    if (!halfedgeConvex[h]) continue;
+  for (int h = 0; h < static_cast<int>(halfedgeSharp.size()); h++) {
+    if (!halfedgeSharp[h]) continue;
     vec3 normal(0.0);
     int e = h;
     while (true) {
@@ -1285,7 +1291,7 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
         const double phi = dot >= 1 ? 0 : (dot <= -1 ? kPi : std::acos(dot));
         normal += phi * pImpl->faceNormal_[e / 3];
       }
-      if (halfedgeConvex[prev(e)]) break;
+      if (halfedgeSharp[prev(e)]) break;
       e = pImpl->halfedge_.Pair(prev(e));
     }
     faceSetNormal[h] = SafeNormalize(normal);
@@ -1293,9 +1299,9 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
 
   auto cornerNormal = [&](int corner) {
     const int vert = pImpl->halfedge_.Start(corner);
-    if (!vertConvex[vert]) return pImpl->vertNormal_[vert];
+    if (!vertSharp[vert]) return pImpl->vertNormal_[vert];
     int e = corner;
-    while (!halfedgeConvex[e]) e = next(e);
+    while (!halfedgeSharp[e]) e = next(e);
     return faceSetNormal[e];
   };
 
