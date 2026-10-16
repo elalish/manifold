@@ -1232,6 +1232,7 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
   // Find convex edges and vertices
   std::vector<int> convexEdges;
   std::vector<bool> vertConvex(numVert, false);
+  std::vector<bool> halfedgeConvex(pImpl->halfedge_.size(), false);
 
   for (size_t idx = 0; idx < pImpl->halfedge_.size(); idx++) {
     const Halfedge& edge = pImpl->halfedge_.Get(idx);
@@ -1249,6 +1250,8 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
 
     if (convexity > 0 && dot(normal0, normal1) < maxDot) {
       convexEdges.push_back(idx);
+      halfedgeConvex[idx] = true;
+      halfedgeConvex[edge.pairedHalfedge] = true;
       vertConvex[edge.startVert] = true;
       vertConvex[edge.endVert] = true;
     }
@@ -1259,6 +1262,43 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
     if (vertConvex[i]) convexVerts.push_back(i);
   }
 
+  // Convex edges split a vertex's faces into sets; the normal for a corner is
+  // the angle-weighted normal of only its own set.
+  auto next = [&](int e) { return NextHalfedge(pImpl->halfedge_.Pair(e)); };
+  auto prev = [](int e) { return 3 * (e / 3) + (e + 2) % 3; };
+
+  // Each convex halfedge is the last halfedge (going around its start vertex)
+  // of exactly one face set; sum the angle-weighted normals backward from it.
+  std::vector<vec3> faceSetNormal(pImpl->halfedge_.size(), vec3(0.0));
+  for (int h = 0; h < static_cast<int>(halfedgeConvex.size()); h++) {
+    if (!halfedgeConvex[h]) continue;
+    vec3 normal(0.0);
+    int e = h;
+    while (true) {
+      const vec3 start = pImpl->vertPos_[pImpl->halfedge_.Start(e)];
+      const vec3 currEdge =
+          la::normalize(pImpl->vertPos_[pImpl->halfedge_.End(e)] - start);
+      const vec3 prevEdge = la::normalize(
+          start - pImpl->vertPos_[pImpl->halfedge_.End(NextHalfedge(e))]);
+      if (la::isfinite(currEdge[0]) && la::isfinite(prevEdge[0])) {
+        const double dot = -la::dot(prevEdge, currEdge);
+        const double phi = dot >= 1 ? 0 : (dot <= -1 ? kPi : std::acos(dot));
+        normal += phi * pImpl->faceNormal_[e / 3];
+      }
+      if (halfedgeConvex[prev(e)]) break;
+      e = pImpl->halfedge_.Pair(prev(e));
+    }
+    faceSetNormal[h] = SafeNormalize(normal);
+  }
+
+  auto cornerNormal = [&](int corner) {
+    const int vert = pImpl->halfedge_.Start(corner);
+    if (!vertConvex[vert]) return pImpl->vertNormal_[vert];
+    int e = corner;
+    while (!halfedgeConvex[e]) e = next(e);
+    return faceSetNormal[e];
+  };
+
   std::vector<Manifold> batch(numTri);
 
   // Extrude triangles using consistent quad diagonals based on vertex ordering
@@ -1267,7 +1307,7 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
     int origIdx[3];
     for (int i = 0; i < 3; i++) {
       origIdx[i] = pImpl->halfedge_.Start(3 * tri + i);
-      const vec3 normal = radius * pImpl->vertNormal_[origIdx[i]];
+      const vec3 normal = radius * cornerNormal(3 * tri + i);
       innerPos[i] = pImpl->vertPos_[origIdx[i]] - (inset ? normal : vec3(0.0));
       outerPos[i] = pImpl->vertPos_[origIdx[i]] + (inset ? vec3(0.0) : normal);
     }
