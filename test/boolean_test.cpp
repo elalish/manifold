@@ -1090,15 +1090,33 @@ TEST(Boolean, BatchBoolean) {
 }
 
 TEST(Boolean, Offset) {
-  Manifold cutout = Manifold::Cube(vec3(100), true) - Manifold::Sphere(60, 12);
+  ManifoldParamGuard guard;
+  ManifoldParams().processOverlaps = true;
+  Manifold cutout = Manifold::Cube(vec3(100), true) - Manifold::Sphere(60, 50);
   Manifold fat = cutout.Offset(5);
-  Manifold thin = cutout.Offset(-5);
+  Manifold thin = cutout.Offset(-3);
   EXPECT_EQ(fat.Genus(), cutout.Genus());
   EXPECT_EQ(thin.Genus(), cutout.Genus());
 
   if (options.exportModels) {
     WriteTestOBJ("offset_fat.obj", fat);
     WriteTestOBJ("offset_thin.obj", thin);
+  }
+}
+
+TEST(Boolean, Offset1) {
+  Manifold rounded =
+      Manifold::Cube(vec3(1), true).Rotate(180, 0, 0).Offset(0.25, 32);
+  EXPECT_EQ(rounded.Genus(), 0);
+  const Box bbox = rounded.BoundingBox();
+  EXPECT_FLOAT_EQ(bbox.max.x, 0.75);
+  EXPECT_FLOAT_EQ(bbox.min.x, -0.75);
+  EXPECT_FLOAT_EQ(bbox.max.y, 0.75);
+  EXPECT_FLOAT_EQ(bbox.min.y, -0.75);
+  EXPECT_FLOAT_EQ(bbox.max.z, 0.75);
+  EXPECT_FLOAT_EQ(bbox.min.z, -0.75);
+  if (options.exportModels) {
+    WriteTestOBJ("offset1.obj", rounded);
   }
 }
 

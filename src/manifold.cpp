@@ -1215,6 +1215,7 @@ Manifold MakePrism(const vec3 innerPos[3], const vec3 outerPos[3],
  */
 Manifold Manifold::Offset(double delta, int circularSegments) const {
   auto pImpl = GetCsgLeafNode().GetImpl();
+  if (pImpl->status_ != Error::NoError) return PropagateStatus(pImpl->status_);
 
   const bool inset = delta < 0;
   const double radius = std::abs(delta);
@@ -1223,9 +1224,14 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
   const Manifold sphere = Manifold::Sphere(radius, 4 * n);
   const Manifold cylinder = Manifold::Cylinder(1, radius, radius, 4 * n);
 
+  const double minDihedral = kPi / (2 * n);
+  const double maxDot = std::cos(minDihedral);
+  const int numTri = pImpl->NumTri();
+  const int numVert = pImpl->NumVert();
+
   // Find convex edges and vertices
   std::vector<int> convexEdges;
-  std::vector<bool> vertConvex(NumVert(), false);
+  std::vector<bool> vertConvex(numVert, false);
 
   for (size_t idx = 0; idx < pImpl->halfedge_.size(); idx++) {
     const Halfedge& edge = pImpl->halfedge_.Get(idx);
@@ -1241,7 +1247,7 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
     const double convexity =
         (inset ? -1.0 : 1.0) * la::dot(edgeVec, la::cross(normal0, normal1));
 
-    if (convexity > 0) {
+    if (convexity > 0 && dot(normal0, normal1) < maxDot) {
       convexEdges.push_back(idx);
       vertConvex[edge.startVert] = true;
       vertConvex[edge.endVert] = true;
@@ -1253,15 +1259,15 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
     if (vertConvex[i]) convexVerts.push_back(i);
   }
 
-  std::vector<Manifold> batch(NumTri());
+  std::vector<Manifold> batch(numTri);
 
   // Extrude triangles using consistent quad diagonals based on vertex ordering
-  for (size_t tri = 0; tri < NumTri(); tri++) {
+  for (size_t tri = 0; tri < numTri; tri++) {
     vec3 innerPos[3], outerPos[3];
     int origIdx[3];
-    const vec3 normal = radius * pImpl->faceNormal_[tri];
     for (int i = 0; i < 3; i++) {
       origIdx[i] = pImpl->halfedge_.Start(3 * tri + i);
+      const vec3 normal = radius * pImpl->vertNormal_[origIdx[i]];
       innerPos[i] = pImpl->vertPos_[origIdx[i]] - (inset ? normal : vec3(0.0));
       outerPos[i] = pImpl->vertPos_[origIdx[i]] + (inset ? vec3(0.0) : normal);
     }
@@ -1275,24 +1281,29 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
   // Add cylinders on convex edges
   for (size_t i = 0; i < convexEdges.size(); i++) {
     const Halfedge& halfedge = pImpl->halfedge_.Get(convexEdges[i]);
-    vec3 edge =
-        pImpl->vertPos_[halfedge.endVert] - pImpl->vertPos_[halfedge.startVert];
+    vec3 base = pImpl->vertPos_[halfedge.startVert];
+    vec3 edge = pImpl->vertPos_[halfedge.endVert] - base;
     const double length = la::length(edge);
     if (length < 1e-10) continue;
+    // The cylinder is symmetric; keep edge.z >= 0 to avoid the antiparallel
+    // singularity of the rotation below.
+    if (edge.z < 0) {
+      base += edge;
+      edge = -edge;
+    }
 
     // Compute rotation to align cylinder with edge
     edge = la::normalize(edge);
     vec3 up(0, 0, 1);
     vec3 axis = la::cross(up, edge);
-    double angle = std::acos(std::clamp(la::dot(up, edge), -1.0, 1.0));
+    const double s = la::length(axis);
 
     Manifold cyl = cylinder.Scale({1, 1, length});
-    if (la::length(axis) > 1e-10) {
+    if (s > 1e-10) {
       axis = la::normalize(axis);
       // Rodrigues rotation formula via Transform
-      double c = std::cos(angle);
-      double s = std::sin(angle);
-      double t = 1 - c;
+      const double c = la::dot(up, edge);
+      const double t = 1 - c;
       mat3x4 rot = {{c + axis.x * axis.x * t, axis.x * axis.y * t + axis.z * s,
                      axis.x * axis.z * t - axis.y * s},
                     {axis.y * axis.x * t - axis.z * s, c + axis.y * axis.y * t,
@@ -1302,7 +1313,7 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
                     {0, 0, 0}};
       cyl = cyl.Transform(rot);
     }
-    batch2[i] = cyl.Translate(pImpl->vertPos_[halfedge.startVert]);
+    batch2[i] = cyl.Translate(base);
   }
 
   // Add spheres on convex vertices
