@@ -228,6 +228,40 @@ TEST(Smooth, MissingNormalsCone) {
   if (options.exportModels) WriteTestOBJ("missingNormalsCone.obj", out);
 }
 
+TEST(Smooth, OperandOrder) {
+  auto mk = [](bool unique) {
+    Manifold a = Manifold::Sphere(10, 16).Scale({3, 1, 1});
+    Manifold b = Manifold::Sphere(6, 16);
+    if (unique) {
+      a = a.AsOriginal();
+      b = b.AsOriginal();
+    }
+    a = a.CalculateNormals(0, 180).Rotate(0, 0, 45);
+    b = b.Rotate(60, 0, 0).Translate({0, 0, 9});
+    return std::make_pair(a, b);
+  };
+  auto smooth = [](const Manifold& m) {
+    return m.SmoothByNormals(0).RefineToTolerance(0.01);
+  };
+
+  auto [a, b] = mk(false);
+  auto [ua, ub] = mk(true);
+
+  Manifold ref = smooth(ua + ub);
+  Manifold good = smooth(a + b);
+  Manifold bad = smooth(b + a);
+
+  EXPECT_NEAR(good.Volume(), ref.Volume(), 0.01 * ref.Volume());
+  EXPECT_NEAR(good.SurfaceArea(), ref.SurfaceArea(), 0.01 * ref.SurfaceArea());
+  EXPECT_NEAR(bad.Volume(), ref.Volume(), 0.01 * ref.Volume());
+  EXPECT_NEAR(bad.SurfaceArea(), ref.SurfaceArea(), 0.01 * ref.SurfaceArea());
+  if (options.exportModels) {
+    WriteTestOBJ("operandOrderRef.obj", ref);
+    WriteTestOBJ("operandOrderGood.obj", good);
+    WriteTestOBJ("operandOrderBad.obj", bad);
+  }
+}
+
 TEST(Smooth, Fillet) {
   float depth = 3;
   float radius = 10;

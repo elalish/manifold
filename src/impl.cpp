@@ -690,8 +690,11 @@ void Manifold::Impl::IncrementMeshIDs() {
 
   int nextMeshID = ReserveIDs(numMeshIDs);
   for (const auto& pair : oldTransforms) {
-    const int thisID = pair.first == 0 ? 0 : nextMeshID++;
-    if (pair.first == 0) continue;
+    if (pair.first == 0) {
+      meshRelation_.meshIDtransform[0] = pair.second;
+      continue;
+    }
+    const int thisID = nextMeshID++;
     meshIDold2new.D().Insert(pair.first, thisID);
     meshRelation_.meshIDtransform[thisID] = pair.second;
   }
