@@ -1268,7 +1268,7 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
     batch[tri] = MakePrism(innerPos, outerPos, origIdx);
   }
 
-  const Manifold faces = BatchBoolean(batch, OpType::Add).AsOriginal();
+  const Manifold faces = BatchBoolean(batch, OpType::Add);
   std::cout << faces.NumTri() << std::endl;
 
   std::vector<Manifold> batch2(convexEdges.size() + convexVerts.size() + 1);
@@ -1314,10 +1314,10 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
 
   batch2.back() = faces;
 
-  const Manifold shell = BatchBoolean(batch2, OpType::Add).AsOriginal();
+  const Manifold shell = BatchBoolean(batch2, OpType::Add);
   std::cout << shell.NumTri() << std::endl;
 
-  return Boolean(shell, inset ? OpType::Subtract : OpType::Add).AsOriginal();
+  return Boolean(shell, inset ? OpType::Subtract : OpType::Add);
 }
 
 /**
