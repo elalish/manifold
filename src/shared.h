@@ -67,13 +67,12 @@ inline double withSign(bool pos, double v) { return pos ? v : -v; }
  * within that tolerance. Domain check via DEBUG_ASSERT.
  */
 inline vec2 Interpolate(vec3 aL, vec3 aR, double x, double tol = 0) {
-  if (tol > 0) {
-    const double clamped =
-        la::clamp(x, std::min(aL.x, aR.x), std::max(aL.x, aR.x));
-    DEBUG_ASSERT(std::abs(clamped - x) <= tol, logicErr,
-                 "Boolean manifold error: not in domain");
-    x = clamped;
-  }
+  const double clamped =
+      la::clamp(x, std::min(aL.x, aR.x), std::max(aL.x, aR.x));
+  DEBUG_ASSERT(std::abs(clamped - x) <= tol, logicErr,
+               "Boolean manifold error: not in domain");
+  x = clamped;
+
   const double dxL = x - aL.x;
   const double dxR = x - aR.x;
   DEBUG_ASSERT(dxL * dxR <= 0, logicErr,
@@ -97,10 +96,9 @@ inline vec2 Interpolate(vec3 aL, vec3 aR, double x, double tol = 0) {
  */
 inline vec4 Intersect(const vec3& aL, const vec3& aR, vec3 bL, vec3 bR,
                       double tol = 0) {
-  if (tol > 0) {
-    if (std::abs(bL.y - aL.y) <= tol) bL.y = aL.y;
-    if (std::abs(bR.y - aR.y) <= tol) bR.y = aR.y;
-  }
+  if (std::abs(bL.y - aL.y) <= tol) bL.y = aL.y;
+  if (std::abs(bR.y - aR.y) <= tol) bR.y = aR.y;
+
   const double dyL = bL.y - aL.y;
   const double dyR = bR.y - aR.y;
   DEBUG_ASSERT(dyL * dyR <= 0, logicErr,
@@ -127,8 +125,8 @@ inline vec4 Intersect(const vec3& aL, const vec3& aR, vec3 bL, vec3 bR,
  * regardless of which side of an FP equality we land on. Values within tol are
  * treated as equal.
  */
-inline bool Shadows(double p, double q, double dir, double tol = 0) {
-  return std::abs(p - q) <= tol ? dir < 0 : p < q;
+inline bool Shadows(double p, double q, double dir, double tol) {
+  return p + (dir > 0 ? 1 : -1) * tol < q;
 }
 
 /**
