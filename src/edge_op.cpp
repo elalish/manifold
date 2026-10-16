@@ -714,6 +714,10 @@ bool Manifold::Impl::SplitQuad(int edge, bool nextDiag) {
   const int next = nextDiag ? halfedge_.Start(h1) : halfedge_.End(h1);
   const int c = halfedge_.Start(prevP0);
 
+  // If the triangle across edge also holds next, it shares an outer edge of
+  // the quad and the split would pair halfedges that it overwrites.
+  if (c == next) return false;
+
   // A colinear next would make the fan triangle containing it degenerate.
   if (IsColinear(vertPos_[end] - vertPos_[last],
                  vertPos_[next] - vertPos_[last], epsilon_))
