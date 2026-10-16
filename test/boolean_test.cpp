@@ -327,6 +327,21 @@ TEST(Boolean, DegenerateSplitQuadAtEnd) {
   EXPECT_NEAR(result.Volume(), 1.480266544, 1e-6);
 }
 
+// Regression test: SplitQuad rewrote a triangle that shares an outer edge of
+// the quad with the triangle across the split edge, leaving stale pairs, and a
+// later vertex orbit in RemoveDegenerates never ended.
+TEST(Boolean, DegenerateSplitQuadSharedEdge) {
+  ManifoldParamGuard guard;
+  ManifoldParams().intermediateChecks = false;
+  Manifold a = ReadTestOBJ("degenerate_split_quad_shared_a.obj");
+  Manifold b = ReadTestOBJ("degenerate_split_quad_shared_b.obj");
+  Manifold c = ReadTestOBJ("degenerate_split_quad_shared_c.obj");
+  Manifold result = a + b + c;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_GT(result.NumTri(), 0u);
+  EXPECT_GT(result.Volume(), 0);
+}
+
 #endif
 
 TEST(Boolean, NoRetainedVerts) {
