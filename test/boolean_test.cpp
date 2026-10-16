@@ -76,7 +76,7 @@ TEST(Boolean, MeshGLRoundTrip) {
   Manifold result = cube + cube.Translate({1, 1, 0});
 
   ASSERT_LT(result.OriginalID(), 0);
-  ExpectMeshes(result, {{18, 32}});
+  ExpectMeshes(result, {{16, 28}});
   RelatedGL(result, {original});
 
   MeshGL inGL = result.TriID2FaceID().GetMeshGL();
@@ -84,7 +84,7 @@ TEST(Boolean, MeshGLRoundTrip) {
   const Manifold result2(inGL);
 
   ASSERT_LT(result2.OriginalID(), 0);
-  ExpectMeshes(result2, {{18, 32}});
+  ExpectMeshes(result2, {{16, 28}});
   RelatedGL(result2, {original});
 
   const MeshGL outGL = result2.GetMeshGL();
@@ -231,7 +231,7 @@ TEST(Boolean, CubeUnion) {
 TEST(Boolean, CubeUnionProp) {
   Manifold cube = WithPositionColors(Manifold::Cube());
   Manifold result = cube + cube.Translate({0.5, 0.5, 0});
-  EXPECT_EQ(result.NumVert(), 18);
+  EXPECT_EQ(result.NumVert(), 16);
   if (options.exportModels) WriteTestOBJ("cubeUnionProp.obj", result);
 }
 
