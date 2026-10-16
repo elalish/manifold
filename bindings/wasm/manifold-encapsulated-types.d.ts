@@ -16,7 +16,9 @@
  * @primaryExport
  */
 
-import {Box, ErrorStatus, FillRule, JoinType, Mat3, Mat4, Polygons, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Smoothness, Vec2, Vec3} from './manifold-global-types';
+import {Box, ErrorStatus, ExecutionContext, JoinType, Mat3, Mat4, Polygons, RayHit, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Vec2, Vec3} from './manifold-global-types';
+
+export {ExecutionContext} from './manifold-global-types';
 
 /**
  * Triangulates a set of /epsilon-valid polygons.
@@ -29,9 +31,14 @@ import {Box, ErrorStatus, FillRule, JoinType, Mat3, Mat4, Polygons, Rect, Sealed
  * The triangle quality may be lower, so set to false to disable this
  * optimization.
  * @return The triangles, referencing the original polygon points in order.
+ *
+ * @see {@link https://manifoldcad.org/docs/html/group___triangulation.html | C++ API: Triangulation}
  */
 export function triangulate(
     polygons: Polygons, epsilon?: number, allowConvex?: boolean): Vec3[];
+
+export function setRelativePrecision(precision: number): void;
+export function getRelativePrecision(): number;
 
 /**
  * Sets an angle constraint the default number of circular segments for the
@@ -87,19 +94,26 @@ export function getCircularSegments(radius: number): number;
 export function resetToCircularDefaults(): void;
 ///@}
 
+/**
+ * Two-dimensional cross sections guaranteed to be without self-intersections,
+ * or overlaps between polygons (from construction onwards). Polygon clipping
+ * (boolean) and offsetting use Manifold's own robust floating-point predicates.
+ *
+ * @see {@link https://manifoldcad.org/docs/html/classmanifold_1_1_cross_section.html | C++ API: CrossSection Class Reference}
+ * @group Basics
+ */
 export class CrossSection {
   /**
    * Create a 2d cross-section from a set of contours (complex polygons). A
-   * boolean union operation (with Positive filling rule by default) is
-   * performed to combine overlapping polygons and ensure the resulting
-   * CrossSection is free of intersections.
+   * boolean union operation (with the Positive filling rule) is performed to
+   * combine overlapping polygons and ensure the resulting CrossSection is free
+   * of intersections.
    *
    * @param contours A set of closed paths describing zero or more complex
    * polygons.
-   * @param fillRule The filling rule used to interpret polygon sub-regions in
-   * contours.
+   * @group Basics
    */
-  constructor(contours: Polygons, fillRule?: FillRule);
+  constructor(contours: Polygons);
 
   // Shapes
 
@@ -110,6 +124,7 @@ export class CrossSection {
    *
    * @param size The X, and Y dimensions of the square.
    * @param center Set to true to shift the center to the origin.
+   * @group Constructors
    */
   static square(size?: Readonly<Vec2>|number, center?: boolean): CrossSection;
 
@@ -119,6 +134,7 @@ export class CrossSection {
    * @param radius Radius of the circle. Must be positive.
    * @param circularSegments Number of segments along its diameter. Default is
    * calculated by the static Quality defaults according to the radius.
+   * @group Constructors
    */
   static circle(radius: number, circularSegments?: number): CrossSection;
 
@@ -139,6 +155,7 @@ export class CrossSection {
    * @param center If true, the extrusion is centered on the z-axis through the
    *     origin
    * as opposed to resting on the XY plane as is default.
+   * @group Transformations
    */
   extrude(
       height: number, nDivisions?: number, twistDegrees?: number,
@@ -152,6 +169,7 @@ export class CrossSection {
    *
    * @param circularSegments Number of segments along its diameter. Default is
    * calculated by the static Defaults.
+   * @group Transformations
    */
   revolve(circularSegments?: number, revolveDegrees?: number): Manifold;
 
@@ -163,6 +181,7 @@ export class CrossSection {
    *
    * @param m The affine transformation matrix to apply to all the vertices. The
    *     last row is ignored.
+   * @group Transformations
    */
   transform(m: Mat3): CrossSection;
 
@@ -171,6 +190,7 @@ export class CrossSection {
    * are combined and applied lazily.
    *
    * @param v The vector to add to every vertex.
+   * @group Transformations
    */
   translate(v: Readonly<Vec2>): CrossSection;
   translate(x: number, y?: number): CrossSection;
@@ -180,6 +200,7 @@ export class CrossSection {
    * can be chained. Transforms are combined and applied lazily.
    *
    * @param degrees degrees about the Z-axis to rotate.
+   * @group Transformations
    */
   rotate(degrees: number): CrossSection;
 
@@ -188,6 +209,7 @@ export class CrossSection {
    * are combined and applied lazily.
    *
    * @param v The vector to multiply every vertex by per component.
+   * @group Transformations
    */
   scale(v: Readonly<Vec2>|number): CrossSection;
 
@@ -199,6 +221,7 @@ export class CrossSection {
    * combined and applied lazily.
    *
    * @param ax the axis to be mirrored over
+   * @group Transformations
    */
   mirror(ax: Readonly<Vec2>): CrossSection;
 
@@ -209,6 +232,7 @@ export class CrossSection {
    * included in the result.
    *
    * @param warpFunc A function that modifies a given vertex position.
+   * @group Transformations
    */
   warp(warpFunc: (vert: Vec2) => void): CrossSection;
 
@@ -231,6 +255,7 @@ export class CrossSection {
    * <B>JoinType::Round</B> corners (roughly, the number of vertices that
    * will be added to each contour). Default is calculated by the static Quality
    * defaults according to the radius.
+   * @group Transformations
    */
   offset(
       delta: number, joinType?: JoinType, miterLimit?: number,
@@ -238,64 +263,76 @@ export class CrossSection {
 
   /**
    * Remove vertices from the contours in this CrossSection that are less than
-   * the specified distance epsilon from an imaginary line that passes through
+   * the specified distance tolerance from an imaginary line that passes through
    * its two adjacent vertices. Near duplicate vertices and collinear points
-   * will be removed at lower epsilons, with elimination of line segments
-   * becoming increasingly aggressive with larger epsilons.
+   * will be removed at lower tolerances, with elimination of line segments
+   * becoming increasingly aggressive with larger tolerances.
    *
    * It is recommended to apply this function following Offset, in order to
    * clean up any spurious tiny line segments introduced that do not improve
    * quality in any meaningful way. This is particularly important if further
    * offseting operations are to be performed, which would compound the issue.
    *
-   * @param epsilon minimum distance vertices must diverge from the hypothetical
-   *     outline without them in order to be included in the output (default
-   *     1e-6)
+   * @param tolerance minimum distance vertices must diverge from the
+   *     hypothetical outline without them in order to be included in the
+   *     output. Default 0 uses the cross-section's own tolerance (from
+   *     tolerance()), which is geometry-scale-derived and may be larger than a
+   *     fixed epsilon for large-coordinate geometry. Pass an explicit value to
+   *     override.
+   * @group Transformations
    */
-  simplify(epsilon?: number): CrossSection;
+  simplify(tolerance?: number): CrossSection;
 
   // Clipping Operations
 
   /**
    * Boolean union
+   * @group Boolean
    */
   add(other: CrossSection|Polygons): CrossSection;
 
   /**
    * Boolean difference
+   * @group Boolean
    */
   subtract(other: CrossSection|Polygons): CrossSection;
 
   /**
    * Boolean intersection
+   * @group Boolean
    */
   intersect(other: CrossSection|Polygons): CrossSection;
 
   /**
    * Boolean union of the cross-sections a and b
+   * @group Boolean
    */
   static union(a: CrossSection|Polygons, b: CrossSection|Polygons):
       CrossSection;
 
   /**
    * Boolean difference of the cross-section b from the cross-section a
+   * @group Boolean
    */
   static difference(a: CrossSection|Polygons, b: CrossSection|Polygons):
       CrossSection;
 
   /**
    * Boolean intersection of the cross-sections a and b
+   * @group Boolean
    */
   static intersection(a: CrossSection|Polygons, b: CrossSection|Polygons):
       CrossSection;
 
   /**
    * Boolean union of a list of cross-sections
+   * @group Boolean
    */
   static union(polygons: readonly(CrossSection|Polygons)[]): CrossSection;
 
   /**
    * Boolean difference of the tail of a list of cross-sections from its head
+   * @group Boolean
    */
   static difference(polygons: readonly(CrossSection|Polygons)[]): CrossSection;
 
@@ -309,26 +346,23 @@ export class CrossSection {
 
   /**
    * Compute the convex hull of the contours in this CrossSection.
+   * @group Convex Hull
    */
   hull(): CrossSection;
 
   /**
    * Compute the convex hull of all points in a list of polygons/cross-sections.
+   * @group Convex Hull
    */
   static hull(polygons: readonly(CrossSection|Polygons)[]): CrossSection;
 
   // Topological Operations
 
   /**
-   * Construct a CrossSection from a vector of other Polygons (batch
-   * boolean union).
-   */
-  static compose(polygons: readonly(CrossSection|Polygons)[]): CrossSection;
-
-  /**
    * This operation returns a vector of CrossSections that are topologically
    * disconnected, each containing one outline contour with zero or more
    * holes.
+   * @group Constructors
    */
   decompose(): CrossSection[];
 
@@ -336,19 +370,33 @@ export class CrossSection {
 
   /**
    * Create a 2d cross-section from a set of contours (complex polygons). A
-   * boolean union operation (with Positive filling rule by default) is
-   * performed to combine overlapping polygons and ensure the resulting
-   * CrossSection is free of intersections.
+   * boolean union operation (with the Positive filling rule) is performed to
+   * combine overlapping polygons and ensure the resulting CrossSection is free
+   * of intersections.
    *
    * @param contours A set of closed paths describing zero or more complex
    * polygons.
-   * @param fillRule The filling rule used to interpret polygon sub-regions in
-   * contours.
+   * @group Input & Output
    */
-  static ofPolygons(contours: Polygons, fillRule?: FillRule): CrossSection;
+  static ofPolygons(contours: Polygons): CrossSection;
+
+  /**
+   * Create a 2d cross-section from a set of contours, reading them by the
+   * even-odd rule: a sub-region is filled when its winding number is odd, so
+   * overlapping an odd number of contours fills and overlapping an even number
+   * leaves a hole. Use this to take input authored for an even-odd tool such
+   * as OpenSCAD. The result is regularized like any other CrossSection, so
+   * every later operation behaves the same.
+   *
+   * @param contours A set of closed paths describing zero or more complex
+   * polygons.
+   * @group Input & Output
+   */
+  static evenOdd(contours: Polygons): CrossSection;
 
   /**
    * Return the contours of this CrossSection as a list of simple polygons.
+   * @group Input & Output
    */
   toPolygons(): SimplePolygon[];
 
@@ -357,27 +405,32 @@ export class CrossSection {
   /**
    * Return the total area covered by complex polygons making up the
    * CrossSection.
+   * @group Information
    */
   area(): number;
 
   /**
    * Does the CrossSection (not) have any contours?
+   * @group Information
    */
   isEmpty(): boolean;
 
   /**
    * The number of vertices in the CrossSection.
+   * @group Information
    */
   numVert(): number;
 
   /**
    * The number of contours in the CrossSection.
+   * @group Information
    */
   numContour(): number;
 
   /**
    * Returns the axis-aligned bounding rectangle of all the CrossSection's
    * vertices.
+   * @group Information
    */
   bounds(): Rect;
 
@@ -386,6 +439,7 @@ export class CrossSection {
   /**
    * Frees the WASM memory of this CrossSection, since these cannot be
    * garbage-collected automatically.
+   * @group Basics
    */
   delete(): void;
 }
@@ -413,6 +467,9 @@ export class CrossSection {
  * operations, particularly useful for materials. Since separate object's
  * properties are not mixed, there is no requirement that channels have
  * consistent meaning between different inputs.
+ *
+ * @see {@link https://manifoldcad.org/docs/html/classmanifold_1_1_manifold.html | C++ API: Manifold Class Reference}
+ * @group Basics
  */
 export class Manifold {
   /**
@@ -425,6 +482,8 @@ export class Manifold {
    * round-trip of data from getMesh(). For multi-material input, use
    * reserveIDs() to set a unique originalID for each material, and sort the
    * materials into triangle runs.
+   *
+   * @group Basics
    */
   constructor(mesh: Mesh);
 
@@ -433,6 +492,7 @@ export class Manifold {
   /**
    * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
    * and the rest at similarly symmetric points.
+   * @group Constructors
    */
   static tetrahedron(): Manifold;
 
@@ -442,6 +502,7 @@ export class Manifold {
    *
    * @param size The X, Y, and Z dimensions of the box.
    * @param center Set to true to shift the center to the origin.
+   * @group Constructors
    */
   static cube(size?: Readonly<Vec3>|number, center?: boolean): Manifold;
 
@@ -457,6 +518,7 @@ export class Manifold {
    * Default is calculated by the static Defaults.
    * @param center Set to true to shift the center to the origin. Default is
    * origin at the bottom.
+   * @group Constructors
    */
   static cylinder(
       height: number, radiusLow: number, radiusHigh?: number,
@@ -471,6 +533,7 @@ export class Manifold {
    * four, as this sphere is constructed by refining an octahedron. This means
    * there are a circle of vertices on all three of the axis planes. Default is
    * calculated by the static Defaults.
+   * @group Constructors
    */
   static sphere(radius: number, circularSegments?: number): Manifold;
 
@@ -493,6 +556,7 @@ export class Manifold {
    * @param center If true, the extrusion is centered on the z-axis through the
    *     origin
    * as opposed to resting on the XY plane as is default.
+   * @group Polygons
    */
   static extrude(
       polygons: CrossSection|Polygons, height: number, nDivisions?: number,
@@ -510,6 +574,7 @@ export class Manifold {
    * @param circularSegments Number of segments along its diameter. Default is
    * calculated by the static Defaults.
    * @param revolveDegrees Number of degrees to revolve. Default is 360 degrees.
+   * @group Polygons
    */
   static revolve(
       polygons: CrossSection|Polygons, circularSegments?: number,
@@ -527,38 +592,9 @@ export class Manifold {
    * round-trip of data from getMesh(). For multi-material input, use
    * reserveIDs() to set a unique originalID for each material, and sort the
    * materials into triangle runs.
+   * @group Input & Output
    */
   static ofMesh(mesh: Mesh): Manifold;
-
-  /**
-   * Constructs a smooth version of the input mesh by creating tangents; this
-   * method will throw if you have supplied tangents with your mesh already. The
-   * actual triangle resolution is unchanged; use the Refine() method to
-   * interpolate to a higher-resolution curve.
-   *
-   * By default, every edge is calculated for maximum smoothness (very much
-   * approximately), attempting to minimize the maximum mean Curvature
-   * magnitude. No higher-order derivatives are considered, as the interpolation
-   * is independent per triangle, only sharing constraints on their boundaries.
-   *
-   * @param mesh input Mesh.
-   * @param sharpenedEdges If desired, you can supply a vector of sharpened
-   * halfedges, which should in general be a small subset of all halfedges.
-   * Order of entries doesn't matter, as each one specifies the desired
-   * smoothness (between zero and one, with one the default for all unspecified
-   * halfedges) and the halfedge index (3 * triangle index + [0,1,2] where 0 is
-   * the edge between triVert 0 and 1, etc).
-   *
-   * At a smoothness value of zero, a sharp crease is made. The smoothness is
-   * interpolated along each edge, so the specified value should be thought of
-   * as an average. Where exactly two sharpened edges meet at a vertex, their
-   * tangents are rotated to be colinear so that the sharpened edge can be
-   * continuous. Vertices with only one sharpened edge are completely smooth,
-   * allowing sharpened edges to smoothly vanish at termination. A single vertex
-   * can be sharpened by sharping all edges that are incident on it, allowing
-   * cones to be formed.
-   */
-  static smooth(mesh: Mesh, sharpenedEdges?: readonly Smoothness[]): Manifold;
 
   // Signed Distance Functions
 
@@ -583,6 +619,7 @@ export class Manifold {
    * surface. Defaults to -1, which will return the interpolated
    * crossing-point based on the two nearest grid points. Small positive values
    * will require more sdf evaluations per output vertex.
+   * @group Constructors
    */
   static levelSet(
       sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
@@ -596,6 +633,7 @@ export class Manifold {
    *
    * @param m The affine transformation matrix to apply to all the vertices. The
    *     last row is ignored.
+   * @group Transformations
    */
   transform(m: Mat4): Manifold;
 
@@ -604,19 +642,28 @@ export class Manifold {
    * combined and applied lazily.
    *
    * @param v The vector to add to every vertex.
+   * @group Transformations
    */
   translate(v: Readonly<Vec3>): Manifold;
   translate(x: number, y?: number, z?: number): Manifold;
 
   /**
-   * Applies an Euler angle rotation to the manifold, first about the X axis,
-   * then Y, then Z, in degrees. We use degrees so that we can minimize rounding
-   * error, and eliminate it completely for any multiples of 90 degrees.
-   * Additionally, more efficient code paths are used to update the manifold
-   * when the transforms only rotate by multiples of 90 degrees. This operation
-   * can be chained. Transforms are combined and applied lazily.
+   * Applies an Euler or Tait-Bryan angle rotation to the manifold.  This
+   * operation can be chained. Transforms are combined and applied lazily.
+   *
+   * We use degrees so that we can minimize rounding error, and eliminate it
+   * completely for any multiples of 90 degrees. Additionally, more efficient
+   * code paths are used to update the manifold when the transforms only rotate
+   * by multiples of 90 degrees.
+   *
+   * From the reference frame of the model being rotated, rotations are applied
+   * in *z-y'-x"* order. That is yaw first, then pitch and finally roll.
+   *
+   * From the global reference frame, a model will be rotated in *x-y-z* order.
+   * That is about the global X axis, then global Y axis, and finally global Z.
    *
    * @param v [X, Y, Z] rotation in degrees.
+   * @group Transformations
    */
   rotate(v: Readonly<Vec3>): Manifold;
   rotate(x: number, y?: number, z?: number): Manifold;
@@ -626,6 +673,7 @@ export class Manifold {
    * combined and applied lazily.
    *
    * @param v The vector to multiply every vertex by per component.
+   * @group Transformations
    */
   scale(v: Readonly<Vec3>|number): Manifold;
 
@@ -636,6 +684,7 @@ export class Manifold {
    * applied lazily.
    *
    * @param normal The normal vector of the plane to be mirrored over
+   * @group Transformations
    */
   mirror(normal: Readonly<Vec3>): Manifold;
 
@@ -647,8 +696,15 @@ export class Manifold {
    * function with discretion.
    *
    * @param warpFunc A function that modifies a given vertex position.
+   * @group Transformations
    */
   warp(warpFunc: (vert: Vec3) => void): Manifold;
+
+  /**
+   * Batch version of warp(). The callback receives a flat array of xyzxyz...
+   * (length = count * 3) and may modify it in-place.
+   */
+  warpBatch(warpFunc: (verts: Float64Array, count: number) => void): Manifold;
 
   /**
    * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
@@ -658,28 +714,12 @@ export class Manifold {
    *
    * @param normalIdx The first property channel of the normals. NumProp must be
    * at least normalIdx + 3. Any vertex where multiple normals exist and don't
-   * agree will result in a sharp edge.
+   * agree will result in a sharp edge. Default is 0, the standard slot.
+   * Non-zero values are retained for compatibility and will not be supported
+   * in a future release.
+   * @group Smoothing
    */
-  smoothByNormals(normalIdx: number): Manifold;
-
-  /**
-   * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
-   * geometry will remain unchanged until Refine or RefineToLength is called to
-   * interpolate the surface. This version uses the geometry of the triangles
-   * and pseudo-normals to define the tangent vectors.
-   *
-   * @param minSharpAngle degrees, default 60. Any edges with angles greater
-   * than this value will remain sharp. The rest will be smoothed to G1
-   * continuity, with the caveat that flat faces of three or more triangles will
-   * always remain flat. With a value of zero, the model is faceted, but in this
-   * case there is no point in smoothing.
-   *
-   * @param minSmoothness range: 0 - 1, default 0. The smoothness applied to
-   * sharp angles. The default gives a hard edge, while values > 0 will give a
-   * small fillet on these sharp edges. A value of 1 is equivalent to a
-   * minSharpAngle of 180 - all edges will be smooth.
-   */
-  smoothOut(minSharpAngle?: number, minSmoothness?: number): Manifold;
+  smoothByNormals(normalIdx?: number): Manifold;
 
   /**
    * Increase the density of the mesh by splitting every edge into n pieces. For
@@ -690,6 +730,7 @@ export class Manifold {
    * interpolated surface according to their barycentric coordinates.
    *
    * @param n The number of pieces to split every edge into. Must be > 1.
+   * @group Smoothing
    */
   refine(n: number): Manifold;
 
@@ -702,6 +743,7 @@ export class Manifold {
    * coordinates.
    *
    * @param length The length that edges will be broken down to.
+   * @group Smoothing
    */
   refineToLength(length: number): Manifold;
 
@@ -716,6 +758,7 @@ export class Manifold {
    * @param tolerance The desired maximum distance between the faceted mesh
    * produced and the exact smoothly curving surface. All vertices are exactly
    * on the surface, within rounding error.
+   * @group Smoothing
    */
   refineToTolerance(tolerance: number): Manifold;
 
@@ -729,6 +772,7 @@ export class Manifold {
    *
    * @param numProp The new number of properties per vertex.
    * @param propFunc A function that modifies the properties of a given vertex.
+   * @group Properties
    */
   setProperties(
       numProp: number,
@@ -751,6 +795,7 @@ export class Manifold {
    *     curvature. An index < 0 will be ignored (stores nothing). The property
    *     set will be automatically expanded to include the channel index
    *     specified.
+   * @group Properties
    */
   calculateCurvature(gaussianIdx: number, meanIdx: number): Manifold;
 
@@ -758,10 +803,13 @@ export class Manifold {
    * Fills in vertex properties for normal vectors, calculated from the mesh
    * geometry. Flat faces composed of three or more triangles will remain flat.
    *
-   * @param normalIdx The property channel in which to store the X
-   * values of the normals. The X, Y, and Z channels will be sequential. The
-   * property set will be automatically expanded to include up through normalIdx
-   * + 2.
+   * @param normalIdx The property channel in which to store the X values of the
+   * normals. The X, Y, and Z channels will be sequential. The property set will
+   * be automatically expanded to include up through normalIdx + 2. Default is
+   * 0, the standard slot; in that case the Manifold records the recording so
+   * a subsequent getMesh() without an explicit normalIdx returns solid-frame
+   * normals. Non-zero values are retained for compatibility and will not be
+   * supported in a future release.
    *
    * @param minSharpAngle Any edges with angles greater than this value will
    * remain sharp, getting different normal vector properties on each side of
@@ -769,53 +817,72 @@ export class Manifold {
    * value of zero, the model is faceted and all normals match their triangle
    * normals, but in this case it would be better not to calculate normals at
    * all.
+   * @group Properties
    */
-  calculateNormals(normalIdx: number, minSharpAngle: number): Manifold;
+  calculateNormals(normalIdx?: number, minSharpAngle?: number): Manifold;
 
   // Boolean Operations
 
   /**
    * Boolean union
+   *
+   * @group Boolean
    */
   add(other: Manifold): Manifold;
 
   /**
    * Boolean difference
+   *
+   * @group Boolean
    */
   subtract(other: Manifold): Manifold;
 
   /**
    * Boolean intersection
+   *
+   * @group Boolean
    */
   intersect(other: Manifold): Manifold;
 
   /**
    * Boolean union of the manifolds a and b
+   *
+   * @group Boolean
    */
   static union(a: Manifold, b: Manifold): Manifold;
 
   /**
    * Boolean difference of the manifold b from the manifold a
+   *
+   * @group Boolean
    */
   static difference(a: Manifold, b: Manifold): Manifold;
 
   /**
    * Boolean intersection of the manifolds a and b
+   *
+   * @group Boolean
    */
   static intersection(a: Manifold, b: Manifold): Manifold;
 
   /**
    * Boolean union of a list of manifolds
+   *
+   * @group Boolean
    */
   static union(manifolds: readonly Manifold[]): Manifold;
 
   /**
    * Boolean difference of the tail of a list of manifolds from its head
+   *
+   * @group Boolean
    */
   static difference(manifolds: readonly Manifold[]): Manifold;
 
   /**
    * Boolean intersection of a list of manifolds
+   *
+   * @group Boolean
    */
   static intersection(manifolds: readonly Manifold[]): Manifold;
 
@@ -825,6 +892,7 @@ export class Manifold {
    * doing them separately.
    *
    * @param cutter
+   * @group Boolean
    */
   split(cutter: Manifold): [Manifold, Manifold];
 
@@ -837,6 +905,7 @@ export class Manifold {
    * result is on the opposite side.
    * @param originOffset The distance of the plane from the origin in the
    * direction of the normal vector.
+   * @group Boolean
    */
   splitByPlane(normal: Readonly<Vec3>, originOffset: number):
       [Manifold, Manifold];
@@ -849,8 +918,28 @@ export class Manifold {
    *     plane.
    * @param originOffset The distance of the plane from the origin in the
    *     direction of the normal vector.
+   *
+   * @group Boolean
    */
   trimByPlane(normal: Readonly<Vec3>, originOffset: number): Manifold;
+
+  /**
+   * Compute the minkowski sum of this manifold with another.
+   * This corresponds to the morphological dilation of the manifold.
+   *
+   * @param other The other manifold to minkowski sum to this one.
+   * @group Boolean
+   */
+  minkowskiSum(other: Manifold): Manifold;
+
+  /**
+   * Subtract the sweep of the other manifold across this manifold's surface.
+   * This corresponds to the morphological erosion of the manifold.
+   *
+   * @param other The other manifold to minkowski subtract from this one.
+   * @group Boolean
+   */
+  minkowskiDifference(other: Manifold): Manifold;
 
   /**
    * Returns the cross section of this object parallel to the X-Y plane at the
@@ -859,12 +948,15 @@ export class Manifold {
    * equal to the top of the bounding box will return empty.
    *
    * @param height Z-level of slice.
+   * @group Polygons
    */
   slice(height: number): CrossSection;
 
   /**
    * Returns a cross section representing the projected outline of this object
    * onto the X-Y plane.
+   *
+   * @group Polygons
    */
   project(): CrossSection;
 
@@ -872,12 +964,16 @@ export class Manifold {
 
   /**
    * Compute the convex hull of all points in this Manifold.
+   *
+   * @group Convex Hull
    */
   hull(): Manifold;
 
   /**
    * Compute the convex hull of all points contained within a set of Manifolds
    * and point vectors.
+   *
+   * @group Convex Hull
    */
   static hull(points: readonly(Manifold|Vec3)[]): Manifold;
 
@@ -889,6 +985,8 @@ export class Manifold {
    * overlapping results. It is the inverse operation of Decompose().
    *
    * @param manifolds A list of Manifolds to lazy-union together.
+   * @deprecated Please use {@link add} or {@link union} instead.
+   * @group Constructors
    */
   static compose(manifolds: readonly Manifold[]): Manifold;
 
@@ -897,6 +995,8 @@ export class Manifold {
    * disconnected. If everything is connected, the vector is length one,
    * containing a copy of the original. It is the inverse operation of
    * Compose().
+   *
+   * @group Constructors
    */
   decompose(): Manifold[];
 
@@ -904,26 +1004,31 @@ export class Manifold {
 
   /**
    * Does the Manifold have any triangles?
+   * @group Information
    */
   isEmpty(): boolean;
 
   /**
    * The number of vertices in the Manifold.
+   * @group Information
    */
   numVert(): number;
 
   /**
    * The number of triangles in the Manifold.
+   * @group Information
    */
   numTri(): number;
 
   /**
    * The number of edges in the Manifold.
+   * @group Information
    */
   numEdge(): number;
 
   /**
    * The number of properties per vertex in the Manifold.
+   * @group Information
    */
   numProp(): number;
 
@@ -931,29 +1036,15 @@ export class Manifold {
    * The number of property vertices in the Manifold. This will always be >=
    * numVert, as some physical vertices may be duplicated to account for
    * different properties on different neighboring triangles.
+   * @group Information
    */
   numPropVert(): number
 
   /**
    * Returns the axis-aligned bounding box of all the Manifold's vertices.
+   * @group Information
    */
   boundingBox(): Box;
-
-  /**
-   * Returns the tolerance of this Manifold's vertices, which tracks the
-   * approximate rounding error over all the transforms and operations that have
-   * led to this state. Any triangles that are colinear within this tolerance
-   * are considered degenerate and removed. This is the value of &epsilon;
-   * defining
-   * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
-   */
-  tolerance(): number;
-
-  /**
-   * Return a copy of the manifold with the set tolerance value.
-   * This performs mesh simplification when the tolerance value is increased.
-   */
-  setTolerance(tolerance: number): Manifold;
 
   /**
    * Return a copy of the manifold simplified to the given tolerance, but with
@@ -963,6 +1054,7 @@ export class Manifold {
    * @param tolerance The maximum distance between the original and simplified
    *     meshes. If not given or is less than the current tolerance, the current
    *     tolerance is used.
+   * @group Transformations
    */
   simplify(tolerance?: number): Manifold;
 
@@ -970,32 +1062,79 @@ export class Manifold {
    * The genus is a topological property of the manifold, representing the
    * number of "handles". A sphere is 0, torus 1, etc. It is only meaningful for
    * a single mesh, so it is best to call Decompose() first.
+   * @group Information
    */
   genus(): number;
 
   /**
    * Returns the surface area of the manifold.
+   *
+   * @group Measurement
    */
   surfaceArea(): number;
 
   /**
    * Returns the volume of the manifold.
+   *
+   * @group Measurement
    */
   volume(): number;
 
   /**
    * Returns the minimum gap between two manifolds. Returns a float between
    * 0 and searchLength.
+   *
+   * @group Measurement
    */
   minGap(other: Manifold, searchLength: number): number;
+
+  /**
+   * Cast a ray segment, returning all hits sorted by distance.
+   *
+   * @param origin The start point of the ray segment.
+   * @param endpoint The end point of the ray segment.
+   * @returns Array of RayHit sorted by distance, empty on miss.
+   *
+   * @group Spatial Queries
+   */
+  rayCast(origin: Vec3, endpoint: Vec3): RayHit[];
+
+  /**
+   * Returns the winding number of this manifold around each of the given
+   * points. Returns 0 for points outside and a non-zero value (typically ±1)
+   * for points inside a simple closed surface. May exceed ±1 in magnitude for
+   * manifolds with overlapping regions.
+   *
+   * @param points The 3D query points.
+   *
+   * @group Spatial Queries
+   */
+  windingNumber(points: Vec3[]): number[];
+
+
 
   /**
    * Returns the reason for an input Mesh producing an empty Manifold. This
    * Status will carry on through operations like NaN propogation, ensuring an
    * errored mesh doesn't get mysteriously lost. Empty meshes may still show
    * NoError, for instance the intersection of non-overlapping meshes.
+   *
+   * @group Information
    */
   status(): ErrorStatus;
+
+  /**
+   * Returns a copy of this Manifold with the given ExecutionContext attached.
+   * The attachment is consumed by the next eager op invoked on the result:
+   * status() for a deferred CSG tree, refine() / refineToLength() /
+   * refineToTolerance(), hull(), or minkowskiSum() / minkowskiDifference().
+   * Deferred ops (Boolean operators, transforms, batch ops) ignore any
+   * attached ctx and produce a result with no attached ctx. See
+   * ExecutionContext for the full model.
+   *
+   * @group Information
+   */
+  withContext(ctx: ExecutionContext): Manifold;
 
   // Export
 
@@ -1012,30 +1151,44 @@ export class Manifold {
    * according to the applied transforms and front/back side. normalIdx + 3 must
    * be <= numProp, and all original MeshGLs must use the same channels for
    * their normals.
+   * @group Input & Output
    */
   getMesh(normalIdx?: number): Mesh;
 
   // ID Management
 
   /**
-   * If you copy a manifold, but you want this new copy to have new properties
-   * (e.g. a different UV mapping), you can reset its IDs to a new original,
-   * meaning it will now be referenced by its descendants instead of the meshes
-   * it was built from, allowing you to differentiate the copies when applying
-   * your properties to the final result.
+   * This removes all relations (originalID, faceID, transform) to ancestor
+   * meshes and this new Manifold is marked an original. It also recreates faces
+   * - these don't get joined at boundaries where originalID changes, so the
+   * reset may allow triangles of flat faces to be further collapsed with
+   * Simplify().
    *
+<<<<<<< HEAD
    * This function also condenses all coplanar faces in the relation, and
    * collapses those edges. If you want to have inconsistent properties across
    * these faces, meaning you want to preserve some of these edges, you should
    * instead call GetMesh(), calculate your properties and use these to
    * construct a new manifold.
+   *
+   * @group Mesh ID
+=======
+   * @param id The ID to assign to this manifold. If negative (the default), a
+   *     new ID is assigned. Use zero to match all default-constructed
+   *     manifolds, thus not keeping track of the joints between input
+   *     manifolds. Ensure separate IDs are used for mesh inputs containing
+   *     properties, generally by calling this function without arguments just
+   *     after construction.
+>>>>>>> c15c7025 (switch meshID tracking to opt-in)
    */
-  asOriginal(): Manifold;
+  asOriginal(id?: number): Manifold;
 
   /**
    * If this mesh is an original, this returns its ID that can be referenced
    * by product manifolds. If this manifold is a product, this
    * returns -1.
+   *
+   * @group Mesh ID
    */
   originalID(): number;
 
@@ -1043,6 +1196,8 @@ export class Manifold {
    * Returns the first of n sequential new unique mesh IDs for marking sets of
    * triangles that can be looked up after further operations. Assign to
    * Mesh.runOriginalID vector.
+   *
+   * @group Mesh ID
    */
   static reserveIDs(count: number): number;
 
@@ -1051,10 +1206,15 @@ export class Manifold {
   /**
    * Frees the WASM memory of this Manifold, since these cannot be
    * garbage-collected automatically.
+   * @group Basics
    */
   delete(): void;
 }
 
+/**
+ * @group Input & Output
+ * @internal
+ */
 export interface MeshOptions {
   numProp: number;
   vertProperties: Float32Array;
@@ -1074,6 +1234,10 @@ export interface MeshOptions {
  * libraries directly. This may not be manifold since the verts are duplicated
  * along property boundaries that do not match. The additional merge vectors
  * store this missing information, allowing the manifold to be reconstructed.
+ *
+ * @see {@link https://manifoldcad.org/docs/html/structmanifold_1_1_mesh_g_l_p.html | C++ API: MeshGLP< Precision, I > Struct Template Reference}
+ * @group Input & Output
+ * @internal
  */
 export class Mesh {
   constructor(options: MeshOptions);
@@ -1136,6 +1300,14 @@ export class Mesh {
    * vector is 12 * runOriginalID.size().
    */
   runTransform: Float32Array;
+
+  /**
+   * Optional: For each run, a bitmask of flags. Bit 0 = backside (this run
+   * is on the backside of its original mesh, e.g. from a subtraction).
+   * Bit 1 = hasNormals (the first three extra-property channels of this run
+   * hold world-frame vertex normals). See `backside(run)` / `hasNormals(run)`.
+   */
+  runFlags: Uint8Array;
 
   /**
    * Optional: Length NumTri, contains the source face ID this triangle comes
@@ -1230,4 +1402,31 @@ export class Mesh {
    * @param run triangle run index.
    */
   transform(run: number): Mat4;
+
+  /**
+   * Returns true if this triangle run is on the backside compared to the
+   * original mesh, e.g. from a subtraction. Informational only - the
+   * framework already orients stored normals so the standard `getMesh()`
+   * flow returns world-frame values regardless of this bit.
+   *
+   * @param run triangle run index.
+   */
+  backside(run: number): boolean;
+
+  /**
+   * Returns true if the first three extra-property channels of this run
+   * carry world-frame vertex normals (set by `calculateNormals(0)` and
+   * round-tripped via `runFlags` bit 1). Consumers should treat the slot
+   * as normals and skip re-applying `runTransform` to it.
+   *
+   * hasNormals is per-run, so different runs may set it differently.
+   * Behavior is undefined when a single propVert is shared by triangles
+   * from runs that disagree - the slot has one interpretation, and a
+   * transform rotates it for hasNormals=true and clobbers any
+   * hasNormals=false sharer. Standard `calculateNormals` / boolean /
+   * compose outputs never produce that shape.
+   *
+   * @param run triangle run index.
+   */
+  hasNormals(run: number): boolean;
 }

@@ -1,0 +1,23 @@
+{
+  "name": "manifold-example-three",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "build:watch": "vite build --watch",
+    "preview": "vite preview",
+    "public": "cp -rv dist/* ../../public/"
+  },
+  "dependencies": {
+    "three": "0.182.0",
+    "manifold-3d": "file:../.."
+  },
+  "devDependencies": {
+    "@types/node": "^25.0.9",
+    "@types/three": "^0.182.0",
+    "typescript": "^5.9.3",
+    "vite": "7.3.1"
+  }
+}

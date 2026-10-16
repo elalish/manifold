@@ -31,44 +31,159 @@
  * time.
  *
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Core
  */
 
 import type * as GLTFTransform from '@gltf-transform/core';
 
-import type {Manifold, Vec3} from '../manifold';
+import type {CrossSection, Manifold, Vec3} from '../manifold.d.ts';
+
+import {getManifoldModuleSync} from './wasm.ts';
 
 const nodes = new Array<BaseGLTFNode>();
 
+
+/**
+ * @inline
+ * @internal
+ */
 export type GLTFAttribute =
     'POSITION'|'NORMAL'|'TANGENT'|'TEXCOORD_0'|'TEXCOORD_1'|'COLOR_0'|
     'JOINTS_0'|'WEIGHTS_0'|'SKIP_1'|'SKIP_2'|'SKIP_3'|'SKIP_4';
 
+/**
+ * Define a material using the glTF metallic-roughness physically-based
+ * rendering model. Materials can be applied to a model through `setMaterial()`,
+ * or set as a {@link GLTFNode.material | GLTFNode property}.
+ *
+ * @see {@link https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#materials | glTF 2.0 Specification: Materials}
+ * @see {@link https://physicallybased.info/ | Physically Based - The PBR values database}
+ * @sortStrategy source-order
+ * @group Material
+ */
 export interface GLTFMaterial {
+  /**
+   * Every vertex in a glTF Mesh has a set of attributes.
+   * `POSITION` cannot be specified -- ManifoldCAD will set it internally.
+   *
+   * This array specifies how vertex properties are arranged in memory.
+   * For example, a value of `['TEXCOORD_0', 'NORMAL', 'SKIP_2', 'COLOR_0']`
+   * would implicitly use property channels 0-2 for position, followed by
+   * channels 3-4 for texture, 5-7 for surface normal, ignore 8-9, and 10-12 for
+   * color.
+   *
+   * Some properties such as `TEXCOORD_0` or `COLOR_0` may be set when importing
+   * a model that has a texture or material.
+   *
+   * When vertex property `COLOR_0` is specified, it will be multiplied
+   * against {@link baseColorFactor}.
+   *
+   * @see {@link https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#meshes-overview | glTF 2.0 Specification: Meshes Overview}
+   * @see {@link https://manifoldcad.org/#Tetrahedron%20Puzzle | ManifoldCAD Example: Tetrahedron Puzzle}
+   */
   attributes?: GLTFAttribute[];
+
+  /**
+   * Roughness of the material.
+   * Ranges from 0 (smooth, specular) to 1.0 (rough, diffuse).
+   *
+   * @default 0.2
+   */
   roughness?: number;
+
+  /**
+   * Metallic property of the material.
+   * Ranges from 0 (dielectric, e.g.: yellow plastic) to 1.0 (conductor, e.g:
+   * gold). Generally speaking materials are either one or the other and
+   * intermediate values are just for blending.
+   *
+   * @default 1.0 // Metallic
+   */
   metallic?: number;
+
+  /**
+   * Base colour of the material.
+   * RGB values, ranging from 0 to 1.0.
+   *
+   * If the {@link attributes | attribute} `COLOR_0` is specifed, it will be
+   * multiplied against `baseColorFactor`. In this case, use an appropriate
+   * value like `[1.0, 1.0, 1.0]`.
+   * @default [1.0, 1.0, 0.0] // Yellow
+   */
   baseColorFactor?: [number, number, number];
+
+  /**
+   * Transparency of the material.
+   * Ranges from 0 (fully transparent) to 1.0 (fully opaque).
+   * @default 1.0 // Opaque
+   */
   alpha?: number;
+
+  /**
+   * Render model as unlit or shadeless, as opposed to physically based
+   * rendering.
+   *
+   * @see {@link https://github.com/KhronosGroup/gltf/tree/main/extensions/2.0/Khronos/KHR_materials_unlit | KHR_materials_unlit}
+   * @see {@link https://gltf-transform.dev/modules/extensions/classes/KHRMaterialsUnlit | glTF Transform: KHRMaterialsUnlit}
+   * @default false // Lit and shadowed.
+   */
   unlit?: boolean;
+
+  /**
+   * Material name.  Will be passed through when exported.
+   */
   name?: string;
+
+  /**
+   * If set, this material is a copy of another material on an in-memory glTF
+   * model. This is used by `importManifold` and `importModel` to pass original
+   * materials and textures through manifold.
+   * @internal
+   */
   sourceMaterial?: GLTFTransform.Material;
+
+  /**
+   * If set, this material is a copy of another material on an in-memory glTF
+   * model. This is used by `importManifold` and `importModel` to pass original
+   * materials and textures through manifold.
+   * @internal
+   */
   sourceRunID?: number;
+
+  /**
+   * Treat this material as double sided.
+   * This is implied for translucent materials (`alpha < 1.0`) and
+   * CrossSections.
+   * @internal
+   */
+  doubleSided?: boolean;
 }
 
 /**
  * The abstract class from which other classes inherit.  Common methods and
  * properties live here.
+ * @group Scene Graph
  */
 export abstract class BaseGLTFNode {
-  _parent?: BaseGLTFNode;
+  /** @internal */
+  private _parent?: BaseGLTFNode;
   name?: string;
 
   // Internally, gltf-transform stores transformations as separate translation,
   // rotation and scale vectors.  It can convert those vectors to and from a
   // transformation matrix as needed.
   translation?: Vec3|((t: number) => Vec3);
+
+  /**
+   * From the reference frame of the model being rotated, rotations are applied
+   * in *z-y'-x"* order. That is yaw first, then pitch and finally roll.
+   *
+   * From the global reference frame, a model will be rotated in *x-y-z* order.
+   * That is about the global X axis, then global Y axis, and finally global Z.
+   *
+   * This matches the behaviour of `Manifold.rotate()`.
+   */
   rotation?: Vec3|((t: number) => Vec3);
   scale?: Vec3|((t: number) => Vec3);
 
@@ -79,10 +194,19 @@ export abstract class BaseGLTFNode {
   get parent() {
     return this._parent;
   }
+
+  /**
+   * Does this node have any geometry that needs to be converted on export?
+   * @internal
+   */
+  isEmpty(): boolean {
+    return true;
+  }
 }
 
 /**
  * Position a manifold model for later export.
+ * @group Scene Graph
  */
 export class GLTFNode extends BaseGLTFNode {
   manifold?: Manifold;
@@ -92,6 +216,10 @@ export class GLTFNode extends BaseGLTFNode {
     const copy = new GLTFNode(newParent ?? this.parent);
     Object.assign(copy, this);
     return copy;
+  }
+
+  isEmpty() {
+    return this.manifold?.isEmpty() ?? true;
   }
 }
 
@@ -125,25 +253,79 @@ export class GLTFNodeTracked extends GLTFNode {
  *
  * GLTF objects meeting the `manifold-gltf` extension will still be manifold
  * when exported.
+ *
+ * @group Scene Graph
  */
 export class VisualizationGLTFNode extends BaseGLTFNode {
+  /** @internal */
   node?: GLTFTransform.Node;
-  document: GLTFTransform.Document;
+  /** @internal */
+  document?: GLTFTransform.Document;
+  /** @internal */
   uri?: string;
 
-  constructor(
-      document: GLTFTransform.Document, node?: GLTFTransform.Node,
-      parent?: BaseGLTFNode) {
+  constructor(parent?: BaseGLTFNode) {
     super(parent);
-    this.document = document;
-    this.node = node;
   }
 
   clone(newParent?: BaseGLTFNode) {
-    const copy = new VisualizationGLTFNode(
-        this.document, this.node, newParent ?? this.parent);
+    const copy = new VisualizationGLTFNode(newParent ?? this.parent);
     Object.assign(copy, this);
     return copy;
+  }
+
+  isEmpty() {
+    return !this.document;
+  }
+}
+
+/**
+ * Display a CrossSection in 3D space.
+ *
+ * A CrossSection object is two dimensional.  Attaching it as a node
+ * allows it to be included in the final exported file, complete with
+ * transformations.
+ *
+ * > [!NOTE]
+ * >
+ * > CrossSections are not -- and can never be -- manifold.  That means
+ * > some exporters (like `.3mf`) will just skip over them entirely.
+ *
+ * @group Scene Graph
+ */
+export class CrossSectionGLTFNode extends BaseGLTFNode {
+  crossSection?: CrossSection;
+  material?: GLTFMaterial;
+
+  private _runid?: number;
+
+  constructor(parent?: BaseGLTFNode) {
+    super(parent);
+  }
+
+  clone(newParent?: BaseGLTFNode) {
+    const copy = new CrossSectionGLTFNode(newParent ?? this.parent);
+    Object.assign(copy, this);
+    return copy;
+  }
+
+  isEmpty() {
+    return this.crossSection?.isEmpty() ?? true;
+  }
+
+  /**
+   * Get the runID for this node.
+   * If there is no runID set, lazily assign one.
+   *
+   * We don't need these for regular operations, but they do help when
+   * converting to meshes for export.
+   * @internal
+   */
+  get runID(): number {
+    if (this._runid === undefined) {
+      this._runid = getManifoldModuleSync()!.Manifold.reserveIDs(1);
+    }
+    return this._runid;
   }
 }
 
@@ -158,7 +340,7 @@ export class VisualizationGLTFNode extends BaseGLTFNode {
  *
  * @returns An array of GLTFNodes.
  */
-export const getGLTFNodes = () => {
+export function getGLTFNodes() {
   return nodes;
 };
 
@@ -169,7 +351,7 @@ export const getGLTFNodes = () => {
  * website or CLI.  When called in an imported library it will have no
  * effect.
  */
-export const resetGLTFNodes = () => {
+export function resetGLTFNodes() {
   nodes.length = 0;
 };
 
@@ -187,20 +369,22 @@ export const cleanup = () => {
  * @returns An array of GLTFNodes.
  */
 export async function anyToGLTFNodeList(
-    any: Manifold|BaseGLTFNode|
-    Array<Manifold|BaseGLTFNode>): Promise<Array<BaseGLTFNode>> {
+    any: Manifold|BaseGLTFNode|CrossSection|
+    Array<Manifold|BaseGLTFNode|CrossSection>): Promise<Array<BaseGLTFNode>> {
   if (Array.isArray(any)) {
     return await any.map(anyToGLTFNodeList)
         .reduce(
             async (acc, cur) => ([...(await acc), ...(await cur)]),
             new Promise(resolve => resolve([])));
   } else if (any instanceof BaseGLTFNode) {
-    const node = any as BaseGLTFNode;
-    if (!node.parent) return [node];
-    return [await anyToGLTFNodeList(node.parent), node].flat();
+    return [any];
   } else if (any.constructor.name === 'Manifold') {
     const node = new GLTFNode();
     node.manifold = any as Manifold;
+    return [node];
+  } else if (any.constructor.name === 'CrossSection') {
+    const node = new CrossSectionGLTFNode();
+    node.crossSection = any as CrossSection;
     return [node];
   }
 

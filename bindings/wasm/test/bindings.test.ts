@@ -1,6 +1,6 @@
 import {beforeAll, expect, suite, test} from 'vitest';
 
-import Module, {type ManifoldToplevel} from '../manifold'
+import Module, {type ManifoldToplevel, type Polygons} from '../manifold'
 
 let manifoldModule: ManifoldToplevel;
 
@@ -26,9 +26,128 @@ suite('CrossSection Bindings', () => {
     expect(cs.area()).to.be.greaterThan(0);
   });
 
+  test('evenOdd fills by parity, not sign', () => {
+    const nested: Polygons = [
+      [[-2, -2], [2, -2], [2, 2], [-2, 2]],
+      [[-1, -1], [1, -1], [1, 1], [-1, 1]],
+    ];
+    // Positive fill leaves the nested pair solid; even-odd cuts the inner
+    // square out.
+    expect(manifoldModule.CrossSection.ofPolygons(nested).area())
+        .toBeCloseTo(16);
+    const evenOdd = manifoldModule.CrossSection.evenOdd(nested);
+    expect(evenOdd.numContour()).toEqual(2);
+    expect(evenOdd.area()).toBeCloseTo(12);
+  });
+
   test('simplify argument is defaulted', () => {
     const cs = manifoldModule.CrossSection.circle(1).simplify();
     expect(cs.numContour()).toEqual(1);
     expect(cs.area()).to.be.greaterThan(0);
+  });
+});
+
+suite('Manifold Bindings', () => {
+  test('Simplify supports default argument', () => {
+    const manifold = manifoldModule.Manifold.sphere(1).simplify();
+    expect(manifold.volume()).toBeGreaterThan(0);
+  });
+
+  test('rayCast returns hits through cube', () => {
+    const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
+    const hits = cube.rayCast([0, 0, -5], [0, 0, 5]);
+    expect(hits).toHaveLength(2);
+    expect(hits[0].position[2]).toEqual(-0.5);
+    expect(hits[1].position[2]).toEqual(0.5);
+  });
+
+  test('rayCast returns empty on miss', () => {
+    const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
+    const hits = cube.rayCast([10, 10, -5], [10, 10, 5]);
+    expect(hits).toHaveLength(0);
+  });
+
+  test('ExecutionContext happy path returns NoError', () => {
+    const ctx = new manifoldModule.ExecutionContext();
+    expect(ctx.cancelled()).toBe(false);
+    // Fresh ctx with no scheduled work reads as trivially complete (1.0).
+    expect(ctx.progress()).toEqual(1);
+
+    const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
+    const sphere = manifoldModule.Manifold.sphere(1.0, 8);
+    const u = cube.add(sphere);
+    const uCtx = u.withContext(ctx);
+    expect(uCtx.status()).toEqual('NoError');
+
+    cube.delete();
+    sphere.delete();
+    u.delete();
+    uCtx.delete();
+    ctx.delete();
+  });
+
+  test('ExecutionContext cancels pending evaluation', () => {
+    const ctx = new manifoldModule.ExecutionContext();
+    ctx.cancel();
+    expect(ctx.cancelled()).toBe(true);
+
+    const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
+    const sphere = manifoldModule.Manifold.sphere(1.0, 8);
+    const u = cube.add(sphere);
+    const uCtx = u.withContext(ctx);
+    expect(uCtx.status()).toEqual('Cancelled');
+
+    cube.delete();
+    sphere.delete();
+    u.delete();
+    uCtx.delete();
+    ctx.delete();
+  });
+
+  test('ExecutionContext static factories', () => {
+    // levelSet via the context: no source Manifold to attach via withContext.
+    const sdfCtx = new manifoldModule.ExecutionContext();
+    const sphere = sdfCtx.levelSet(
+        ([x, y, z]) => 1 - Math.sqrt(x * x + y * y + z * z),
+        {min: [-1.1, -1.1, -1.1], max: [1.1, 1.1, 1.1]}, 0.2);
+    expect(sphere.status()).toEqual('NoError');
+    expect(sdfCtx.progress()).toEqual(1);
+
+    // fromMesh via the context.
+    const ingestCtx = new manifoldModule.ExecutionContext();
+    const cube = manifoldModule.Manifold.cube([2, 2, 2], true);
+    const ingested = ingestCtx.fromMesh(cube.getMesh());
+    expect(ingested.status()).toEqual('NoError');
+    expect(ingestCtx.progress()).toEqual(1);
+
+    // A pre-cancelled ctx propagates through a factory; this proves the ctx is
+    // wired (NoError + progress==1 also hold for an untouched ctx).
+    const cancelCtx = new manifoldModule.ExecutionContext();
+    cancelCtx.cancel();
+    const cancelled = cancelCtx.fromMesh(cube.getMesh());
+    expect(cancelled.status()).toEqual('Cancelled');
+
+    sphere.delete();
+    cube.delete();
+    ingested.delete();
+    cancelled.delete();
+    sdfCtx.delete();
+    ingestCtx.delete();
+    cancelCtx.delete();
+  });
+
+  test('refineToTolerance does not throw (issue #1545)', () => {
+    // Reproduces the original failing geometry from issue #1545: a flat-faced
+    // mesh with normals set via calculateNormals + smoothByNormals. On flat
+    // faces, tangents are parallel to the edges so d == 0 exactly, making
+    // edgeDivisions return 0 for *any* tolerance. This triggers longest == 0 in
+    // the keepInterior block — the integer divide-by-zero that traps in WASM.
+    const cube =
+        manifoldModule.Manifold.cube([10, 10, 10]).calculateNormals(0, 30);
+    const smooth =
+        manifoldModule.Manifold.ofMesh(cube.getMesh(0)).smoothByNormals(0);
+    // Before the fix, any tolerance value crashed: RuntimeError: divide by zero
+    const refined = smooth.refineToTolerance(0.1);
+    expect(refined.volume()).toBeGreaterThan(0);
   });
 });

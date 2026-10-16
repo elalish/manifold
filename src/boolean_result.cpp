@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <array>
 #include <map>
+#include <optional>
 
 #include "boolean3.h"
 #include "parallel.h"
@@ -64,17 +65,14 @@ struct DuplicateVerts {
   }
 };
 
-template <bool atomic>
 struct CountVerts {
-  VecView<Halfedge> halfedges;
+  const Halfedges& halfedges;
   VecView<int> count;
   VecView<const int> inclusion;
 
   void operator()(size_t i) {
-    if (atomic)
-      AtomicAdd(count[i / 3], std::abs(inclusion[halfedges[i].startVert]));
-    else
-      count[i / 3] += std::abs(inclusion[halfedges[i].startVert]);
+    for (size_t j : {0, 1, 2})
+      count[i] += std::abs(inclusion[halfedges.Start(3 * i + j)]);
   }
 };
 
@@ -84,7 +82,7 @@ struct CountNewVerts {
   VecView<int> countQ;
   VecView<const int> i12;
   const Vec<std::array<int, 2>>& pq;
-  VecView<const Halfedge> halfedges;
+  const Halfedges& halfedges;
 
   void operator()(const int idx) {
     int edgeP = pq[idx][inverted ? 1 : 0];
@@ -93,14 +91,12 @@ struct CountNewVerts {
 
     if (atomic) {
       AtomicAdd(countQ[faceQ], inclusion);
-      const Halfedge half = halfedges[edgeP];
       AtomicAdd(countP[edgeP / 3], inclusion);
-      AtomicAdd(countP[half.pairedHalfedge / 3], inclusion);
+      AtomicAdd(countP[halfedges.Pair(edgeP) / 3], inclusion);
     } else {
       countQ[faceQ] += inclusion;
-      const Halfedge half = halfedges[edgeP];
       countP[edgeP / 3] += inclusion;
-      countP[half.pairedHalfedge / 3] += inclusion;
+      countP[halfedges.Pair(edgeP) / 3] += inclusion;
     }
   }
 };
@@ -109,41 +105,39 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
     Manifold::Impl& outR, const Manifold::Impl& inP, const Manifold::Impl& inQ,
     const Vec<int>& i03, const Vec<int>& i30, const Vec<int>& i12,
     const Vec<int>& i21, const Vec<std::array<int, 2>>& p1q2,
-    const Vec<std::array<int, 2>>& p2q1, bool invertQ) {
+    const Vec<std::array<int, 2>>& p2q1, bool invertQ,
+    ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every ctx-passing parallel op is followed by IsCancelled to
+  // keep partial output from feeding unconditional downstream consumers.
   Vec<int> sidesPerFacePQ(inP.NumTri() + inQ.NumTri(), 0);
   // note: numFaceR <= facePQ2R.size() = sidesPerFacePQ.size() + 1
 
   auto sidesPerFaceP = sidesPerFacePQ.view(0, inP.NumTri());
   auto sidesPerFaceQ = sidesPerFacePQ.view(inP.NumTri(), inQ.NumTri());
 
-  if (inP.halfedge_.size() >= 1e5) {
-    for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(inP.halfedge_.size()),
-             CountVerts<true>({inP.halfedge_, sidesPerFaceP, i03}));
-    for_each(ExecutionPolicy::Par, countAt(0_uz), countAt(inQ.halfedge_.size()),
-             CountVerts<true>({inQ.halfedge_, sidesPerFaceQ, i30}));
-  } else {
-    for_each(ExecutionPolicy::Seq, countAt(0_uz), countAt(inP.halfedge_.size()),
-             CountVerts<false>({inP.halfedge_, sidesPerFaceP, i03}));
-    for_each(ExecutionPolicy::Seq, countAt(0_uz), countAt(inQ.halfedge_.size()),
-             CountVerts<false>({inQ.halfedge_, sidesPerFaceQ, i30}));
-  }
+  auto policy = autoPolicy(inP.halfedge_.size());
+  for_each(policy, countAt(0_uz), countAt(inP.halfedge_.size() / 3), ctx,
+           CountVerts{inP.halfedge_, sidesPerFaceP, i03});
+  for_each(policy, countAt(0_uz), countAt(inQ.halfedge_.size() / 3), ctx,
+           CountVerts{inQ.halfedge_, sidesPerFaceQ, i30});
 
   if (i12.size() >= 1e5) {
-    for_each_n(ExecutionPolicy::Par, countAt(0), i12.size(),
-               CountNewVerts<false, true>(
-                   {sidesPerFaceP, sidesPerFaceQ, i12, p1q2, inP.halfedge_}));
-    for_each_n(ExecutionPolicy::Par, countAt(0), i21.size(),
-               CountNewVerts<true, true>(
-                   {sidesPerFaceQ, sidesPerFaceP, i21, p2q1, inQ.halfedge_}));
+    for_each_n(ExecutionPolicy::Par, countAt(0), i12.size(), ctx,
+               CountNewVerts<false, true>{sidesPerFaceP, sidesPerFaceQ, i12,
+                                          p1q2, inP.halfedge_});
+    for_each_n(ExecutionPolicy::Par, countAt(0), i21.size(), ctx,
+               CountNewVerts<true, true>{sidesPerFaceQ, sidesPerFaceP, i21,
+                                         p2q1, inQ.halfedge_});
   } else {
-    for_each_n(ExecutionPolicy::Seq, countAt(0), i12.size(),
-               CountNewVerts<false, false>(
-                   {sidesPerFaceP, sidesPerFaceQ, i12, p1q2, inP.halfedge_}));
-    for_each_n(ExecutionPolicy::Seq, countAt(0), i21.size(),
-               CountNewVerts<true, false>(
-                   {sidesPerFaceQ, sidesPerFaceP, i21, p2q1, inQ.halfedge_}));
+    for_each_n(ExecutionPolicy::Seq, countAt(0), i12.size(), ctx,
+               CountNewVerts<false, false>{sidesPerFaceP, sidesPerFaceQ, i12,
+                                           p1q2, inP.halfedge_});
+    for_each_n(ExecutionPolicy::Seq, countAt(0), i21.size(), ctx,
+               CountNewVerts<true, false>{sidesPerFaceQ, sidesPerFaceP, i21,
+                                          p2q1, inQ.halfedge_});
   }
+  if (IsCancelled(ctx)) return std::make_tuple(Vec<int>{}, Vec<int>{});
 
   Vec<int> facePQ2R(inP.NumTri() + inQ.NumTri() + 1, 0);
   auto keepFace = TransformIterator(sidesPerFacePQ.begin(),
@@ -157,13 +151,13 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   outR.faceNormal_.resize_nofill(numFaceR);
 
   Vec<size_t> tmpBuffer(outR.faceNormal_.size());
-  auto faceIds = TransformIterator(countAt(0_uz), [&sidesPerFacePQ](size_t i) {
+  auto faceIdsP = TransformIterator(countAt(0_uz), [&sidesPerFacePQ](size_t i) {
     if (sidesPerFacePQ[i] > 0) return i;
     return std::numeric_limits<size_t>::max();
   });
 
   auto next =
-      copy_if(faceIds, faceIds + inP.faceNormal_.size(), tmpBuffer.begin(),
+      copy_if(faceIdsP, faceIdsP + inP.faceNormal_.size(), tmpBuffer.begin(),
               [](size_t v) { return v != std::numeric_limits<size_t>::max(); });
 
   gather(tmpBuffer.begin(), next, inP.faceNormal_.begin(),
@@ -190,7 +184,6 @@ std::tuple<Vec<int>, Vec<int>> SizeOutput(
   auto newEnd = remove(sidesPerFacePQ.begin(), sidesPerFacePQ.end(), 0);
   Vec<int> faceEdge(newEnd - sidesPerFacePQ.begin() + 1, 0);
   inclusive_scan(sidesPerFacePQ.begin(), newEnd, faceEdge.begin() + 1);
-  outR.halfedge_.resize(faceEdge.back());
 
   return std::make_tuple(std::move(faceEdge), std::move(facePQ2R));
 }
@@ -208,20 +201,16 @@ struct EdgePos {
   }
 };
 
-// thread sanitizer doesn't really know how to check when there are too many
-// mutex
-#if defined(__has_feature)
-#if __has_feature(thread_sanitizer)
-__attribute__((no_sanitize("thread")))
-#endif
-#endif
 void AddNewEdgeVerts(
     // we need concurrent_map because we will be adding things concurrently
-    concurrent_map<int, std::vector<EdgePos>> &edgesP,
-    concurrent_map<std::pair<int, int>, std::vector<EdgePos>> &edgesNew,
-    const Vec<std::array<int, 2>> &p1q2, const Vec<int> &i12, const Vec<int> &v12R,
-    const VecView<Halfedge> &halfedgeP, bool forward, size_t offset) {
+    concurrent_map<int, std::vector<EdgePos>>& edgesP,
+    concurrent_map<std::pair<int, int>, std::vector<EdgePos>>& edgesNew,
+    const Vec<std::array<int, 2>>& p1q2, const Vec<int>& i12,
+    const Vec<int>& v12R, const Halfedges& halfedgeP, bool forward,
+    size_t offset, ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every ctx-passing parallel op is followed by IsCancelled to
+  // keep partial output from feeding unconditional downstream consumers.
   // For each edge of P that intersects a face of Q (p1q2), add this vertex to
   // P's corresponding edge vector and to the two new edges, which are
   // intersections between the face of Q and the two faces of P attached to the
@@ -234,8 +223,7 @@ void AddNewEdgeVerts(
     const int vert = v12R[i];
     const int inclusion = i12[i];
 
-    Halfedge halfedge = halfedgeP[edgeP];
-    std::pair<int, int> keyRight = {halfedge.pairedHalfedge / 3, faceQ};
+    std::pair<int, int> keyRight = {halfedgeP.Pair(edgeP) / 3, faceQ};
     if (!forward) std::swap(keyRight.first, keyRight.second);
 
     std::pair<int, int> keyLeft = {edgeP / 3, faceQ};
@@ -265,7 +253,9 @@ void AddNewEdgeVerts(
     // ideally we should have 1 mutex per key, but kParallelThreshold is enough
     // to avoid contention for most of the cases
     std::array<std::mutex, kParallelThreshold> mutexes;
-    static tbb::affinity_partitioner ap;
+    // thread_local: affinity_partitioner isn't safe for concurrent use
+    // (internal state mutated by parallel_for without synchronization).
+    thread_local tbb::affinity_partitioner ap;
     auto processFun = std::bind(
         process, [&](size_t hash) { mutexes[hash % mutexes.size()].lock(); },
         [&](size_t hash) { mutexes[hash % mutexes.size()].unlock(); },
@@ -273,15 +263,22 @@ void AddNewEdgeVerts(
     tbb::parallel_for(
         tbb::blocked_range<size_t>(0_uz, p1q2.size(), 32),
         [&](const tbb::blocked_range<size_t>& range) {
+          if (IsCancelled(ctx)) return;
           for (size_t i = range.begin(); i != range.end(); i++) processFun(i);
         },
         ap);
     return;
   }
 #endif
+  if (IsCancelled(ctx)) return;
   auto processFun =
       std::bind(process, [](size_t) {}, [](size_t) {}, std::placeholders::_1);
-  for (size_t i = 0; i < p1q2.size(); ++i) processFun(i);
+  // Per-iter cancel check; the caller's post-call IsCancelled discards the
+  // partial edgesP/edgesNew.
+  for (size_t i = 0; i < p1q2.size(); ++i) {
+    if (IsCancelled(ctx)) return;
+    processFun(i);
+  }
 }
 
 template <typename F>
@@ -304,33 +301,36 @@ void PairUp(std::vector<EdgePos>& edgePos, F f) {
     f(Halfedge{edgePos[i].vert, edgePos[i + nEdges].vert, -1});
 }
 
-void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
-                        Vec<int>& facePtrR,
+void AppendPartialEdges(Manifold::Impl& outR, Vec<Halfedge>& halfedgeR,
+                        Vec<char>& wholeHalfedgeP, Vec<int>& facePtrR,
                         concurrent_map<int, std::vector<EdgePos>>& edgesP,
                         Vec<TriRef>& halfedgeRef, const Manifold::Impl& inP,
                         const Vec<int>& i03, const Vec<int>& vP2R,
-                        const Vec<int>::IterC faceP2R, bool forward) {
+                        const Vec<int>::IterC faceP2R, bool forward,
+                        ExecutionContext::Impl* ctx) {
   ZoneScoped;
   // Each edge in the map is partially retained; for each of these, look up
   // their original verts and include them based on their winding number (i03),
   // while remapping them to the output using vP2R. Use the verts position
   // projected along the edge vector to pair them up, then distribute these
   // edges to their faces.
-  auto& halfedgeR = outR.halfedge_;
   const Vec<vec3>& vertPosP = inP.vertPos_;
-  const SharedVec<Halfedge>& halfedgeP = inP.halfedge_;
+  const Halfedges& halfedgeP = inP.halfedge_;
 
+  // Per-iter cancel check; the caller's post-call IsCancelled discards the
+  // partial outR.
   for (auto& value : edgesP) {
+    if (IsCancelled(ctx)) return;
     const int edgeP = value.first;
     std::vector<EdgePos> edgePosP = value.second;
     std::stable_sort(edgePosP.begin(), edgePosP.end());
 
-    const Halfedge& halfedge = halfedgeP[edgeP];
+    const int pairP = halfedgeP.Pair(edgeP);
     wholeHalfedgeP[edgeP] = false;
-    wholeHalfedgeP[halfedge.pairedHalfedge] = false;
+    wholeHalfedgeP[pairP] = false;
 
-    const int vStart = halfedge.startVert;
-    const int vEnd = halfedge.endVert;
+    const int vStart = halfedgeP.Start(edgeP);
+    const int vEnd = halfedgeP.End(edgeP);
     const vec3 edgeVec = vertPosP[vEnd] - vertPosP[vStart];
     // Fill in the edge positions of the old points.
     for (EdgePos& edge : edgePosP) {
@@ -357,7 +357,7 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
     // add halfedges to result
     const int faceLeftP = edgeP / 3;
     const int faceLeft = faceP2R[faceLeftP];
-    const int faceRightP = halfedge.pairedHalfedge / 3;
+    const int faceRightP = pairP / 3;
     const int faceRight = faceP2R[faceRightP];
     // Negative inclusion means the halfedges are reversed, which means our
     // reference is now to the endVert instead of the startVert, which is one
@@ -383,15 +383,18 @@ void AppendPartialEdges(Manifold::Impl& outR, Vec<char>& wholeHalfedgeP,
 }
 
 void AppendNewEdges(
-    Manifold::Impl& outR, Vec<int>& facePtrR,
+    Manifold::Impl& outR, Vec<Halfedge>& halfedgeR, Vec<int>& facePtrR,
     concurrent_map<std::pair<int, int>, std::vector<EdgePos>>& edgesNew,
-    Vec<TriRef>& halfedgeRef, const Vec<int>& facePQ2R, const int numFaceP) {
+    Vec<TriRef>& halfedgeRef, const Vec<int>& facePQ2R, const int numFaceP,
+    ExecutionContext::Impl* ctx) {
   ZoneScoped;
   // Pair up each edge's verts and distribute to faces based on indices in key.
-  auto& halfedgeR = outR.halfedge_;
   Vec<vec3>& vertPosR = outR.vertPos_;
 
+  // Per-iter cancel check; the caller's post-call IsCancelled discards the
+  // partial outR.
   for (auto& value : edgesNew) {
+    if (IsCancelled(ctx)) return;
     const int faceP = value.first.first;
     const int faceQ = value.first.second;
     std::vector<EdgePos>& edgePos = value.second;
@@ -436,7 +439,7 @@ struct DuplicateHalfedges {
   VecView<TriRef> halfedgeRef;
   VecView<int> facePtr;
   VecView<const char> wholeHalfedgeP;
-  VecView<const Halfedge> halfedgesP;
+  const Halfedges& halfedgesP;
   VecView<const int> i03;
   VecView<const int> vP2R;
   VecView<const int> faceP2R;
@@ -444,19 +447,23 @@ struct DuplicateHalfedges {
 
   void operator()(const int idx) {
     if (!wholeHalfedgeP[idx]) return;
-    Halfedge halfedge = halfedgesP[idx];
-    if (!halfedge.IsForward()) return;
 
-    const int inclusion = i03[halfedge.startVert];
+    int startVert = halfedgesP.Start(idx);
+    int endVert = halfedgesP.Start(NextHalfedge(idx));
+    if (startVert >= endVert) return;
+    const int inclusion = i03[startVert];
     if (inclusion == 0) return;
     if (inclusion < 0) {  // reverse
-      std::swap(halfedge.startVert, halfedge.endVert);
+      std::swap(startVert, endVert);
     }
-    halfedge.startVert = vP2R[halfedge.startVert];
-    halfedge.endVert = vP2R[halfedge.endVert];
+    startVert = vP2R[startVert];
+    endVert = vP2R[endVert];
+    const int propVert = halfedgesP.Prop(idx);
+    const int pair = halfedgesP.Pair(idx);
+    const int pairPropVert = halfedgesP.Prop(pair);
     const int faceLeftP = idx / 3;
     const int newFace = faceP2R[faceLeftP];
-    const int faceRightP = halfedge.pairedHalfedge / 3;
+    const int faceRightP = pair / 3;
     const int faceRight = faceP2R[faceRightP];
     // Negative inclusion means the halfedges are reversed, which means our
     // reference is now to the endVert instead of the startVert, which is one
@@ -467,60 +474,69 @@ struct DuplicateHalfedges {
     for (int i = 0; i < std::abs(inclusion); ++i) {
       int forwardEdge = AtomicAdd(facePtr[newFace], 1);
       int backwardEdge = AtomicAdd(facePtr[faceRight], 1);
-      halfedge.pairedHalfedge = backwardEdge;
 
-      halfedgesR[forwardEdge] = halfedge;
-      halfedgesR[backwardEdge] = {halfedge.endVert, halfedge.startVert,
-                                  forwardEdge};
+      halfedgesR[forwardEdge] = {startVert, endVert, backwardEdge, propVert};
+      halfedgesR[backwardEdge] = {endVert, startVert, forwardEdge,
+                                  pairPropVert};
       halfedgeRef[forwardEdge] = forwardRef;
       halfedgeRef[backwardEdge] = backwardRef;
 
-      ++halfedge.startVert;
-      ++halfedge.endVert;
+      ++startVert;
+      ++endVert;
     }
   }
 };
 
 void AppendWholeEdges(Manifold::Impl& outR, Vec<int>& facePtrR,
-                      Vec<TriRef>& halfedgeRef, const Manifold::Impl& inP,
-                      const Vec<char> wholeHalfedgeP, const Vec<int>& i03,
-                      const Vec<int>& vP2R, VecView<const int> faceP2R,
-                      bool forward) {
+                      Vec<Halfedge>& halfedgesR, Vec<TriRef>& halfedgeRef,
+                      const Manifold::Impl& inP, const Vec<char> wholeHalfedgeP,
+                      const Vec<int>& i03, const Vec<int>& vP2R,
+                      VecView<const int> faceP2R, bool forward,
+                      ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every ctx-passing parallel op is followed by IsCancelled to
+  // keep partial output from feeding unconditional downstream consumers.
   for_each_n(
-      autoPolicy(inP.halfedge_.size()), countAt(0), inP.halfedge_.size(),
-      DuplicateHalfedges({outR.halfedge_, halfedgeRef, facePtrR, wholeHalfedgeP,
-                          inP.halfedge_, i03, vP2R, faceP2R, forward}));
+      autoPolicy(inP.halfedge_.size()), countAt(0), inP.halfedge_.size(), ctx,
+      DuplicateHalfedges{halfedgesR, halfedgeRef, facePtrR, wholeHalfedgeP,
+                         inP.halfedge_, i03, vP2R, faceP2R, forward});
 }
 
-struct MapTriRef {
-  VecView<const TriRef> triRefP;
-  VecView<const TriRef> triRefQ;
-  const int offsetQ;
-
-  void operator()(TriRef& triRef) {
-    const int tri = triRef.faceID;
-    const bool PQ = triRef.meshID == 0;
-    triRef = PQ ? triRefP[tri] : triRefQ[tri];
-    if (!PQ) triRef.meshID += offsetQ;
-  }
-};
-
 void UpdateReference(Manifold::Impl& outR, const Manifold::Impl& inP,
-                     const Manifold::Impl& inQ, bool invertQ) {
+                     const Manifold::Impl& inQ, bool invertQ,
+                     ExecutionContext::Impl* ctx) {
+  // Invariant: every ctx-passing parallel op is followed by IsCancelled to
+  // keep partial output from feeding unconditional downstream consumers.
   const int offsetQ = Manifold::Impl::meshIDCounter_;
-  for_each_n(
-      autoPolicy(outR.NumTri(), 1e5), outR.meshRelation_.triRef.begin(),
-      outR.NumTri(),
-      MapTriRef({inP.meshRelation_.triRef, inQ.meshRelation_.triRef, offsetQ}));
+  // Both inputs may use meshID 0 with different relations (e.g. only one has
+  // normals); Q's must then get its own ID so it isn't overwritten by P's.
+  const auto& relP = inP.meshRelation_.meshIDtransform;
+  const auto& relQ = inQ.meshRelation_.meshIDtransform;
+  const auto p0 = relP.find(0);
+  const auto q0 = relQ.find(0);
+  const bool splitQ0 = p0 != relP.end() && q0 != relQ.end() &&
+                       p0->second.hasNormals != q0->second.hasNormals;
+  for_each_n(autoPolicy(outR.NumTri(), 1e5), outR.meshRelation_.triRef.begin(),
+             outR.NumTri(), ctx,
+             [&inP, &inQ, offsetQ, splitQ0](TriRef& triRef) {
+               const int tri = triRef.faceID;
+               const bool PQ = triRef.meshID == 0;
+               triRef = PQ ? inP.meshRelation_.triRef[tri]
+                           : inQ.meshRelation_.triRef[tri];
+               if (!PQ && (triRef.meshID != 0 || splitQ0))
+                 triRef.meshID += offsetQ;
+             });
+  if (IsCancelled(ctx)) return;
 
   for (const auto& pair : inP.meshRelation_.meshIDtransform) {
     outR.meshRelation_.meshIDtransform[pair.first] = pair.second;
   }
   for (const auto& pair : inQ.meshRelation_.meshIDtransform) {
-    outR.meshRelation_.meshIDtransform[pair.first + offsetQ] = pair.second;
-    outR.meshRelation_.meshIDtransform[pair.first + offsetQ].backSide ^=
-        invertQ;
+    if (pair.first != 0 || splitQ0) {
+      outR.meshRelation_.meshIDtransform[pair.first + offsetQ] = pair.second;
+      outR.meshRelation_.meshIDtransform[pair.first + offsetQ].backSide ^=
+          invertQ;
+    }
   }
 }
 
@@ -530,14 +546,14 @@ struct Barycentric {
   VecView<const vec3> vertPosP;
   VecView<const vec3> vertPosQ;
   VecView<const vec3> vertPosR;
-  VecView<const Halfedge> halfedgeP;
-  VecView<const Halfedge> halfedgeQ;
-  VecView<const Halfedge> halfedgeR;
+  const Halfedges& halfedgeP;
+  const Halfedges& halfedgeQ;
+  const Halfedges& halfedgeR;
   const double epsilon;
 
   void operator()(const int tri) {
     const TriRef refPQ = ref[tri];
-    if (halfedgeR[3 * tri].startVert < 0) return;
+    if (halfedgeR.Start(3 * tri) < 0) return;
 
     const int triPQ = refPQ.faceID;
     const bool PQ = refPQ.meshID == 0;
@@ -546,18 +562,21 @@ struct Barycentric {
 
     mat3 triPos;
     for (const int j : {0, 1, 2})
-      triPos[j] = vertPos[halfedge[3 * triPQ + j].startVert];
+      triPos[j] = vertPos[halfedge.Start(3 * triPQ + j)];
 
     for (const int i : {0, 1, 2}) {
-      const int vert = halfedgeR[3 * tri + i].startVert;
+      const int vert = halfedgeR.Start(3 * tri + i);
       uvw[3 * tri + i] = GetBarycentric(vertPosR[vert], triPos, epsilon);
     }
   }
 };
 
 void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
-                      const Manifold::Impl& inQ) {
+                      const Manifold::Impl& inQ, bool invertQ,
+                      ExecutionContext::Impl* ctx) {
   ZoneScoped;
+  // Invariant: every ctx-passing parallel op is followed by IsCancelled to
+  // keep partial output from feeding unconditional downstream consumers.
   const int numPropP = inP.NumProp();
   const int numPropQ = inQ.NumProp();
   const int numProp = std::max(numPropP, numPropQ);
@@ -566,10 +585,11 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
 
   const int numTri = outR.NumTri();
   Vec<vec3> bary(outR.halfedge_.size());
-  for_each_n(autoPolicy(numTri, 1e4), countAt(0), numTri,
-             Barycentric({bary, outR.meshRelation_.triRef, inP.vertPos_,
-                          inQ.vertPos_, outR.vertPos_, inP.halfedge_,
-                          inQ.halfedge_, outR.halfedge_, outR.epsilon_}));
+  for_each_n(autoPolicy(numTri, 1e4), countAt(0), numTri, ctx,
+             Barycentric{bary, outR.meshRelation_.triRef, inP.vertPos_,
+                         inQ.vertPos_, outR.vertPos_, inP.halfedge_,
+                         inQ.halfedge_, outR.halfedge_, outR.epsilon_});
+  if (IsCancelled(ctx)) return;
 
   using Entry = std::pair<ivec3, int>;
   int idMissProp = outR.NumVert();
@@ -582,8 +602,9 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
   int idx = 0;
 
   for (int tri = 0; tri < numTri; ++tri) {
+    if (IsCancelled(ctx)) return;
     // Skip collapsed triangles
-    if (outR.halfedge_[3 * tri].startVert < 0) continue;
+    if (outR.halfedge_.Start(3 * tri) < 0) continue;
 
     const TriRef ref = outR.meshRelation_.triRef[tri];
     const bool PQ = ref.meshID == 0;
@@ -591,8 +612,17 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
     const auto& properties = PQ ? inP.properties_ : inQ.properties_;
     const auto& halfedge = PQ ? inP.halfedge_ : inQ.halfedge_;
 
+    // For Subtract, Q's triangles are flipped in the result, so Q's
+    // world-frame vertex normals (slot 0..2 when hasNormals) need a sign
+    // flip to point outward from the result's solid (into the cavity).
+    // Check is per-source-triangle, not whole input - inQ may be a mixed
+    // Boolean result.
+    const bool negateNormals =
+        !PQ && invertQ && oldNumProp >= 3 &&
+        Manifold::Impl::TriHasNormals(inQ.meshRelation_, ref.faceID);
+
     for (const int i : {0, 1, 2}) {
-      const int vert = outR.halfedge_[3 * tri + i].startVert;
+      const int vert = outR.halfedge_.Start(3 * tri + i);
       const vec3& uvw = bary[3 * tri + i];
 
       ivec4 key(PQ, idMissProp, -1, -1);
@@ -601,7 +631,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         for (const int j : {0, 1, 2}) {
           if (uvw[j] == 1) {
             // On a retained vert, the propVert must also match
-            key[2] = halfedge[3 * ref.faceID + j].propVert;
+            key[2] = halfedge.Prop(3 * ref.faceID + j);
             edge = -1;
             break;
           }
@@ -609,8 +639,8 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         }
         if (edge >= 0) {
           // On an edge, both propVerts must match
-          const int p0 = halfedge[3 * ref.faceID + Next3(edge)].propVert;
-          const int p1 = halfedge[3 * ref.faceID + Prev3(edge)].propVert;
+          const int p0 = halfedge.Prop(3 * ref.faceID + Next3(edge));
+          const int p1 = halfedge.Prop(3 * ref.faceID + Prev3(edge));
           key[1] = vert;
           key[2] = std::min(p0, p1);
           key[3] = std::max(p0, p1);
@@ -623,7 +653,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         // only key.x/key.z matters
         auto& entry = propMissIdx[key.x][key.z];
         if (entry >= 0) {
-          outR.halfedge_[3 * tri + i].propVert = entry;
+          outR.halfedge_.SetProp(3 * tri + i, entry);
           continue;
         }
         entry = idx;
@@ -633,7 +663,7 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         for (const auto& b : bin) {
           if (b.first == ivec3(key.x, key.z, key.w)) {
             bFound = true;
-            outR.halfedge_[3 * tri + i].propVert = b.second;
+            outR.halfedge_.SetProp(3 * tri + i, b.second);
             break;
           }
         }
@@ -641,15 +671,16 @@ void CreateProperties(Manifold::Impl& outR, const Manifold::Impl& inP,
         bin.push_back(std::make_pair(ivec3(key.x, key.z, key.w), idx));
       }
 
-      outR.halfedge_[3 * tri + i].propVert = idx++;
+      outR.halfedge_.SetProp(3 * tri + i, idx++);
       for (int p = 0; p < numProp; ++p) {
         if (p < oldNumProp) {
           vec3 oldProps;
           for (const int j : {0, 1, 2})
             oldProps[j] =
-                properties[oldNumProp * halfedge[3 * ref.faceID + j].propVert +
-                           p];
-          outR.properties_.push_back(la::dot(uvw, oldProps));
+                properties[oldNumProp * halfedge.Prop(3 * ref.faceID + j) + p];
+          double val = la::dot(uvw, oldProps);
+          if (negateNormals && p < 3) val = -val;
+          outR.properties_.push_back(val);
         } else {
           outR.properties_.push_back(0);
         }
@@ -664,9 +695,12 @@ namespace manifold {
 
 Manifold::Impl Boolean3::Result(OpType op) const {
   ZoneScoped;
-#ifdef MANIFOLD_DEBUG
-  Timer assemble;
-  assemble.Start();
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+  // Per-Result local timing baseline, kept off the shared ctx so concurrent
+  // booleans in a CSG tree don't clobber it; the uid tags each printed phase
+  // line so interleaved parallel output can be split apart. Replaces the old
+  // per-stage Timers.
+  LocalPhaseTiming phaseTiming = BeginLocalPhaseTiming();
 #endif
 
   DEBUG_ASSERT(expandP_ == (op == OpType::Add), logicErr,
@@ -674,6 +708,32 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   const int c1 = op == OpType::Intersect ? 0 : 1;
   const int c2 = op == OpType::Add ? 1 : 0;
   const int c3 = op == OpType::Intersect ? 1 : -1;
+
+  // Sub-Boolean progress accounting. `phase()` advances `donePhases` by 1
+  // and checks cancel; `balance` (declared just below) tops up `donePhases`
+  // to `kPhasesPerBoolean` on any non-cancelled return so `Progress()`
+  // reaches 1.0 even after early-exit paths (status errors, empty/degenerate
+  // inputs) that skip most or all of the phase sites.
+  struct PhaseBalance {
+    ExecutionContext::Impl* ctx;
+    int published = 0;
+    bool fullPath = false;
+    ~PhaseBalance() {
+      if (!ctx) return;
+      if (IsCancelled(ctx)) return;  // partial publication is intentional
+      if (fullPath) {
+        DEBUG_ASSERT(published == kPhasesPerBoolean, logicErr,
+                     "Boolean3::Result phase count drift; "
+                     "update kPhasesPerBoolean to match phase() site count");
+        return;
+      }
+      if (published < kPhasesPerBoolean) {
+        ctx->donePhases.fetch_add(kPhasesPerBoolean - published,
+                                  std::memory_order_relaxed);
+      }
+    }
+  };
+  PhaseBalance balance{ctx_};
 
   if (inP_.status_ != Manifold::Error::NoError) {
     auto impl = Manifold::Impl();
@@ -697,6 +757,26 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     }
     return inP_;
   }
+
+  auto phase = [&](int line) -> std::optional<Manifold::Impl> {
+    if (ctx_) ctx_->donePhases.fetch_add(1, std::memory_order_relaxed);
+    ++balance.published;
+    if (IsCancelled(ctx_)) {
+      auto impl = Manifold::Impl();
+      impl.status_ = Manifold::Error::Cancelled;
+      return impl;
+    }
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+    // Record this boundary against the per-Result baseline; `line` is the call
+    // site so each phase reports its own location (the lambda body has one).
+    if (ctx_) RecordPhase(phaseTiming, balance.published, __FILE__, line);
+#endif
+    return std::nullopt;
+  };
+
+  // Invariant: every ctx-passing parallel op is followed by IsCancelled to
+  // keep partial output from feeding unconditional downstream consumers.
+  if (auto c = phase(__LINE__)) return *c;
 
   if (!valid) {
     auto impl = Manifold::Impl();
@@ -748,23 +828,23 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // Create the output Manifold
   Manifold::Impl outR;
 
-  if (numVertR == 0) return outR;
-
-  outR.epsilon_ = std::max(inP_.epsilon_, inQ_.epsilon_);
-  outR.tolerance_ = std::max(inP_.tolerance_, inQ_.tolerance_);
+  if (numVertR == 0) {
+    return outR;
+  }
 
   outR.vertPos_.resize_nofill(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].
   // Retained vertices from P and Q:
-  for_each_n(autoPolicy(inP_.NumVert(), 1e4), countAt(0), inP_.NumVert(),
+  for_each_n(autoPolicy(inP_.NumVert(), 1e4), countAt(0), inP_.NumVert(), ctx_,
              DuplicateVerts({outR.vertPos_, i03, vP2R, inP_.vertPos_}));
-  for_each_n(autoPolicy(inQ_.NumVert(), 1e4), countAt(0), inQ_.NumVert(),
+  for_each_n(autoPolicy(inQ_.NumVert(), 1e4), countAt(0), inQ_.NumVert(), ctx_,
              DuplicateVerts({outR.vertPos_, i30, vQ2R, inQ_.vertPos_}));
   // New vertices created from intersections:
-  for_each_n(autoPolicy(i12.size(), 1e4), countAt(0), i12.size(),
+  for_each_n(autoPolicy(i12.size(), 1e4), countAt(0), i12.size(), ctx_,
              DuplicateVerts({outR.vertPos_, i12, v12R, xv12_.v12}));
-  for_each_n(autoPolicy(i21.size(), 1e4), countAt(0), i21.size(),
+  for_each_n(autoPolicy(i21.size(), 1e4), countAt(0), i21.size(), ctx_,
              DuplicateVerts({outR.vertPos_, i21, v21R, xv21_.v12}));
+  if (auto c = phase(__LINE__)) return *c;
 
   PRINT(nPv << " verts from inP");
   PRINT(nQv << " verts from inQ");
@@ -783,9 +863,10 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   concurrent_map<std::pair<int, int>, std::vector<EdgePos>> edgesNew;
 
   AddNewEdgeVerts(edgesP, edgesNew, xv12_.p1q2, i12, v12R, inP_.halfedge_, true,
-                  0);
+                  0, ctx_);
   AddNewEdgeVerts(edgesQ, edgesNew, xv21_.p1q2, i21, v21R, inQ_.halfedge_,
-                  false, xv12_.p1q2.size());
+                  false, xv12_.p1q2.size(), ctx_);
+  if (auto c = phase(__LINE__)) return *c;
 
   v12R.clear();
   v21R.clear();
@@ -793,8 +874,10 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // Level 4
   Vec<int> faceEdge;
   Vec<int> facePQ2R;
-  std::tie(faceEdge, facePQ2R) = SizeOutput(
-      outR, inP_, inQ_, i03, i30, i12, i21, xv12_.p1q2, xv21_.p1q2, invertQ);
+  std::tie(faceEdge, facePQ2R) =
+      SizeOutput(outR, inP_, inQ_, i03, i30, i12, i21, xv12_.p1q2, xv21_.p1q2,
+                 invertQ, ctx_);
+  if (auto c = phase(__LINE__)) return *c;
 
   i12.clear();
   i21.clear();
@@ -807,25 +890,36 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   Vec<char> wholeHalfedgeQ(inQ_.halfedge_.size(), true);
   // The halfedgeRef contains the data that will become triRef once the faces
   // are triangulated.
-  Vec<TriRef> halfedgeRef(2 * outR.NumEdge());
+  Vec<TriRef> halfedgeRef(faceEdge.back());
+  // Note that we are working with Vec<Halfedge> instead of Halfedges here,
+  // since the faces can be arbitrary polygons before feeding into the
+  // triangulator.
+  Vec<Halfedge> faceHalfedges(faceEdge.back());
 
-  AppendPartialEdges(outR, wholeHalfedgeP, facePtrR, edgesP, halfedgeRef, inP_,
-                     i03, vP2R, facePQ2R.begin(), true);
-  AppendPartialEdges(outR, wholeHalfedgeQ, facePtrR, edgesQ, halfedgeRef, inQ_,
-                     i30, vQ2R, facePQ2R.begin() + inP_.NumTri(), false);
+  AppendPartialEdges(outR, faceHalfedges, wholeHalfedgeP, facePtrR, edgesP,
+                     halfedgeRef, inP_, i03, vP2R, facePQ2R.begin(), true,
+                     ctx_);
+  AppendPartialEdges(outR, faceHalfedges, wholeHalfedgeQ, facePtrR, edgesQ,
+                     halfedgeRef, inQ_, i30, vQ2R,
+                     facePQ2R.begin() + inP_.NumTri(), false, ctx_);
+  if (auto c = phase(__LINE__)) return *c;
 
   edgesP.clear();
   edgesQ.clear();
 
-  AppendNewEdges(outR, facePtrR, edgesNew, halfedgeRef, facePQ2R,
-                 inP_.NumTri());
+  AppendNewEdges(outR, faceHalfedges, facePtrR, edgesNew, halfedgeRef, facePQ2R,
+                 inP_.NumTri(), ctx_);
+  if (auto c = phase(__LINE__)) return *c;
 
   edgesNew.clear();
 
-  AppendWholeEdges(outR, facePtrR, halfedgeRef, inP_, wholeHalfedgeP, i03, vP2R,
-                   facePQ2R.cview(0, inP_.NumTri()), true);
-  AppendWholeEdges(outR, facePtrR, halfedgeRef, inQ_, wholeHalfedgeQ, i30, vQ2R,
-                   facePQ2R.cview(inP_.NumTri(), inQ_.NumTri()), false);
+  AppendWholeEdges(outR, facePtrR, faceHalfedges, halfedgeRef, inP_,
+                   wholeHalfedgeP, i03, vP2R, facePQ2R.cview(0, inP_.NumTri()),
+                   true, ctx_);
+  AppendWholeEdges(outR, facePtrR, faceHalfedges, halfedgeRef, inQ_,
+                   wholeHalfedgeQ, i30, vQ2R,
+                   facePQ2R.cview(inP_.NumTri(), inQ_.NumTri()), false, ctx_);
+  if (auto c = phase(__LINE__)) return *c;
 
   wholeHalfedgeP.clear();
   wholeHalfedgeQ.clear();
@@ -836,62 +930,55 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   vP2R.clear();
   vQ2R.clear();
 
-#ifdef MANIFOLD_DEBUG
-  assemble.Stop();
-  Timer triangulate;
-  triangulate.Start();
-#endif
+  outR.CalculateBBox();
 
   // Level 6
-  outR.Face2Tri(faceEdge, halfedgeRef);
+  outR.Face2Tri(faceEdge, faceHalfedges, halfedgeRef, /*allowConvex=*/false,
+                ctx_);
   halfedgeRef.clear();
+  faceHalfedges.clear();
   faceEdge.clear();
 
-  outR.ReorderHalfedges();
-
-#ifdef MANIFOLD_DEBUG
-  triangulate.Stop();
-  Timer simplify;
-  simplify.Start();
-#endif
+  outR.ReorderHalfedges(ctx_);
+  if (auto c = phase(__LINE__)) return *c;
 
   if (ManifoldParams().intermediateChecks)
     DEBUG_ASSERT(outR.IsManifold(), logicErr,
                  "triangulated mesh is not manifold!");
 
-  CreateProperties(outR, inP_, inQ_);
+  CreateProperties(outR, inP_, inQ_, invertQ, ctx_);
+  if (auto c = phase(__LINE__)) return *c;
 
-  UpdateReference(outR, inP_, inQ_, invertQ);
+  UpdateReference(outR, inP_, inQ_, invertQ, ctx_);
+  if (auto c = phase(__LINE__)) return *c;
 
-  outR.SimplifyTopology(nPv + nQv);
+  outR.RemoveDegenerates(nPv + nQv);
   outR.RemoveUnreferencedVerts();
 
-  if (ManifoldParams().intermediateChecks)
+  if (ManifoldParams().intermediateChecks) {
     DEBUG_ASSERT(outR.Is2Manifold(), logicErr,
                  "simplified mesh is not 2-manifold!");
+  }
+  if (ManifoldParams().verifyNoDegenerates) {
+    DEBUG_ASSERT(outR.NumDegenerateTris() == 0, logicErr,
+                 "simplified mesh has degenerate triangles!");
+  }
 
-#ifdef MANIFOLD_DEBUG
-  simplify.Stop();
-  Timer sort;
-  sort.Start();
-#endif
-
-  outR.CalculateBBox();
-  outR.SortGeometry();
+  outR.SortGeometry(ctx_);
   outR.IncrementMeshIDs();
+  if (auto c = phase(__LINE__)) return *c;
 
-#ifdef MANIFOLD_DEBUG
-  sort.Stop();
-  if (ManifoldParams().verbose) {
-    assemble.Print("Assembly");
-    triangulate.Print("Triangulation");
-    simplify.Print("Simplification");
-    sort.Print("Sorting");
-    std::cout << outR.NumVert() << " verts and " << outR.NumTri() << " tris"
-              << std::endl;
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+  // Per-stage timing now comes from the phase() boundaries above (verbose >= 2,
+  // ctx attached); this keeps the result-size summary, tagged with the same uid
+  // so it groups with this boolean's phase lines.
+  if (ManifoldParams().verbose >= 2) {
+    std::cout << "  [b" << phaseTiming.uid << "] " << outR.NumVert()
+              << " verts and " << outR.NumTri() << " tris" << std::endl;
   }
 #endif
 
+  balance.fullPath = true;
   return outR;
 }
 

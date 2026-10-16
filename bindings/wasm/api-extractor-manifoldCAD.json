@@ -29,6 +29,12 @@
       },
       "ae-unresolved-link": {
         "logLevel": "none"
+      },
+      "ae-incompatible-release-tags": {
+        "logLevel": "none"
+      },
+      "ae-internal-missing-underscore": {
+        "logLevel": "none"
       }
     },
     "tsdocMessageReporting": {

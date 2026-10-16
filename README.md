@@ -5,7 +5,7 @@
 [![npm version](https://badge.fury.io/js/manifold-3d.svg)](https://badge.fury.io/js/manifold-3d)
 [![twitter](https://img.shields.io/twitter/follow/manifoldcad?style=social&logo=twitter)](https://twitter.com/intent/follow?screen_name=manifoldcad)
 
-[**C++ Documentation**](https://manifoldcad.org/docs/html/classmanifold_1_1_manifold.html) | [**TS Documentation**](https://manifoldcad.org/jsdocs) | [**Algorithm Documentation**](https://github.com/elalish/manifold/wiki/Manifold-Library) | [**Blog Posts**](https://elalish.blogspot.com/search/label/Manifold) | [**Web Examples**](https://manifoldcad.org/model-viewer.html)
+[**C++ Documentation**](https://manifoldcad.org/docs/html/classmanifold_1_1_manifold.html) | [**ManifoldCAD User Guide**](https://manifoldcad.org/docs/jsuser/) | [**JS/TS/WASM API**](https://manifoldcad.org/docs/jsapi/) | [**Algorithm Documentation**](https://github.com/elalish/manifold/wiki/Manifold-Library) | [**Blog Posts**](https://elalish.blogspot.com/search/label/Manifold) | [**Web Examples**](https://manifoldcad.org/model-viewer.html)
 
 [Manifold](https://github.com/elalish/manifold) is a geometry library dedicated to creating and operating on manifold triangle meshes. A [manifold mesh](https://github.com/elalish/manifold/wiki/Manifold-Library#manifoldness) is a mesh that represents a solid object, and so is very important in manufacturing, CAD, structural analysis, etc. Manifold also supports arbitrary vertex properties and enables mapping of materials for rendering use-cases. Our primary goal is reliability: guaranteed manifold output without caveats or edge cases. Our secondary goal is performance: efficient algorithms that make extensive use of parallelization, or pipelining when only a single thread is available.
 
@@ -24,9 +24,14 @@ Here is an incomplete list of our users, whose integrations may be anywhere from
 | [Conversation](https://james-bern.github.io/conversation.html) | [AnchorSCAD](https://github.com/owebeeone/anchorscad-core) | [Dactyl Web Configurator](https://github.com/rianadon/dactyl-configurator) |
 | [Arcol](https://arcol.io) | [Bento3D](https://bento3d.design) | [SKÅPA](https://skapa.build) |
 | [Cadova](https://github.com/tomasf/Cadova) | [BREP.io](https://github.com/mmiscool/BREP)  | [Otterplans](https://otterplans.com) |
+| [Bracket Engineer](https://bracket.engineer) | [Nodillo](https://nodillo3d.com) | [CaDoodle CAD](https://cadoodlecad.com/) |
+| [Bridge Designer](https://www.asce.org/career-growth/pre-college-outreach/bridge-designer) |[AdaShape](https://adashape.com)| [PyVista](https://github.com/pyvista/pyvista-manifold) |
+| [Nasscad 4.7.0](https://www.nasscad.com) | [SolidSKeleton](https://github.com/FerroIT/SolidSKeleton) | [Piecad (Python-based)](https://github.com/briansturgill/Piecad) |
+| [3D Model Print Simple Edit](https://www.huragankodu.com/3defaulthk) 
+
 ### Bindings & Packages
 
-Manifold has bindings to many other languages, some maintained in this repository, and others elsewhere. It can also be built in C++ via [vcpkg](https://github.com/microsoft/vcpkg.git).
+Manifold has bindings to many other languages, some maintained in this repository, and others elsewhere. It can also be built in C++ via [vcpkg](https://github.com/microsoft/vcpkg.git). There is also a native Rust port, [manifold-rust](https://github.com/larsbrubaker/manifold-rust), which passes Manifold's full test suite with identical results and has no C++ dependency — from a user's perspective it works like a binding.
 
 | Language | Packager | Name | Maintenance |
 | --- | --- | --- | --- |
@@ -34,22 +39,27 @@ Manifold has bindings to many other languages, some maintained in this repositor
 | C++ | vcpkg | [manifold](https://github.com/microsoft/vcpkg/tree/master/ports/manifold) | external |
 | TS/JS | npm | [manifold-3d](https://www.npmjs.com/package/manifold-3d) | internal |
 | Python | PyPI | [manifold3d](https://pypi.org/project/manifold3d/) | internal |
-| Java | N/A | [manifold](https://github.com/SovereignShop/manifold) | external |
+| Java | Maven | [manifold3d](https://github.com/CommonWealthRobotics/manifold3d-java/blob/development/bindings/java/README.md) | external |
 | Clojure | N/A | [clj-manifold3d](https://github.com/SovereignShop/clj-manifold3d) | external |
 | C# | NuGet | [ManifoldNET](https://www.nuget.org/packages/ManifoldNET) | external |
 | Julia | Packages | [ManifoldBindings.jl](https://juliapackages.com/p/manifoldbindings) | external |
 | OCaml | N/A | [OManifold](https://ocadml.github.io/OManifold/OManifold/index.html) | external |
+| Rust | crates.io | [manifold-csg](https://github.com/zmerlynn/manifold-csg) | external |
+| Rust (native port) | crates.io | [manifold-rust](https://crates.io/crates/manifold-rust) | external |
 | Swift | SPM | [Manifold-Swift](https://github.com/tomasf/manifold-swift) | external |
 
 ## Frontend Sandboxes
 
-### [ManifoldCAD.org](https://manifoldcad.org)
+[ManifoldCAD.org]: https://manifoldcad.org
+[Python Colab Example]: https://colab.research.google.com/drive/1VxrFYHPSHZgUbl9TeWzCeovlpXrPQ5J5?usp=sharing
 
-If you like OpenSCAD / JSCAD, you might also like ManifoldCAD - our own solid modelling web app where you script in JS/TS. This uses our npm package, [manifold-3d](https://www.npmjs.com/package/manifold-3d), built via WASM. It's not quite as fast as our raw C++, but it's hard to beat for interoperability.
+### [ManifoldCAD.org]
 
-### [Python Colab Example](https://colab.research.google.com/drive/1VxrFYHPSHZgUbl9TeWzCeovlpXrPQ5J5?usp=sharing)
+If you like OpenSCAD / JSCAD, you might also like [ManifoldCAD][ManifoldCAD.org] - our own solid modelling web app where you script in JS/TS. This uses our npm package, [manifold-3d](https://www.npmjs.com/package/manifold-3d), built via WASM. It's not quite as fast as our raw C++, but it's hard to beat for interoperability.
 
-If you prefer Python to JS/TS, make your own copy of the example notebook above. It demonstrates interop between our [`manifold3d`](https://pypi.org/project/manifold3d/) PyPI library and the popular [`trimesh`](https://pypi.org/project/trimesh/) library, including showing the interactive model right in the notebook and saving 3D model output.
+### [Python Colab Example]
+
+If you prefer Python to JS/TS, make your own copy of [the notebook][Python Colab Example]. It demonstrates interop between our [`manifold3d`](https://pypi.org/project/manifold3d/) PyPI library and the popular [`trimesh`](https://pypi.org/project/trimesh/) library, including showing the interactive model right in the notebook and saving 3D model output.
 
 ![A metallic Menger sponge](https://manifoldcad.org/samples/models/mengerSponge192.png "A metallic Menger sponge")
 
@@ -65,7 +75,7 @@ Also included are a novel and powerful suite of refining functions for smooth me
 
 To aid in speed, this library makes extensive use of parallelization through TBB, if enabled. Not everything is so parallelizable, for instance a [polygon triangulation](https://github.com/elalish/manifold/wiki/Manifold-Library#polygon-triangulation) algorithm is included which is serial. Even if compiled with parallel backend, the code will still fall back to the serial version of the algorithms if the problem size is small. The WASM build is serial-only for now, but still fast.
 
-Look in the [samples](https://github.com/elalish/manifold/tree/master/samples) directory for examples of how to use this library to make interesting 3D models. You may notice that some of these examples bare a certain resemblance to my OpenSCAD designs on [Thingiverse](https://www.thingiverse.com/emmett), which is no accident. Much as I love OpenSCAD, my library is dramatically faster and the code is more flexible.
+Look in the [samples](https://github.com/elalish/manifold/tree/master/samples) directory for examples of how to use this library to make interesting 3D models. You may notice that some of these examples bear a certain resemblance to my OpenSCAD designs on [Thingiverse](https://www.thingiverse.com/emmett), which is no accident. Much as I love OpenSCAD, my library is dramatically faster and the code is more flexible.
 
 ### Dependencies
 
@@ -73,11 +83,12 @@ Manifold no longer has **any** required dependencies! However, we do have severa
 | Name | CMake Flag | Provides |
 | --- | --- | --- |
 | [`TBB`](https://github.com/oneapi-src/oneTBB/) |`MANIFOLD_PAR=ON` | Parallel acceleration |
-| [`Clipper2`](https://github.com/AngusJohnson/Clipper2) | `MANIFOLD_CROSS_SECTION=ON` | 2D: [`CrossSection`](https://manifoldcad.org/docs/html/classmanifold_1_1_cross_section.html) |
-| [`Assimp`](https://github.com/assimp/assimp) | `MANIFOLD_EXPORT=ON` | Basic Mesh I/O |
 | [`Nanobind`](https://github.com/wjakob/nanobind) | `MANIFOLD_PYBIND=ON` | Python bindings |
 | [`Emscripten`](https://github.com/emscripten-core/emscripten) | `MANIFOLD_JSBIND=ON` | JS bindings via WASM |
 | [`GTest`](https://github.com/google/googletest/) | `MANIFOLD_TEST=ON` | Testing framework |
+| [`Assimp`](https://github.com/assimp/assimp) | `ASSIMP_ENABLE=ON` | Utilities in `extras` |
+| [`Tracy`](https://github.com/wolfpld/tracy) | `TRACY_ENABLE=ON` | Performance analysis |
+
 
 ### 3D Formats
 
@@ -85,7 +96,8 @@ Please avoid saving to STL files! They are lossy and inefficient - when saving a
 
 If you use vertex properties for things like interpolated normals or texture UV coordinates, [glTF](https://www.khronos.org/Gltf) is recommended, specifically using the [`EXT_mesh_manifold`](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Vendor/EXT_mesh_manifold/README.md) extension. This allows for the lossless and efficient transmission of manifoldness even with property boundaries. Try our [make-manifold](https://manifoldcad.org/make-manifold) page to add this extension to your existing glTF/GLB models. 
 
-Manifold provides an optional [`MeshIO`](https://manifoldcad.org/docs/html/group___mesh_i_o.html) component based on [Assimp](https://assimp.org/), but it is limited in functionality and is primarily to aid in testing. If you are using our npm module, we have a much more capable [gltf-io.ts](https://github.com/elalish/manifold/blob/master/bindings/wasm/examples/gltf-io.ts) you can use instead. For other languages we strongly recommend using existing packages that focus on 3D file I/O, e.g. [trimesh](https://trimesh.org/) for Python, particularly when using vertex properties or materials.  
+Manifold provides high precision OBJ file IO, but it is limited in functionality and is primarily to aid in testing. If you are using our npm module, we have a much more capable [gltf-io.ts](https://github.com/elalish/manifold/blob/master/bindings/wasm/examples/gltf-io.ts) you can use instead. For other languages we strongly recommend using existing packages that focus on 3D file I/O, e.g. [trimesh](https://trimesh.org/) for Python, particularly when using vertex properties or materials.
+Example for integrating with [Assimp](https://github.com/assimp/assimp) is in `extras/meshIO.cpp`, which is used by files such as `extras/convert_file.cpp`.
 
 ## Building
 
@@ -106,21 +118,27 @@ CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
 - `MANIFOLD_CBIND=[<OFF>, ON]`: Build C FFI binding.
 - `MANIFOLD_PYBIND=[OFF, <ON>]`: Build python binding, requires `nanobind`.
 - `MANIFOLD_PAR=[<OFF>, ON]`: Enables multi-thread parallelization, requires `tbb`.
-- `MANIFOLD_CROSS_SECTION=[OFF, <ON>]`: Build CrossSection for 2D support (needed by language bindings), requires `Clipper2`.
-- `MANIFOLD_EXPORT=[<OFF>, ON]`: Enables `MeshIO` and GLB export of 3D models from the tests, requires `assimp`.
 - `MANIFOLD_DEBUG=[<OFF>, ON]`: Enables exceptions, timing, verbosity, OBJ test dumps. Has almost no effect on its own, but enables further runtime parameters to dump various outputs.
 - `MANIFOLD_ASSERT=[<OFF>, ON]`: Enables internal assertions. This incurs around 20% runtime overhead. Requires MANIFOLD_DEBUG to work.
 - `MANIFOLD_TEST=[OFF, <ON>]`: Build unit tests, requires `GTest`.
 - `TRACY_ENABLE=[<OFF>, ON]`: Enable integration with tracy profiler. 
   See profiling section below.
+- `ASSIMP_ENABLE=[<OFF>, ON]`: Enable integration with assimp, which is needed for some of the utilities in `extras`.
 - `MANIFOLD_STRICT=[<OFF>, ON]`: Treat compile warnings as fatal build errors.
+- `MANIFOLD_NO_IOSTREAM=[<OFF>, ON]`: Strip iostream- and filesystem-using
+  bits from the public API and tests; useful for freestanding/embedded
+  builds (e.g., `wasm32-unknown-unknown`). Defines both
+  `MANIFOLD_NO_IOSTREAM` and `MANIFOLD_NO_FILESYSTEM` as PUBLIC compile
+  definitions. The test suite still builds + runs — iostream-using
+  TESTs in `manifold_test`/`polygon_test`/`manifoldc_test` are gated
+  out under the macro. Incompatible with `MANIFOLD_DEBUG` /
+  `MANIFOLD_TIMING` (which use `std::cout` for diagnostic output).
 
 Dependency version override:
 - `MANIFOLD_USE_BUILTIN_TBB=[<OFF>, ON]`: Use builtin version of tbb.
-- `MANIFOLD_USE_BUILTIN_CLIPPER2=[<OFF>, ON]`: Use builtin version of clipper2.
 - `MANIFOLD_USE_BUILTIN_NANOBIND=[<OFF>, ON]`: Use builtin version of nanobind.
 
-> Note: These three options can force the build to avoid using the system
+> Note: These two options can force the build to avoid using the system
 > version of the dependency. This will either use the provided source directory
 > via `FETCHCONTENT_SOURCE_DIR_*` (see below), or fetch the source from GitHub.
 > Note that the dependency will be built as static dependency to avoid dynamic
@@ -138,7 +156,6 @@ Offline building (with missing dependencies/dependency version override):
 - `MANIFOLD_DOWNLOADS=[OFF, <ON>]`: Automatically download missing dependencies.
   Need to set `FETCHCONTENT_SOURCE_DIR_*` if the dependency `*` is missing.
 - `FETCHCONTENT_SOURCE_DIR_TBB`: path to tbb source (if `MANIFOLD_PAR` is enabled).
-- `FETCHCONTENT_SOURCE_DIR_CLIPPER2`: path to tbb source (if `MANIFOLD_CROSS_SECTION` is enabled).
 - `FETCHCONTENT_SOURCE_DIR_NANOBIND`: path to nanobind source (if `MANIFOLD_PYBIND` is enabled).
 - `FETCHCONTENT_SOURCE_DIR_GOOGLETEST`: path to googletest source (if `MANIFOLD_TEST` is enabled).
 
@@ -147,6 +164,18 @@ Offline building (with missing dependencies/dependency version override):
 > `MANIFOLD_DOWNLOADS`.
 
 The build instructions used by our CI are in [manifold.yml](https://github.com/elalish/manifold/blob/master/.github/workflows/manifold.yml), which is a good source to check if something goes wrong and for instructions specific to other platforms, like Windows.
+
+#### Sanitizer CI Reproduction
+
+To reproduce the sanitizer CI test locally from repo root:
+
+```bash
+bash ./scripts/ci/sanitizer_build.sh
+source ./scripts/sanitizer_cases.sh
+ASAN_OPTIONS=detect_container_overflow=0:strict_init_order=1 \
+UBSAN_OPTIONS=print_stacktrace=1 \
+./build/test/manifold_test --gtest_filter="${SANITIZER_GTEST_FILTER_CORE}"
+```
 
 ### WASM
 

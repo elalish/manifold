@@ -16,7 +16,7 @@
  * Assign glTF materials to manifoldCAD models.
  *
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Modelling
  */
 
@@ -26,7 +26,9 @@ import {copyToDocument} from '@gltf-transform/functions';
 
 import type {Manifold} from '../manifold.d.ts';
 
-import {GLTFMaterial, GLTFNode} from './gltf-node.ts';
+import {getPropertyResolver} from './export-model.ts';
+import type {GLTFMaterial} from './gltf-node.ts';
+import {BaseGLTFNode, CrossSectionGLTFNode, GLTFNode} from './gltf-node.ts';
 import {getDocumentByID} from './import-model.ts';
 
 const defaultMaterial = {
@@ -35,6 +37,7 @@ const defaultMaterial = {
   baseColorFactor: [1, 1, 0] as [number, number, number],
   alpha: 1,
   unlit: false,
+  doubleSided: false
 };
 
 const id2material = new Map<number, GLTFMaterial>();
@@ -49,16 +52,15 @@ export function cleanup() {
  * Return a shallow copy of the input manifold with the given material
  * properties applied. They will be carried along through operations.
  *
- * @group Modelling Functions
  * @param manifold The input object.
  * @param material A set of material properties to apply to this manifold.
  */
-export const setMaterial =
-    (manifold: Manifold, material: GLTFMaterial): Manifold => {
-      const out = manifold.asOriginal();
-      id2material.set(out.originalID(), material);
-      return out;
-    };
+export function setMaterial(
+    manifold: Manifold, material: GLTFMaterial): Manifold {
+  const out = manifold.asOriginal();
+  id2material.set(out.originalID(), material);
+  return out;
+}
 
 /**
  * @internal
@@ -75,16 +77,18 @@ export const setMaterialByID = (id: number, material: GLTFMaterial) => {
 };
 
 /**
+ * Recurse up the scene graph to find a material.
  * @internal
  */
-export function getBackupMaterial(node?: GLTFNode): GLTFMaterial {
-  if (node == null) {
-    return {};
+export function getBackupMaterial(node?: BaseGLTFNode): GLTFMaterial {
+  if (node != null &&
+      (node instanceof GLTFNode || node instanceof CrossSectionGLTFNode)) {
+    if (node.material == null) {
+      return getBackupMaterial((node.parent as GLTFNode));
+    }
+    return node.material;
   }
-  if (node.material == null) {
-    node.material = getBackupMaterial((node.parent as GLTFNode));
-  }
-  return node.material;
+  return {}
 }
 
 function copyImportedMaterial(
@@ -97,14 +101,15 @@ function copyImportedMaterial(
   // We need to copy it into place.
   const sourceDoc = getDocumentByID(matIn.sourceRunID!)!;
   const sourceMaterial = matIn.sourceMaterial!;
-  const map = copyToDocument(doc, sourceDoc, [sourceMaterial]);
-  return map.get(sourceMaterial) as GLTFTransform.Material;
+  const resolve = getPropertyResolver(doc, sourceDoc);
+  copyToDocument(doc, sourceDoc, [sourceMaterial], resolve);
+  return resolve(sourceMaterial) as GLTFTransform.Material;
 }
 
 function makeDefaultMaterial(
     doc: GLTFTransform.Document,
     matIn: GLTFMaterial = {}): GLTFTransform.Material {
-  const {roughness, metallic, baseColorFactor, alpha, unlit} = {
+  const {roughness, metallic, baseColorFactor, alpha, unlit, doubleSided} = {
     ...defaultMaterial,
     ...matIn
   };
@@ -117,13 +122,13 @@ function makeDefaultMaterial(
   }
 
   if (alpha < 1) {
-    material.setAlphaMode(GLTFTransform.Material.AlphaMode.BLEND)
-        .setDoubleSided(true);
+    material.setAlphaMode(GLTFTransform.Material.AlphaMode.BLEND);
   }
 
   return material.setRoughnessFactor(roughness)
       .setMetallicFactor(metallic)
-      .setBaseColorFactor([...baseColorFactor, alpha]);
+      .setBaseColorFactor([...baseColorFactor, alpha])
+      .setDoubleSided(!!doubleSided || alpha < 1);
 }
 
 /**

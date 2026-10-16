@@ -203,6 +203,11 @@ const std::string manifold__rotate__v =
 NB_MODULE(manifold3d, m) {
   m.doc() = "Python binding for the Manifold library.";
 
+  m.def("set_relative_precision", Quality::SetRelativePrecision,
+        nb::arg("precision"));
+
+  m.def("get_relative_precision", Quality::GetRelativePrecision);
+
   m.def("set_min_circular_angle", Quality::SetMinCircularAngle,
         nb::arg("angle"), quality__set_min_circular_angle__angle);
 
@@ -320,14 +325,17 @@ NB_MODULE(manifold3d, m) {
            nb::arg("search_length"),
            "Returns the minimum gap between two manifolds."
            "Returns a double between 0 and searchLength.")
+      .def("ray_cast", &Manifold::RayCast, nb::arg("origin"),
+           nb::arg("endpoint"),
+           "Cast a ray segment, returning all hits sorted by distance.")
+      .def("winding_number", &Manifold::WindingNumber, nb::arg("points"),
+           "Returns the winding number of this manifold around each of the "
+           "given points. 0 means outside, non-zero means inside.")
       .def("calculate_normals", &Manifold::CalculateNormals,
-           nb::arg("normal_idx"), nb::arg("min_sharp_angle") = 60,
+           nb::arg("normal_idx") = 0, nb::arg("min_sharp_angle") = 52.5,
            manifold__calculate_normals__normal_idx__min_sharp_angle)
       .def("smooth_by_normals", &Manifold::SmoothByNormals,
-           nb::arg("normal_idx"), manifold__smooth_by_normals__normal_idx)
-      .def("smooth_out", &Manifold::SmoothOut, nb::arg("min_sharp_angle") = 60,
-           nb::arg("min_smoothness") = 0,
-           manifold__smooth_out__min_sharp_angle__min_smoothness)
+           nb::arg("normal_idx") = 0, manifold__smooth_by_normals__normal_idx)
       .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n)
       .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
            manifold__refine_to_length__length)
@@ -353,11 +361,9 @@ NB_MODULE(manifold3d, m) {
           "Get the surface area of the manifold\n This is clamped to zero for "
           "a given face if they are within the Epsilon().")
       .def("original_id", &Manifold::OriginalID, manifold__original_id)
-      .def("get_tolerance", &Manifold::GetTolerance, manifold__get_tolerance)
-      .def("set_tolerance", &Manifold::SetTolerance,
-           manifold__set_tolerance__tolerance)
       .def("simplify", &Manifold::Simplify, manifold__simplify__tolerance)
-      .def("as_original", &Manifold::AsOriginal, manifold__as_original)
+      .def("as_original", &Manifold::AsOriginal, nb::arg("id") = -1,
+           manifold__as_original__id)
       .def("is_empty", &Manifold::IsEmpty, manifold__is_empty)
       .def("decompose", &Manifold::Decompose, manifold__decompose)
       .def("split", &Manifold::Split, nb::arg("cutter"),
@@ -368,6 +374,10 @@ NB_MODULE(manifold3d, m) {
       .def("trim_by_plane", &Manifold::TrimByPlane, nb::arg("normal"),
            nb::arg("origin_offset"),
            manifold__trim_by_plane__normal__origin_offset)
+      .def("minkowski_sum", &Manifold::MinkowskiSum, nb::arg("other"),
+           manifold__minkowski_sum__other)
+      .def("minkowski_difference", &Manifold::MinkowskiDifference,
+           nb::arg("other"), manifold__minkowski_difference__other)
       .def(
           "slice",
           [](const Manifold& self, double height) {
@@ -381,6 +391,8 @@ NB_MODULE(manifold3d, m) {
           },
           manifold__project)
       .def("status", &Manifold::Status, manifold__status)
+      .def("with_context", &Manifold::WithContext, nb::arg("ctx"),
+           manifold__with_context__ctx)
       .def(
           "bounding_box",
           [](const Manifold& self) {
@@ -390,48 +402,15 @@ NB_MODULE(manifold3d, m) {
           },
           "Gets the manifold bounding box as a tuple "
           "(xmin, ymin, zmin, xmax, ymax, zmax).")
-      .def_static(
-          "smooth",
-          [](const MeshGL& mesh, std::vector<size_t> sharpened_edges,
-             std::vector<double> edge_smoothness) {
-            if (sharpened_edges.size() != edge_smoothness.size()) {
-              throw std::runtime_error(
-                  "sharpened_edges.size() != edge_smoothness.size()");
-            }
-            std::vector<Smoothness> vec(sharpened_edges.size());
-            for (size_t i = 0; i < vec.size(); i++) {
-              vec[i] = {sharpened_edges[i], edge_smoothness[i]};
-            }
-            return Manifold::Smooth(mesh, vec);
-          },
-          nb::arg("mesh"), nb::arg("sharpened_edges") = nb::list(),
-          nb::arg("edge_smoothness") = nb::list(),
-          manifold__smooth__mesh_gl__sharpened_edges)
-      .def_static(
-          "smooth",
-          [](const MeshGL64& mesh, std::vector<size_t> sharpened_edges,
-             std::vector<double> edge_smoothness) {
-            if (sharpened_edges.size() != edge_smoothness.size()) {
-              throw std::runtime_error(
-                  "sharpened_edges.size() != edge_smoothness.size()");
-            }
-            std::vector<Smoothness> vec(sharpened_edges.size());
-            for (size_t i = 0; i < vec.size(); i++) {
-              vec[i] = {sharpened_edges[i], edge_smoothness[i]};
-            }
-            return Manifold::Smooth(mesh, vec);
-          },
-          nb::arg("mesh"), nb::arg("sharpened_edges") = nb::list(),
-          nb::arg("edge_smoothness") = nb::list(),
-          // note: this is not a typo, the documentation is essentially the same
-          // so we just use the 32 byte variant to avoid duplicating docstring
-          // override...
-          manifold__smooth__mesh_gl__sharpened_edges)
       .def_static("batch_boolean", &Manifold::BatchBoolean,
                   nb::arg("manifolds"), nb::arg("op"),
                   manifold__batch_boolean__manifolds__op)
-      .def_static("compose", &Manifold::Compose, nb::arg("manifolds"),
-                  manifold__compose__manifolds)
+      .def_static(
+          "compose",
+          [](const std::vector<Manifold>& manifolds) {
+            return Manifold::BatchBoolean(manifolds, OpType::Add);
+          },
+          nb::arg("manifolds"), manifold__compose__manifolds)
       .def_static("tetrahedron", &Manifold::Tetrahedron, manifold__tetrahedron)
       .def_static("cube", &Manifold::Cube,
                   nb::arg("size") = std::make_tuple(1.0, 1.0, 1.0),
@@ -505,6 +484,8 @@ NB_MODULE(manifold3d, m) {
              std::optional<nb::ndarray<float, nb::shape<-1, 4, 3>,
                                        nb::c_contig>>& runTransform,
              const std::optional<
+                 nb::ndarray<uint8_t, nb::shape<-1>, nb::c_contig>>& runFlags,
+             const std::optional<
                  nb::ndarray<uint32_t, nb::shape<-1>, nb::c_contig>>& faceID,
              const std::optional<nb::ndarray<float, nb::shape<-1, 3, 4>,
                                              nb::c_contig>>& halfedgeTangent,
@@ -536,6 +517,10 @@ NB_MODULE(manifold3d, m) {
                   toVector(runTransform->data(), runTransform->size());
             }
 
+            if (runFlags.has_value()) {
+              out.runFlags = toVector(runFlags->data(), runFlags->size());
+            }
+
             if (faceID.has_value())
               out.faceID = toVector(faceID->data(), faceID->size());
 
@@ -550,7 +535,7 @@ NB_MODULE(manifold3d, m) {
           nb::arg("run_index") = nb::none(),
           nb::arg("run_original_id") = nb::none(),
           nb::arg("run_transform") = nb::none(),
-          nb::arg("face_id") = nb::none(),
+          nb::arg("run_flags") = nb::none(), nb::arg("face_id") = nb::none(),
           nb::arg("halfedge_tangent") = nb::none(), nb::arg("tolerance") = 0)
       .def_prop_ro(
           "vert_properties",
@@ -589,7 +574,10 @@ NB_MODULE(manifold3d, m) {
       .def_ro("merge_to_vert", &MeshGL::mergeToVert)
       .def_ro("run_index", &MeshGL::runIndex)
       .def_ro("run_original_id", &MeshGL::runOriginalID)
+      .def_ro("run_flags", &MeshGL::runFlags)
       .def_ro("face_id", &MeshGL::faceID)
+      .def("backside", &MeshGL::Backside, nb::arg("run"))
+      .def("has_normals", &MeshGL::HasNormals, nb::arg("run"))
       .def("merge", &MeshGL::Merge, mesh_gl__merge);
 
   nb::class_<MeshGL64>(m, "Mesh64")
@@ -610,6 +598,8 @@ NB_MODULE(manifold3d, m) {
                                              nb::c_contig>>& runOriginalID,
              std::optional<nb::ndarray<double, nb::shape<-1, 4, 3>,
                                        nb::c_contig>>& runTransform,
+             const std::optional<
+                 nb::ndarray<uint8_t, nb::shape<-1>, nb::c_contig>>& runFlags,
              const std::optional<
                  nb::ndarray<uint64_t, nb::shape<-1>, nb::c_contig>>& faceID,
              const std::optional<nb::ndarray<double, nb::shape<-1, 3, 4>,
@@ -642,6 +632,10 @@ NB_MODULE(manifold3d, m) {
                   toVector(runTransform->data(), runTransform->size());
             }
 
+            if (runFlags.has_value()) {
+              out.runFlags = toVector(runFlags->data(), runFlags->size());
+            }
+
             if (faceID.has_value())
               out.faceID = toVector(faceID->data(), faceID->size());
 
@@ -656,7 +650,7 @@ NB_MODULE(manifold3d, m) {
           nb::arg("run_index") = nb::none(),
           nb::arg("run_original_id") = nb::none(),
           nb::arg("run_transform") = nb::none(),
-          nb::arg("face_id") = nb::none(),
+          nb::arg("run_flags") = nb::none(), nb::arg("face_id") = nb::none(),
           nb::arg("halfedge_tangent") = nb::none(), nb::arg("tolerance") = 0)
       .def_prop_ro(
           "vert_properties",
@@ -695,8 +689,60 @@ NB_MODULE(manifold3d, m) {
       .def_ro("merge_to_vert", &MeshGL64::mergeToVert)
       .def_ro("run_index", &MeshGL64::runIndex)
       .def_ro("run_original_id", &MeshGL64::runOriginalID)
+      .def_ro("run_flags", &MeshGL64::runFlags)
       .def_ro("face_id", &MeshGL64::faceID)
+      .def("backside", &MeshGL64::Backside, nb::arg("run"))
+      .def("has_normals", &MeshGL64::HasNormals, nb::arg("run"))
       .def("merge", &MeshGL64::Merge, mesh_gl__merge);
+
+  nb::class_<RayHit>(m, "RayHit")
+      .def_ro("face_id", &RayHit::faceID)
+      .def_ro("distance", &RayHit::distance)
+      .def_ro("position", &RayHit::position)
+      .def_ro("normal", &RayHit::normal);
+
+  nb::class_<ExecutionContext>(m, "ExecutionContext")
+      .def(nb::init<>())
+      .def("cancel", &ExecutionContext::Cancel)
+      .def("cancelled", &ExecutionContext::Cancelled)
+      .def("progress", &ExecutionContext::Progress)
+      // ctx-aware static factories: like Manifold.from_mesh / level_set, but
+      // run under this context so progress / cancellation are observed (these
+      // ops have no source Manifold to attach via with_context).
+      .def(
+          "from_mesh",
+          [](ExecutionContext& ctx, const MeshGL& mesh) {
+            return ctx.FromMeshGL(mesh);
+          },
+          nb::arg("mesh"),
+          "Ingest a MeshGL into a Manifold under this context, so the ingest "
+          "reports progress and observes cancellation.")
+      .def(
+          "from_mesh",
+          [](ExecutionContext& ctx, const MeshGL64& mesh) {
+            return ctx.FromMeshGL(mesh);
+          },
+          nb::arg("mesh"),
+          "Ingest a MeshGL64 into a Manifold under this context, so the ingest "
+          "reports progress and observes cancellation.")
+      .def(
+          "level_set",
+          [](ExecutionContext& ctx,
+             const std::function<double(double, double, double)>& f,
+             std::vector<double> bounds, double edgeLength, double level,
+             double tolerance) {
+            Box bound = {vec3(bounds[0], bounds[1], bounds[2]),
+                         vec3(bounds[3], bounds[4], bounds[5])};
+            std::function<double(vec3)> cppToPython = [&f](vec3 v) {
+              return f(v.x, v.y, v.z);
+            };
+            return ctx.LevelSet(cppToPython, bound, edgeLength, level,
+                                tolerance, false);
+          },
+          nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
+          nb::arg("level") = 0.0, nb::arg("tolerance") = -1,
+          "Like Manifold.level_set, run under this context so the level-set "
+          "evaluation reports progress and observes cancellation.");
 
   nb::enum_<Manifold::Error>(m, "Error")
       .value("NoError", Manifold::Error::NoError)
@@ -712,17 +758,10 @@ NB_MODULE(manifold3d, m) {
       .value("TransformWrongLength", Manifold::Error::TransformWrongLength)
       .value("RunIndexWrongLength", Manifold::Error::RunIndexWrongLength)
       .value("FaceIDWrongLength", Manifold::Error::FaceIDWrongLength)
-      .value("InvalidConstruction", Manifold::Error::InvalidConstruction);
-
-  nb::enum_<CrossSection::FillRule>(m, "FillRule")
-      .value("EvenOdd", CrossSection::FillRule::EvenOdd,
-             "Only odd numbered sub-regions are filled.")
-      .value("NonZero", CrossSection::FillRule::NonZero,
-             "Only non-zero sub-regions are filled.")
-      .value("Positive", CrossSection::FillRule::Positive,
-             "Only sub-regions with winding counts > 0 are filled.")
-      .value("Negative", CrossSection::FillRule::Negative,
-             "Only sub-regions with winding counts < 0 are filled.");
+      .value("InvalidConstruction", Manifold::Error::InvalidConstruction)
+      .value("ResultTooLarge", Manifold::Error::ResultTooLarge)
+      .value("InvalidTangents", Manifold::Error::InvalidTangents)
+      .value("Cancelled", Manifold::Error::Cancelled);
 
   nb::enum_<CrossSection::JoinType>(m, "JoinType")
       .value("Square", CrossSection::JoinType::Square,
@@ -761,14 +800,14 @@ NB_MODULE(manifold3d, m) {
       m, "CrossSection",
       "Two-dimensional cross sections guaranteed to be without "
       "self-intersections, or overlaps between polygons (from construction "
-      "onwards). This class makes use of the "
-      "[Clipper2](http://www.angusj.com/clipper2/Docs/Overview.htm) library "
-      "for polygon clipping (boolean) and offsetting operations.")
+      "onwards). Polygon clipping (boolean) and offsetting use Manifold's own "
+      "robust floating-point predicates.")
       .def(nb::init<>(), cross_section__cross_section)
-      .def(nb::init<std::vector<std::vector<vec2>>, CrossSection::FillRule>(),
-           nb::arg("contours"),
-           nb::arg("fillrule") = CrossSection::FillRule::Positive,
-           cross_section__cross_section__contours__fillrule)
+      .def(nb::init<std::vector<std::vector<vec2>>>(), nb::arg("contours"),
+           cross_section__cross_section__contours)
+      .def_static("even_odd",
+                  nb::overload_cast<const Polygons&>(&CrossSection::EvenOdd),
+                  nb::arg("contours"), cross_section__even_odd__contours)
       .def("area", &CrossSection::Area, cross_section__area)
       .def("num_vert", &CrossSection::NumVert, cross_section__num_vert)
       .def("num_contour", &CrossSection::NumContour, cross_section__num_contour)
@@ -825,8 +864,8 @@ NB_MODULE(manifold3d, m) {
             });
           },
           nb::arg("warp_func"), cross_section__warp_batch__warp_func)
-      .def("simplify", &CrossSection::Simplify, nb::arg("epsilon") = 1e-6,
-           cross_section__simplify__epsilon)
+      .def("simplify", &CrossSection::Simplify, nb::arg("tolerance") = 0,
+           cross_section__simplify__tolerance)
       .def(
           "offset", &CrossSection::Offset, nb::arg("delta"),
           nb::arg("join_type") = CrossSection::JoinType::Round,
@@ -850,8 +889,6 @@ NB_MODULE(manifold3d, m) {
       .def_static("batch_boolean", &CrossSection::BatchBoolean,
                   nb::arg("cross_sections"), nb::arg("op"),
                   cross_section__batch_boolean__cross_sections__op)
-      .def_static("compose", &CrossSection::Compose, nb::arg("cross_sections"),
-                  cross_section__compose__cross_sections)
       .def("to_polygons", &CrossSection::ToPolygons, cross_section__to_polygons)
       .def(
           "extrude",

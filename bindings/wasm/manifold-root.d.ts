@@ -15,18 +15,18 @@
 /**
  * The core WASM bindings with no frills.
  *
- * @group manifold
  * @packageDocumentation
  * @primaryExport
+ * @group none
  * @see {@link "Using Manifold" | Using Manifold}
  * @see {@link "Manifold Examples" | Manifold Examples}
  */
 
 export type * from './manifold-global-types';
-export type {MeshOptions, triangulate, setMinCircularAngle, setMinCircularEdgeLength, setCircularSegments, getCircularSegments, resetToCircularDefaults} from './manifold-encapsulated-types';
+export type {MeshOptions, triangulate, setRelativePrecision, getRelativePrecision, setMinCircularAngle, setMinCircularEdgeLength, setCircularSegments, getCircularSegments, resetToCircularDefaults} from './manifold-encapsulated-types';
 export {CrossSection, Manifold, Mesh} from './manifold-encapsulated-types';
 
-import type {triangulate, setMinCircularAngle, setMinCircularEdgeLength, setCircularSegments, getCircularSegments, resetToCircularDefaults} from './manifold-encapsulated-types';
+import type {triangulate, setRelativePrecision, getRelativePrecision, setMinCircularAngle, setMinCircularEdgeLength, setCircularSegments, getCircularSegments, resetToCircularDefaults} from './manifold-encapsulated-types';
 import {CrossSection, Manifold, Mesh} from './manifold-encapsulated-types';
 
 export interface ManifoldToplevel {
@@ -34,6 +34,8 @@ export interface ManifoldToplevel {
   Manifold: typeof Manifold;
   Mesh: typeof Mesh;
   triangulate: typeof triangulate;
+  setRelativePrecision: typeof setRelativePrecision;
+  getRelativePrecision: typeof getRelativePrecision;
   setMinCircularAngle: typeof setMinCircularAngle;
   setMinCircularEdgeLength: typeof setMinCircularEdgeLength;
   setCircularSegments: typeof setCircularSegments;

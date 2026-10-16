@@ -74,7 +74,7 @@ Manifold TorusKnot(int p, int q, double majorRadius, double minorRadius,
       knots.push_back(
           knot.Rotate(0, 0, 360.0 * (k / kLoops) * (q / double(p))));
     }
-    knot = Manifold::Compose(knots);
+    knot = Manifold::BatchBoolean(knots, OpType::Add);
   }
 
   return knot;

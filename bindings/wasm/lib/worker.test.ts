@@ -36,7 +36,7 @@ async function resolveExample(name: string) {
   return filepath.fullpath()
 }
 
-async function runExample(name: string) {
+async function runExample(name: string, firstMeshOnly: boolean = true) {
   const filename = await resolveExample(name);
   const code = await fs.readFile(filename, 'utf-8');
   const doc = await evaluate(code, {jsCDN: 'jsDelivr', filename});
@@ -46,10 +46,15 @@ async function runExample(name: string) {
 
   // These tests are agains the first glTF node containing meshes in a given
   // model.
-  const {document} = await importModel(glbURL, {mimetype: 'model/gltf-binary'});
-  const node = document.getRoot().listNodes().find(node => !!node.getMesh());
-  const manifold = await gltfDocToManifold(document, node);
+  const node = await importModel(glbURL, {mimetype: 'model/gltf-binary'});
+  const document = node.document!;
   URL.revokeObjectURL(glbURL);
+
+  const firstMesh =
+      document.getRoot().listNodes().find(node => !!node.getMesh());
+  const manifold =
+      await (firstMeshOnly ? gltfDocToManifold(document, firstMesh) :
+                             gltfDocToManifold(document))
 
   if (manifold) {
     const volume = manifold.volume();
@@ -104,8 +109,8 @@ suite('Examples', () => {
   test('Scallop', async () => {
     const result = await runExample('Scallop');
     expect(result?.genus).to.equal(0, 'Genus');
-    expect(result?.volume).to.be.closeTo(39900, 100, 'Volume');
-    expect(result?.surfaceArea).to.be.closeTo(7930, 10, 'Surface Area');
+    expect(result?.volume).to.be.closeTo(37300, 100, 'Volume');
+    expect(result?.surfaceArea).to.be.closeTo(8270, 10, 'Surface Area');
   });
 
   test('Torus Knot', async () => {
@@ -159,6 +164,15 @@ suite('Examples', () => {
     expect(result?.surfaceArea).to.be.greaterThan(10000, 'Surface Area');
   });
 
+  test('Import Model', async () => {
+    const filename = await resolveExample('Import Model');
+    const code = await fs.readFile(filename, 'utf-8');
+    const doc = await evaluate(code, {jsCDN: 'jsDelivr', filename});
+    const glbURL = await exportBlobURL(doc, 'glb');
+    cleanup();
+    expect(glbURL).toBeTruthy();
+  });
+
   test('Import Manifold', async () => {
     const result = await runExample('Import Manifold');
     expect(result?.genus).to.equal(3, 'Genus');
@@ -166,5 +180,12 @@ suite('Examples', () => {
     // They add up fast.
     expect(result?.volume).to.be.closeTo(2.10e15, 1e13, 'Volume');
     expect(result?.surfaceArea).to.be.closeTo(1.67e11, 1e9, 'Surface Area');
+  });
+
+  test('Godel, Escher Bach', async () => {
+    const result = await runExample('Godel Escher Bach', false);
+    expect(result?.genus).to.equal(8, 'Genus');
+    expect(result?.volume).to.be.closeTo(854805, 1, 'Volume');
+    expect(result?.surfaceArea).to.be.closeTo(158946, 1, 'Surface Area');
   });
 });

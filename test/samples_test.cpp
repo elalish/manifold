@@ -14,9 +14,8 @@
 
 #include "samples.h"
 
-#ifdef MANIFOLD_CROSS_SECTION
+#include "gtest/gtest.h"
 #include "manifold/cross_section.h"
-#endif
 #include "test.h"
 
 using namespace manifold;
@@ -40,14 +39,11 @@ std::vector<int> EdgePairs(const MeshGL in) {
   return edgePair;
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 // If you print this knot (with support), you can snap a half-inch marble into
 // it and it'll roll around (dimensions in mm).
 TEST(Samples, Knot13) {
   Manifold knot13 = TorusKnot(1, 3, 25, 10, 3.75);
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("knot13.glb", knot13.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("knot13.obj", knot13);
   EXPECT_EQ(knot13.Genus(), 1);
   EXPECT_NEAR(knot13.Volume(), 20786, 1);
   EXPECT_NEAR(knot13.SurfaceArea(), 11177, 1);
@@ -57,9 +53,7 @@ TEST(Samples, Knot13) {
 // This creates two interlinked knots.
 TEST(Samples, Knot42) {
   Manifold knot42 = TorusKnot(4, 2, 15, 6, 5);
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("knot42.glb", knot42.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("knot42.obj", knot42);
   std::vector<Manifold> knots = knot42.Decompose();
   ASSERT_EQ(knots.size(), 2);
   EXPECT_EQ(knots[0].Genus(), 1);
@@ -68,37 +62,11 @@ TEST(Samples, Knot42) {
   EXPECT_NEAR(knots[0].SurfaceArea(), knots[1].SurfaceArea(), 1);
   CheckGL(knot42);
 }
-#endif
 
 TEST(Samples, Scallop) {
   Manifold scallop = Scallop();
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) {
-    MeshGL in = scallop.GetMeshGL();
-    std::vector<int> edgePair = EdgePairs(in);
-
-    ExportOptions options;
-    const int numVert = scallop.NumVert();
-    const int numHalfedge = 3 * scallop.NumTri();
-    const int numProp = in.numProp;
-    for (int i = 0; i < numHalfedge; ++i) {
-      const int vert = in.triVerts[i];
-      for (int j : {0, 1, 2}) {
-        in.vertProperties.push_back(in.vertProperties[numProp * vert + j] +
-                                    in.halfedgeTangent[4 * i + j] *
-                                        in.halfedgeTangent[4 * i + 3]);
-      }
-      const int j = edgePair[i % 3 == 0 ? i + 2 : i - 1];
-      in.triVerts.push_back(vert);
-      in.triVerts.push_back(numVert + i);
-      in.triVerts.push_back(numVert + j);
-    }
-    options.faceted = true;
-    options.mat.roughness = 0.5;
-    ExportMesh("scallopFacets.glb", scallop.GetMeshGL(), options);
-  }
-#endif
+  if (options.exportModels) WriteTestOBJ("scallopFacets.obj", scallop);
 
   auto colorCurvature = [](double* newProp, vec3 pos, const double* oldProp) {
     const double curvature = oldProp[0];
@@ -113,68 +81,45 @@ TEST(Samples, Scallop) {
 
   scallop = scallop.Refine(50).CalculateCurvature(-1, 0).SetProperties(
       3, colorCurvature);
-  EXPECT_NEAR(scallop.Volume(), 39.9, 0.1);
-  EXPECT_NEAR(scallop.SurfaceArea(), 79.3, 0.1);
+  EXPECT_NEAR(scallop.Volume(), 37.3, 0.1);
+  EXPECT_NEAR(scallop.SurfaceArea(), 82.7, 0.1);
   EXPECT_EQ(scallop.NumVert(), scallop.NumPropVert());
   CheckGL(scallop);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) {
-    MeshGL out = scallop.GetMeshGL();
-    ExportOptions options2;
-    // options2.faceted = false;
-    options2.mat.roughness = 0.1;
-    options2.mat.metalness = 0;
-    options2.mat.colorIdx = 0;
-    ExportMesh("scallop.glb", out, options2);
-  }
-#endif
+  if (options.exportModels) WriteTestOBJ("scallop.obj", scallop);
 }
 
 TEST(Samples, TetPuzzle) {
   Manifold puzzle = TetPuzzle(50, 0.2, 50);
-  EXPECT_LE(puzzle.NumDegenerateTris(), 2);
   CheckGL(puzzle);
 
   Manifold puzzle2 = puzzle.Rotate(0, 0, 180);
   EXPECT_TRUE((puzzle ^ puzzle2).IsEmpty());
   quat q = rotation_quat(normalize(vec3(1, -1, -1)), vec3(0, 0, 1));
   puzzle = puzzle.Transform({la::qmat(q), vec3()});
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("tetPuzzle.glb", puzzle.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("tetPuzzle.obj", puzzle);
 }
 
 TEST(Samples, FrameReduced) {
   Manifold frame = RoundedFrame(100, 10, 4);
-  EXPECT_EQ(frame.NumDegenerateTris(), 0);
   EXPECT_EQ(frame.Genus(), 5);
   EXPECT_NEAR(frame.Volume(), 227333, 10);
   EXPECT_NEAR(frame.SurfaceArea(), 62635, 1);
   CheckGL(frame);
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("roundedFrameReduced.glb", frame.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("roundedFrameReduced.obj", frame);
 }
 
 TEST(Samples, Frame) {
   Manifold frame = RoundedFrame(100, 10);
-  EXPECT_EQ(frame.NumDegenerateTris(), 0);
   EXPECT_EQ(frame.Genus(), 5);
   CheckGL(frame);
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("roundedFrame.glb", frame.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("roundedFrame.obj", frame);
 }
 
 // This creates a bracelet sample which involves many operations between shapes
 // that are not in general position, e.g. coplanar faces.
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Samples, Bracelet) {
   Manifold bracelet = StretchyBracelet();
-  EXPECT_EQ(bracelet.NumDegenerateTris(), 0);
   EXPECT_EQ(bracelet.Genus(), 1);
   CheckGL(bracelet);
 
@@ -189,7 +134,6 @@ TEST(Samples, Bracelet) {
   EXPECT_NEAR(projection.Area(), 649, 1);
   EXPECT_EQ(projection.NumContour(), 2);
   Manifold extrusion = Manifold::Extrude(projection.ToPolygons(), 1);
-  EXPECT_EQ(extrusion.NumDegenerateTris(), 0);
   EXPECT_EQ(extrusion.Genus(), 1);
 
   CrossSection slice(bracelet.Slice());
@@ -198,16 +142,12 @@ TEST(Samples, Bracelet) {
   extrusion = Manifold::Extrude(slice.ToPolygons(), 1);
   EXPECT_EQ(extrusion.Genus(), 1);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("bracelet.glb", bracelet.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("bracelet.obj", bracelet);
 }
 
 TEST(Samples, GyroidModule) {
   const double size = 20;
   Manifold gyroid = GyroidModule(size);
-  EXPECT_LE(gyroid.NumDegenerateTris(), 4);
   EXPECT_EQ(gyroid.Genus(), 15);
   CheckGL(gyroid);
 
@@ -222,23 +162,15 @@ TEST(Samples, GyroidModule) {
   Manifold extrusion = Manifold::Extrude(slice.ToPolygons(), 1);
   EXPECT_EQ(extrusion.Genus(), -3);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("gyroidModule.glb", gyroid.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("gyroidModule.obj", gyroid);
 }
-#endif
 
 TEST(Samples, Sponge1) {
   Manifold sponge = MengerSponge(1);
-  EXPECT_EQ(sponge.NumDegenerateTris(), 0);
   EXPECT_EQ(sponge.NumVert(), 40);
   EXPECT_EQ(sponge.Genus(), 5);
   CheckGL(sponge);
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("mengerSponge1.glb", sponge.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("mengerSponge1.obj", sponge);
 }
 
 // This sample needs a lot of memory to run and is therefore disabled for
@@ -246,10 +178,8 @@ TEST(Samples, Sponge1) {
 #ifndef __EMSCRIPTEN__
 // A fractal with many degenerate intersections, which also tests exact 90
 // degree rotations.
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(Samples, Sponge4) {
   Manifold sponge = MengerSponge(4);
-  EXPECT_LE(sponge.NumDegenerateTris(), 8);
   EXPECT_EQ(sponge.Genus(), 26433);  // should be 1:5, 2:81, 3:1409, 4:26433
   CheckGL(sponge);
 
@@ -267,34 +197,21 @@ TEST(Samples, Sponge4) {
   EXPECT_EQ(rect.max.y, box.max.y);
   EXPECT_NEAR(projection.Area(), 0.535, 0.001);
   Manifold extrusion = Manifold::Extrude(projection.ToPolygons(), 1);
-  EXPECT_LE(extrusion.NumDegenerateTris(), 32);
   EXPECT_EQ(extrusion.Genus(), 502);
 
-#ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    ExportMesh("mengerHalf.glb", cutSponge.first.GetMeshGL(), {});
+    WriteTestOBJ("mengerHalf.obj", cutSponge.first);
 
-    const MeshGL out = sponge
-                           .SetProperties(3,
-                                          [](double* newProp, vec3 pos,
-                                             const double* oldProp) {
-                                            for (const int i : {0, 1, 2})
-                                              newProp[i] = 0.5 * (pos[i] + 0.5);
-                                          })
-                           .GetMeshGL();
-    ExportOptions options;
-    options.faceted = true;
-    options.mat.roughness = 0.2;
-    options.mat.metalness = 1.0;
-    options.mat.colorIdx = 0;
-    ExportMesh("mengerSponge.glb", out, options);
+    const Manifold out = sponge.SetProperties(
+        3, [](double* newProp, vec3 pos, const double* oldProp) {
+          for (const int i : {0, 1, 2}) newProp[i] = 0.5 * (pos[i] + 0.5);
+        });
+    WriteTestOBJ("mengerSponge.obj", out);
   }
-#endif
   Manifold sponge2 = MengerSponge(4);
   std::pair<Manifold, Manifold> cutSponge2 = sponge2.SplitByPlane({1, 1, 1}, 0);
   CheckGLEquiv(cutSponge.first.GetMeshGL(), cutSponge2.first.GetMeshGL());
 }
-#endif
 #endif
 
 TEST(Samples, CondensedMatter16) {
@@ -302,10 +219,7 @@ TEST(Samples, CondensedMatter16) {
   CheckGL(cm);
   Manifold cm2 = CondensedMatter(16);
   CheckGLEquiv(cm.GetMeshGL(), cm2.GetMeshGL());
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("condensedMatter16.glb", cm.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("condensedMatter16.obj", cm);
 }
 
 #ifndef __EMSCRIPTEN__
@@ -318,9 +232,6 @@ TEST(Samples, CondensedMatter64) {
 
   Manifold cm2 = CondensedMatter(64);
   CheckGLEquiv(cm.GetMeshGL(), cm2.GetMeshGL());
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("condensedMatter64.glb", cm.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("condensedMatter64.obj", cm);
 }
 #endif

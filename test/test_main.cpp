@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 #include <algorithm>
+#ifndef MANIFOLD_NO_FILESYSTEM
 #include <filesystem>
-
-#include "manifold/manifold.h"
-#include "test.h"
-
-#if defined(MANIFOLD_EXPORT) || defined(MANIFOLD_DEBUG)
 #include <fstream>
 #endif
+
+#include "gtest/gtest.h"
+#include "manifold/manifold.h"
+#include "test.h"
 
 #if (MANIFOLD_PAR == 1)
 #include <oneapi/tbb/parallel_for.h>
@@ -41,14 +41,19 @@ void print_usage() {
   printf("-------------------------------\n");
   printf("manifold_test specific options:\n");
   printf("  -h: Print this message\n");
-  printf("  -e: Export GLB models of samples\n");
+  printf("  -e: Export OBJ models of samples\n");
   printf("  -c: Enable self-intersection checks (needs MANIFOLD_DEBUG)\n");
   printf(
-      "  -v: Enable verbose output (only works if compiled with MANIFOLD_DEBUG "
+      "  -v: Enable Boolean debug dumps (only works if compiled with "
+      "MANIFOLD_DEBUG flag)\n");
+  printf(
+      "  -vv: Enable Boolean stats (only works "
+      "if compiled with MANIFOLD_DEBUG "
       "flag)\n");
   printf(
-      "  -vv: Enable extra verbose output for triangulator (only works if "
-      "compiled with MANIFOLD_DEBUG flag)\n");
+      "  -vvv: Enable extra triangulator output (only works "
+      "if compiled with MANIFOLD_DEBUG "
+      "flag)\n");
 }
 
 int main(int argc, char** argv) {
@@ -85,17 +90,15 @@ int main(int argc, char** argv) {
         print_usage();
         return 0;
       case 'e':
-#ifndef MANIFOLD_EXPORT
-        printf(
-            "Export not possible because MANIFOLD_EXPORT compile flag is not "
-            "set.\n");
-#endif
         options.exportModels = true;
         break;
       case 'v':
         manifold::ManifoldParams().verbose = 1;
         if (argv[i][2] == 'v') {
           manifold::ManifoldParams().verbose = 2;
+          if (argv[i][3] == 'v') {
+            manifold::ManifoldParams().verbose = 3;
+          }
         }
         break;
       case 'c':
@@ -109,6 +112,7 @@ int main(int argc, char** argv) {
   }
 
   manifold::ManifoldParams().intermediateChecks = true;
+  manifold::ManifoldParams().verifyNoDegenerates = true;
   manifold::ManifoldParams().processOverlaps = false;
 
   FrameMarkEnd(name);
@@ -330,25 +334,51 @@ void Identical(const MeshGL& mesh1, const MeshGL& mesh2) {
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
                bool checkNormals, bool updateNormals) {
   ASSERT_FALSE(out.IsEmpty());
-  const int normalIdx = updateNormals ? 0 : -1;
-  MeshGL output = out.GetMeshGL(normalIdx);
+  MeshGL output = out.TriID2FaceID().GetMeshGL();
+  std::vector<mat3x4> runTransforms(output.NumRun());
+  for (size_t run = 0; run < output.NumRun(); ++run) {
+    runTransforms[run] = output.GetRunTransform(run);
+  }
+  if (updateNormals) {
+    // Bring slot 3..5 into world frame on every run and normalize. Runs with
+    // hasNormals (runFlags bit 1) are already in world frame but may be off
+    // unit-length from barycentric interpolation at seam verts; the others
+    // need the inverse-transpose of the per-run linear transform applied
+    // (and a sign flip for backside).
+    std::vector<bool> vertUpdated(output.NumVert(), false);
+    for (size_t run = 0; run < output.NumRun(); ++run) {
+      const bool runHasN = output.HasNormals(run);
+      const mat3 t =
+          runHasN ? mat3(la::identity)
+                  : la::inverse(la::transpose(mat3(runTransforms[run]))) *
+                        (output.Backside(run) ? -1.0 : 1.0);
+      // `data() + i` rather than `&v[i]`: the latter is UB when
+      // `i == size()` (one-past-the-end of the final run) and traps under
+      // libc++ fast hardening - see #1735.
+      for (uint32_t* itr = output.triVerts.data() + output.runIndex[run];
+           itr < output.triVerts.data() + output.runIndex[run + 1]; ++itr) {
+        const uint32_t v = *itr;
+        if (vertUpdated[v]) continue;
+        vertUpdated[v] = true;
+        vec3 n;
+        for (int k : {0, 1, 2})
+          n[k] = output.vertProperties[v * output.numProp + 3 + k];
+        n = la::normalize(t * n);
+        for (int k : {0, 1, 2})
+          output.vertProperties[v * output.numProp + 3 + k] = n[k];
+      }
+    }
+  }
 
-  for (size_t run = 0; run < output.runOriginalID.size(); ++run) {
-    const float* m = output.runTransform.data() + 12 * run;
-    const mat3x4 transform =
-        output.runTransform.empty()
-            ? la::identity
-            : mat3x4({m[0], m[1], m[2]}, {m[3], m[4], m[5]}, {m[6], m[7], m[8]},
-                     {m[9], m[10], m[11]});
+  for (size_t run = 0; run < output.NumRun(); ++run) {
     size_t i = 0;
     for (; i < originals.size(); ++i) {
-      ASSERT_EQ(originals[i].runOriginalID.size(), 1);
+      ASSERT_EQ(originals[i].NumRun(), 1);
       if (originals[i].runOriginalID[0] == output.runOriginalID[run]) break;
     }
     ASSERT_LT(i, originals.size());
     const MeshGL& inMesh = originals[i];
-    const float tolerance =
-        3 * std::max(static_cast<float>(out.GetTolerance()), inMesh.tolerance);
+    const float tolerance = 3 * std::max(output.tolerance, inMesh.tolerance);
 
     for (uint32_t tri = output.runIndex[run] / 3;
          tri < output.runIndex[run + 1] / 3; ++tri) {
@@ -372,7 +402,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
           outTriPos[j][k] = output.vertProperties[vert * output.numProp + k];
         }
         pos[3] = 1;
-        inTriPos[j] = transform * pos;
+        inTriPos[j] = runTransforms[run] * pos;
       }
       vec3 outNormal =
           la::cross(outTriPos[1] - outTriPos[0], outTriPos[2] - outTriPos[0]);
@@ -441,10 +471,6 @@ void ExpectMeshes(const Manifold& manifold,
   }
 }
 
-void CheckStrictly(const Manifold& manifold) {
-  EXPECT_EQ(manifold.NumDegenerateTris(), 0);
-}
-
 void CheckGL(const Manifold& manifold, bool noMerge) {
   ASSERT_FALSE(manifold.IsEmpty());
   const MeshGL meshGL = manifold.GetMeshGL();
@@ -459,7 +485,6 @@ void CheckGL(const Manifold& manifold, bool noMerge) {
   if (!meshGL.runTransform.empty()) {
     EXPECT_EQ(meshGL.runTransform.size(), 12 * meshGL.runOriginalID.size());
   }
-  EXPECT_EQ(meshGL.faceID.size(), meshGL.NumTri());
   CheckFinite(meshGL);
 }
 
@@ -485,15 +510,7 @@ void CheckGLEquiv(const MeshGL& mgl1, const MeshGL& mgl2) {
   }
 }
 
-#ifdef MANIFOLD_EXPORT
-MeshGL ReadMesh(const std::string& filename) {
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  return ImportMesh(dir + "/models/" + filename);
-}
-#endif
-
-#ifdef MANIFOLD_DEBUG
+#ifndef MANIFOLD_NO_FILESYSTEM
 Manifold ReadTestOBJ(const std::string& filename) {
 #ifdef __EMSCRIPTEN__
   std::string obj = "/models/" + filename;
@@ -507,6 +524,25 @@ Manifold ReadTestOBJ(const std::string& filename) {
   f.open(obj);
   Manifold a = Manifold::ReadOBJ(f);
   f.close();
+  EXPECT_FALSE(a.IsEmpty());
   return a;
 }
+
+void WriteTestOBJ(const std::string& filename, Manifold m) {
+  std::ofstream f;
+  f.open(filename);
+  WriteOBJ(f, m.GetMeshGL64());
+  f.close();
+}
+#else
+// Stub WriteTestOBJ for MANIFOLD_NO_FILESYSTEM builds: lets the
+// `if (options.exportModels) WriteTestOBJ(...)` call sites keep
+// linking. exportModels defaults false, so the runtime path is dead.
+//
+// ReadTestOBJ / ReadTestMeshGL64OBJ are deliberately NOT stubbed —
+// tests that read fixtures depend on real geometry, and a stub
+// returning an empty Manifold would silently make assertions fail
+// by construction. Callers must be compile-time gated; an unguarded
+// caller fails to link, which is the bright signal we want.
+void WriteTestOBJ(const std::string& /*filename*/, Manifold /*m*/) {}
 #endif

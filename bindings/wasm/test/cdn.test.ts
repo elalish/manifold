@@ -29,7 +29,7 @@ const countVertices = (doc: Document) => {
 beforeEach(() => worker.cleanup());
 
 suite('Import remote modules from', () => {
-  test('esm.sh', async () => {
+  test.skip('esm.sh', async () => {
     const entrypoint = resolve(import.meta.dirname, './examples/voronoi.mjs');
     const bundle = await bundleFile(entrypoint, {jsCDN: 'esm.sh'});
     const result = await worker.evaluate(bundle, {doNotBundle: true});

@@ -38,10 +38,6 @@
 
 namespace manifold {
 
-#if (MANIFOLD_PAR == 1)
-extern tbb::task_arena gc_arena;
-#endif
-
 struct Empty {};
 
 template <typename T, bool shared = false>
@@ -232,7 +228,8 @@ class Vec : public VecView<T> {
         manifold::copy(autoPolicy(this->size_), this->ptr_,
                        this->ptr_ + this->size_, newBuffer);
       if (this->ptr_ != nullptr) {
-        free_async(this->ptr_, capacity_);
+        TracyFreeS(this->ptr_, 3);
+        free(this->ptr_);
       }
       this->ptr_ = newBuffer;
       capacity_ = n;
@@ -280,7 +277,8 @@ class Vec : public VecView<T> {
       manifold::copy(this->ptr_, this->ptr_ + this->size_, newBuffer);
     }
     if (this->ptr_ != nullptr) {
-      free_async(this->ptr_, capacity_);
+      TracyFreeS(this->ptr_, 3);
+      free(this->ptr_);
     }
     this->ptr_ = newBuffer;
     capacity_ = this->size_;
@@ -322,7 +320,8 @@ class Vec : public VecView<T> {
       this->count_ = nullptr;
     }
     if (this->ptr_ != nullptr) {
-      Vec<T, false>::free_async(this->ptr_, this->capacity_);
+      TracyFreeS(this->ptr_, 3);
+      free(this->ptr_);
     }
     this->ptr_ = nullptr;
     this->size_ = 0;
@@ -343,24 +342,5 @@ class Vec : public VecView<T> {
   // This is required so we can access private fields between shared and
   // non-shared vectors.
   friend Vec<T, !shared>;
-
-  static void free_async(T* ptr, size_t size) {
-    // Only do async free if the size is large, because otherwise we may be able
-    // to reuse the allocation, and the deallocation probably won't trigger
-    // munmap.
-    // Currently it is set to 64 pages (4kB page).
-    constexpr size_t ASYNC_FREE_THRESHOLD = 1 << 18;
-    TracyFreeS(ptr, 3);
-#if defined(__has_feature)
-#if !__has_feature(address_sanitizer)
-#if (MANIFOLD_PAR == 1)
-    if (size * sizeof(T) > ASYNC_FREE_THRESHOLD)
-      gc_arena.enqueue([ptr]() { free(ptr); });
-    else
-#endif
-#endif
-#endif
-      free(ptr);
-  }
 };
 }  // namespace manifold

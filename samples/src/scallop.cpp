@@ -17,47 +17,69 @@
 namespace manifold {
 
 /**
- * A smoothed manifold demonstrating selective edge sharpening with
- * Manifold.Smooth(). Use Manifold.Refine() before export to see the curvature.
+ * A smoothed manifold demonstrating manual smoothing by assigning tangents to
+ * halfedges. Use Manifold.Refine() before export to see the curvature.
  */
 Manifold Scallop() {
   constexpr double height = 1;
   constexpr double radius = 3;
   constexpr double offset = 2;
   constexpr int wiggles = 12;
-  constexpr double sharpness = 0.8;
+  constexpr double lean = 0.3;
+  constexpr double frontalSharpness = 1;
 
   MeshGL64 scallop;
-  std::vector<Smoothness> sharpenedEdges;
   scallop.numProp = 3;
   scallop.vertProperties = {-offset, 0, height, -offset, 0, -height};
 
+  const double len = kPi * radius / (2 * wiggles);
+  const vec3 topNormal = vec3(-lean, 0, la::sqrt(1 - lean * lean));
+
   const double delta = kPi / wiggles;
-  for (int i = 0; i < 2 * wiggles; ++i) {
-    double theta = (i - wiggles) * delta;
-    double amp = 0.5 * height * la::max(la::cos(0.8 * theta), 0.0);
+  std::array<vec3, 2 * wiggles> centerTangents;
+  std::array<vec3, 2 * wiggles> edgeTangents;
+  for (uint32_t i = 0; i < 2 * wiggles; ++i) {
+    const double theta = i * delta;
+    const double amp = 0.5 * height * (la::cos(theta) + 1) / 2;
+    const vec3 v(radius * la::cos(theta), radius * la::sin(theta),
+                 amp * (i % 2 == 0 ? 1 : -1));
 
-    scallop.vertProperties.insert(
-        scallop.vertProperties.end(),
-        {radius * la::cos(theta), radius * la::sin(theta),
-         amp * (i % 2 == 0 ? 1 : -1)});
-    int j = i + 1;
-    if (j == 2 * wiggles) j = 0;
-
-    double smoothness = 1 - sharpness * la::cos((theta + delta / 2) / 2);
-    size_t halfedge = scallop.triVerts.size() + 1;
-    sharpenedEdges.push_back({halfedge, smoothness});
-    scallop.triVerts.insert(
-        scallop.triVerts.end(),
-        {0, static_cast<uint32_t>(2 + i), static_cast<uint32_t>(2 + j)});
-
-    halfedge = scallop.triVerts.size() + 1;
-    sharpenedEdges.push_back({halfedge, smoothness});
-    scallop.triVerts.insert(
-        scallop.triVerts.end(),
-        {1, static_cast<uint32_t>(2 + j), static_cast<uint32_t>(2 + i)});
+    scallop.vertProperties.insert(scallop.vertProperties.end(),
+                                  {v.x, v.y, v.z});
+    vec3 centerTan = v - vec3(-offset, 0, height);
+    centerTan /= 2;
+    centerTangents[i] = centerTan - la::dot(centerTan, topNormal) * topNormal;
+    edgeTangents[i] = vec3(-len * la::sin(theta), len * la::cos(theta), 0);
   }
 
-  return Manifold::Smooth(scallop, sharpenedEdges);
+  for (uint32_t i = 0; i < 2 * wiggles; ++i) {
+    const uint32_t next = i + 1 == 2 * wiggles ? 0 : i + 1;
+
+    const vec3 radial = centerTangents[i];
+    const vec3 nextRadial = centerTangents[next];
+    const vec3 edge = edgeTangents[i];
+    const vec3 nextEdge = -edgeTangents[next];
+    const double sharpness = frontalSharpness * (la::cos(i * delta) + 1) / 4;
+    const vec3 up =
+        la::lerp(vec3(0, 0, len), vec3(nextEdge.y, -nextEdge.x, 0), sharpness);
+    const vec3 down =
+        la::lerp(vec3(0, 0, -len), vec3(-edge.y, edge.x, 0), sharpness);
+
+    scallop.triVerts.insert(scallop.triVerts.end(), {0, 2 + i, 2 + next});
+    scallop.halfedgeTangent.insert(        //
+        scallop.halfedgeTangent.end(),     //
+        {radial.x, radial.y, radial.z, 1,  //
+         edge.x, edge.y, edge.z, 1,        //
+         up.x, up.y, up.z, 1});
+
+    scallop.triVerts.insert(scallop.triVerts.end(), {1, 2 + next, 2 + i});
+    scallop.halfedgeTangent.insert(
+        scallop.halfedgeTangent.end(),
+        {nextRadial.x, nextRadial.y, -nextRadial.z, 1,  //
+         nextEdge.x, nextEdge.y, nextEdge.z, 1,         //
+         down.x, down.y, down.z, 1});
+  }
+
+  return Manifold(scallop);
 }
 }  // namespace manifold

@@ -133,5 +133,8 @@ CMakeSettings.json
 [._]sw[a-p]
 
 # Benchmark stl files
-extras/ember_tests/testfiles/raw_meshes
+extras/ember_tests/testfiles/raw_meshes/*
 
+#Eclipse project files
+/.project
+/.cproject

@@ -966,18 +966,17 @@ WARN_LOGFILE           =
 # Note: If this tag is empty the current directory is searched.
 
 INPUT                  = include/manifold/manifold.h \
+                         include/manifold/mesh.h \
                          include/manifold/cross_section.h \
                          include/manifold/polygon.h \
                          include/manifold/common.h \
-                         include/manifold/meshIO.h \
                          include/manifold/linalg.h \
                          include/manifold/vec_view.h \
                          include/manifold/optional_assert.h \
                          src/manifold.cpp \
                          src/constructors.cpp \
                          src/polygon.cpp \
-                         src/cross_section/cross_section.cpp \
-                         src/meshIO/meshIO.cpp \
+                         src/cross_section.cpp \
                          src/sdf.cpp \
                          README.md \
                          samples/include/samples.h \

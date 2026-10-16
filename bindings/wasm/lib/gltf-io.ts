@@ -18,7 +18,7 @@
  * meshes and manifold meshes.
  *
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Input/Output
  * @groupDescription Import
  * These properties implement the {@link lib/import-model!Importer | Importer}
@@ -33,9 +33,10 @@
 import * as GLTFTransform from '@gltf-transform/core';
 import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 
-import {Mesh as ManifoldMesh, MeshOptions} from '../manifold';
+import type {Mesh as ManifoldMesh, MeshOptions} from '../manifold.d.ts';
 
 import {EXTManifold, ManifoldPrimitive} from './manifold-gltf.ts';
+import {fetchWithRetry} from './util.ts';
 
 const binaryFormat = {
   extension: 'glb',
@@ -245,36 +246,49 @@ export function readMesh(
  *     the manifoldMesh vertProperties, thus the first attribute must always be
  *     'POSITION'. Any properties that should not be output for a given
  *     primitive must use the 'SKIP_*' attributes.
+ * @param EXT_mesh_manifold If false, emit a plain glTF mesh.  In this case,
+ *     the mesh is not required to be fully manifold when written.  Use this
+ *     to write explicitly non-manifold meshes, e.g.: CrossSections.
  * @returns The glTF Mesh to add to the Document.
  */
 export function writeMesh(
     doc: GLTFTransform.Document, manifoldMesh: ManifoldMesh,
-    id2properties: Map<number, Properties>): GLTFTransform.Mesh {
+    id2properties: Map<number, Properties>,
+    EXT_mesh_manifold: boolean = true): GLTFTransform.Mesh {
   if (doc.getRoot().listBuffers().length === 0) {
     doc.createBuffer();
   }
-  const buffer = doc.getRoot().listBuffers()[0];
-  const manifoldExtension = doc.createExtension(EXTManifold);
 
   const mesh = doc.createMesh();
-  const runIndex = Array<number>();
+  writePrimitiveAttributes(doc, mesh, manifoldMesh, id2properties);
+  if (EXT_mesh_manifold) {
+    writeExtMeshManifoldIndices(doc, mesh, manifoldMesh);
+  } else {
+    writePlainIndices(doc, mesh, manifoldMesh);
+  }
+
+  return mesh;
+}
+
+/**
+ * Create the necessary primitives and their attributes needed to represent a
+ * ManifoldMesh object as a glTF mesh, and add those to an existing glTF
+ * transform mesh node.
+ *
+ * This does not create or populate indices.  After this call these primitives
+ * will exist and have positions, but will not have visible geometry.
+ */
+function writePrimitiveAttributes(
+    doc: GLTFTransform.Document, mesh: GLTFTransform.Mesh,
+    manifoldMesh: ManifoldMesh, id2properties: Map<number, Properties>) {
   const attributeUnion = Array<Attribute>();
   const primitive2attributes = new Map<GLTFTransform.Primitive, Attribute[]>();
-  const numRun = manifoldMesh.runIndex.length - 1;
-  let lastID = -1;
-  for (let run = 0; run < numRun; ++run) {
-    const id = manifoldMesh.runOriginalID[run];
-    if (id == lastID) {
-      continue;
-    }
-    lastID = id;
-    runIndex.push(manifoldMesh.runIndex[run]);
 
-    const indices = doc.createAccessor('primitive indices of ID ' + id)
-                        .setBuffer(buffer)
-                        .setType(GLTFTransform.Accessor.Type.SCALAR)
-                        .setArray(new Uint32Array(1));
-    const primitive = doc.createPrimitive().setIndices(indices);
+  // For each run, create a primitive, set material and collate attributes.
+  const buffer = doc.getRoot().listBuffers()[0];
+  for (let run = 0; run < (manifoldMesh.runIndex.length - 1); run++) {
+    const id = manifoldMesh.runOriginalID[run];
+    const primitive = doc.createPrimitive();
 
     const properties = id2properties.get(id);
     if (properties) {
@@ -307,8 +321,9 @@ export function writeMesh(
 
     mesh.addPrimitive(primitive);
   }
-  runIndex.push(manifoldMesh.runIndex[numRun]);
 
+  // For each primitive, create accessors for each attribute and populate those
+  // attributes.
   const numVert = manifoldMesh.numVert;
   const numProp = manifoldMesh.numProp;
   let offset = 0;
@@ -350,14 +365,33 @@ export function writeMesh(
     }
     offset += n;
   });
+}
 
+function writeExtMeshManifoldIndices(
+    doc: GLTFTransform.Document, mesh: GLTFTransform.Mesh,
+    manifoldMesh: ManifoldMesh) {
+  const manifoldExtension = doc.createExtension(EXTManifold);
   const manifoldPrimitive = manifoldExtension.createManifoldPrimitive();
   mesh.setExtension('EXT_mesh_manifold', manifoldPrimitive);
 
-  const indices = doc.createAccessor('manifold indices')
-                      .setBuffer(buffer)
-                      .setType(GLTFTransform.Accessor.Type.SCALAR)
-                      .setArray(manifoldMesh.triVerts);
+  const buffer = doc.getRoot().listBuffers()[0];
+  const {runIndex} = manifoldMesh;
+
+  mesh.listPrimitives().forEach((primitive, n) => {
+    // These indices will be populated by `manifold-gtlf` when the
+    // document is written out by glTF transform.
+    const indices = doc.createAccessor('primitive indices of ID ' + runIndex[n])
+                        .setBuffer(buffer)
+                        .setType(GLTFTransform.Accessor.Type.SCALAR)
+                        .setArray(new Uint32Array(1));
+    primitive.setIndices(indices);
+  });
+
+  const indices =
+      doc.createAccessor('manifold indices')
+          .setBuffer(buffer)
+          .setType(GLTFTransform.Accessor.Type.SCALAR)
+          .setArray(manifoldMesh.triVerts as Uint32Array<ArrayBuffer>);
   manifoldPrimitive.setIndices(indices);
   manifoldPrimitive.setRunIndex(runIndex);
 
@@ -388,8 +422,22 @@ export function writeMesh(
                                .setArray(new Uint32Array(val));
     manifoldPrimitive.setMerge(indicesAccessor, valuesAccessor);
   }
+}
 
-  return mesh;
+function writePlainIndices(
+    doc: GLTFTransform.Document, mesh: GLTFTransform.Mesh,
+    manifoldMesh: ManifoldMesh) {
+  const buffer = doc.getRoot().listBuffers()[0];
+  const {runIndex} = manifoldMesh;
+
+  mesh.listPrimitives().forEach((primitive, n) => {
+    const indices = doc.createAccessor('primitive indices of ID ' + runIndex[n])
+                        .setBuffer(buffer)
+                        .setType(GLTFTransform.Accessor.Type.SCALAR)
+                        .setArray(manifoldMesh.triVerts.slice(
+                            runIndex[n], runIndex[n + 1]));
+    primitive.setIndices(indices);
+  });
 }
 
 /**
@@ -424,7 +472,7 @@ export function disposeMesh(mesh: GLTFTransform.Mesh) {
  * @param uri The location of the image to download
  */
 export async function loadTexture(texture: GLTFTransform.Texture, uri: string) {
-  const response = await fetch(uri);
+  const response = await fetchWithRetry(uri);
   const blob = await response.blob();
   texture.setMimeType(blob.type);
   texture.setImage(new Uint8Array(await blob.arrayBuffer()));

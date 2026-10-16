@@ -17,7 +17,7 @@
  * the manifoldCAD runtime to provide objects (like manifold itself) and
  * properties (such as `import.meta.url`).
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Core
  */
 
@@ -25,8 +25,8 @@ import resolve from '@jridgewell/resolve-uri';
 import * as esbuild from 'esbuild-wasm';
 import MagicString from 'magic-string';
 
-import {BundlerError} from './error.ts';
-import {isNode} from './util.ts';
+import {BundlerError, FetchError} from './error.ts';
+import {fetchWithRetry, isNode} from './util.ts';
 
 let esbuildWasmUrl: string|null = null;
 let esbuildHasOwnWorker: boolean = false;
@@ -63,13 +63,6 @@ export interface BundlerOptions {
   resolveDir?: string;
 }
 
-// Swallow informational logs in testing framework
-function log(...args: any[]) {
-  if (typeof self !== 'undefined' && self.console) {
-    self.console.log(...args);
-  }
-}
-
 const insertMetaData =
     (text: string, sourceUrl?: string) => {
       if (sourceUrl) {
@@ -100,7 +93,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
   name: 'esbuild-manifold-plugin',
   async setup(build) {
     let manifoldCADExportPath: string|null = null;
-    const manifoldCADExportSpecifier = 'manifold-3d/manifoldCAD'
+    const manifoldCADExportURLMatch = /manifold-3d(@[0-9.]+)?\/manifoldCAD/
     const ManifoldCADExportMatch = /^manifold-3d\/manifoldCAD(.ts|.js)?$/
     const manifoldCADExportNames = [
       // Manifold classes.
@@ -112,17 +105,19 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       'show', 'only', 'setMaterial',
       // GLTFNode and utilities.
       'GLTFMaterial', 'GLTFNode', 'getGLTFNodes', 'VisualizationGLTFNode',
+      'CrossSectionGLTFNode',
       // Import
       'importModel', 'importManifold',
       // Getters for global properties
       'getCircularSegments', 'getMinCircularAngle', 'getMinCircularEdgeLength',
-      'getAnimationDuration', 'getAnimationFPS', 'getAnimationMode',
+      'getRelativePrecision', 'getAnimationDuration', 'getAnimationFPS',
+      'getAnimationMode',
       // Setters for global properties.
       // These will only be defined for top level scripts
       'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-      'resetToCircularDefaults', 'setMorphStart', 'setMorphEnd',
-      'setAnimationDuration', 'setAnimationFPS', 'setAnimationMode',
-      'resetGLTFNodes',
+      'setRelativePrecision', 'resetToCircularDefaults', 'setMorphStart',
+      'setMorphEnd', 'setAnimationDuration', 'setAnimationFPS',
+      'setAnimationMode', 'resetGLTFNodes',
 
       // ManifoldCAD specific exports.
       'isManifoldCAD'
@@ -238,7 +233,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
 
         // Is this a manifoldCAD context import from a remote package?
         // e.g.: `/npm/manifold-3d/manifoldCAD/+esm`
-        if (path === cdnUrl(manifoldCADExportSpecifier, options.jsCDN)) {
+        if (path.match(manifoldCADExportURLMatch)) {
           const response = {
             path,
             namespace: 'manifold-cad-globals',
@@ -252,12 +247,14 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
 
       // Fetch urls.
       build.onLoad({filter: /.*/, namespace: 'http-url'}, async (args) => {
-        const response = await fetch(args.path);
-        if (response.ok) {
-          log(`Fetching ${args.path}.`);
+        try {
+          const response = await fetchWithRetry(args.path);
           return {contents: await response.text()};
-        } else {
-          return {errors: [{text: await response.text()}]};
+        } catch (err) {
+          if (err instanceof FetchError) {
+            return {errors: [{text: err.message}]};
+          }
+          throw err;
         }
       });
     }

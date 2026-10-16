@@ -1,4 +1,4 @@
-// Copyright 2021 The Manifold Authors.
+// Copyright 2026 The Manifold Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,228 +19,17 @@
 #include "manifold/polygon.h"
 #include "parallel.h"
 
-namespace {
-using namespace manifold;
-
-template <typename P, typename I>
-std::shared_ptr<Manifold::Impl> SmoothImpl(
-    const MeshGLP<P, I>& meshGL,
-    const std::vector<Smoothness>& sharpenedEdges) {
-  DEBUG_ASSERT(meshGL.halfedgeTangent.empty(), std::runtime_error,
-               "when supplying tangents, the normal constructor should be used "
-               "rather than Smooth().");
-
-  MeshGLP<P, I> meshTmp = meshGL;
-  meshTmp.faceID.resize(meshGL.NumTri());
-  std::iota(meshTmp.faceID.begin(), meshTmp.faceID.end(), 0);
-
-  std::shared_ptr<Manifold::Impl> impl =
-      std::make_shared<Manifold::Impl>(meshTmp);
-  impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges));
-  // Restore the original faceID
-  const size_t numTri = impl->NumTri();
-  for (size_t i = 0; i < numTri; ++i) {
-    if (meshGL.faceID.size() == numTri) {
-      impl->meshRelation_.triRef[i].faceID =
-          meshGL.faceID[impl->meshRelation_.triRef[i].faceID];
-    } else {
-      impl->meshRelation_.triRef[i].faceID = -1;
-    }
-  }
-  return impl;
-}
-}  // namespace
-
 namespace manifold {
-/**
- * Constructs a smooth version of the input mesh by creating tangents; this
- * method will throw if you have supplied tangents with your mesh already. The
- * actual triangle resolution is unchanged; use the Refine() method to
- * interpolate to a higher-resolution curve.
- *
- * By default, every edge is calculated for maximum smoothness (very much
- * approximately), attempting to minimize the maximum mean Curvature magnitude.
- * No higher-order derivatives are considered, as the interpolation is
- * independent per triangle, only sharing constraints on their boundaries.
- *
- * @param meshGL input MeshGL.
- * @param sharpenedEdges If desired, you can supply a vector of sharpened
- * halfedges, which should in general be a small subset of all halfedges. Order
- * of entries doesn't matter, as each one specifies the desired smoothness
- * (between zero and one, with one the default for all unspecified halfedges)
- * and the halfedge index (3 * triangle index + [0,1,2] where 0 is the edge
- * between triVert 0 and 1, etc).
- *
- * At a smoothness value of zero, a sharp crease is made. The smoothness is
- * interpolated along each edge, so the specified value should be thought of as
- * an average. Where exactly two sharpened edges meet at a vertex, their
- * tangents are rotated to be colinear so that the sharpened edge can be
- * continuous. Vertices with only one sharpened edge are completely smooth,
- * allowing sharpened edges to smoothly vanish at termination. A single vertex
- * can be sharpened by sharping all edges that are incident on it, allowing
- * cones to be formed.
- */
-Manifold Manifold::Smooth(const MeshGL& meshGL,
-                          const std::vector<Smoothness>& sharpenedEdges) {
-  return Manifold(SmoothImpl(meshGL, sharpenedEdges));
-}
-
-/**
- * Constructs a smooth version of the input mesh by creating tangents; this
- * method will throw if you have supplied tangents with your mesh already. The
- * actual triangle resolution is unchanged; use the Refine() method to
- * interpolate to a higher-resolution curve.
- *
- * By default, every edge is calculated for maximum smoothness (very much
- * approximately), attempting to minimize the maximum mean Curvature magnitude.
- * No higher-order derivatives are considered, as the interpolation is
- * independent per triangle, only sharing constraints on their boundaries.
- *
- * @param meshGL64 input MeshGL64.
- * @param sharpenedEdges If desired, you can supply a vector of sharpened
- * halfedges, which should in general be a small subset of all halfedges. Order
- * of entries doesn't matter, as each one specifies the desired smoothness
- * (between zero and one, with one the default for all unspecified halfedges)
- * and the halfedge index (3 * triangle index + [0,1,2] where 0 is the edge
- * between triVert 0 and 1, etc).
- *
- * At a smoothness value of zero, a sharp crease is made. The smoothness is
- * interpolated along each edge, so the specified value should be thought of as
- * an average. Where exactly two sharpened edges meet at a vertex, their
- * tangents are rotated to be colinear so that the sharpened edge can be
- * continuous. Vertices with only one sharpened edge are completely smooth,
- * allowing sharpened edges to smoothly vanish at termination. A single vertex
- * can be sharpened by sharping all edges that are incident on it, allowing
- * cones to be formed.
- */
-Manifold Manifold::Smooth(const MeshGL64& meshGL64,
-                          const std::vector<Smoothness>& sharpenedEdges) {
-  return Manifold(SmoothImpl(meshGL64, sharpenedEdges));
-}
-
-/**
- * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
- * and the rest at similarly symmetric points.
- */
-Manifold Manifold::Tetrahedron() {
-  return Manifold(std::make_shared<Impl>(Impl::Shape::Tetrahedron));
-}
-
-/**
- * Constructs a unit cube (edge lengths all one), by default in the first
- * octant, touching the origin. If any dimensions in size are negative, or if
- * all are zero, an empty Manifold will be returned.
- *
- * @param size The X, Y, and Z dimensions of the box.
- * @param center Set to true to shift the center to the origin.
- */
-Manifold Manifold::Cube(vec3 size, bool center) {
-  if (size.x < 0.0 || size.y < 0.0 || size.z < 0.0 || la::length(size) == 0.) {
-    return Invalid();
-  }
-  mat3x4 m({{size.x, 0.0, 0.0}, {0.0, size.y, 0.0}, {0.0, 0.0, size.z}},
-           center ? (-size / 2.0) : vec3(0.0));
-  return Manifold(std::make_shared<Impl>(Manifold::Impl::Shape::Cube, m));
-}
-
-/**
- * A convenience constructor for the common case of extruding a circle. Can also
- * form cones if both radii are specified.
- *
- * @param height Z-extent
- * @param radiusLow Radius of bottom circle. Must be positive.
- * @param radiusHigh Radius of top circle. Can equal zero. Default is equal to
- * radiusLow.
- * @param circularSegments How many line segments to use around the circle.
- * Default is calculated by the static Defaults.
- * @param center Set to true to shift the center to the origin. Default is
- * origin at the bottom.
- */
-Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
-                            int circularSegments, bool center) {
-  if (height <= 0.0 || radiusLow <= 0.0) {
-    return Invalid();
-  }
-  const double scale = radiusHigh >= 0.0 ? radiusHigh / radiusLow : 1.0;
-  const double radius = fmax(radiusLow, radiusHigh);
-  const int n = circularSegments > 2 ? circularSegments
-                                     : Quality::GetCircularSegments(radius);
-
-  SimplePolygon circle(n);
-  const double dPhi = 360.0 / n;
-  for (int i = 0; i < n; ++i) {
-    circle[i] = {radiusLow * cosd(dPhi * i), radiusLow * sind(dPhi * i)};
-  }
-
-  Manifold cylinder = Manifold::Extrude({circle}, height, 0, 0.0, vec2(scale));
-  if (center)
-    cylinder = cylinder.Translate(vec3(0.0, 0.0, -height / 2.0)).AsOriginal();
-  return cylinder;
-}
-
-/**
- * Constructs a geodesic sphere of a given radius.
- *
- * @param radius Radius of the sphere. Must be positive.
- * @param circularSegments Number of segments along its
- * diameter. This number will always be rounded up to the nearest factor of
- * four, as this sphere is constructed by refining an octahedron. This means
- * there are a circle of vertices on all three of the axis planes. Default is
- * calculated by the static Defaults.
- */
-Manifold Manifold::Sphere(double radius, int circularSegments) {
-  if (radius <= 0.0) {
-    return Invalid();
-  }
-  int n = circularSegments > 0 ? (circularSegments + 3) / 4
-                               : Quality::GetCircularSegments(radius) / 4;
-  auto pImpl_ = std::make_shared<Impl>(Impl::Shape::Octahedron);
-  pImpl_->Subdivide([n](vec3, vec4, vec4) { return n - 1; });
-  for_each_n(autoPolicy(pImpl_->NumVert(), 1e5), pImpl_->vertPos_.begin(),
-             pImpl_->NumVert(), [radius](vec3& v) {
-               v = la::cos(kHalfPi * (1.0 - v));
-               v = radius * la::normalize(v);
-               if (std::isnan(v.x)) v = vec3(0.0);
-             });
-  // Ignore preceding octahedron.
-  pImpl_->InitializeOriginal();
-  pImpl_->CalculateBBox();
-  pImpl_->SetEpsilon();
-  pImpl_->SortGeometry();
-  pImpl_->SetNormalsAndCoplanar();
-  return Manifold(pImpl_);
-}
-
-/**
- * Constructs a manifold from a set of polygons by extruding them along the
- * Z-axis.
- * Note that high twistDegrees with small nDivisions may cause
- * self-intersection. This is not checked here and it is up to the user to
- * choose the correct parameters.
- *
- * @param crossSection A set of non-overlapping polygons to extrude.
- * @param height Z-extent of extrusion.
- * @param nDivisions Number of extra copies of the crossSection to insert into
- * the shape vertically; especially useful in combination with twistDegrees to
- * avoid interpolation artifacts. Default is none.
- * @param twistDegrees Amount to twist the top crossSection relative to the
- * bottom, interpolated linearly for the divisions in between.
- * @param scaleTop Amount to scale the top (independently in X and Y). If the
- * scale is {0, 0}, a pure cone is formed with only a single vertex at the top.
- * Note that scale is applied after twist.
- * Default {1, 1}.
- */
-Manifold Manifold::Extrude(const Polygons& crossSection, double height,
-                           int nDivisions, double twistDegrees, vec2 scaleTop) {
-  ZoneScoped;
-  if (crossSection.size() == 0 || height <= 0.0) {
-    return Invalid();
-  }
-
+namespace {
+std::shared_ptr<Manifold::Impl> ExtrudeImpl(const Polygons& crossSection,
+                                            double height, int nDivisions,
+                                            double twistDegrees, vec2 scaleTop,
+                                            double zOffset = 0.0,
+                                            bool flipZ = false) {
   scaleTop.x = std::max(scaleTop.x, 0.0);
   scaleTop.y = std::max(scaleTop.y, 0.0);
 
-  auto pImpl_ = std::make_shared<Impl>();
+  auto pImpl_ = std::make_shared<Manifold::Impl>();
   ++nDivisions;
   auto& vertPos = pImpl_->vertPos_;
   Vec<ivec3> triVertsDH;
@@ -298,13 +87,150 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
     if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
   }
 
+  if (flipZ) {
+    for (vec3& v : vertPos) v.z = zOffset - v.z;
+    for (ivec3& tri : triVerts) std::swap(tri[1], tri[2]);
+  } else if (zOffset != 0.0) {
+    for (vec3& v : vertPos) v.z += zOffset;
+  }
+
   pImpl_->CreateHalfedges(triVertsDH);
-  pImpl_->InitializeOriginal();
   pImpl_->CalculateBBox();
-  pImpl_->SetEpsilon();
   pImpl_->SortGeometry();
-  pImpl_->SetNormalsAndCoplanar();
+  pImpl_->SetFaceAndVertNormals();
+  pImpl_->InitializeOriginal();
+  return pImpl_;
+}
+}  // namespace
+
+/**
+ * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
+ * and the rest at similarly symmetric points.
+ */
+Manifold Manifold::Tetrahedron() {
+  return Manifold(std::make_shared<Impl>(Impl::Shape::Tetrahedron));
+}
+
+/**
+ * Constructs a unit cube (edge lengths all one), by default in the first
+ * octant, touching the origin. If any dimensions in size are negative, or if
+ * all are zero, an empty Manifold will be returned.
+ *
+ * @param size The X, Y, and Z dimensions of the box.
+ * @param center Set to true to shift the center to the origin.
+ */
+Manifold Manifold::Cube(vec3 size, bool center) {
+  if (size.x < 0.0 || size.y < 0.0 || size.z < 0.0 || la::length(size) == 0.) {
+    return Invalid();
+  }
+  mat3x4 m({{size.x, 0.0, 0.0}, {0.0, size.y, 0.0}, {0.0, 0.0, size.z}},
+           center ? (-size / 2.0) : vec3(0.0));
+  return Manifold(std::make_shared<Impl>(Manifold::Impl::Shape::Cube, m));
+}
+
+/**
+ * A convenience constructor for the common case of extruding a circle. Can also
+ * form cones if both radii are specified.
+ *
+ * @param height Z-extent
+ * @param radiusLow Radius of bottom circle. Must be non-negative. If zero,
+ * radiusHigh must be positive and a cone with apex at the bottom is created.
+ * @param radiusHigh Radius of top circle. Can equal zero. Default is equal to
+ * radiusLow.
+ * @param circularSegments How many line segments to use around the circle.
+ * Default is calculated by the static Defaults.
+ * @param center Set to true to shift the center to the origin. Default is
+ * origin at the bottom.
+ */
+Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
+                            int circularSegments, bool center) {
+  if (height <= 0.0 || radiusLow < 0.0) {
+    return Invalid();
+  }
+  const bool flip = radiusLow == 0.0;
+  if (flip) {
+    if (radiusHigh <= 0.0) {
+      return Invalid();
+    }
+    std::swap(radiusLow, radiusHigh);
+  }
+  const double scale = radiusHigh >= 0.0 ? radiusHigh / radiusLow : 1.0;
+  const double radius = fmax(radiusLow, radiusHigh);
+  const int n = circularSegments > 2 ? circularSegments
+                                     : Quality::GetCircularSegments(radius);
+
+  SimplePolygon circle(n);
+  const double dPhi = 360.0 / n;
+  for (int i = 0; i < n; ++i) {
+    circle[i] = {radiusLow * cosd(dPhi * i), radiusLow * sind(dPhi * i)};
+  }
+
+  const double zOffset = (flip ? height : 0.0) - (center ? height / 2.0 : 0.0);
+  return Manifold(
+      ExtrudeImpl({circle}, height, 0, 0.0, vec2(scale), zOffset, flip));
+}
+
+/**
+ * Constructs a geodesic sphere of a given radius.
+ *
+ * @param radius Radius of the sphere. Must be positive.
+ * @param circularSegments Number of segments along its
+ * diameter. This number will always be rounded up to the nearest factor of
+ * four, as this sphere is constructed by refining an octahedron. This means
+ * there are a circle of vertices on all three of the axis planes. Default is
+ * calculated by the static Defaults.
+ */
+Manifold Manifold::Sphere(double radius, int circularSegments) {
+  if (radius <= 0.0) {
+    return Invalid();
+  }
+  int n = circularSegments > 0 ? (circularSegments + 3) / 4
+                               : Quality::GetCircularSegments(radius) / 4;
+  auto pImpl_ = std::make_shared<Impl>(Impl::Shape::Octahedron);
+  pImpl_->Subdivide([n](vec3, vec4, vec4) { return n - 1; });
+  for_each_n(autoPolicy(pImpl_->NumVert(), 1e5), pImpl_->vertPos_.begin(),
+             pImpl_->NumVert(), [radius](vec3& v) {
+               v = vec3(la::cos(kHalfPi * (1.0 - v.x)),
+                        la::cos(kHalfPi * (1.0 - v.y)),
+                        la::cos(kHalfPi * (1.0 - v.z)));
+               v = radius * la::normalize(v);
+               if (std::isnan(v.x)) v = vec3(0.0);
+             });
+  // Ignore preceding octahedron.
+  pImpl_->CalculateBBox();
+  pImpl_->SortGeometry();
+  pImpl_->SetFaceAndVertNormals();
+  pImpl_->InitializeOriginal();
   return Manifold(pImpl_);
+}
+
+/**
+ * Constructs a manifold from a set of polygons by extruding them along the
+ * Z-axis.
+ * Note that high twistDegrees with small nDivisions may cause
+ * self-intersection. This is not checked here and it is up to the user to
+ * choose the correct parameters.
+ *
+ * @param crossSection A set of non-overlapping polygons to extrude.
+ * @param height Z-extent of extrusion.
+ * @param nDivisions Number of extra copies of the crossSection to insert into
+ * the shape vertically; especially useful in combination with twistDegrees to
+ * avoid interpolation artifacts. Default is none.
+ * @param twistDegrees Amount to twist the top crossSection relative to the
+ * bottom, interpolated linearly for the divisions in between.
+ * @param scaleTop Amount to scale the top (independently in X and Y). If the
+ * scale is {0, 0}, a pure cone is formed with only a single vertex at the top.
+ * Note that scale is applied after twist.
+ * Default {1, 1}.
+ */
+Manifold Manifold::Extrude(const Polygons& crossSection, double height,
+                           int nDivisions, double twistDegrees, vec2 scaleTop) {
+  ZoneScoped;
+  if (crossSection.size() == 0 || height <= 0.0) {
+    return Invalid();
+  }
+  return Manifold(
+      ExtrudeImpl(crossSection, height, nDivisions, twistDegrees, scaleTop));
 }
 
 /**
@@ -444,15 +370,16 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   }
 
   pImpl_->CreateHalfedges(triVertsDH);
-  pImpl_->InitializeOriginal();
   pImpl_->CalculateBBox();
-  pImpl_->SetEpsilon();
   pImpl_->SortGeometry();
-  pImpl_->SetNormalsAndCoplanar();
+  pImpl_->SetFaceAndVertNormals();
+  pImpl_->InitializeOriginal();
   return Manifold(pImpl_);
 }
 
 /**
+ * Deprecated: Use BatchBoolean with OpType::Add instead.
+ *
  * Constructs a new manifold from a vector of other manifolds. This is a purely
  * topological operation, so care should be taken to avoid creating
  * overlapping results. It is the inverse operation of Decompose().
@@ -460,11 +387,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
  * @param manifolds A vector of Manifolds to lazy-union together.
  */
 Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
-  std::vector<std::shared_ptr<CsgLeafNode>> children;
-  for (const auto& manifold : manifolds) {
-    children.push_back(manifold.pNode_->ToLeafNode());
-  }
-  return Manifold(CsgLeafNode::Compose(children));
+  return BatchBoolean(manifolds, OpType::Add);
 }
 
 /**
@@ -474,11 +397,15 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
  */
 std::vector<Manifold> Manifold::Decompose() const {
   ZoneScoped;
-  DisjointSets uf(NumVert());
-  // Graph graph;
   auto pImpl_ = GetCsgLeafNode().GetImpl();
-  for (const Halfedge& halfedge : pImpl_->halfedge_) {
-    if (halfedge.IsForward()) uf.unite(halfedge.startVert, halfedge.endVert);
+  if (pImpl_->status_ != Error::NoError) {
+    return {PropagateStatus(pImpl_->status_)};
+  }
+  DisjointSets uf(NumVert());
+  for (size_t edge = 0; edge < pImpl_->halfedge_.size(); ++edge) {
+    if (pImpl_->halfedge_.IsForward(edge)) {
+      uf.unite(pImpl_->halfedge_.Start(edge), pImpl_->halfedge_.End(edge));
+    }
   }
   std::vector<int> componentIndices;
   const int numComponents = uf.connectedComponents(componentIndices);
@@ -494,9 +421,6 @@ std::vector<Manifold> Manifold::Decompose() const {
   std::vector<Manifold> meshes;
   for (int i = 0; i < numComponents; ++i) {
     auto impl = std::make_shared<Impl>();
-    // inherit original object's precision
-    impl->epsilon_ = pImpl_->epsilon_;
-    impl->tolerance_ = pImpl_->tolerance_;
 
     Vec<int> vertNew2Old(numVert);
     const int nVert =
@@ -511,17 +435,16 @@ std::vector<Manifold> Manifold::Decompose() const {
     gather(vertNew2Old.begin(), vertNew2Old.end(), pImpl_->vertNormal_.begin(),
            impl->vertNormal_.begin());
 
-    Vec<int> faceNew2Old(NumTri());
+    Vec<int> faceNew2Old;
+    faceNew2Old.reserve(NumTri());
     const auto& halfedge = pImpl_->halfedge_;
-    const int nFace =
-        copy_if(countAt(0_uz), countAt(NumTri()), faceNew2Old.begin(),
-                [i, &vertLabel, &halfedge](int face) {
-                  return vertLabel[halfedge[3 * face].startVert] == i;
-                }) -
-        faceNew2Old.begin();
+    for (size_t face = 0; face < NumTri(); ++face) {
+      if (vertLabel[halfedge.Start(static_cast<int>(3 * face))] == i) {
+        faceNew2Old.push_back(static_cast<int>(face));
+      }
+    }
 
-    if (nFace == 0) continue;
-    faceNew2Old.resize(nFace);
+    if (faceNew2Old.empty()) continue;
 
     impl->GatherFaces(*pImpl_, faceNew2Old);
     impl->ReindexVerts(vertNew2Old, pImpl_->NumVert());

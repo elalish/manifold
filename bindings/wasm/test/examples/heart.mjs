@@ -3,7 +3,7 @@
 // https://www.thingiverse.com/thing:6190
 // It also demonstrates the use of setMorph to animate a warping function.
 
-import {Manifold, GLTFNode, setMorphStart} from 'manifold-3d/manifoldCAD';
+import {GLTFNode, Manifold, setMorphStart} from 'manifold-3d/manifoldCAD';
 
 
 const func = (v) => {
@@ -22,8 +22,7 @@ const func = (v) => {
     // Taubin's function: https://mathworld.wolfram.com/HeartSurface.html
     const f = a3 * r4 * r2 - b * r4 * r - 3 * a2 * r4 + 3 * a * r2 - 1;
     // Derivative
-    const df =
-        6 * a3 * r4 * r - 5 * b * r4 - 12 * a2 * r2 * r + 6 * a * r;
+    const df = 6 * a3 * r4 * r - 5 * b * r4 - 12 * a2 * r2 * r + 6 * a * r;
     return f / df;
   };
   // Newton's method for root finding
@@ -49,8 +48,9 @@ setMorphStart(ball, func);
 const node = new GLTFNode();
 node.manifold = ball;
 node.scale = [scale, scale, scale];
+node.translation = [0, 0, scale];
 
-setAnimationDuration(5); // seconds
+setAnimationDuration(5);  // seconds
 setAnimationMode('ping-pong');
 
 export default node;

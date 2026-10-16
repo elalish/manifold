@@ -85,60 +85,6 @@ if(MANIFOLD_PAR)
   endif()
 endif()
 
-# If we're building cross_section, we need Clipper2
-if(MANIFOLD_CROSS_SECTION)
-  if(NOT MANIFOLD_USE_BUILTIN_CLIPPER2 AND NOT Clipper2_FOUND)
-    find_package(Clipper2 QUIET)
-    if(NOT Clipper2_FOUND AND PKG_CONFIG_FOUND)
-      pkg_check_modules(Clipper2 Clipper2)
-      if(Clipper2_FOUND)
-        add_library(Clipper2 SHARED IMPORTED)
-        set_property(
-          TARGET Clipper2
-          PROPERTY IMPORTED_LOCATION ${Clipper2_LINK_LIBRARIES}
-        )
-        if(WIN32)
-          set_property(
-            TARGET Clipper2
-            PROPERTY IMPORTED_IMPLIB ${Clipper2_LINK_LIBRARIES}
-          )
-        endif()
-        target_include_directories(Clipper2 INTERFACE ${Clipper2_INCLUDE_DIRS})
-      endif(Clipper2_FOUND)
-    endif(NOT Clipper2_FOUND AND PKG_CONFIG_FOUND)
-  endif(NOT MANIFOLD_USE_BUILTIN_CLIPPER2 AND NOT Clipper2_FOUND)
-  if(NOT Clipper2_FOUND)
-    logmissingdep("Clipper2" , "cross_section")
-    set(MANIFOLD_USE_BUILTIN_CLIPPER2 ON)
-    set(CLIPPER2_UTILS OFF)
-    set(CLIPPER2_EXAMPLES OFF)
-    set(CLIPPER2_TESTS OFF)
-    set(
-      CLIPPER2_USINGZ
-      OFF
-      CACHE BOOL
-      "Preempt cache default of USINGZ (we only use 2d)"
-    )
-    FetchContent_Declare(
-      Clipper2
-      GIT_REPOSITORY https://github.com/AngusJohnson/Clipper2.git
-      # Jun 15, 2025
-      GIT_TAG 11ef6ca611a732e7d75fcc1b4abe89387523fa64
-      GIT_PROGRESS TRUE
-      SOURCE_SUBDIR
-      CPP
-    )
-    FetchContent_MakeAvailable(Clipper2)
-    set_property(
-      DIRECTORY ${clipper2_SOURCE_DIR}/CPP
-      PROPERTY EXCLUDE_FROM_ALL ${BUILD_SHARED_LIBS}
-    )
-  endif()
-  if(NOT TARGET Clipper2::Clipper2)
-    add_library(Clipper2::Clipper2 ALIAS Clipper2)
-  endif()
-endif()
-
 if(TRACY_ENABLE)
   logmissingdep("tracy" , "TRACY_ENABLE")
   FetchContent_Declare(
@@ -152,8 +98,7 @@ if(TRACY_ENABLE)
   FetchContent_MakeAvailable(tracy)
 endif()
 
-# If we're supporting mesh I/O, we need assimp
-if(MANIFOLD_EXPORT)
+if(ASSIMP_ENABLE)
   find_package(assimp REQUIRED)
 endif()
 
@@ -169,6 +114,14 @@ if(MANIFOLD_PYBIND)
     # stubgen does not support version less than 3.11
     set(MANIFOLD_PYBIND_STUBGEN OFF)
     message("Python version too old, stub will not be generated")
+  endif()
+
+  if(
+    CMAKE_CXX_FLAGS MATCHES "-fsanitize=address"
+    OR CMAKE_EXE_LINKER_FLAGS MATCHES "-fsanitize=address"
+  )
+    set(MANIFOLD_PYBIND_STUBGEN OFF)
+    message("AddressSanitizer detected, Python stub generation disabled")
   endif()
 
   if(NOT MANIFOLD_USE_BUILTIN_NANOBIND)
@@ -193,12 +146,12 @@ if(MANIFOLD_PYBIND)
     FetchContent_Declare(
       nanobind
       GIT_REPOSITORY https://github.com/wjakob/nanobind.git
-      GIT_TAG v2.5.0
+      GIT_TAG v2.12.0
       GIT_PROGRESS TRUE
       EXCLUDE_FROM_ALL
     )
     FetchContent_MakeAvailable(nanobind)
-    set(NB_VERSION 2.2.0)
+    set(NB_VERSION 2.12.0)
   endif()
 
   if(NB_VERSION VERSION_LESS 2.1.0)
@@ -219,7 +172,7 @@ if(MANIFOLD_TEST)
     FetchContent_Declare(
       googletest
       GIT_REPOSITORY https://github.com/google/googletest.git
-      GIT_TAG v1.14.0
+      GIT_TAG v1.17.0
       GIT_SHALLOW TRUE
       GIT_PROGRESS TRUE
       FIND_PACKAGE_ARGS NAMES GTest gtest

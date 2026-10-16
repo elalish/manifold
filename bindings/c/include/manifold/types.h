@@ -14,6 +14,7 @@
 
 #pragma once
 #include <stddef.h>
+#include <stdint.h>
 
 // opaque pointers
 
@@ -21,6 +22,7 @@ typedef struct ManifoldManifold ManifoldManifold;
 typedef struct ManifoldManifoldVec ManifoldManifoldVec;
 typedef struct ManifoldCrossSection ManifoldCrossSection;
 typedef struct ManifoldCrossSectionVec ManifoldCrossSectionVec;
+typedef struct ManifoldRayHitVec ManifoldRayHitVec;
 typedef struct ManifoldSimplePolygon ManifoldSimplePolygon;
 typedef struct ManifoldPolygons ManifoldPolygons;
 typedef struct ManifoldMeshGL ManifoldMeshGL;
@@ -28,11 +30,7 @@ typedef struct ManifoldMeshGL64 ManifoldMeshGL64;
 typedef struct ManifoldBox ManifoldBox;
 typedef struct ManifoldRect ManifoldRect;
 typedef struct ManifoldTriangulation ManifoldTriangulation;
-
-#ifdef MANIFOLD_EXPORT
-typedef struct ManifoldMaterial ManifoldMaterial;
-typedef struct ManifoldExportOptions ManifoldExportOptions;
-#endif
+typedef struct ManifoldExecutionContext ManifoldExecutionContext;
 
 // structs
 
@@ -70,6 +68,35 @@ typedef struct ManifoldProperties {
   double volume;
 } ManifoldProperties;
 
+typedef struct ManifoldMeshGLOptions {
+  uint32_t* run_indices;
+  size_t run_indices_length;
+  uint32_t* run_original_ids;
+  size_t run_original_ids_length;
+  uint32_t* merge_from_vert;
+  uint32_t* merge_to_vert;
+  size_t merge_verts_length;
+  float* halfedge_tangents;
+} ManifoldMeshGLOptions;
+
+typedef struct ManifoldMeshGL64Options {
+  uint64_t* run_indices;
+  size_t run_indices_length;
+  uint32_t* run_original_ids;
+  size_t run_original_ids_length;
+  uint64_t* merge_from_vert;
+  uint64_t* merge_to_vert;
+  size_t merge_verts_length;
+  double* halfedge_tangents;
+} ManifoldMeshGL64Options;
+
+typedef struct ManifoldRayHit {
+  uint64_t face_id;
+  double distance;
+  ManifoldVec3 position;
+  ManifoldVec3 normal;
+} ManifoldRayHit;
+
 // enums
 
 typedef enum ManifoldOpType {
@@ -92,14 +119,9 @@ typedef enum ManifoldError {
   MANIFOLD_FACE_ID_WRONG_LENGTH,
   MANIFOLD_INVALID_CONSTRUCTION,
   MANIFOLD_RESULT_TOO_LARGE,
+  MANIFOLD_INVALID_TANGENTS,
+  MANIFOLD_CANCELLED,
 } ManifoldError;
-
-typedef enum ManifoldFillRule {
-  MANIFOLD_FILL_RULE_EVEN_ODD,
-  MANIFOLD_FILL_RULE_NON_ZERO,
-  MANIFOLD_FILL_RULE_POSITIVE,
-  MANIFOLD_FILL_RULE_NEGATIVE
-} ManifoldFillRule;
 
 typedef enum ManifoldJoinType {
   MANIFOLD_JOIN_TYPE_SQUARE,

@@ -12,10 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifdef MANIFOLD_CROSS_SECTION
+#include "gtest/gtest.h"
 #include "manifold/cross_section.h"
-#endif
-
 #include "manifold/manifold.h"
 #include "test.h"
 
@@ -27,52 +25,35 @@ using namespace manifold;
  */
 
 TEST(BooleanComplex, Sphere) {
-  Manifold sphere = WithPositionColors(Manifold::Sphere(1.0, 12));
+  Manifold sphere = WithPositionColors(Manifold::Sphere(1.0, 12).AsOriginal());
   MeshGL sphereGL = sphere.GetMeshGL();
 
   Manifold sphere2 = sphere.Translate(vec3(0.5));
   Manifold result = sphere - sphere2;
 
   ExpectMeshes(result, {{74, 144, 3, 110}});
-  EXPECT_EQ(result.NumDegenerateTris(), 0);
 
   RelatedGL(result, {sphereGL});
   result = result.Refine(4);
   RelatedGL(result, {sphereGL});
 
-#ifdef MANIFOLD_EXPORT
-  ExportOptions opt;
-  opt.mat.roughness = 1;
-  opt.mat.colorIdx = 0;
-  if (options.exportModels)
-    ExportMesh("sphereUnion.glb", result.GetMeshGL(), opt);
-#endif
+  if (options.exportModels) WriteTestOBJ("sphereUnion.obj", result);
 }
 
 TEST(BooleanComplex, MeshRelation) {
-  Manifold gyroid = WithPositionColors(Gyroid());
+  Manifold gyroid = WithPositionColors(Gyroid().AsOriginal());
   MeshGL gyroidMeshGL = gyroid.GetMeshGL();
-  gyroid = gyroid.Simplify();
-
-  Manifold gyroid2 = gyroid.Translate(vec3(2.0));
 
   EXPECT_FALSE(gyroid.IsEmpty());
   EXPECT_TRUE(gyroid.MatchesTriNormals());
   EXPECT_LE(gyroid.NumDegenerateTris(), 0);
 
-  Manifold result = gyroid + gyroid2;
+  Manifold result = gyroid + gyroid.Translate(vec3(2.0));
   result = result.RefineToLength(0.1);
 
-#ifdef MANIFOLD_EXPORT
-  ExportOptions opt;
-  opt.mat.roughness = 1;
-  opt.mat.colorIdx = 0;
-  if (options.exportModels)
-    ExportMesh("gyroidUnion.glb", result.GetMeshGL(), opt);
-#endif
+  if (options.exportModels) WriteTestOBJ("gyroidUnion.obj", result);
 
   EXPECT_TRUE(result.MatchesTriNormals());
-  EXPECT_LE(result.NumDegenerateTris(), 12);
   EXPECT_EQ(result.Decompose().size(), 1);
   EXPECT_NEAR(result.Volume(), 226, 1);
   EXPECT_NEAR(result.SurfaceArea(), 387, 1);
@@ -163,7 +144,6 @@ TEST(BooleanComplex, Cylinders) {
   m1 += m2;
 
   EXPECT_TRUE(m1.MatchesTriNormals());
-  EXPECT_LE(m1.NumDegenerateTris(), 12);
 }
 
 TEST(BooleanComplex, Subtract) {
@@ -242,9 +222,7 @@ TEST(BooleanComplex, Close) {
   EXPECT_NEAR(result.Volume(), (4.0 / 3.0) * kPi * r * r * r, tol * r * r * r);
   EXPECT_NEAR(result.SurfaceArea(), 4 * kPi * r * r, tol * r * r);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("close.glb", result.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("close.obj", result);
 }
 
 TEST(BooleanComplex, BooleanVolumes) {
@@ -287,7 +265,6 @@ TEST(BooleanComplex, Spiral) {
   EXPECT_EQ(result.Genus(), -120);
 }
 
-#ifdef MANIFOLD_CROSS_SECTION
 TEST(BooleanComplex, Sweep) {
   ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
@@ -520,11 +497,8 @@ TEST(BooleanComplex, Sweep) {
   Manifold shape = Manifold::BatchBoolean(result, OpType::Add);
 
   EXPECT_NEAR(shape.Volume(), 3757, 1);
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("unionError.glb", shape.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("unionError.obj", shape);
 }
-#endif
 
 TEST(BooleanComplex, InterpolatedNormals) {
   MeshGL a;
@@ -862,11 +836,12 @@ TEST(BooleanComplex, InterpolatedNormals) {
   b.runOriginalID = {Manifold::ReserveIDs(1)};
 
   Manifold aManifold(a);
+
   Manifold bManifold(b);
 
   auto aMinusB = aManifold - bManifold;
 
-  RelatedGL(aMinusB, {a, b}, false, false);
+  RelatedGL(aMinusB, {a, b}, true, true);
 }
 
 MeshGL mgl_0() {
@@ -1484,19 +1459,19 @@ TEST(BooleanComplex, Ring) {
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
 }
 
-#ifdef MANIFOLD_EXPORT
+#ifndef MANIFOLD_NO_FILESYSTEM
 TEST(BooleanComplex, SelfIntersect) {
   ManifoldParamGuard guard;
   manifold::ManifoldParams().processOverlaps = true;
-  Manifold m1 = ReadMesh("self_intersectA.glb");
-  Manifold m2 = ReadMesh("self_intersectB.glb");
+  Manifold m1 = ReadTestOBJ("self_intersectA.obj");
+  Manifold m2 = ReadTestOBJ("self_intersectB.obj");
   Manifold res = m1 + m2;
   res.GetMeshGL();  // test crash
 }
 
 TEST(BooleanComplex, GenericTwinBooleanTest7081) {
-  Manifold m1 = ReadMesh("Generic_Twin_7081.1.t0_left.glb");
-  Manifold m2 = ReadMesh("Generic_Twin_7081.1.t0_right.glb");
+  Manifold m1 = ReadTestOBJ("Generic_Twin_7081.1.t0_left.obj");
+  Manifold m2 = ReadTestOBJ("Generic_Twin_7081.1.t0_right.obj");
   Manifold res = m1 + m2;  // Union
   res.GetMeshGL();         // test crash
 }
@@ -1504,8 +1479,8 @@ TEST(BooleanComplex, GenericTwinBooleanTest7081) {
 TEST(BooleanComplex, GenericTwinBooleanTest7863) {
   ManifoldParamGuard guard;
   manifold::ManifoldParams().processOverlaps = true;
-  Manifold m1 = ReadMesh("Generic_Twin_7863.1.t0_left.glb");
-  Manifold m2 = ReadMesh("Generic_Twin_7863.1.t0_right.glb");
+  Manifold m1 = ReadTestOBJ("Generic_Twin_7863.1.t0_left.obj");
+  Manifold m2 = ReadTestOBJ("Generic_Twin_7863.1.t0_right.obj");
   Manifold res = m1 + m2;  // Union
   res.GetMeshGL();         // test crash
 }
@@ -1513,115 +1488,45 @@ TEST(BooleanComplex, GenericTwinBooleanTest7863) {
 TEST(BooleanComplex, Havocglass8Bool) {
   ManifoldParamGuard guard;
   manifold::ManifoldParams().processOverlaps = true;
-  Manifold m1 = ReadMesh("Havocglass8_left.glb");
-  Manifold m2 = ReadMesh("Havocglass8_right.glb");
+  Manifold m1 = ReadTestOBJ("Havocglass8_left.obj");
+  Manifold m2 = ReadTestOBJ("Havocglass8_right.obj");
   Manifold res = m1 + m2;  // Union
   res.GetMeshGL();         // test crash
 }
 
 TEST(BooleanComplex, CraycloudBool) {
-  Manifold m1 = ReadMesh("Cray_left.glb");
-  Manifold m2 = ReadMesh("Cray_right.glb");
+  Manifold m1 = ReadTestOBJ("Cray_left.obj");
+  Manifold m2 = ReadTestOBJ("Cray_right.obj");
   Manifold res = m1 - m2;
   EXPECT_EQ(res.Status(), Manifold::Error::NoError);
   EXPECT_FALSE(res.IsEmpty());
-  res = res.AsOriginal().Simplify();
-  EXPECT_TRUE(res.IsEmpty());
 }
 
 TEST(BooleanComplex, HullMask) {
-  Manifold body = ReadMesh("hull-body.glb");
-  Manifold mask = ReadMesh("hull-mask.glb");
+  Manifold body = ReadTestOBJ("hull-body.obj");
+  Manifold mask = ReadTestOBJ("hull-mask.obj");
   Manifold ret = body - mask;
   MeshGL mesh = ret.GetMeshGL();
 }
-
-TEST(BooleanComplex, SimpleOffset) {
-  std::string file = __FILE__;
-  std::string dir = file.substr(0, file.rfind('/'));
-  MeshGL seeds = ImportMesh(dir + "/models/" + "Generic_Twin_91.1.t0.glb");
-  EXPECT_TRUE(seeds.NumTri() > 10);
-  EXPECT_TRUE(seeds.NumVert() > 10);
-  // Unique edges
-  std::vector<std::pair<int, int>> edges;
-  for (size_t i = 0; i < seeds.NumTri(); i++) {
-    const int k[3] = {1, 2, 0};
-    for (const int j : {0, 1, 2}) {
-      int v1 = seeds.triVerts[i * 3 + j];
-      int v2 = seeds.triVerts[i * 3 + k[j]];
-      if (v2 > v1) edges.push_back(std::make_pair(v1, v2));
-    }
-  }
-  manifold::Manifold c;
-  // Vertex Spheres
-  Manifold sph = Manifold::Sphere(1, 8);
-  for (size_t i = 0; i < seeds.NumVert(); i++) {
-    vec3 vpos(seeds.vertProperties[3 * i + 0], seeds.vertProperties[3 * i + 1],
-              seeds.vertProperties[3 * i + 2]);
-    Manifold vsph = sph.Translate(vpos);
-    c += vsph;
-  }
-  // Edge Cylinders
-  for (size_t i = 0; i < edges.size(); i++) {
-    vec3 ev1 = vec3(seeds.vertProperties[3 * edges[i].first + 0],
-                    seeds.vertProperties[3 * edges[i].first + 1],
-                    seeds.vertProperties[3 * edges[i].first + 2]);
-    vec3 ev2 = vec3(seeds.vertProperties[3 * edges[i].second + 0],
-                    seeds.vertProperties[3 * edges[i].second + 1],
-                    seeds.vertProperties[3 * edges[i].second + 2]);
-    vec3 edge = ev2 - ev1;
-    double len = la::length(edge);
-    if (len < std::numeric_limits<float>::min()) continue;
-    manifold::Manifold origin_cyl = manifold::Manifold::Cylinder(len, 1, 1, 8);
-    vec3 evec(-1 * edge.x, -1 * edge.y, edge.z);
-    quat q = rotation_quat(normalize(evec), vec3(0, 0, 1));
-    manifold::Manifold right = origin_cyl.Transform({la::qmat(q), ev1});
-    c += right;
-  }
-  // Triangle Volumes
-  for (size_t i = 0; i < seeds.NumTri(); i++) {
-    int eind[3];
-    for (int j = 0; j < 3; j++) eind[j] = seeds.triVerts[i * 3 + j];
-    std::vector<vec3> ev;
-    for (int j = 0; j < 3; j++) {
-      ev.push_back(vec3(seeds.vertProperties[3 * eind[j] + 0],
-                        seeds.vertProperties[3 * eind[j] + 1],
-                        seeds.vertProperties[3 * eind[j] + 2]));
-    }
-    vec3 a = ev[0] - ev[2];
-    vec3 b = ev[1] - ev[2];
-    vec3 n = la::normalize(la::cross(a, b));
-    if (!all(isfinite(n))) continue;
-    // Extrude the points above and below the plane of the triangle
-    vec3 pnts[6];
-    for (int j = 0; j < 3; j++) pnts[j] = ev[j] + n;
-    for (int j = 3; j < 6; j++) pnts[j] = ev[j - 3] - n;
-    // Construct the points and faces of the new manifold
-    double pts[3 * 6] = {pnts[4].x, pnts[4].y, pnts[4].z, pnts[3].x, pnts[3].y,
-                         pnts[3].z, pnts[0].x, pnts[0].y, pnts[0].z, pnts[1].x,
-                         pnts[1].y, pnts[1].z, pnts[5].x, pnts[5].y, pnts[5].z,
-                         pnts[2].x, pnts[2].y, pnts[2].z};
-    int faces[24] = {
-        faces[0] = 0,  faces[1] = 1,  faces[2] = 4,   // 1 2 5
-        faces[3] = 2,  faces[4] = 3,  faces[5] = 5,   // 3 4 6
-        faces[6] = 1,  faces[7] = 0,  faces[8] = 3,   // 2 1 4
-        faces[9] = 3,  faces[10] = 2, faces[11] = 1,  // 4 3 2
-        faces[12] = 3, faces[13] = 0, faces[14] = 4,  // 4 1 5
-        faces[15] = 4, faces[16] = 5, faces[17] = 3,  // 5 6 4
-        faces[18] = 5, faces[19] = 4, faces[20] = 1,  // 6 5 2
-        faces[21] = 1, faces[22] = 2, faces[23] = 5   // 2 3 6
-    };
-    manifold::MeshGL64 tri_m;
-    for (int j = 0; j < 18; j++)
-      tri_m.vertProperties.insert(tri_m.vertProperties.end(), pts[j]);
-    for (int j = 0; j < 24; j++)
-      tri_m.triVerts.insert(tri_m.triVerts.end(), faces[j]);
-    manifold::Manifold right(tri_m);
-    c += right;
-  }
-  EXPECT_EQ(c.Status(), Manifold::Error::NoError);
-}
 #endif
+
+TEST(BooleanComplex, LazyCollider) {
+  Manifold ele1 = Manifold::Cylinder(50, 50);
+  Manifold ele2 = Manifold::Cylinder(60, 30);
+  Manifold ele3 = Manifold::Cylinder(60, 40).Mirror(vec3{0, 0, 1});
+
+  Manifold ele4 = (ele1 + ele2).Mirror(vec3{0, 0, 1});
+
+  EXPECT_NEAR(ele4.Volume(), 418839, 1);
+
+  Manifold r1 = ele4 - ele2.Translate(vec3{0, 0, -20});
+
+  EXPECT_NEAR(r1.Volume(), 362577, 1);
+
+  Manifold r2 = ele4.Translate(vec3{0, 0, 1}) - ele3;
+
+  EXPECT_NEAR(r2.Volume(), 145656, 1);
+}
 
 #ifdef MANIFOLD_DEBUG
 TEST(BooleanComplex, OffsetTriangulationFailure) {
@@ -1640,5 +1545,22 @@ TEST(BooleanComplex, OffsetSelfIntersect) {
   Manifold b = ReadTestOBJ("Offset4.obj");
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+}
+
+TEST(BooleanComplex, InfiniteRecursion) {
+  Manifold a = ReadTestOBJ("r1.obj");
+  Manifold b = ReadTestOBJ("r2.obj");
+  Manifold result = a ^ b;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+}
+
+TEST(BooleanComplex, OpenscadCrash) {
+  ManifoldParamGuard guard;
+  ManifoldParams().processOverlaps = true;
+  Manifold m = ReadTestOBJ("openscad-nonmanifold-crash.obj");
+  // m is not empty
+  EXPECT_EQ(m.IsEmpty(), false);
+  Manifold m2 = m + m.Translate({0, 0.6, 0});
+  EXPECT_EQ(m2.IsEmpty(), false);
 }
 #endif

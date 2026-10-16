@@ -92,7 +92,7 @@ inline double Dist2(vec3 v) { return manifold::la::dot(v, v); }
 inline Givens ApproximateGivensQuaternion(Symmetric3x3& A) {
   Givens g{2.0 * (A.m_00 - A.m_11), A.m_10};
   bool b = _gamma * g.sh * g.sh < g.ch * g.ch;
-  double w = 1.0 / hypot(g.ch, g.sh);
+  double w = 1.0 / std::sqrt(g.ch * g.ch + g.sh * g.sh);
   if (!std::isfinite(w)) b = 0;
   return Givens{b ? w * g.ch : _cStar, b ? w * g.sh : _sStar};
 }
@@ -190,11 +190,11 @@ inline Givens QRGivensQuaternion(double a1, double a2) {
   // a1 = pivot point on diagonal
   // a2 = lower triangular entry we want to annihilate
   double epsilon = _SVD_EPSILON;
-  double rho = hypot(a1, a2);
+  double rho = std::sqrt(a1 * a1 + a2 * a2);
   Givens g{fabs(a1) + fmax(rho, epsilon), rho > epsilon ? a2 : 0};
   bool b = a1 < 0.0;
   CondSwap(b, g.sh, g.ch);
-  double w = 1.0 / hypot(g.ch, g.sh);
+  double w = 1.0 / std::sqrt(g.ch * g.ch + g.sh * g.sh);
   g.ch *= w;
   g.sh *= w;
   return g;
@@ -293,6 +293,20 @@ inline SVDSet SVD(mat3 A) {
 }
 
 /**
+ * Returns the pseudo-inverse of A, which is equal to the inverse if A is
+ * invertible, and otherwise gives a solution to A * x = b that minimizes the
+ * norm of x.
+ */
+inline mat3 PseudoInverse(mat3 A) {
+  SVDSet usv = SVD(A);
+  mat3 invS;
+  for (const int i : {0, 1, 2}) {
+    invS[i][i] = usv.S[i][i] > _SVD_EPSILON ? 1.0 / usv.S[i][i] : 0.0;
+  }
+  return usv.V * invS * la::transpose(usv.U);
+}
+
+/**
  * Returns the largest singular value of A.
  *
  * @param A The matrix to measure.
@@ -300,5 +314,25 @@ inline SVDSet SVD(mat3 A) {
 inline double SpectralNorm(mat3 A) {
   SVDSet usv = SVD(A);
   return usv.S[0][0];
+}
+
+/**
+ * Returns the largest singular value (spectral norm) of a 2x2 matrix, via the
+ * closed-form eigenvalues of A^T A. The mat3 overload would floor the norm if a
+ * 2D linear map were embedded in 3D.
+ *
+ * @param A The matrix to measure.
+ */
+inline double SpectralNorm(mat2 A) {
+  const vec2 c0 = A[0];
+  const vec2 c1 = A[1];
+  const double m00 = la::dot(c0, c0);
+  const double m11 = la::dot(c1, c1);
+  const double m01 = la::dot(c0, c1);
+  const double trace = m00 + m11;
+  const double det = m00 * m11 - m01 * m01;
+  const double disc2 = trace * trace - 4.0 * det;
+  const double disc = std::sqrt(disc2 > 0.0 ? disc2 : 0.0);
+  return std::sqrt(0.5 * (trace + disc));
 }
 }  // namespace manifold

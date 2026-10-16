@@ -24,24 +24,24 @@
  * functions are available in manifoldCAD.
  *
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Input/Output
- * @groupDescription Modelling Functions
- * These functions are available within manifoldCAD.
  * @groupDescription Low Level Functions
  * These functions are not available within manifoldCAD, but can be used when
  * including manifold in another project.
  */
 
-import type * as GLTFTransform from '@gltf-transform/core';
+import * as GLTFTransform from '@gltf-transform/core';
 
 import type {Manifold, Mesh, Vec3} from '../manifold.d.ts';
 
 import {ImportError, UnsupportedFormatError} from './error.ts';
 import * as gltfIO from './gltf-io.ts';
 import {VisualizationGLTFNode} from './gltf-node.ts';
+import * as import3MF from './import-3mf.ts';
 import {setMaterialByID} from './material.ts';
-import {findExtension, findMimeType, isNode} from './util.ts';
+import {euler2quat, multiplyQuat} from './math.ts';
+import {fetchWithRetry, findExtension, findMimeType, isNode} from './util.ts';
 import {getManifoldModuleSync} from './wasm.ts';
 
 /**
@@ -78,7 +78,7 @@ export interface Importer {
 /**
  * @group Management
  * @inline
- * @hidden
+ * @internal
  */
 export interface ImportOptions {
   /**
@@ -95,15 +95,13 @@ export interface ImportOptions {
 
 const importers: Array<Importer> = [];
 register(gltfIO);
+register(import3MF);
 
 const id2mesh = new Map<number, GLTFTransform.Mesh>();
-const mesh2node = new Map<GLTFTransform.Mesh, GLTFTransform.Node>();
+const mesh2node = new Map<GLTFTransform.Mesh, Array<GLTFTransform.Node>>();
 const mesh2mesh = new Map<Mesh, GLTFTransform.Mesh>();
 const node2doc = new Map<GLTFTransform.Node, GLTFTransform.Document>();
 
-/**
- * @internal
- */
 export const cleanup = () => {
   id2mesh.clear();
   mesh2node.clear();
@@ -117,7 +115,7 @@ export const cleanup = () => {
 export const getDocumentByID = (runID: number): GLTFTransform.Document|null => {
   const mesh = id2mesh.get(runID);
   if (!mesh) return null;
-  const node = mesh2node.get(mesh);
+  const [node] = mesh2node.get(mesh) ?? [];
   if (!node) return null;
   return node2doc.get(node) ?? null;
 };
@@ -134,6 +132,33 @@ function getImporter(identifier: ImportFormat|string) {
   const format =
       typeof identifier === 'string' ? getFormat(identifier) : identifier;
   return importers.find(im => im.importFormats.includes(format))!;
+}
+
+function getSourceFilename(source: string|Blob|URL|ArrayBuffer): string|
+    undefined {
+  let path: string|undefined;
+  if (source instanceof URL) {
+    if (source.protocol === 'blob:' || source.protocol === 'data:') return;
+    path = source.pathname;
+  } else if (typeof source === 'string') {
+    if (source.startsWith('blob:') || source.startsWith('data:')) return;
+    try {
+      const url = new URL(source);
+      if (url.protocol === 'blob:' || url.protocol === 'data:') return;
+      path = url.pathname;
+    } catch {
+      path = source;
+    }
+  }
+  if (!path) return;
+
+  const filename = path.split(/[\/\\]/).pop();
+  if (!filename) return;
+  try {
+    return decodeURIComponent(filename);
+  } catch {
+    return filename;
+  }
 }
 
 /**
@@ -167,9 +192,6 @@ export function register(importer: Importer) {
 
 /**
  * Import a model, for display only.
- *
- * @group Modelling Functions
- * @returns
  */
 export async function importModel(
     source: string|Blob|URL|ArrayBuffer,
@@ -181,11 +203,15 @@ export async function importModel(
         `Model imported from \`${source}\` contains no nodes.`);
   }
 
-  const targetNode = new VisualizationGLTFNode(sourceDoc);
+  const targetNode = new VisualizationGLTFNode();
+  targetNode.document = sourceDoc
   if (sourceNodes.length == 1) {
     const [sourceNode] = sourceNodes;
     targetNode.node = sourceNode;
-    targetNode.name = sourceNode.getName();
+    targetNode.name = sourceNode.getName() || getSourceFilename(source);
+  }
+  else {
+    targetNode.name = getSourceFilename(source);
   }
   if (typeof source === 'string') targetNode.uri = source;
 
@@ -200,15 +226,13 @@ export async function importModel(
  * and then union the results together.  If a child node has no mesh, the mesh
  * has no geometry, or the mesh is not manifold, that child node will be
  * silently excluded.
- *
- * @group Modelling Functions
  */
 export async function importManifold(
     source: string|Blob|URL|ArrayBuffer,
     options: ImportOptions = {}): Promise<Manifold> {
   const {document, node} = await importModel(source, options);
   try {
-    return gltfDocToManifold(document, node, options.tolerance);
+    return gltfDocToManifold(document!, node, options.tolerance);
   } catch (e) {
     if (e instanceof ImportError) {
       const newError = new Error(
@@ -280,7 +304,7 @@ export async function readModel(
 export async function fetchModel(
     uri: string, options: ImportOptions = {}): Promise<GLTFTransform.Document> {
   const importer = getImporter(options.mimetype ?? uri);
-  const response = await fetch(uri);
+  const response = await fetchWithRetry(uri);
   const blob = await response.blob();
   return importTransform(
       await importer.fromArrayBuffer(await blob.arrayBuffer(), options));
@@ -339,17 +363,33 @@ export async function readFile(filename: string, options: ImportOptions = {}) {
  * Scale and transform imported geometry.
  *
  * glTF has a defined scale of 1:1 metre.
- * manifoldCAD has a defined scale of 1:1 mm.
+ * ManifoldCAD has a defined scale of 1:1 mm.
  *
- * @internal
+ * glTF defines up as '+Y'.
+ * ManifoldCAD defines up as '+Z'.
  */
 function importTransform(doc: GLTFTransform.Document): GLTFTransform.Document {
-  // Find top level nodes and correct their scale.
-  for (const sourceNode of doc.getRoot().listNodes()) {
-    if (sourceNode.getParentNode()) continue;
+  for (const scene of doc.getRoot().listScenes()) {
+    const nodes =
+        scene.listChildren().filter(c => c instanceof GLTFTransform.Node);
+    const rotate = euler2quat([90, 0, 0]);
+    const scale = 1000;
 
-    const scale = sourceNode.getScale();
-    sourceNode.setScale([scale[0] * 1000, scale[1] * 1000, scale[2] * 1000]);
+    if (nodes.length === 1) {
+      // If there's just one node, transform it in place.
+      const [node] = nodes;
+      node.setScale(node.getScale().map(n => n * scale) as GLTFTransform.vec3);
+      node.setRotation(multiplyQuat(node.getRotation(), rotate));
+
+    } else {
+      // If there's more than one node, create a parent node and transform that.
+      const parent = doc.createNode();
+      for (const node of nodes) parent.addChild(node);
+
+      parent.setScale([scale, scale, scale]);
+      parent.setRotation(rotate);
+      scene.addChild(parent);
+    }
   }
   return doc;
 }
@@ -382,17 +422,21 @@ export function gltfDocToManifold(
  * nodes in a document, and convert them to Mesh objects.  Meshless nodes will
  * be silently skipped.
  *
- * @internal
  */
 function gltfNodeToMeshes(
     document: GLTFTransform.Document, node?: GLTFTransform.Node): Array<Mesh> {
-  const getDescendants = (root: GLTFTransform.Node) => {
-    const descendants: Array<GLTFTransform.Node> = [];
-    root.traverse(descendant => descendants.push(descendant));
-    return descendants;
-  };
-  const descendants: Array<GLTFTransform.Node> =
-      node ? getDescendants(node) : document.getRoot().listNodes();
+  const descendants: Array<GLTFTransform.Node> = [];
+  const getDescendants = (root: GLTFTransform.Node) =>
+      root.traverse(node => descendants.push(node));
+
+  if (node) {
+    getDescendants(node);
+  } else {
+    for (const node of document.getRoot().listNodes()) {
+      if (node.getParentNode()) continue;
+      getDescendants(node);
+    }
+  }
 
   return descendants
       .map(descendant => {
@@ -400,9 +444,12 @@ function gltfNodeToMeshes(
         if (!gltfmesh) return null;
 
         node2doc.set(descendant, document);
-        mesh2node.set(gltfmesh, descendant);
+        const nodes = mesh2node.get(gltfmesh) ?? [];
+        nodes.push(descendant);
+        mesh2node.set(gltfmesh, nodes);
 
-        return gltfMeshToMesh(gltfmesh);
+        const mesh = gltfMeshToMesh(gltfmesh);
+        return mesh;
       })
       .filter(mesh => !!mesh);
 }
@@ -410,7 +457,6 @@ function gltfNodeToMeshes(
 /**
  * Convert a Mesh into a Manifold.  Returns null if the result is not manifold
  * or is empty.  All other exceptions will be re-thrown.
- * @internal
  */
 const tryToMakeManifold = (mesh: Mesh): Manifold|null => {
   const {Manifold} = getManifoldModuleSync()!;
@@ -434,10 +480,10 @@ const tryToMakeManifold = (mesh: Mesh): Manifold|null => {
  * Manifold objects, and return the union.  Non-manifold Meshes will be silently
  * skipped.
  *
- * @internal
  */
 function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
   const {Manifold} = getManifoldModuleSync()!;
+  const mesh2nextNode = new Map<GLTFTransform.Mesh, number>();
 
   const manifolds = [];
   for (const mesh of meshes) {
@@ -460,7 +506,10 @@ function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
     // the original glTF-transform node.  Find that node, and transform it back
     // if possible.
     const sourceMesh = mesh2mesh.get(mesh);
-    const sourceNode = sourceMesh ? mesh2node.get(sourceMesh) : null;
+    const sourceNodes = sourceMesh ? mesh2node.get(sourceMesh) : null;
+    const nextNode = sourceMesh ? (mesh2nextNode.get(sourceMesh) ?? 0) : 0;
+    const sourceNode = sourceNodes?.[nextNode] ?? null;
+    if (sourceMesh && sourceNode) mesh2nextNode.set(sourceMesh, nextNode + 1);
     if (sourceNode) {
       manifolds.push(manifold.transform(sourceNode.getWorldMatrix()));
     } else {
@@ -486,7 +535,6 @@ function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
  * (properties) to be copied into an exported GLTF document.  It will also set
  * ManifoldCAD materials (a subset of GLTF materials) as a fallback.
  *
- * @internal
  */
 function gltfMeshToMesh(gltfmesh: GLTFTransform.Mesh): Mesh {
   const {Manifold, Mesh} = getManifoldModuleSync()!;
@@ -514,7 +562,7 @@ function gltfMeshToMesh(gltfmesh: GLTFTransform.Mesh): Mesh {
       // 'POSITION' is always present; we don't need to specify it.
       attributes: attributes.filter(x => x !== 'POSITION'),
       alpha: material.getAlpha(),
-      baseColorFactor: material.getBaseColorFactor() as any as Vec3,
+      baseColorFactor: material.getBaseColorFactor().slice(0, 3) as Vec3,
       metallic: material.getMetallicFactor(),
       roughness: material.getRoughnessFactor(),
       name: material.getName(),

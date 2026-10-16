@@ -15,7 +15,7 @@ const ball = sphere(60, 100);
 // a GLTFNode, an array of Manifold or GLTFNode objects, or even a function
 // that returns one of those options.
 // See Menger Sponge, Gyroid Module and Involute Gear Library examples.
-const result = box.subtract(ball);
+const result = box.subtract(ball).translate([0, 0, 50]);
 export default result;
 
 // For visual debug, wrap any shape with show() and it and all of its
@@ -29,7 +29,8 @@ export default result;
 
 // See the script drop-down above ("Intro") for usage examples.
 
-// Use GLTFNode for disjoint manifolds rather than compose(), as this will
-// keep them better organized in the GLB. This will also allow you to
-// specify animation, material properties, and even vertex colors via
-// setProperties(). See Tetrahedron Puzzle example.
+// Use GLTFNode for disjoint manifolds (rather than union() or add()),
+// as this will keep them better organized in the GLB. This will also
+// allow you to specify animation, material properties, and even vertex
+// colors via setProperties().
+// See Tetrahedron Puzzle example.

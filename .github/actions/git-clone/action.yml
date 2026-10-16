@@ -1,0 +1,41 @@
+name: download and cache git repo
+description: this simply dumps it in the current directory...
+inputs:
+  name:
+    required: true
+  url:
+    required: true
+  rev:
+    default: ''
+  tag:
+    default: ''
+
+runs:
+  using: "composite"
+  steps:
+    - name: setup cache
+      id: cache
+      uses: actions/cache@v5
+      with:
+        path: ${{inputs.name}}
+        key: ${{inputs.url}}@${{inputs.rev}}${{inputs.tag}}
+
+    - name: download rev
+      if: steps.cache.outputs.cache-hit != 'true' && inputs.rev != ''
+      shell: bash
+      run: |
+        mkdir ${{inputs.name}}
+        cd ${{inputs.name}}
+        git init
+        git remote add origin ${{inputs.url}}
+        git fetch --depth 1 origin ${{inputs.rev}}
+        git checkout ${{inputs.rev}}
+        git submodule update --init --recursive
+
+    - name: download tag
+      if: steps.cache.outputs.cache-hit != 'true' && inputs.tag != ''
+      shell: bash
+      run: |
+        git clone --branch ${{inputs.tag}} --depth 1 ${{inputs.url}} ${{inputs.name}}
+        cd ${{inputs.name}}
+        git submodule update --init --recursive

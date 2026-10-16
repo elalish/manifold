@@ -21,7 +21,7 @@ EOT
 cp -r ../manifold ./
 mkdir build
 cd build
-cmake ..
+cmake -DFETCHCONTENT_SOURCE_DIR_TBB=$TBB ..
 make
 ./testing
 

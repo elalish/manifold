@@ -4,3 +4,13 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      # Routine bumps arrive as one PR; majors stay separate so each can be
+      # reviewed against its own changelog.
+      actions:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]

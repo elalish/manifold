@@ -12,17 +12,49 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <atomic>
+#include <limits>
+#include <numeric>
+#include <thread>
+
 #include "../src/utils.h"
+#include "gtest/gtest.h"
+#include "manifold/common.h"
 #include "manifold/manifold.h"
 #include "test.h"
 
 using namespace manifold;
 
+#if MANIFOLD_PAR == 1
+namespace {
+// Sense-reversing spin barrier (std::barrier is C++20). Lazy CSG-node
+// realization is one-shot, so all workers must first-touch a shared node
+// together to race deterministically under ThreadSanitizer. Used by the
+// concurrent-shared-node tests below.
+struct SpinBarrier {
+  const int n;
+  std::atomic<int> arrived{0};
+  std::atomic<int> generation{0};
+  explicit SpinBarrier(int n) : n(n) {}
+  void Sync() {
+    const int gen = generation.load(std::memory_order_acquire);
+    if (arrived.fetch_add(1, std::memory_order_acq_rel) + 1 == n) {
+      arrived.store(0, std::memory_order_release);
+      generation.fetch_add(1, std::memory_order_acq_rel);
+    } else {
+      while (generation.load(std::memory_order_acquire) == gen)
+        std::this_thread::yield();
+    }
+  }
+};
+}  // namespace
+#endif
+
 /**
  * The very simplest Boolean operation test.
  */
 TEST(Boolean, Tetra) {
-  Manifold tetra = WithPositionColors(Manifold::Tetrahedron());
+  Manifold tetra = WithPositionColors(Manifold::Tetrahedron().AsOriginal());
   MeshGL tetraGL = tetra.GetMeshGL();
   EXPECT_TRUE(!tetra.IsEmpty());
 
@@ -36,21 +68,23 @@ TEST(Boolean, Tetra) {
 
 TEST(Boolean, MeshGLRoundTrip) {
   Manifold cube = Manifold::Cube(vec3(2));
-  ASSERT_GE(cube.OriginalID(), 0);
+  ASSERT_EQ(cube.OriginalID(), 0);
+  cube = cube.AsOriginal();
+  ASSERT_GT(cube.OriginalID(), 0);
   const MeshGL original = cube.GetMeshGL();
 
   Manifold result = cube + cube.Translate({1, 1, 0});
 
   ASSERT_LT(result.OriginalID(), 0);
-  ExpectMeshes(result, {{18, 32}});
+  ExpectMeshes(result, {{16, 28}});
   RelatedGL(result, {original});
 
-  MeshGL inGL = result.GetMeshGL();
+  MeshGL inGL = result.TriID2FaceID().GetMeshGL();
   ASSERT_EQ(inGL.runOriginalID.size(), 2);
   const Manifold result2(inGL);
 
   ASSERT_LT(result2.OriginalID(), 0);
-  ExpectMeshes(result2, {{18, 32}});
+  ExpectMeshes(result2, {{16, 28}});
   RelatedGL(result2, {original});
 
   const MeshGL outGL = result2.GetMeshGL();
@@ -61,7 +95,7 @@ TEST(Boolean, Normals) {
   MeshGL cubeGL = CubeSTL();
   cubeGL.Merge();
   const Manifold cube(cubeGL);
-  const Manifold sphere = Manifold::Sphere(60).CalculateNormals(0);
+  const Manifold sphere = Manifold::Sphere(60).CalculateNormals(0).AsOriginal();
   const MeshGL sphereGL = sphere.GetMeshGL();
 
   Manifold result =
@@ -71,27 +105,30 @@ TEST(Boolean, Normals) {
 
   RelatedGL(result, {cubeGL, sphereGL}, true, true);
 
-  MeshGL output = result.GetMeshGL(0);
+  MeshGL output = result.TriID2FaceID().GetMeshGL();
 
-#ifdef MANIFOLD_EXPORT
-  ExportOptions opt;
-  opt.faceted = false;
-  opt.mat.roughness = 0;
-  opt.mat.normalIdx = 0;
-  if (options.exportModels) ExportMesh("normals.glb", output, opt);
-#endif
+  if (options.exportModels) WriteTestOBJ("normals.obj", result);
 
   output.mergeFromVert.clear();
   output.mergeToVert.clear();
   output.Merge();
   Manifold roundTrip(output);
 
-  RelatedGL(roundTrip, {cubeGL, sphereGL}, true, false);
+  RelatedGL(roundTrip, {cubeGL, sphereGL}, true, true);
+}
+
+TEST(Boolean, MissingNormals) {
+  const Manifold noNormals = Manifold::Cube(vec3(1), true);
+  const Manifold hasNormals =
+      Manifold::Cube(vec3(2), true).Translate({0, 0, -1}).CalculateNormals(0);
+  const MeshGL combo = (noNormals + hasNormals).GetMeshGL(0);
+  Manifold result(combo);
+  EXPECT_FALSE(result.IsEmpty());
 }
 
 TEST(Boolean, EmptyOriginal) {
-  const Manifold cube = Manifold::Cube();
-  const Manifold tet = Manifold::Tetrahedron();
+  const Manifold cube = Manifold::Cube().AsOriginal();
+  const Manifold tet = Manifold::Tetrahedron().AsOriginal();
   const Manifold result = tet - cube.Translate({3, 4, 5});
   const MeshGL mesh = result.GetMeshGL();
   ASSERT_EQ(mesh.runIndex.size(), 3);
@@ -129,45 +166,104 @@ TEST(Boolean, Cubes) {
   result += Manifold::Cube({1.2, 0.1, 0.5}).Translate({-0.6, -0.1, 0});
 
   EXPECT_TRUE(result.MatchesTriNormals());
-  EXPECT_LE(result.NumDegenerateTris(), 0);
   EXPECT_NEAR(result.Volume(), 1.6, 0.001);
   EXPECT_NEAR(result.SurfaceArea(), 9.2, 0.01);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("cubes.glb", result.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("cubes.obj", result);
+}
+
+TEST(Boolean, Cubes2) {
+  Manifold cube = Manifold::Cube();
+
+  Manifold result = cube + cube.Rotate(0, 0, 45);
+
+  ExpectMeshes(result, {{12, 20}});
+
+  if (options.exportModels) WriteTestOBJ("cubes2.obj", result);
+}
+
+TEST(Boolean, DeterminismSimpleSubtract) {
+  const Manifold a = Manifold::Cube({1, 1, 1}, true);
+  const Manifold b = Manifold::Cube({1, 1, 1}, true).Translate({0.5, 0, 0});
+  const Manifold out = a - b;
+
+  EXPECT_EQ(out.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(out.IsEmpty());
+  EXPECT_TRUE(out.MatchesTriNormals());
+  EXPECT_NEAR(out.Volume(), 0.5, 1e-6);
+
+  if (options.exportModels) WriteTestOBJ("det_simple_subtract.obj", out);
+}
+
+TEST(Boolean, DeterminismSimpleUnion) {
+  const Manifold a = Manifold::Cube({1, 1, 1}, true);
+  const Manifold b = Manifold::Cube({1, 1, 1}, true).Translate({0.5, 0, 0});
+  const Manifold out = a + b;
+
+  EXPECT_EQ(out.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(out.IsEmpty());
+  EXPECT_TRUE(out.MatchesTriNormals());
+  EXPECT_NEAR(out.Volume(), 1.5, 1e-6);
+
+  if (options.exportModels) WriteTestOBJ("det_simple_union.obj", out);
+}
+
+TEST(Boolean, DeterminismSimpleIntersect) {
+  const Manifold a = Manifold::Cube({1, 1, 1}, true);
+  const Manifold b = Manifold::Cube({1, 1, 1}, true).Translate({0.5, 0, 0});
+  const Manifold out = a ^ b;
+
+  EXPECT_EQ(out.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(out.IsEmpty());
+  EXPECT_TRUE(out.MatchesTriNormals());
+  EXPECT_NEAR(out.Volume(), 0.5, 1e-6);
+
+  if (options.exportModels) WriteTestOBJ("det_simple_intersect.obj", out);
+}
+
+TEST(Boolean, CubeUnion) {
+  Manifold cube = Manifold::Cube();
+  Manifold result = cube + cube.Translate({0.5, 0.5, 0});
+  EXPECT_EQ(result.NumVert(), 16);
+  if (options.exportModels) WriteTestOBJ("cubeUnion.obj", result);
+}
+
+TEST(Boolean, CubeUnionProp) {
+  Manifold cube = WithPositionColors(Manifold::Cube());
+  Manifold result = cube + cube.Translate({0.5, 0.5, 0});
+  EXPECT_EQ(result.NumVert(), 16);
+  if (options.exportModels) WriteTestOBJ("cubeUnionProp.obj", result);
 }
 
 TEST(Boolean, Simplify) {
   const int n = 10;
   MeshGL cubeGL = Manifold::Cube().Refine(n).GetMeshGL();
-  size_t tri = 0;
-  for (auto& id : cubeGL.faceID) {
-    id = tri++;
-  }
+  // Give unique face IDs to stop edge removal
+  cubeGL.faceID.resize(cubeGL.NumTri());
+  std::iota(cubeGL.faceID.begin(), cubeGL.faceID.end(), 0);
   Manifold cube(cubeGL);
 
-  const int nExpected = 20 * n * n;
+  const int nStarting = 20 * n * n;
   Manifold result = cube + cube.Translate({1, 0, 0});
-  EXPECT_EQ(result.NumTri(), nExpected);
-  result = result.Simplify();
-  EXPECT_EQ(result.NumTri(), nExpected);
+  EXPECT_EQ(result.NumTri(), nStarting);
+  EXPECT_EQ(result.RemoveDegenerates().NumTri(), nStarting);
+  EXPECT_EQ(result.Simplify().NumTri(), nStarting);
 
   MeshGL resultGL = result.GetMeshGL();
   resultGL.faceID.clear();
   Manifold result2(resultGL);
-  EXPECT_EQ(result2.NumTri(), nExpected);
-  result2 = result2.Simplify();
-  EXPECT_EQ(result2.NumTri(), 20);
+  EXPECT_EQ(result2.NumTri(), nStarting);
+  EXPECT_EQ(result2.RemoveDegenerates().NumTri(), 36);
+  EXPECT_EQ(result2.Simplify().NumTri(), 12);
 }
 
 TEST(Boolean, SimplifyCracks) {
   Manifold cylinder =
-      Manifold::Cylinder(2, 50, 50, 180)
+      WithPositionColors(Manifold::Cylinder(2, 50, 50, 180))
           .Rotate(
               -89.999999999999)  // Rotating by -90 makes the result too perfect
           .Translate(vec3(50, 0, 50));
-  Manifold cube = Manifold::Cube(vec3(100, 2, 50));
+  Manifold cube = WithPositionColors(Manifold::Cube(vec3(100, 2, 50)));
   Manifold refined = (cylinder + cube).RefineToLength(1);
   Manifold deformed =
       refined.Warp([](vec3& p) { p.y += p.x - (p.x * p.x) / 100.0; });
@@ -179,11 +275,59 @@ TEST(Boolean, SimplifyCracks) {
   EXPECT_NEAR(simplified.Volume(), deformed.Volume(), 10);
   EXPECT_NEAR(simplified.SurfaceArea(), deformed.SurfaceArea(), 1);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("cracks.glb", simplified.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("cracks.obj", simplified);
 }
+
+TEST(Boolean, SimplifyShards) {
+  Manifold a = Manifold::Sphere(40, 10);
+  Manifold b = a.Translate({0, 0, 40}) ^ a;
+  Manifold result = a - b;
+  Box bounds = result.BoundingBox();
+  EXPECT_FLOAT_EQ(bounds.max.z, 20);
+}
+
+#ifndef MANIFOLD_NO_FILESYSTEM
+// Regression test for #1857: coincident meshes with different triangulations
+// made RemoveDegenerates cycle edge swaps for ~3e8 iterations.
+TEST(Boolean, DegenerateSwapCycle) {
+  ManifoldParamGuard guard;
+  ManifoldParams().intermediateChecks = false;
+  Manifold first = ReadTestOBJ("degenerate_swap_cycle_first.obj");
+  Manifold second = ReadTestOBJ("degenerate_swap_cycle_second.obj");
+  Manifold result = first + second;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_GT(result.NumTri(), 0u);
+  EXPECT_GT(result.Volume(), 0);
+}
+
+// Since #1869, SwapDegenerateEdges leaves a broken vertex orbit on these
+// coincident meshes, and a later orbit walk in RemoveDegenerates never ends.
+TEST(Boolean, DegenerateSwapLoop) {
+  ManifoldParamGuard guard;
+  ManifoldParams().intermediateChecks = false;
+  Manifold a = ReadTestOBJ("degenerate_swap_loop_a.obj");
+  Manifold b = ReadTestOBJ("degenerate_swap_loop_b.obj");
+  Manifold c = ReadTestOBJ("degenerate_swap_loop_c.obj");
+  Manifold result = (a + b) - c;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_GT(result.NumTri(), 0u);
+  EXPECT_GT(result.Volume(), 0);
+}
+
+// Regression test: SplitQuad clamped its new vert onto an end of the edge,
+// which only added a zero-length edge, so SwapDegenerateEdges split the same
+// quad again and again, growing the mesh until it crashed.
+TEST(Boolean, DegenerateSplitQuadAtEnd) {
+  ManifoldParamGuard guard;
+  ManifoldParams().intermediateChecks = false;
+  Manifold first = ReadTestOBJ("degenerate_split_quad_first.obj");
+  Manifold second = ReadTestOBJ("degenerate_split_quad_second.obj");
+  Manifold result = first + second;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_NEAR(result.Volume(), 1.480266544, 1e-6);
+}
+
+#endif
 
 TEST(Boolean, NoRetainedVerts) {
   Manifold cube = Manifold::Cube(vec3(1), true);
@@ -205,7 +349,7 @@ TEST(Boolean, PropertiesNoIntersection) {
 TEST(Boolean, MixedProperties) {
   MeshGL cubeUV = CubeUV();
   Manifold m0(cubeUV);
-  Manifold m1 = Manifold::Cube();
+  Manifold m1 = Manifold::Cube().AsOriginal();
   Manifold result = m0 + m1.Translate(vec3(0.5));
   EXPECT_EQ(result.NumProp(), 2);
   RelatedGL(result, {cubeUV, m1.GetMeshGL()});
@@ -214,7 +358,7 @@ TEST(Boolean, MixedProperties) {
 TEST(Boolean, MixedNumProp) {
   MeshGL cubeUV = CubeUV();
   Manifold m0(cubeUV);
-  Manifold m1 = Manifold::Cube();
+  Manifold m1 = Manifold::Cube().AsOriginal();
   Manifold result =
       m0 + m1.SetProperties(1, [](double* prop, vec3 p, const double* n) {
                prop[0] = 1;
@@ -248,8 +392,11 @@ TEST(Boolean, TreeTransforms) {
   auto a = (Manifold::Cube({1, 1, 1}) + Manifold::Cube({1, 1, 1}))
                .Translate({1, 0, 0});
   auto b = (Manifold::Cube({1, 1, 1}) + Manifold::Cube({1, 1, 1}));
+  auto c = a + b;
 
-  EXPECT_FLOAT_EQ((a + b).Volume(), 2);
+  EXPECT_FLOAT_EQ(c.Volume(), 2);
+  EXPECT_FLOAT_EQ(a.Volume(), 1);
+  EXPECT_FLOAT_EQ(b.Volume(), 1);
 }
 
 TEST(Boolean, CreatePropertiesSlow) {
@@ -260,6 +407,19 @@ TEST(Boolean, CreatePropertiesSlow) {
   Manifold b = Manifold::Sphere(10, 1024).Translate({5, 0, 0});
   Manifold result = a + b;
   EXPECT_EQ(result.NumProp(), 3);
+}
+
+TEST(Boolean, SimpleProperties) {
+  Manifold cube = Manifold::Cube(vec3(2), true).CalculateNormals(0, 180);
+  EXPECT_TRUE(cube.HasSimpleProps());
+  Manifold flange =
+      Manifold::Extrude(cube.Slice(), 2, 0, 0, vec2(2)).AsOriginal();
+  EXPECT_TRUE(flange.HasSimpleProps());
+  Manifold result = cube + flange;
+  EXPECT_EQ(result.NumProp(), 3);
+  EXPECT_NEAR(result.Volume(), 22.6666, 0.0001);
+  EXPECT_EQ(result.NumVert(), 12);
+  EXPECT_TRUE(result.HasSimpleProps());
 }
 
 /**
@@ -307,14 +467,11 @@ TEST(Boolean, Perturb1) {
       Manifold::Extrude({{{1, 2}, {2, 2}, {2, 3}}}, 1.0).Translate({0, 0, 1});
   const Manifold result = (big + little) - punchHole;
 
-  EXPECT_EQ(result.NumDegenerateTris(), 0);
   EXPECT_EQ(result.NumVert(), 24);
   EXPECT_FLOAT_EQ(result.Volume(), 7.5);
   EXPECT_NEAR(result.SurfaceArea(), 38.2, 0.1);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("perturb1.glb", result.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("perturb1.obj", result);
 }
 
 TEST(Boolean, Perturb2) {
@@ -361,7 +518,6 @@ TEST(Boolean, Perturb2) {
   // The result should be a double-sized cube, 4 units to a side.
   // If symbolic perturbation fails, the number of verts and the surface area
   // will increase, indicating cracks and internal geometry.
-  EXPECT_EQ(result.NumDegenerateTris(), 0);
   EXPECT_EQ(result.NumVert(), 8);
   EXPECT_FLOAT_EQ(result.Volume(), 64.0);
   EXPECT_FLOAT_EQ(result.SurfaceArea(), 96.0);
@@ -375,14 +531,50 @@ TEST(Boolean, Perturb3) {
   const int N = 16;  // Number of rotations for the gear pattern
   const double alpha = 90.0 / N;
 
+  // First decomposition step: a single union operation from the same setup.
+  const Manifold cube = Manifold::Cube({1, 1, 1}, true);
+  const Manifold pairUnion = cube + cube.Rotate(0, 0, alpha);
+  if (options.exportModels) WriteTestOBJ("perturb3_pair_union.obj", pairUnion);
+
   // Create outer gear - many rotated cubes unioned together
   std::vector<Manifold> outerCubes;
-  const Manifold cube = Manifold::Cube({1, 1, 1}, true);
   for (int i = 0; i < N; i++) {
     outerCubes.push_back(cube.Rotate(0, 0, alpha * i));
   }
+
+  // Binary-tree probes for the first 4 shapes.
+  Manifold pair01 = outerCubes[0] + outerCubes[1];
+  Manifold pair23 = outerCubes[2] + outerCubes[3];
+  Manifold gear4BalancedSeq = pair01 + pair23;
+  if (options.exportModels) {
+    WriteTestOBJ("perturb3_pair01.obj", pair01);
+    WriteTestOBJ("perturb3_pair23.obj", pair23);
+    WriteTestOBJ("perturb3_gear4_balanced_seq.obj", gear4BalancedSeq);
+  }
+
+  // small prefixes before the full 16-shape reduction.
+  Manifold gear3Seq = outerCubes[0] + outerCubes[1];
+  gear3Seq = gear3Seq + outerCubes[2];
+  Manifold gear3Batch = Manifold::BatchBoolean(
+      {outerCubes[0], outerCubes[1], outerCubes[2]}, OpType::Add);
+  if (options.exportModels) {
+    WriteTestOBJ("perturb3_gear3_seq.obj", gear3Seq);
+    WriteTestOBJ("perturb3_gear3_batch.obj", gear3Batch);
+  }
+
+  Manifold gear4Seq = gear3Seq + outerCubes[3];
+  Manifold gear4Batch = Manifold::BatchBoolean(
+      {outerCubes[0], outerCubes[1], outerCubes[2], outerCubes[3]},
+      OpType::Add);
+  if (options.exportModels) {
+    WriteTestOBJ("perturb3_gear4_seq.obj", gear4Seq);
+    WriteTestOBJ("perturb3_gear4_batch.obj", gear4Batch);
+  }
+
   Manifold gear = Manifold::BatchBoolean(outerCubes, OpType::Add);
+  if (options.exportModels) WriteTestOBJ("perturb3_gear.obj", gear);
   Manifold outerGear = gear.Scale({2, 2, 1});
+  if (options.exportModels) WriteTestOBJ("perturb3_outerGear.obj", outerGear);
 
   // Subtract inner from outer to create the nasty gear with slivers
   Manifold nastyGear = outerGear - gear;
@@ -399,28 +591,22 @@ TEST(Boolean, Perturb3) {
   EXPECT_NEAR(nastyGear.Volume(), expectedVolume, 1e-5);
   EXPECT_NEAR(nastyGear.SurfaceArea(), expectedArea, 1e-4);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels)
-    ExportMesh("nastyGear.glb", nastyGear.GetMeshGL(), {});
-#endif
+  if (options.exportModels) {
+    WriteTestOBJ("perturb3_nastyGear.obj", nastyGear);
+  }
 }
 
 TEST(Boolean, Coplanar) {
-  Manifold cylinder = WithPositionColors(Manifold::Cylinder(1.0, 1.0));
+  Manifold cylinder =
+      WithPositionColors(Manifold::Cylinder(1.0, 1.0).AsOriginal());
   MeshGL cylinderGL = cylinder.GetMeshGL();
 
   Manifold cylinder2 = cylinder.Scale({0.8, 0.8, 1.0}).Rotate(0, 0, 185);
   Manifold out = cylinder - cylinder2;
   ExpectMeshes(out, {{32, 64, 3, 48}});
-  EXPECT_EQ(out.NumDegenerateTris(), 0);
   EXPECT_EQ(out.Genus(), 1);
 
-#ifdef MANIFOLD_EXPORT
-  ExportOptions opt;
-  opt.mat.roughness = 1;
-  opt.mat.colorIdx = 0;
-  if (options.exportModels) ExportMesh("coplanar.glb", out.GetMeshGL(), opt);
-#endif
+  if (options.exportModels) WriteTestOBJ("coplanar.obj", out);
 
   RelatedGL(out, {cylinderGL});
 }
@@ -430,10 +616,12 @@ TEST(Boolean, MultiCoplanar) {
   Manifold first = cube - cube.Translate({0.3, 0.3, 0.0});
   cube = cube.Translate({-0.3, -0.3, 0.0});
   Manifold out = first - cube;
-  CheckStrictly(out);
+  EXPECT_TRUE(out.MatchesTriNormals());
   EXPECT_EQ(out.Genus(), -1);
   EXPECT_NEAR(out.Volume(), 0.18, 1e-5);
   EXPECT_NEAR(out.SurfaceArea(), 2.76, 1e-5);
+
+  if (options.exportModels) WriteTestOBJ("det_multi_coplanar.obj", out);
 }
 
 TEST(Boolean, AlmostCoplanar) {
@@ -441,19 +629,18 @@ TEST(Boolean, AlmostCoplanar) {
   Manifold result =
       tet + tet.Rotate(0.001, -0.08472872823860228, 0.055910459615905288) + tet;
   ExpectMeshes(result, {{20, 36}});
+  if (options.exportModels) WriteTestOBJ("det_nearly_coplanar.obj", result);
 }
 
 TEST(Boolean, FaceUnion) {
-  Manifold cubes = Manifold::Cube();
+  Manifold cubes = Manifold::Cube().AsOriginal();
   cubes += cubes.Translate({1, 0, 0});
   EXPECT_EQ(cubes.Genus(), 0);
   ExpectMeshes(cubes, {{12, 20}});
   EXPECT_NEAR(cubes.Volume(), 2, 1e-5);
   EXPECT_NEAR(cubes.SurfaceArea(), 10, 1e-5);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) ExportMesh("faceUnion.glb", cubes.GetMeshGL(), {});
-#endif
+  if (options.exportModels) WriteTestOBJ("faceUnion.obj", cubes);
 }
 
 TEST(Boolean, EdgeUnion) {
@@ -484,10 +671,24 @@ TEST(Boolean, Split) {
   Manifold cube = Manifold::Cube(vec3(2.0), true);
   Manifold oct = Manifold::Sphere(1, 4).Translate(vec3(0.0, 0.0, 1.0));
   std::pair<Manifold, Manifold> splits = cube.Split(oct);
-  CheckStrictly(splits.first);
-  CheckStrictly(splits.second);
+  EXPECT_TRUE(splits.first.MatchesTriNormals());
+  EXPECT_TRUE(splits.second.MatchesTriNormals());
   EXPECT_FLOAT_EQ(splits.first.Volume() + splits.second.Volume(),
                   cube.Volume());
+}
+
+TEST(Boolean, SplitByPlaneEmpty) {
+  Manifold empty;
+  EXPECT_TRUE(empty.IsEmpty());
+  EXPECT_EQ(empty.Status(), Manifold::Error::NoError);
+
+  std::pair<Manifold, Manifold> split =
+      empty.SplitByPlane({1.0, 0.0, 0.0}, 0.0);
+
+  EXPECT_EQ(split.first.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(split.second.Status(), Manifold::Error::NoError);
+  EXPECT_TRUE(split.first.IsEmpty());
+  EXPECT_TRUE(split.second.IsEmpty());
 }
 
 TEST(Boolean, SplitByPlane) {
@@ -496,8 +697,8 @@ TEST(Boolean, SplitByPlane) {
   cube = cube.Rotate(90.0, 0.0, 0.0);
   std::pair<Manifold, Manifold> splits =
       cube.SplitByPlane({0.0, 0.0, 1.0}, 1.0);
-  CheckStrictly(splits.first);
-  CheckStrictly(splits.second);
+  EXPECT_TRUE(splits.first.MatchesTriNormals());
+  EXPECT_TRUE(splits.second.MatchesTriNormals());
   EXPECT_NEAR(splits.first.Volume(), splits.second.Volume(), 1e-5);
 
   Manifold first = cube.TrimByPlane({0.0, 0.0, 1.0}, 1.0);
@@ -515,9 +716,111 @@ TEST(Boolean, SplitByPlane60) {
   double phi = 30.0;
   std::pair<Manifold, Manifold> splits =
       cube.SplitByPlane({sind(phi), -cosd(phi), 0.0}, 1.0);
-  CheckStrictly(splits.first);
-  CheckStrictly(splits.second);
+  EXPECT_TRUE(splits.first.MatchesTriNormals());
+  EXPECT_TRUE(splits.second.MatchesTriNormals());
   EXPECT_NEAR(splits.first.Volume(), splits.second.Volume(), 1e-5);
+}
+
+TEST(Boolean, ConvexConvexMinkowski) {
+  double r = 0.1;
+  double w = 2.0;
+  Manifold sphere = Manifold::Sphere(r, 20);
+  Manifold cube = Manifold::Cube({w, w, w});
+  Manifold sum = cube.MinkowskiSum(sphere);
+  // Analytical volume of rounded cuboid: cube + 6 slabs + 12 quarter-cylinders
+  // + 8 sphere octants = w³ + 6w²r + 3πwr² + (4/3)πr³
+  double analyticalVolume = w * w * w + 6 * w * w * r + 3 * kPi * w * r * r +
+                            (4.0 / 3) * kPi * r * r * r;
+  // Analytical surface area: 6 faces + 12 quarter-cylinders + 8 octants
+  // = 6w² + 6πwr + 4πr²
+  double analyticalArea = 6 * w * w + 6 * kPi * w * r + 4 * kPi * r * r;
+  // Discrete sphere approximation differs from analytical by ~1%
+  EXPECT_NEAR(sum.Volume(), analyticalVolume, 0.15);
+  EXPECT_NEAR(sum.SurfaceArea(), analyticalArea, 0.5);
+  EXPECT_EQ(sum.Genus(), 0);
+
+  if (options.exportModels) WriteTestOBJ("minkowski-convex-convex.obj", sum);
+}
+
+TEST(Boolean, ConvexConvexMinkowskiDifference) {
+  ManifoldParamGuard guard;
+  ManifoldParams().processOverlaps = true;
+
+  double r = 0.1;
+  double w = 2.0;
+  Manifold sphere = Manifold::Sphere(r, 20);
+  Manifold cube = Manifold::Cube({w, w, w});
+  Manifold difference = cube.MinkowskiDifference(sphere);
+  // Analytical volume of eroded cube: (w-2r)³
+  double analyticalVolume = (w - 2 * r) * (w - 2 * r) * (w - 2 * r);
+  EXPECT_NEAR(difference.Volume(), analyticalVolume, 0.1);
+  // Analytical surface area: 6*(w-2r)²
+  double analyticalArea = 6 * (w - 2 * r) * (w - 2 * r);
+  EXPECT_NEAR(difference.SurfaceArea(), analyticalArea, 0.1);
+  EXPECT_EQ(difference.Genus(), 0);
+
+  if (options.exportModels)
+    WriteTestOBJ("minkowski-convex-convex-difference.obj", difference);
+}
+
+TEST(Boolean, NonConvexConvexMinkowskiSum) {
+  ManifoldParamGuard guard;
+  ManifoldParams().processOverlaps = true;
+
+  Manifold sphere = Manifold::Sphere(1.2, 20);
+  Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
+  Manifold nonConvex = cube - sphere;
+  Manifold sum = nonConvex.MinkowskiSum(Manifold::Sphere(0.1, 20));
+  EXPECT_NEAR(sum.Volume(), 4.841, 1e-3);
+  EXPECT_NEAR(sum.SurfaceArea(), 34.06, 1e-2);
+  EXPECT_EQ(sum.Genus(), 5);
+
+  if (options.exportModels)
+    WriteTestOBJ("minkowski-nonconvex-convex-sum.obj", sum);
+}
+
+TEST(Boolean, NonConvexConvexMinkowskiDifference) {
+  ManifoldParamGuard guard;
+  ManifoldParams().processOverlaps = true;
+
+  Manifold sphere = Manifold::Sphere(1.2, 20);
+  Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
+  Manifold nonConvex = cube - sphere;
+  Manifold difference =
+      nonConvex.MinkowskiDifference(Manifold::Sphere(0.05, 20));
+  EXPECT_NEAR(difference.Volume(), 0.778, 1e-3);
+  EXPECT_NEAR(difference.SurfaceArea(), 16.70, 1e-2);
+  EXPECT_EQ(difference.Genus(), 5);
+
+  if (options.exportModels)
+    WriteTestOBJ("minkowski-nonconvex-convex-difference.obj", difference);
+}
+
+TEST(Boolean, NonConvexNonConvexMinkowskiSum) {
+  Manifold tet = Manifold::Tetrahedron();
+  Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
+
+  Manifold sum = nonConvex.MinkowskiSum(nonConvex.Scale(vec3(0.5)));
+  EXPECT_NEAR(sum.Volume(), 8.65625, 1e-5);
+  EXPECT_NEAR(sum.SurfaceArea(), 31.17691, 1e-5);
+  EXPECT_EQ(sum.Genus(), 0);
+
+  if (options.exportModels)
+    WriteTestOBJ("minkowski-nonconvex-nonconvex-sum.obj", sum);
+}
+
+TEST(Boolean, NonConvexNonConvexMinkowskiDifference) {
+  Manifold tet = Manifold::Tetrahedron();
+  Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
+
+  Manifold difference =
+      nonConvex.MinkowskiDifference(nonConvex.Scale(vec3(0.1)));
+  EXPECT_NEAR(difference.Volume(), 0.815542, 1e-5);
+  EXPECT_NEAR(difference.SurfaceArea(), 6.95045, 1e-5);
+  EXPECT_EQ(difference.Genus(), 0);
+
+  if (options.exportModels)
+    WriteTestOBJ("minkowski-nonconvex-nonconvex-diff.obj", difference);
 }
 
 /**
@@ -530,7 +833,7 @@ TEST(Boolean, Vug) {
   EXPECT_EQ(vug.Genus(), -1);
 
   Manifold half = vug.SplitByPlane({0.0, 0.0, 1.0}, -1.0).first;
-  CheckStrictly(half);
+  EXPECT_TRUE(half.MatchesTriNormals());
   EXPECT_EQ(half.Genus(), -1);
 
   EXPECT_FLOAT_EQ(half.Volume(), 4.0 * 4.0 * 3.0 - 1.0);
@@ -552,7 +855,7 @@ TEST(Boolean, Winding) {
   std::vector<Manifold> cubes;
   cubes.emplace_back(Manifold::Cube(vec3(3.0), true));
   cubes.emplace_back(Manifold::Cube(vec3(2.0), true));
-  Manifold doubled = Manifold::Compose(cubes);
+  Manifold doubled = Manifold::BatchBoolean(cubes, OpType::Add);
 
   Manifold cube = Manifold::Cube(vec3(1.0), true);
   EXPECT_FALSE((cube ^= doubled).IsEmpty());
@@ -564,9 +867,11 @@ TEST(Boolean, NonIntersecting) {
   Manifold cube2 = cube1.Scale(vec3(2)).Translate({3, 0, 0});
   double vol2 = cube2.Volume();
 
-  EXPECT_EQ((cube1 + cube2).Volume(), vol1 + vol2);
+  Manifold unionOut = cube1 + cube2;
+  EXPECT_EQ(unionOut.Volume(), vol1 + vol2);
   EXPECT_EQ((cube1 - cube2).Volume(), vol1);
   EXPECT_TRUE((cube1 ^ cube2).IsEmpty());
+  if (options.exportModels) WriteTestOBJ("det_non_overlap.obj", unionOut);
 }
 
 TEST(Boolean, Precision) {
@@ -574,28 +879,50 @@ TEST(Boolean, Precision) {
   Manifold cube2 = cube;
   Manifold cube3 = cube;
   double distance = 100;
-  double scale = distance * kPrecision;
+  double scale = distance * Quality::GetRelativePrecision();
   cube2 = cube2.Scale(vec3(scale)).Translate({distance, 0, 0});
 
   cube += cube2;
+  cube = cube.Simplify();
   ExpectMeshes(cube, {{8, 12}});
 
   cube3 = cube3.Scale(vec3(2 * scale)).Translate({distance, 0, 0});
   cube += cube3;
+  cube = cube.Simplify();
   ExpectMeshes(cube, {{8, 12}, {8, 12}});
 }
 
 TEST(Boolean, Precision2) {
   double scale = 1000;
   Manifold cube = Manifold::Cube(vec3(scale));
-  Manifold cube2 = cube;
-  double distance = scale * (1 - kPrecision / 2);
+  const double epsilon = scale * Quality::GetRelativePrecision();
+  // An overlap within epsilon is a tie, resolved as no intersection.
+  double distance = scale - epsilon / 2;
+  EXPECT_TRUE((cube ^ cube.Translate(vec3(-distance))).IsEmpty());
+  EXPECT_TRUE((cube ^ cube.Translate(vec3(distance))).IsEmpty());
+  // An overlap beyond epsilon is an intersection.
+  distance = scale - 4 * epsilon;
+  EXPECT_FALSE((cube ^ cube.Translate(vec3(-distance))).IsEmpty());
+  EXPECT_FALSE((cube ^ cube.Translate(vec3(distance))).IsEmpty());
+}
 
-  cube2 = cube2.Translate(vec3(-distance));
-  EXPECT_TRUE((cube ^ cube2).IsEmpty());
-
-  cube2 = cube2.Translate(vec3(scale * kPrecision));
-  EXPECT_FALSE((cube ^ cube2).IsEmpty());
+TEST(Boolean, Precision3) {
+  Manifold cube1 = Manifold::Cube().Rotate(45);
+  Manifold cube2 = Manifold::Cube().Translate({0, 0.5, 0}).Rotate(45);
+  Manifold result = cube1 + cube2;
+  ExpectMeshes(result, {{8, 12}});
+  // Double precision round-trips through MeshGL64
+  Manifold result2 =
+      Manifold(cube1.GetMeshGL64()) + Manifold(cube2.GetMeshGL64());
+  EXPECT_EQ(result2.NumTri(), result.NumTri());
+  // MeshGL rounds to single precision, so the results are no longer coplanar.
+  Manifold result3 = Manifold(cube1.GetMeshGL()) + Manifold(cube2.GetMeshGL());
+  EXPECT_GT(result3.NumTri(), result.NumTri());
+  // Setting the precision to reflect this makes the faces coplanar again.
+  Quality::SetRelativePrecision(1e-7);
+  Manifold result4 = Manifold(cube1.GetMeshGL()) + Manifold(cube2.GetMeshGL());
+  EXPECT_EQ(result4.NumTri(), result.NumTri());
+  Quality::ResetToDefaults();
 }
 
 TEST(Boolean, SimpleCubeRegression) {
@@ -606,7 +933,135 @@ TEST(Boolean, SimpleCubeRegression) {
       Manifold::Cube() -
       Manifold::Cube().Rotate(-0.10000000000000001, -0.10000000000066571, -1.);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_TRUE(result.MatchesTriNormals());
+  if (options.exportModels) WriteTestOBJ("simple_cube_regression.obj", result);
 }
+
+// Regression: Compose() in csg_tree.cpp used to read the global atomic
+// Manifold::Impl::meshIDCounter_ twice — once when shifting `triRef.meshID`
+// values and once when shifting `meshIDtransform` keys. If another thread
+// advanced the counter between the two reads, the offsets disagreed and
+// the resulting Impl had `triRef.meshID` values not present in
+// `meshIDtransform`. After IncrementMeshIDs's HashTable lookup, those
+// orphan meshIDs collapsed to 0, and GetMeshGL64 emitted runs with the
+// default Relation's `originalID = -1` (UINT32_MAX as uint32).
+//
+// MANIFOLD_PAR guard: emscripten/WASM builds without pthreads can't
+// construct std::thread and abort at runtime; the bug also can't manifest
+// without concurrent CSG, so skipping there is fine.
+#if MANIFOLD_PAR == 1
+TEST(Boolean, BatchBooleanComposeMeshIDStable) {
+  // Three pairwise-disjoint cubes — forces the Compose path inside
+  // BatchBoolean(Add).
+  auto build = []() {
+    Manifold a = Manifold::Cube(vec3(1, 1, 1)).AsOriginal();
+    Manifold b =
+        Manifold::Cube(vec3(1, 1, 1)).AsOriginal().Translate({3, 0, 0});
+    Manifold c =
+        Manifold::Cube(vec3(1, 1, 1)).AsOriginal().Translate({0, 3, 0});
+    return Manifold::BatchBoolean({a, b, c}, OpType::Add);
+  };
+
+  // Several worker threads each running the same pipeline. The internal
+  // ReserveIDs calls during their CSG ops provide the cross-thread counter
+  // contention the bug needs.
+  std::atomic<int> orphans{0};
+  auto worker = [&]() {
+    for (int i = 0; i < 200; ++i) {
+      MeshGL64 m = build().GetMeshGL64();
+      for (uint32_t orig : m.runOriginalID) {
+        if (orig == std::numeric_limits<uint32_t>::max()) ++orphans;
+      }
+    }
+  };
+
+  std::vector<std::thread> ts;
+  for (int t = 0; t < 8; ++t) ts.emplace_back(worker);
+  for (auto& t : ts) t.join();
+
+  EXPECT_EQ(orphans.load(), 0)
+      << "Compose produced runs with originalID = -1; indicates a "
+         "non-atomic meshIDCounter_ snapshot.";
+}
+
+// Regression: a CSG leaf is realized lazily on first const access -
+// CsgLeafNode::GetImpl rewrites pImpl_/transform_. A Manifold and its copies
+// share the node but not its lock, so two threads realizing one shared node at
+// once tore the meshID mapping and faces came back with originalID = -1.
+TEST(Boolean, ConcurrentSharedNodeOriginalIDStable) {
+  constexpr int kThreads = 8;
+  constexpr int kRounds = 256;
+  // Each view shares original's realized Impl with a pending transform, so its
+  // first touch realizes it - the contended write.
+  const Manifold original = Manifold::Cube(vec3(2)).AsOriginal();
+  const auto origID = static_cast<uint32_t>(original.OriginalID());
+  const size_t expectTri = original.NumTri();
+  std::vector<Manifold> shared;
+  shared.reserve(kRounds);
+  for (int r = 0; r < kRounds; ++r)
+    shared.push_back(original.Translate({0.1 * r, 0, 0}));
+
+  SpinBarrier barrier(kThreads);
+  std::atomic<int> bad{0};
+  auto worker = [&]() {
+    for (int r = 0; r < kRounds; ++r) {
+      barrier.Sync();
+      const MeshGL m = shared[r].GetMeshGL();
+      if (m.NumTri() != expectTri) ++bad;
+      // A transformed view keeps the original's per-face id in runOriginalID.
+      for (uint32_t orig : m.runOriginalID)
+        if (orig != origID) ++bad;  // includes the -1 (UINT32_MAX) collapse
+    }
+  };
+  std::vector<std::thread> ts;
+  for (int t = 0; t < kThreads; ++t) ts.emplace_back(worker);
+  for (auto& t : ts) t.join();
+
+  EXPECT_EQ(bad.load(), 0)
+      << "concurrent realization of a shared CSG leaf corrupted originalID or "
+         "the mesh; also flagged as a data race under ThreadSanitizer.";
+}
+
+// Companion for CsgOpNode's lazy-eval cache_: a shared, unevaluated op node is
+// evaluated by all threads at once via per-thread Manifold copies (which share
+// pNode_ but get their own pNodeMutex_). Without the guarded cache_
+// read/publish the concurrent evaluation tears the result.
+TEST(Boolean, ConcurrentSharedOpNodeOriginalIDStable) {
+  constexpr int kThreads = 8;
+  constexpr int kRounds = 256;
+  const Manifold a = Manifold::Cube(vec3(2)).AsOriginal();
+  // Disjoint union: each result keeps runs from both originals, none collapsed.
+  std::vector<Manifold> shared;
+  shared.reserve(kRounds);
+  for (int r = 0; r < kRounds; ++r)
+    shared.push_back(
+        a + Manifold::Cube(vec3(0.2)).Translate({10.0 + 0.1 * r, 0, 0}));
+  // Probe a throwaway union so the shared nodes stay unevaluated until the
+  // race.
+  const size_t expectTri =
+      (a + Manifold::Cube(vec3(0.2)).Translate({10, 0, 0})).NumTri();
+
+  SpinBarrier barrier(kThreads);
+  std::atomic<int> bad{0};
+  auto worker = [&]() {
+    for (int r = 0; r < kRounds; ++r) {
+      Manifold m = shared[r];  // copy shares the op node, own pNodeMutex_
+      barrier.Sync();
+      const MeshGL mesh = m.GetMeshGL();
+      if (mesh.NumTri() != expectTri) ++bad;
+      for (uint32_t orig : mesh.runOriginalID)
+        if (orig == std::numeric_limits<uint32_t>::max()) ++bad;  // -1 collapse
+    }
+  };
+  std::vector<std::thread> ts;
+  for (int t = 0; t < kThreads; ++t) ts.emplace_back(worker);
+  for (auto& t : ts) t.join();
+
+  EXPECT_EQ(bad.load(), 0)
+      << "concurrent evaluation of a shared CsgOpNode corrupted originalID or "
+         "the mesh; also flagged as a data race under ThreadSanitizer.";
+}
+#endif  // MANIFOLD_PAR == 1
 
 TEST(Boolean, BatchBoolean) {
   Manifold cube = Manifold::Cube({100, 100, 1});
@@ -622,7 +1077,7 @@ TEST(Boolean, BatchBoolean) {
   Manifold add = Manifold::BatchBoolean({cube, cylinder1, cylinder2, cylinder3},
                                         OpType::Add);
 
-  ExpectMeshes(add, {{152, 300}});
+  ExpectMeshes(add, {{150, 296}});
   EXPECT_FLOAT_EQ(add.Volume(), 16290.478);
   EXPECT_FLOAT_EQ(add.SurfaceArea(), 33156.594);
 
@@ -644,10 +1099,91 @@ TEST(Boolean, Offset) {
   EXPECT_EQ(fat.Genus(), cutout.Genus());
   EXPECT_EQ(thin.Genus(), -7);
 
-#ifdef MANIFOLD_EXPORT
   if (options.exportModels) {
-    ExportMesh("fat.glb", fat.GetMeshGL(), {});
-    ExportMesh("thin.glb", thin.GetMeshGL(), {});
+    WriteTestOBJ("offset_fat.obj", fat);
+    WriteTestOBJ("offset_thin.obj", thin);
   }
-#endif
+}
+
+// Regression for #1672: a sub-tree shared between two trees must survive when
+// one of those trees is destroyed without being evaluated. Previously the
+// CsgOpNode destructor emptied descendant impls regardless of whether they
+// were still referenced by other live trees, which then manifested as empty
+// positive_children in Add/Intersect finalize and a crash in BatchUnion.
+TEST(Boolean, SharedSubtreeAfterSiblingDestroyed) {
+  Manifold a = Manifold::Cube(vec3(1));
+  Manifold b = Manifold::Cube(vec3(1)).Translate(vec3(0.5, 0, 0));
+  Manifold c = Manifold::Cube(vec3(1)).Translate(vec3(1.0, 0, 0));
+  Manifold shared = a + b;
+  Manifold tree2 = shared - c;
+  {
+    Manifold tree1 = shared + c;
+    // tree1 goes out of scope here, its destructor runs while its impl
+    // still has original children (never evaluated).
+  }
+  // Build the same tree without sharing so we can compare — a partial
+  // corruption that didn't crash would show up as a tri-count mismatch.
+  Manifold reference = (Manifold::Cube(vec3(1)) +
+                        Manifold::Cube(vec3(1)).Translate(vec3(0.5, 0, 0))) -
+                       Manifold::Cube(vec3(1)).Translate(vec3(1.0, 0, 0));
+  EXPECT_EQ(tree2.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(tree2.NumTri(), reference.NumTri());
+}
+
+// Two cubes offset vertically and booleaned inside / outside a third cube.
+// A subsequent union of these two solids should not contain any internal
+// triangles along the shared internal face.
+//
+//             +--------+  z = 100
+//             |   b1   |
+//    +--------+        |  z = 70
+//    |   b2   :        |
+//    |        +--------+  z = 0
+//    |        |
+//    +--------+           z = -30
+//    : = shared internal face, should be removed by union
+TEST(Boolean, PartialCoincidentFaceUnion) {
+  MeshGL64 cube = Manifold::Cube(vec3(100)).Refine(8).GetMeshGL64();
+  cube.faceID.resize(cube.NumTri());
+  std::iota(cube.faceID.begin(), cube.faceID.end(), 0);
+  const Manifold block(cube);
+  for (int angle = 1; angle <= 45; ++angle) {
+    SCOPED_TRACE("angle = " + std::to_string(angle));
+    const Manifold clipper = Manifold::Cube(vec3(150, 300, 200))
+                                 .Translate(vec3(-150, -150, -50))
+                                 .Rotate(0, 0, -angle);
+    const Manifold b1 = block - clipper;
+    const Manifold b2 = block.Translate(vec3(0, 0, -30)) ^ clipper;
+    const Manifold result = b1 + b2;
+
+    EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+    EXPECT_EQ(result.Genus(), 0);
+    EXPECT_NEAR(result.Volume(), b1.Volume() + b2.Volume(), 1e-6);
+    // Check that the internal face is dropped
+    const double overlap = 100 / std::cos(angle * kPi / 180) * 70;
+    EXPECT_NEAR(result.SurfaceArea(),
+                b1.SurfaceArea() + b2.SurfaceArea() - 2 * overlap, 1e-6);
+  }
+}
+
+// A point outside but within tolerance of the surface counts as inside, before
+// and after a boolean operation, including along a coincident face.
+TEST(Boolean, PointWithinToleranceOfCoincidentEdge) {
+  const Manifold block = Manifold::Cube(vec3(100));
+  const Manifold clipper = Manifold::Cube(vec3(150, 300, 200))
+                               .Translate(vec3(-150, -150, -50))
+                               .Rotate(0, 0, -30);
+  const Manifold b1 = block - clipper;
+  const Manifold b2 = block.Translate(vec3(0, 0, -30)) ^ clipper;
+  const Manifold result = b1 + b2;
+  const double tol = 100 * Quality::GetRelativePrecision();
+  const vec3 edge(50 * std::tan(kPi / 6), 50, 70);
+  const vec3 out(-std::cos(kPi / 6), std::sin(kPi / 6), 1);
+  const vec3 within = edge + out * (tol / 4);
+  const vec3 beyond = edge + out * (4 * tol);
+  for (const Manifold& m : {b1, b2, result}) {
+    const auto w = m.WindingNumber({within, beyond});
+    EXPECT_NE(w[0], 0);
+    EXPECT_EQ(w[1], 0);
+  }
 }

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #pragma once
+#include "execution_impl.h"
 #include "manifold/common.h"
 #include "parallel.h"
 #include "utils.h"
@@ -157,21 +158,19 @@ struct CreateRadixTree {
   }
 };
 
-template <typename F, const bool selfCollision, const bool hasTransform,
-          typename Recorder>
+template <typename F, const bool selfCollision, typename Recorder>
 struct FindCollision {
   F& f;
   VecView<const Box> nodeBBox_;
   VecView<const std::pair<int, int>> internalChildren_;
   Recorder& recorder;
-  mat3x4 transform;
 
   using Local = typename Recorder::Local;
 
-  inline int RecordCollision(int node, const int queryIdx, Local& local) {
+  inline int RecordCollision(std::invoke_result_t<F, const int> query, int node,
+                             const int queryIdx, Local& local) {
     auto box = nodeBBox_[node];
-    if (hasTransform) box = box.Transform(transform);
-    bool overlaps = box.DoesOverlap(f(queryIdx));
+    bool overlaps = box.DoesOverlap(query);
     if (overlaps && IsLeaf(node)) {
       int leafIdx = Node2Leaf(node);
       if (!selfCollision || leafIdx != queryIdx) {
@@ -182,6 +181,13 @@ struct FindCollision {
   }
 
   void operator()(const int queryIdx) {
+    auto query = f(queryIdx);
+
+    // early exit for empty boxes
+    if constexpr (std::is_same_v<std::remove_cv_t<decltype(query)>, Box>) {
+      if (query.min.x == std::numeric_limits<double>::infinity()) return;
+    }
+
     // stack cannot overflow because radix tree has max depth 30 (Morton code) +
     // 32 (index).
     int stack[64];
@@ -194,8 +200,8 @@ struct FindCollision {
       int child1 = internalChildren_[internal].first;
       int child2 = internalChildren_[internal].second;
 
-      int traverse1 = RecordCollision(child1, queryIdx, local);
-      int traverse2 = RecordCollision(child2, queryIdx, local);
+      int traverse1 = RecordCollision(query, child1, queryIdx, local);
+      int traverse2 = RecordCollision(query, child2, queryIdx, local);
 
       if (!traverse1 && !traverse2) {
         if (top < 0) break;   // done
@@ -276,6 +282,11 @@ class Collider {
     UpdateBoxes(leafBB);
   }
 
+  Box GetBoundingBox() const {
+    if (nodeBBox_.empty()) return Box();
+    return nodeBBox_[collider_internal::Internal2Node(0)];
+  }
+
   void UpdateBoxes(const VecView<const Box>& leafBB) {
     ZoneScoped;
     DEBUG_ASSERT(leafBB.size() == NumLeaves(), userErr,
@@ -291,27 +302,27 @@ class Collider {
                    {nodeBBox_, counter, nodeParent_, internalChildren_}));
   }
 
+  void Transform(const mat3x4& transform) {
+    ZoneScoped;
+    DEBUG_ASSERT(IsAxisAligned(transform), userErr,
+                 "transform must be axis-aligned");
+    for_each(autoPolicy(nodeBBox_.size()), countAt(0_uz),
+             countAt(nodeBBox_.size()), [&transform, this](size_t i) {
+               nodeBBox_[i] = nodeBBox_[i].Transform(transform);
+             });
+  }
+
   template <const bool selfCollision = false, typename F, typename Recorder>
-  void Collisions(Recorder& recorder, std::optional<mat3x4> transform, F f,
-                  int n, bool parallel = true) const {
+  void Collisions(Recorder& recorder, F f, int n, bool parallel = true,
+                  ExecutionContext::Impl* ctx = nullptr) const {
     ZoneScoped;
     using collider_internal::FindCollision;
     if (internalChildren_.empty()) return;
-    if (transform) {
-      for_each_n(
-          parallel ? autoPolicy(n, collider_internal::kSequentialThreshold)
-                   : ExecutionPolicy::Seq,
-          countAt(0), n,
-          FindCollision<decltype(f), selfCollision, true, Recorder>{
-              f, nodeBBox_, internalChildren_, recorder, transform.value()});
-    } else {
-      for_each_n(parallel
-                     ? autoPolicy(n, collider_internal::kSequentialThreshold)
-                     : ExecutionPolicy::Seq,
-                 countAt(0), n,
-                 FindCollision<decltype(f), selfCollision, false, Recorder>{
-                     f, nodeBBox_, internalChildren_, recorder, la::identity});
-    }
+    for_each_n(parallel ? autoPolicy(n, collider_internal::kSequentialThreshold)
+                        : ExecutionPolicy::Seq,
+               countAt(0), n, ctx,
+               FindCollision<decltype(f), selfCollision, Recorder>{
+                   f, nodeBBox_, internalChildren_, recorder});
   }
 
   // This function iterates over queriesIn and calls recorder.record(queryIdx,
@@ -324,12 +335,11 @@ class Collider {
   //
   // If thread local storage is not needed, use SimpleRecorder.
   template <const bool selfCollision = false, typename T, typename Recorder>
-  void Collisions(Recorder& recorder, std::optional<mat3x4> transform,
-                  const VecView<const T>& queriesIn,
-                  bool parallel = true) const {
+  void Collisions(Recorder& recorder, const VecView<const T>& queriesIn,
+                  bool parallel = true,
+                  ExecutionContext::Impl* ctx = nullptr) const {
     auto f = [queriesIn](const int i) { return queriesIn[i]; };
-    Collisions<selfCollision>(recorder, transform, f, queriesIn.size(),
-                              parallel);
+    Collisions<selfCollision>(recorder, f, queriesIn.size(), parallel, ctx);
   }
 
   static uint32_t MortonCode(vec3 position, Box bBox) {
@@ -340,6 +350,17 @@ class Collider {
     uint32_t y = SpreadBits3(static_cast<uint32_t>(xyz.y));
     uint32_t z = SpreadBits3(static_cast<uint32_t>(xyz.z));
     return x * 4 + y * 2 + z;
+  }
+
+  static bool IsAxisAligned(const mat3x4& transform) {
+    for (int row : {0, 1, 2}) {
+      int count = 0;
+      for (int col : {0, 1, 2}) {
+        if (transform[col][row] == 0.0) ++count;
+      }
+      if (count != 2) return false;
+    }
+    return true;
   }
 
  private:

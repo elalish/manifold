@@ -15,9 +15,11 @@
 cmake_minimum_required(VERSION 3.18)
 project(manifold LANGUAGES CXX)
 
-# Use C++17
+# C++17 by default, guarded so -DCMAKE_CXX_STANDARD and parent projects work.
 set(CMAKE_CXX_EXTENSIONS OFF)
-set(CMAKE_CXX_STANDARD 17)
+if(NOT DEFINED CMAKE_CXX_STANDARD OR CMAKE_CXX_STANDARD LESS 17)
+  set(CMAKE_CXX_STANDARD 17)
+endif()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
@@ -29,24 +31,28 @@ include(CMakeDependentOption)
 
 # Define Manifold version
 set(MANIFOLD_VERSION_MAJOR 3)
-set(MANIFOLD_VERSION_MINOR 3)
-set(MANIFOLD_VERSION_PATCH 2)
+set(MANIFOLD_VERSION_MINOR 5)
+set(MANIFOLD_VERSION_PATCH 1)
 set(
   MANIFOLD_VERSION
   "${MANIFOLD_VERSION_MAJOR}.${MANIFOLD_VERSION_MINOR}.${MANIFOLD_VERSION_PATCH}"
 )
 
 # Primary user facing options
-option(MANIFOLD_CROSS_SECTION "Build CrossSection for 2D support" ON)
 option(MANIFOLD_DEBUG "Enable debug tracing/timing" OFF)
 option(MANIFOLD_ASSERT "Enable assertions - requires MANIFOLD_DEBUG" OFF)
+option(MANIFOLD_TIMING "Enable Boolean3 phase timing without debug overhead" OFF)
 option(MANIFOLD_STRICT "Treat compile warnings as fatal build errors" OFF)
+option(
+  MANIFOLD_NO_IOSTREAM
+  "Strip iostream- and filesystem-using bits from the public API and tests; useful for freestanding/embedded builds. When ON, defines both MANIFOLD_NO_IOSTREAM and MANIFOLD_NO_FILESYSTEM."
+  OFF
+)
 option(
   MANIFOLD_DOWNLOADS
   "Allow Manifold build to download missing dependencies"
   ON
 )
-option(MANIFOLD_EXPORT "Build mesh export (via assimp) utility library" OFF)
 option(MANIFOLD_PAR "Enable Parallel backend" OFF)
 option(
   MANIFOLD_OPTIMIZED
@@ -55,14 +61,7 @@ option(
 )
 option(MANIFOLD_TEST "Enable testing suite" ON)
 option(MANIFOLD_PYBIND "Build python bindings" OFF)
-# MANIFOLD_CBIND is only available when MANIFOLD_CROSS_SECTION is enabled
-cmake_dependent_option(
-  MANIFOLD_CBIND
-  "Build C (FFI) bindings"
-  ON
-  "MANIFOLD_CROSS_SECTION"
-  OFF
-)
+option(MANIFOLD_CBIND "Build C (FFI) bindings" ON)
 # MANIFOLD_JSBIND is only available when building with Emscripten
 cmake_dependent_option(
   MANIFOLD_JSBIND
@@ -80,7 +79,6 @@ cmake_dependent_option(
 # When the system package is unavailable, the option will be automatically set
 # to true.
 option(MANIFOLD_USE_BUILTIN_TBB "Use builtin tbb" OFF)
-option(MANIFOLD_USE_BUILTIN_CLIPPER2 "Use builtin clipper2" OFF)
 option(MANIFOLD_USE_BUILTIN_NANOBIND "Use builtin nanobind" OFF)
 
 # default to Release build
@@ -94,9 +92,24 @@ set(MANIFOLD_FLAGS "" CACHE STRING "Manifold compiler flags")
 option(TRACY_ENABLE "Use tracy profiling" OFF)
 option(TRACY_MEMORY_USAGE "Track memory allocation with tracy (expensive)" OFF)
 option(MANIFOLD_FUZZ "Enable fuzzing tests" OFF)
+option(ASSIMP_ENABLE "Enable ASSIMP for utilities in extras" OFF)
 mark_as_advanced(TRACY_ENABLE)
 mark_as_advanced(TRACY_MEMORY_USAGE)
 mark_as_advanced(MANIFOLD_FUZZ)
+mark_as_advanced(ASSIMP_ENABLE)
+
+# MANIFOLD_NO_IOSTREAM strips iostream- and filesystem-using bits
+# from the public API and from the test files that use them.
+# Incompatible with options that emit diagnostic output via iostream:
+# MANIFOLD_DEBUG and MANIFOLD_TIMING (both use std::cout).
+# MANIFOLD_TEST=ON is supported — iostream-using TEST(...) blocks
+# in manifold_test/polygon_test/manifoldc_test are gated out under
+# the macro; the test executable still builds and runs the rest.
+if(MANIFOLD_NO_IOSTREAM AND (MANIFOLD_DEBUG OR MANIFOLD_TIMING))
+  message(FATAL_ERROR
+    "MANIFOLD_NO_IOSTREAM is incompatible with MANIFOLD_DEBUG / MANIFOLD_TIMING "
+    "(those options use std::cout for diagnostic output).")
+endif()
 
 # Always build position independent code for relocatability
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -149,7 +162,10 @@ if(CMAKE_EXPORT_COMPILE_COMMANDS AND NOT EMSCRIPTEN)
 endif()
 
 if(MSVC)
-  list(APPEND MANIFOLD_FLAGS /DNOMINMAX /bigobj)
+  list(APPEND MANIFOLD_FLAGS /DNOMINMAX /bigobj /fp:precise)
+  if(MANIFOLD_STRICT)
+    list(APPEND MANIFOLD_FLAGS /WX)
+  endif()
 else()
   list(
     APPEND
@@ -158,6 +174,7 @@ else()
     -Wno-unknown-warning-option
     -Wno-unused
     -Wno-shorten-64-to-32
+    -Wno-sign-compare
     -Wno-alloc-size-larger-than
   )
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
@@ -247,11 +264,6 @@ set_source_files_properties(
   PROPERTIES GENERATED TRUE
 )
 
-# If it's an EMSCRIPTEN build, we're done
-if(EMSCRIPTEN)
-  return()
-endif()
-
 # CMake exports
 configure_file(
   cmake/manifoldConfig.cmake.in
@@ -285,13 +297,14 @@ install(
 set(
   MANIFOLD_PUBLIC_HDRS
   common.h
+  math.h
+  mesh.h
   linalg.h
   manifold.h
   optional_assert.h
   polygon.h
   vec_view.h
-  $<$<BOOL:${MANIFOLD_CROSS_SECTION}>:cross_section.h>
-  $<$<BOOL:${MANIFOLD_EXPORT}>:meshIO.h>
+  cross_section.h
 )
 list(TRANSFORM MANIFOLD_PUBLIC_HDRS PREPEND include/manifold/)
 list(
@@ -308,9 +321,6 @@ install(
 # PkgConfig file
 if(MANIFOLD_PAR)
   set(TEMPLATE_OPTIONAL_TBB "tbb")
-endif()
-if(MANIFOLD_CROSS_SECTION)
-  set(TEMPLATE_OPTIONAL_CLIPPER "Clipper2")
 endif()
 configure_file(
   cmake/manifold.pc.in

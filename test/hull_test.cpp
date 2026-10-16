@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "gtest/gtest.h"
 #include "manifold/manifold.h"
 #include "samples.h"
 #include "test.h"
@@ -71,11 +72,7 @@ TEST(Hull, Tictac) {
                                       sphere.Translate({0, 0, tictacMid})};
   const auto tictac = Manifold::Hull(spheres);
 
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) {
-    ExportMesh("tictac_hull.glb", tictac.GetMeshGL(), {});
-  }
-#endif
+  if (options.exportModels) WriteTestOBJ("tictac_hull.obj", tictac);
 
   EXPECT_NEAR(sphere.NumVert() + tictacSeg, tictac.NumVert(), 1);
 }
@@ -146,11 +143,7 @@ TEST(Hull, FailingTest1) {
       {-20.442623138f, -35.407661438f, 8.2749996185f},
       {10.229375839f, -14.717799187f, 10.508025169f}};
   auto hull = Manifold::Hull(hullPts);
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) {
-    ExportMesh("failing_test1.glb", hull.GetMeshGL(), {});
-  }
-#endif
+  if (options.exportModels) WriteTestOBJ("failing_test1.obj", hull);
   EXPECT_TRUE(isMeshConvex(hull, 1.09375e-05));
 }
 
@@ -179,12 +172,57 @@ TEST(Hull, FailingTest2) {
       {174.17001343f, -19.502000809f, 29.562002182f},
       {190.06401062f, -0.81000006199f, -14.250000954f}};
   auto hull = Manifold::Hull(hullPts);
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) {
-    ExportMesh("failing_test2.glb", hull.GetMeshGL(), {});
-  }
-#endif
+  if (options.exportModels) WriteTestOBJ("failing_test2.obj", hull);
   EXPECT_TRUE(isMeshConvex(hull, 2.13966e-05));
+}
+
+TEST(Hull, CoplanarClusters) {
+  // A convex polygon swept by an octahedron (a Minkowski sum): every corner
+  // of the polygon shifted by each octahedron vertex. Large exactly coplanar
+  // clusters; the visibility test used to remove faces the new point merely
+  // lay on, leaving inward-facing faces and points far outside the hull.
+  const std::vector<vec3> hullPts = {
+      {2.2965078353881836, 1.8417460918426514, 2.041705846786499},
+      {2.3199396133422852, 1.8417460918426514, 2.041705846786499},
+      {2.3082237243652344, 1.8300302028656006, 2.041705846786499},
+      {2.3082237243652344, 1.8534619808197021, 2.041705846786499},
+      {2.3082237243652344, 1.8417460918426514, 2.0299899578094482},
+      {2.3082237243652344, 1.8417460918426514, 2.0534217357635498},
+      {2.2965078353881836, 1.7583343982696533, 2.041705846786499},
+      {2.3199396133422852, 1.7583343982696533, 2.041705846786499},
+      {2.3082237243652344, 1.7466185092926025, 2.041705846786499},
+      {2.3082237243652344, 1.7700502872467041, 2.041705846786499},
+      {2.3082237243652344, 1.7583343982696533, 2.0299899578094482},
+      {2.3082237243652344, 1.7583343982696533, 2.0534217357635498},
+      {2.8965883255004883, 1.1582539081573486, 2.6417863368988037},
+      {2.9200201034545898, 1.1582539081573486, 2.6417863368988037},
+      {2.9083042144775391, 1.1465380191802979, 2.6417863368988037},
+      {2.9083042144775391, 1.1699697971343994, 2.6417863368988037},
+      {2.9083042144775391, 1.1582539081573486, 2.6300704479217529},
+      {2.9083042144775391, 1.1582539081573486, 2.6535022258758545},
+      {2.9465782642364502, 1.1582539081573486, 2.6917762756347656},
+      {2.9700100421905518, 1.1582539081573486, 2.6917762756347656},
+      {2.958294153213501, 1.1465380191802979, 2.6917762756347656},
+      {2.958294153213501, 1.1699697971343994, 2.6917762756347656},
+      {2.958294153213501, 1.1582539081573486, 2.6800603866577148},
+      {2.958294153213501, 1.1582539081573486, 2.7034921646118164},
+      {2.9465782642364502, 1.2416656017303467, 2.6917762756347656},
+      {2.9700100421905518, 1.2416656017303467, 2.6917762756347656},
+      {2.958294153213501, 1.2299497127532959, 2.6917762756347656},
+      {2.958294153213501, 1.2533814907073975, 2.6917762756347656},
+      {2.958294153213501, 1.2416656017303467, 2.6800603866577148},
+      {2.958294153213501, 1.2416656017303467, 2.7034921646118164},
+      {2.3464977741241455, 1.8417460918426514, 2.0916957855224609},
+      {2.3699295520782471, 1.8417460918426514, 2.0916957855224609},
+      {2.3582136631011963, 1.8300302028656006, 2.0916957855224609},
+      {2.3582136631011963, 1.8534619808197021, 2.0916957855224609},
+      {2.3582136631011963, 1.8417460918426514, 2.0799798965454102},
+      {2.3582136631011963, 1.8417460918426514, 2.1034116744995117},
+  };
+  auto hull = Manifold::Hull(hullPts);
+  if (options.exportModels) WriteTestOBJ("coplanar_clusters.obj", hull);
+  EXPECT_TRUE(isMeshConvex(hull));
+  EXPECT_NEAR(hull.Volume(), 0.002259329608, 1e-12);
 }
 
 TEST(Hull, DisabledFaceTest) {
@@ -203,11 +241,44 @@ TEST(Hull, DisabledFaceTest) {
       {29.590316772, 20.917686462, 73.143547058},
       {101.61526489, 98.461585999, 30.909877777}};
   auto hull = Manifold::Hull(hullPts);
-#ifdef MANIFOLD_EXPORT
-  if (options.exportModels) {
-    ExportMesh("disabledFaceTest.glb", hull.GetMeshGL(), {});
-  }
-#endif
+  if (options.exportModels) WriteTestOBJ("disabledFaceTest.obj", hull);
   EXPECT_TRUE(!hull.IsEmpty());
   EXPECT_TRUE(isMeshConvex(hull));
+}
+
+TEST(Hull, Degenerate2D) {
+  // issue 1491
+  // note that we need 5 points to trigger this bug
+  Manifold hull = Manifold::Hull({
+      {0.0, 0.0, 0.0},
+      {0.0, 0.0, 1.0},
+      {0.5, 0.0, 0.0},
+      {0.5, 0.0, 0.0},
+      {0.5, 0.0, 1.0},
+  });
+  EXPECT_TRUE(hull.IsEmpty());
+}
+
+TEST(Hull, Degenerate1D) {
+  Manifold hull = Manifold::Hull({
+      {0.0, 0.0, 0.0},
+      {0.0, 0.0, 0.0},
+      {0.5, 0.0, 0.0},
+      {0.5, 0.0, 0.0},
+      {0.5, 0.0, 0.0},
+  });
+  EXPECT_TRUE(hull.IsEmpty());
+}
+
+TEST(Hull, NotEnoughPoints) {
+  Manifold hull = Manifold::Hull({
+      {0.0, 0.0, 0.0},
+      {0.5, 0.0, 0.0},
+  });
+  EXPECT_TRUE(hull.IsEmpty());
+}
+
+TEST(Hull, EmptyHull) {
+  Manifold hull = Manifold::Hull(std::vector<vec3>());
+  EXPECT_TRUE(hull.IsEmpty());
 }

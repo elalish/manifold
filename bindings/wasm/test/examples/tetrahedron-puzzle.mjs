@@ -50,7 +50,7 @@ const result =
 
 const layFlat = new GLTFNode();
 layFlat.rotation =
-    [45, -Math.atan(1 / Math.sqrt(2)) * 180 / Math.PI, 120];
+    [45, -(Math.atan(1 / Math.sqrt(2)) * 180 / Math.PI), 120];
 layFlat.translation = [0, 0, scale * Math.sqrt(3) / 3];
 
 const fixed = new GLTFNode(layFlat);

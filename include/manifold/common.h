@@ -1,4 +1,4 @@
-// Copyright 2021 The Manifold Authors.
+// Copyright 2026 The Manifold Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,16 +13,31 @@
 // limitations under the License.
 
 #pragma once
+#include <cmath>
+#include <functional>
 #include <limits>
+#include <memory>
 #include <vector>
 
-#ifdef MANIFOLD_DEBUG
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
 #include <chrono>
+#include <iostream>
 #endif
 
+#include "./math.h"
 #include "linalg.h"
 
 namespace manifold {
+
+// Forward decls for ExecutionContext factory methods (full defs in
+// manifold.h / mesh.h).
+class Manifold;
+template <typename Precision, typename I = uint32_t>
+struct MeshGLP;
+using MeshGL = MeshGLP<float>;
+using MeshGL64 = MeshGLP<double, uint64_t>;
+struct Box;  // defined below; needed by ExecutionContext::LevelSet
+
 /** @addtogroup Math
  * @ingroup Core
  * @brief Simple math operations.
@@ -92,19 +107,26 @@ constexpr double smoothstep(double edge0, double edge1, double a) {
  * @param x Angle in degrees.
  */
 inline double sind(double x) {
-  if (!la::isfinite(x)) return sin(x);
+  if (!la::isfinite(x)) return NAN;
   if (x < 0.0) return -sind(-x);
+#if defined(_WIN32) && defined(_M_ARM64)
+  x = std::fmod(x, 360.0);
+  const int quo = static_cast<int>(std::floor(x / 90.0 + 0.5));
+  x -= quo * 90.0;
+#else
   int quo;
-  x = remquo(fabs(x), 90.0, &quo);
+  x = std::remquo(std::fabs(x), 90.0, &quo);
+#endif
+  const double xr = radians(x);
   switch (quo % 4) {
     case 0:
-      return sin(radians(x));
+      return math::sin(xr);
     case 1:
-      return cos(radians(x));
+      return math::cos(xr);
     case 2:
-      return -sin(radians(x));
+      return -math::sin(xr);
     case 3:
-      return -cos(radians(x));
+      return -math::cos(xr);
   }
   return 0.0;
 }
@@ -139,16 +161,119 @@ using SimplePolygon = std::vector<vec2>;
 using Polygons = std::vector<SimplePolygon>;
 
 /**
- * @brief Defines which edges to sharpen and how much for the Manifold.Smooth()
- * constructor.
+ * @brief Result of a ray cast query against a Manifold.
  */
-struct Smoothness {
-  /// The halfedge index = 3 * tri + i, referring to Mesh.triVerts[tri][i].
-  size_t halfedge;
-  /// A value between 0 and 1, where 0 is sharp and 1 is the default and the
-  /// curvature is interpolated between these values. The two paired halfedges
-  /// can have different values while maintaining C-1 continuity (except for 0).
-  double smoothness;
+struct RayHit {
+  /// The triangle index that was hit.
+  uint64_t faceID = 0;
+  /// The parametric distance along the ray segment in the closed interval
+  /// [0, 1], where 0 is the origin and 1 is the endpoint. Hits exactly at
+  /// the origin or endpoint are included.
+  double distance = 0;
+  /// The 3D position of the hit point.
+  vec3 position = vec3(0.0);
+  /// The geometric face normal at the hit.
+  vec3 normal = vec3(0.0);
+};
+
+/**
+ * @brief Observe and control a long-running Manifold evaluation.
+ *
+ * Attach to a Manifold via Manifold::WithContext(ctx); the next *eager* op
+ * invoked on the result (Status, Refine / RefineToLength / RefineToTolerance,
+ * Hull, MinkowskiSum / MinkowskiDifference) snapshots the ctx and reports
+ * progress and observes cancellation through it. Safe to read/write from any
+ * thread.
+ *
+ * Copyable and movable: copies share the same underlying state via a
+ * shared_ptr, so one thread can evaluate while another holds a copy and
+ * observes Progress() or calls Cancel(). Use a separate context per
+ * evaluation; passing the same context (or a copy of it) to two concurrent
+ * eager ops produces meaningless progress values because both calls reset
+ * and mutate the same counters.
+ *
+ * Cancellation is permanent for a Manifold: once requested and detected,
+ * the Manifold's status becomes Error::Cancelled and stays Cancelled. To
+ * retry, construct a new Manifold. A context, however, is reusable: each
+ * evaluation through it resets the progress counters, but it does NOT
+ * clear the cancel flag -- once Cancel() has been called on a context,
+ * every subsequent evaluation with that context (or any copy of it) will
+ * short-circuit to Error::Cancelled. Construct a fresh context to make a
+ * new evaluation cancellable independently.
+ *
+ * Cancellation granularity varies by op: Boolean trees check per
+ * sub-boolean (so a single very large boolean may run to completion
+ * before the next check); Hull checks at the boundaries of its main
+ * phases (post-buildMesh and post-SortGeometry); Minkowski checks per
+ * face of the first input and per internal BatchBoolean batch.
+ *
+ * Example: cancel a long-running BatchBoolean from an observer thread.
+ * @code
+ * ExecutionContext ctx;
+ * Manifold big = Manifold::BatchBoolean(items, OpType::Add).WithContext(ctx);
+ * std::thread eval([&] {
+ *   if (big.Status() == Manifold::Error::Cancelled) {
+ *     // evaluation was cancelled
+ *   }
+ * });
+ * // ...later, from the UI thread:
+ * ctx.Cancel();
+ * eval.join();
+ * @endcode
+ *
+ * Example: cancel a Minkowski sum mid-evaluation.
+ * @code
+ * ExecutionContext ctx;
+ * std::thread eval([&] {
+ *   if (a.WithContext(ctx).MinkowskiSum(b).Status() ==
+ *       Manifold::Error::Cancelled) {
+ *     // evaluation was cancelled
+ *   }
+ * });
+ * ctx.Cancel();
+ * eval.join();
+ * @endcode
+ */
+class ExecutionContext {
+ public:
+  ExecutionContext();
+  ~ExecutionContext();
+  ExecutionContext(const ExecutionContext&);
+  ExecutionContext(ExecutionContext&&) noexcept;
+  ExecutionContext& operator=(const ExecutionContext&);
+  ExecutionContext& operator=(ExecutionContext&&) noexcept;
+
+  /// Request cancellation. Can be called from any thread. Idempotent.
+  void Cancel();
+  /// Has cancellation been requested?
+  bool Cancelled() const;
+  /// Normalized progress in [0, 1]. Monotonically increases during
+  /// evaluation. Returns 1.0 when no work has been scheduled (interpreted
+  /// as trivially complete -- e.g. a single-leaf manifold has nothing to
+  /// evaluate, and `Progress()` called before any `Status(ctx)` reflects
+  /// the same "no pending work" state).
+  double Progress() const;
+
+  /// Eager ctx-aware `Manifold(MeshGL)`. The heavy ingest steps check
+  /// cancel and credit `Progress()` between phases. Precedence: a
+  /// Cancel() before this call wins over empty/malformed input;
+  /// validation errors win over a Cancel() that races in after that.
+  /// Concurrent calls on the same ctx produce undefined progress
+  /// values; the returned Manifolds remain valid.
+  Manifold FromMeshGL(const MeshGL& mesh);
+  Manifold FromMeshGL(const MeshGL64& mesh);
+
+  /// Eager ctx-aware `Manifold::LevelSet`. The voxel-sampling and
+  /// mesh-extraction phases check cancel and credit `Progress()` between
+  /// phases. A Cancel() before or during the call yields a Cancelled result.
+  Manifold LevelSet(std::function<double(vec3)> sdf, Box bounds,
+                    double edgeLength, double level = 0, double tolerance = -1,
+                    bool canParallel = true);
+
+  /// @internal Opaque implementation. Defined in src/execution_impl.h;
+  /// accessible only to internal code that includes that header.
+  struct Impl;
+  std::shared_ptr<Impl> impl_;
 };
 
 /**
@@ -204,6 +329,18 @@ struct Box {
     return la::all(la::gequal(box.min, min)) &&
            la::all(la::gequal(max, box.max));
   }
+
+  /**
+   * Does this box equal the given box exactly?
+   */
+  constexpr bool operator==(const Box& box) const {
+    return la::all(la::equal(box.min, min)) && la::all(la::equal(max, box.max));
+  }
+
+  /**
+   * Does this box not equal the given box exactly?
+   */
+  constexpr bool operator!=(const Box& box) const { return !(*this == box); }
 
   /**
    * Expand this box to include the given point.
@@ -379,7 +516,7 @@ struct Rect {
   /**
    * Is the rectangle empty (containing no space)?
    */
-  constexpr bool IsEmpty() const { return max.y <= min.y || max.x <= min.x; };
+  constexpr bool IsEmpty() const { return max.y <= min.y || max.x <= min.x; }
 
   /**
    * Does this recangle have finite bounds?
@@ -472,6 +609,39 @@ struct Rect {
  */
 enum class OpType : char { Add, Subtract, Intersect };
 
+// Adapted from Clipper2 docs:
+// http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/JoinType.htm
+// (Copyright © 2010-2023 Angus Johnson)
+/**
+ * Specifies the treatment of path/contour joins (corners) when offseting
+ * CrossSections. See the [Clipper2
+ * doc](http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/JoinType.htm)
+ * for illustrations.
+ */
+enum class JoinType {
+  Square, /*!< Squaring is applied uniformly at all joins where the internal
+            join angle is less that 90 degrees. The squared edge will be at
+            exactly the offset distance from the join vertex. */
+  Round,  /*!< Rounding is applied to all joins that have convex external
+           angles, and it maintains the exact offset distance from the join
+           vertex. */
+  Miter,  /*!< There's a necessary limit to mitered joins (to avoid narrow
+           angled joins producing excessively long and narrow
+           [spikes](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)).
+           So where mitered joins would exceed a given maximum miter distance
+           (relative to the offset distance), these are 'squared' instead. */
+  Bevel   /*!< Bevelled joins are similar to 'squared' joins except that
+           squaring won't occur at a fixed distance. While bevelled joins may
+           not be as pretty as squared joins, bevelling is much easier (ie
+           faster) than squaring. And perhaps this is why bevelling rather
+           than squaring is preferred in numerous graphics display formats
+           (including
+           [SVG](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-linejoin)
+           and
+           [PDF](https://helpx.adobe.com/indesign/using/applying-line-stroke-settings.html)
+           document formats). */
+};
+
 constexpr int DEFAULT_SEGMENTS = 0;
 constexpr double DEFAULT_ANGLE = 10.0;
 constexpr double DEFAULT_LENGTH = 1.0;
@@ -486,11 +656,12 @@ constexpr double DEFAULT_LENGTH = 1.0;
  * must be specified.
  */
 class Quality {
- private:
  public:
+  static void SetRelativePrecision(double p);
   static void SetMinCircularAngle(double angle);
   static void SetMinCircularEdgeLength(double length);
   static void SetCircularSegments(int number);
+  static double GetRelativePrecision();
   static int GetCircularSegments(double radius);
   static void ResetToDefaults();
 };
@@ -512,6 +683,10 @@ struct ExecutionParams {
   /// Perform 3D mesh self-intersection test on intermediate boolean results to
   /// test for ϵ-validity. For debug purposes only.
   bool selfIntersectionChecks = false;
+  /// Check that each Boolean does not produce any degenerate triangles. For
+  /// debug purposes only. Only valid for inputs that also don't contain
+  /// degenerate triangles.
+  bool verifyNoDegenerates = false;
   /// If processOverlaps is false, a geometric check will be performed to assert
   /// all triangles are CCW.
   bool processOverlaps = true;
@@ -523,9 +698,8 @@ struct ExecutionParams {
   bool cleanupTriangles = true;
   /// Verbose level:
   /// - 0 for no verbose output
-  /// - 1 for verbose output for the Boolean, including timing info and vector
-  /// sizes.
-  /// - 2 for verbose output with triangulator action as well.
+  /// - 1 for Boolean debug dumps on failures and invalid intermediate meshes.
+  /// - 2 for Boolean timing and size statistics, plus triangulator action.
   int verbose = 0;
 };
 /** @} */
@@ -533,18 +707,11 @@ struct ExecutionParams {
 #ifdef MANIFOLD_DEBUG
 
 inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
-  return stream << "min: " << box.min << ", "
-                << "max: " << box.max;
+  return stream << "min: " << box.min << ", " << "max: " << box.max;
 }
 
 inline std::ostream& operator<<(std::ostream& stream, const Rect& box) {
-  return stream << "min: " << box.min << ", "
-                << "max: " << box.max;
-}
-
-inline std::ostream& operator<<(std::ostream& stream, const Smoothness& s) {
-  return stream << "halfedge: " << s.halfedge << ", "
-                << "smoothness: " << s.smoothness;
+  return stream << "min: " << box.min << ", " << "max: " << box.max;
 }
 
 /**
@@ -575,6 +742,9 @@ void Diff(const std::vector<T>& a, const std::vector<T>& b) {
   std::cout << std::endl;
 }
 
+#endif
+
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
 struct Timer {
   std::chrono::high_resolution_clock::time_point start, end;
 

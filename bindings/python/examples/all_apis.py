@@ -17,6 +17,7 @@ def all_cross_section():
     poly = [[0, 0], [1, 0], [1, 1]]
     c = CrossSection([np.array(poly)])
     c = CrossSection([poly])
+    c = CrossSection.even_odd([poly])
     c = CrossSection() + c
     a = c.area()
     c = CrossSection.batch_boolean(
@@ -30,7 +31,7 @@ def all_cross_section():
     c = CrossSection.batch_hull([c, c.translate((1, 0))])
     b = c.bounds()
     c = CrossSection.circle(1)
-    c = CrossSection.compose([c, c.translate((1, 0))])
+    c = CrossSection.batch_boolean([c, c.translate((1, 0))], OpType.Add)
     cs = c.decompose()
     m = c.extrude(1)
     c = c.hull()
@@ -90,23 +91,49 @@ def all_manifold():
     n = m.num_tri()
     n = m.num_vert()
     i = m.original_id()
-    p = m.get_tolerance()
-    pp = m.set_tolerance(0.0001)
     m = m.simplify(0.001)
     c = m.project()
     m = m.refine(2)
     m = m.refine_to_length(0.1)
     m = m.refine_to_tolerance(0.01)
-    m = m.smooth_out()
     i = Manifold.reserve_ids(1)
     m = m.scale((1, 2, 3))
     m = m.set_properties(3, lambda pos, prop: pos)
     c = m.slice(0.5)
-    m = Manifold.smooth(mesh, [0], [0.5])
     m = Manifold.sphere(1)
     m, n = m.split(m.translate((1, 0, 0)))
     m, n = m.split_by_plane((0, 0, 1), 0)
     e = m.status()
+    ctx = ExecutionContext()
+    _ = ctx.cancelled()
+    _ = ctx.progress()
+    ctx.cancel()
+    m = m.with_context(ctx)
+    # Real cancel assertion: a pre-cancelled ctx on a CsgOpNode returns
+    # Cancelled (not NoError). Leaf nodes are trivially evaluated so use a
+    # fresh union to ensure an actual CSG tree is traversed.
+    cancelled_ctx = ExecutionContext()
+    cancelled_ctx.cancel()
+    tree = (Manifold.cube() + Manifold.sphere(1)).with_context(cancelled_ctx)
+    assert tree.status() == Error.Cancelled
+    # ctx-aware static factories: these ops have no source Manifold to attach a
+    # context to via with_context, so they run on the context directly.
+    ingest_ctx = ExecutionContext()
+    assert ingest_ctx.from_mesh(Manifold.cube().to_mesh()).status() == Error.NoError
+    assert ingest_ctx.progress() == 1.0
+    sdf_ctx = ExecutionContext()
+    sphere = sdf_ctx.level_set(
+        lambda x, y, z: 1 - (x * x + y * y + z * z) ** 0.5,
+        [-1.1, -1.1, -1.1, 1.1, 1.1, 1.1],
+        0.2,
+    )
+    assert sphere.status() == Error.NoError
+    # A pre-cancelled ctx propagates through a factory; this proves the ctx is
+    # wired, since NoError + progress==1 also hold for an untouched ctx.
+    cancel_factory_ctx = ExecutionContext()
+    cancel_factory_ctx.cancel()
+    cancelled = cancel_factory_ctx.from_mesh(Manifold.cube().to_mesh())
+    assert cancelled.status() == Error.Cancelled
     m = Manifold.tetrahedron()
     mesh = m.to_mesh()
     ok = mesh.merge()

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "extends": ["./typedoc.common.json"],
+  "name": "ManifoldCAD User Guide",
+  "customCss": "./documents/user-guide.css",
+  "out": "docs/jsuser",
+  "entryPoints": [ "./types/manifoldCADUserGuide.d.ts" ],
+  "alwaysCreateEntryPointModule": false,
+  "excludeInternal": true,
+  "readme": "none",
+  "categorizeByGroup": true,
+  "navigation": {
+    "includeGroups": true
+  }
+}

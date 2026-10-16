@@ -13,22 +13,51 @@
 // limitations under the License.
 
 #include <chrono>
+#include <cstdlib>
 #include <iostream>
+#include <string>
 
 #include "manifold/manifold.h"
 
 using namespace manifold;
 
+namespace {
+
+constexpr int kNumSizes = 8;
+
+void RunSizeIndex(int i) {
+  Manifold sphere = Manifold::Sphere(1, (8 << i) * 4);
+  Manifold sphere2 = sphere.Translate(vec3(0.5));
+  auto start = std::chrono::high_resolution_clock::now();
+  Manifold diff = sphere - sphere2;
+  diff.NumTri();
+  auto end = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double> elapsed = end - start;
+  std::cout << "nTri = " << sphere.NumTri() << ", time = " << elapsed.count()
+            << " sec" << std::endl;
+}
+
+}  // namespace
+
 int main(int argc, char** argv) {
-  for (int i = 0; i < 8; ++i) {
-    Manifold sphere = Manifold::Sphere(1, (8 << i) * 4);
-    Manifold sphere2 = sphere.Translate(vec3(0.5));
-    auto start = std::chrono::high_resolution_clock::now();
-    Manifold diff = sphere - sphere2;
-    diff.NumTri();
-    auto end = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = end - start;
-    std::cout << "nTri = " << sphere.NumTri() << ", time = " << elapsed.count()
-              << " sec" << std::endl;
+  if (argc == 3 && std::string(argv[1]) == "--size-index") {
+    int index = std::atoi(argv[2]);
+    if (index < 0 || index >= kNumSizes) {
+      std::cerr << "size index must be in range 0.." << (kNumSizes - 1)
+                << std::endl;
+      return 2;
+    }
+    RunSizeIndex(index);
+    return 0;
+  }
+
+  if (argc != 1) {
+    std::cerr << "Usage: " << argv[0] << " [--size-index 0.." << (kNumSizes - 1)
+              << "]" << std::endl;
+    return 2;
+  }
+
+  for (int i = 0; i < kNumSizes; ++i) {
+    RunSizeIndex(i);
   }
 }

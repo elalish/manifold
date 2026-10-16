@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Type-only import for the ctx-aware factories on ExecutionContext below.
+import type {Manifold, Mesh} from './manifold-encapsulated-types';
+
 /**
  * @inline
  * @hidden
@@ -28,9 +31,19 @@ export interface SealedFloat32Array<N extends number> extends Float32Array {
   length: N;
 }
 
+/**
+ * A vector in two dimensional space.
+ */
 export type Vec2 = [number, number];
+
+/**
+ * A vector in three dimensional space.
+ */
 export type Vec3 = [number, number, number];
-// 3x3 matrix stored in column-major order
+
+/**
+ * 3x3 matrix stored in column-major order.
+ */
 export type Mat3 = [
   number,
   number,
@@ -42,7 +55,10 @@ export type Mat3 = [
   number,
   number,
 ];
-// 4x4 matrix stored in column-major order
+
+/**
+ * 4x4 matrix stored in column-major order.
+ */
 export type Mat4 = [
   number,
   number,
@@ -63,22 +79,85 @@ export type Mat4 = [
 ];
 export type SimplePolygon = Vec2[];
 export type Polygons = SimplePolygon|SimplePolygon[];
+
+/**
+ * A two dimensional rectangle, aligned to the coordinate system.
+ * @see {@link CrossSection.bounds}
+ */
 export type Rect = {
   min: Vec2,
   max: Vec2
 };
+
+/**
+ * A three dimensional box, aligned to the coordinate system.
+ *
+ * @see {@link Manifold.boundingBox}
+ * @see {@link Manifold.levelSet}
+ */
 export type Box = {
   min: Vec3,
   max: Vec3
 };
-export type Smoothness = {
-  halfedge: number,
-  smoothness: number
+
+export type RayHit = {
+  faceID: number,
+  distance: number,
+  position: Vec3,
+  normal: Vec3
 };
-export type FillRule = 'EvenOdd'|'NonZero'|'Positive'|'Negative'
-export type JoinType = 'Square'|'Round'|'Miter'
+
+export type JoinType = 'Square'|'Round'|'Miter'|'Bevel';
+
+/**
+ * @see {@link Manifold.status}
+ */
 export type ErrorStatus = 'NoError'|'NonFiniteVertex'|'NotManifold'|
     'VertexOutOfBounds'|'PropertiesWrongLength'|'MissingPositionProperties'|
     'MergeVectorsDifferentLengths'|'MergeIndexOutOfBounds'|
     'TransformWrongLength'|'RunIndexWrongLength'|'FaceIDWrongLength'|
-    'InvalidConstruction'
+    'InvalidConstruction'|'ResultTooLarge'|'InvalidTangents'|'Cancelled';
+
+/**
+ * Observe and control a long-running Manifold evaluation. Attach to a
+ * Manifold via Manifold.withContext(); the next eager op invoked on the
+ * result (status(), one of the refine* family, hull(), or minkowskiSum() /
+ * minkowskiDifference()) snapshots the ctx and reports progress / observes
+ * cancellation through it. Deferred ops (Boolean, transforms, batch ops)
+ * ignore any attached ctx. Safe to read/write from any thread/worker.
+ *
+ * Cancellation is permanent for a Manifold: once cancelled and detected,
+ * the Manifold's status becomes 'Cancelled' and stays 'Cancelled'.
+ */
+export interface ExecutionContext {
+  /** Request cancellation. Can be called from any context. Idempotent. */
+  cancel(): void;
+  /** Has cancellation been requested? */
+  cancelled(): boolean;
+  /**
+   * Normalized progress in [0, 1]. Monotonic within an evaluation.
+   * Returns 1 when no work has been scheduled (interpreted as trivially
+   * complete -- e.g. a single-leaf manifold has nothing to evaluate).
+   */
+  progress(): number;
+
+  // ctx-aware static factories: like Manifold.ofMesh / levelSet, but
+  // run under this context so progress / cancellation are observed (these ops
+  // have no source Manifold to attach via Manifold.withContext).
+
+  /** Like {@link Manifold.ofMesh}, observed/cancellable via this context. */
+  fromMesh(mesh: Mesh): Manifold;
+  /** Like {@link Manifold.levelSet}, observed/cancellable via this context. */
+  levelSet(
+      sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
+      level?: number, tolerance?: number): Manifold;
+
+  // Memory
+
+  /**
+   * Frees the WASM memory of this ExecutionContext, since these cannot be
+   * garbage-collected automatically.
+   * @group Basics
+   */
+  delete(): void;
+}

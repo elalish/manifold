@@ -31,14 +31,23 @@ ManifoldCrossSection* manifold_cross_section_copy(void* mem,
 }
 
 ManifoldCrossSection* manifold_cross_section_of_simple_polygon(
-    void* mem, ManifoldSimplePolygon* p, ManifoldFillRule fr) {
-  return to_c(new (mem) CrossSection(*from_c(p), from_c(fr)));
+    void* mem, ManifoldSimplePolygon* p) {
+  return to_c(new (mem) CrossSection(*from_c(p)));
 }
 
 ManifoldCrossSection* manifold_cross_section_of_polygons(void* mem,
-                                                         ManifoldPolygons* p,
-                                                         ManifoldFillRule fr) {
-  return to_c(new (mem) CrossSection(*from_c(p), from_c(fr)));
+                                                         ManifoldPolygons* p) {
+  return to_c(new (mem) CrossSection(*from_c(p)));
+}
+
+ManifoldCrossSection* manifold_cross_section_even_odd_simple_polygon(
+    void* mem, ManifoldSimplePolygon* p) {
+  return to_c(new (mem) CrossSection(CrossSection::EvenOdd(*from_c(p))));
+}
+
+ManifoldCrossSection* manifold_cross_section_even_odd_polygons(
+    void* mem, ManifoldPolygons* p) {
+  return to_c(new (mem) CrossSection(CrossSection::EvenOdd(*from_c(p))));
 }
 
 ManifoldCrossSectionVec* manifold_cross_section_empty_vec(void* mem) {
@@ -181,7 +190,7 @@ ManifoldCrossSection* manifold_cross_section_transform(void* mem,
   return to_c(new (mem) CrossSection(transformed));
 }
 
-ManifoldCrossSection* manifold_cross_section_warp(
+ManifoldCrossSection* manifold_cross_section_warp_context(
     void* mem, ManifoldCrossSection* cs,
     ManifoldVec2 (*fun)(double, double, void*), void* ctx) {
   // Bind function with context argument to one without
@@ -196,8 +205,8 @@ ManifoldCrossSection* manifold_cross_section_warp(
 
 ManifoldCrossSection* manifold_cross_section_simplify(void* mem,
                                                       ManifoldCrossSection* cs,
-                                                      double epsilon) {
-  auto simplified = from_c(cs)->Simplify(epsilon);
+                                                      double tolerance) {
+  auto simplified = from_c(cs)->Simplify(tolerance);
   return to_c(new (mem) CrossSection(simplified));
 }
 
@@ -235,12 +244,6 @@ ManifoldPolygons* manifold_cross_section_to_polygons(void* mem,
                                                      ManifoldCrossSection* cs) {
   auto ps = from_c(cs)->ToPolygons();
   return to_c(new (mem) Polygons(ps));
-}
-
-ManifoldCrossSection* manifold_cross_section_compose(
-    void* mem, ManifoldCrossSectionVec* csv) {
-  auto cs = CrossSection::Compose(*from_c(csv));
-  return to_c(new (mem) CrossSection(cs));
 }
 
 ManifoldCrossSectionVec* manifold_cross_section_decompose(

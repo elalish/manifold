@@ -23,7 +23,7 @@ function mengerSponge(n) {
   const holes = [];
   fractal(holes, result, 1.0, [0.0, 0.0], 1, n);
 
-  const hole = Manifold.compose(holes);
+  const hole = Manifold.union(holes);
 
   result = Manifold.difference([
     result,
@@ -43,6 +43,7 @@ const posColors = (newProp, pos) => {
 const result = mengerSponge(3)
                    .trimByPlane([1, 1, 1], 0)
                    .setProperties(3, posColors)
+                   .translate([0, 0, 0.5])
                    .scale(100);
 
 const node = new GLTFNode();

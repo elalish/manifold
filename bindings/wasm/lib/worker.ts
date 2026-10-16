@@ -23,7 +23,7 @@
  * a set of interfaces for communication in that case.
  *
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Core
  */
 
@@ -230,6 +230,7 @@ export async function evaluate(
     setCircularSegments: levelOfDetail.setCircularSegments,
     setMinCircularAngle: levelOfDetail.setMinCircularAngle,
     setMinCircularEdgeLength: levelOfDetail.setMinCircularEdgeLength,
+    setRelativePrecision: levelOfDetail.setRelativePrecision,
     resetToCircularDefaults: levelOfDetail.resetToCircularDefaults,
     setAnimationDuration: animation.setAnimationDuration,
     setAnimationFPS: animation.setAnimationFPS,
@@ -346,7 +347,6 @@ const initializeWebWorker = (): void => {
   const interceptConsole = () => {
     console.debug('Intercepting console.log() in manifoldCAD worker.');
     if (self.console) {
-      const oldLog = self.console.log;
       self.console.log = function(...args) {
         let message = '';
         for (const arg of args) {
@@ -359,7 +359,6 @@ const initializeWebWorker = (): void => {
           }
         }
         self.postMessage({type: 'log', message} as MessageFromWorker.Log);
-        oldLog(...args);
       };
     };
   };

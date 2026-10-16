@@ -16,7 +16,7 @@
  * Use material properties (like transparency and colour) to debug manifoldCAD
  * models.
  * @packageDocumentation
- * @group manifoldCAD Runtime
+ * @group ManifoldCAD
  * @category Modelling
  */
 
@@ -24,8 +24,9 @@ import {Document} from '@gltf-transform/core';
 
 import type {Manifold, Mesh} from '../manifold.d.ts';
 
-import {Properties, writeMesh} from './gltf-io.ts';
-import {GLTFMaterial} from './gltf-node.ts';
+import type {Properties} from './gltf-io.ts';
+import {writeMesh} from './gltf-io.ts';
+import type {GLTFMaterial} from './gltf-node.ts';
 import {getCachedMaterial, getMaterialByID as getOriginalMaterialByID} from './material.ts';
 
 // Debug setup to show source meshes
@@ -47,9 +48,6 @@ const GHOST = {
   metallic: 0
 } as GLTFMaterial;
 
-/**
- * @internal
- */
 export function cleanup() {
   ghost = false;
   shown.clear();
@@ -72,7 +70,6 @@ const getDebugMeshByID = (id: number):
  *     Any other mesh will have the GHOST material, while
  *     this one gets it's natural material.
  *
- * @internal
  * @param id The `originalID` of the mesh.
  */
 const getDebugMaterialByID = (id: number):
@@ -93,7 +90,6 @@ const getDebugMaterialByID = (id: number):
  * Everything gets rendered in the GHOST material, while the flagged
  * mesh is added as a debug node.
  *
- * @internal
  * @param id The `originalID` of the mesh.
  */
 export const getMaterialByID = (id: number): GLTFMaterial|undefined =>
@@ -111,10 +107,9 @@ const debug = (manifold: Manifold, map: Map<number, Mesh>) => {
  * will allow you find the object even if it doesn't currently intersect the
  * result.
  *
- * @group Modelling Functions
  * @param manifold The object to show - returned for chaining.
  */
-export const show = (manifold: Manifold) => {
+export function show(manifold: Manifold) {
   return debug(manifold, shown);
 };
 
@@ -124,10 +119,9 @@ export const show = (manifold: Manifold) => {
  * debugging as it allows you to see objects that may be hidden in the interior
  * of the result. Multiple objects marked `only()` will all be shown.
  *
- * @group Modelling Functions
  * @param manifold The object to show - returned for chaining.
  */
-export const only = (manifold: Manifold) => {
+export function only(manifold: Manifold) {
   ghost = true;
   return debug(manifold, singles);
 };

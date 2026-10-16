@@ -25,19 +25,117 @@ inline vec3 SafeNormalize(vec3 v) {
   return std::isfinite(v.x) ? v : vec3(0.0);
 }
 
-inline double MaxEpsilon(double minEpsilon, const Box& bBox) {
-  double epsilon = std::max(minEpsilon, kPrecision * bBox.Scale());
-  return std::isfinite(epsilon) ? epsilon : -1;
-}
-
 inline int NextHalfedge(int current) {
-  ++current;
-  if (current % 3 == 0) current -= 3;
+  current += current % 3 == 2 ? -2 : 1;
   return current;
 }
 
+inline int PrevHalfedge(int current) {
+  current += current % 3 == 0 ? 2 : -1;
+  return current;
+}
+
+/**
+When a transform is applied to the verts of an object, and different transform
+is needed for the normals. Note that applying this transform will stretch their
+length, so they should be renormalized after.
+*/
 inline mat3 NormalTransform(const mat3x4& transform) {
   return la::inverse(la::transpose(mat3(transform)));
+}
+
+/**
+This is the corresponding normal transform for the inverse of the input
+transform.
+*/
+inline mat3 InverseNormalTransform(const mat3x4& transform) {
+  return la::inverse(la::transpose(la::inverse(mat3(transform))));
+}
+
+/**
+ * Symbolic perturbation primitives shared by Boolean3 and Boolean2.
+ * Carefully designed to minimize FP rounding error and eliminate it at edge
+ * cases.
+ */
+
+inline double withSign(bool pos, double v) { return pos ? v : -v; }
+
+/**
+ * Interpolate the (y, z) of segment aL-aR at the given x. The choice of
+ * (x - aL) vs (x - aR) is the smaller in magnitude, which keeps FP error
+ * low near either endpoint. Positive tol allows clamping x to the segment
+ * within that tolerance. Domain check via DEBUG_ASSERT.
+ */
+inline vec2 Interpolate(vec3 aL, vec3 aR, double x, double tol = 0) {
+  const double clamped =
+      la::clamp(x, std::min(aL.x, aR.x), std::max(aL.x, aR.x));
+  DEBUG_ASSERT(std::abs(clamped - x) <= tol, logicErr,
+               "Boolean manifold error: not in domain");
+  x = clamped;
+
+  const double dxL = x - aL.x;
+  const double dxR = x - aR.x;
+  DEBUG_ASSERT(dxL * dxR <= 0, logicErr,
+               "Boolean manifold error: not in domain");
+  const bool useL = fabs(dxL) < fabs(dxR);
+  const vec3 dLR = aR - aL;
+  const double lambda = (useL ? dxL : dxR) / dLR.x;
+  if (!std::isfinite(lambda) || !std::isfinite(dLR.y) || !std::isfinite(dLR.z))
+    return vec2(aL.y, aL.z);
+  vec2 yz;
+  yz[0] = lambda * dLR.y + (useL ? aL.y : aR.y);
+  yz[1] = lambda * dLR.z + (useL ? aL.z : aR.z);
+  return yz;
+}
+
+/**
+ * Intersect two projected segments aL-aR and bL-bR. The segments are ordered
+ * over the same x interval, and their y gaps must bracket zero. The returned
+ * value is (x, y, a.z, b.z) at the crossing. Positive tol snaps b's endpoint
+ * y coordinates to a's when they are within that tolerance.
+ */
+inline vec4 Intersect(const vec3& aL, const vec3& aR, vec3 bL, vec3 bR,
+                      double tol = 0) {
+  if (std::abs(bL.y - aL.y) <= tol) bL.y = aL.y;
+  if (std::abs(bR.y - aR.y) <= tol) bR.y = aR.y;
+
+  const double dyL = bL.y - aL.y;
+  const double dyR = bR.y - aR.y;
+  DEBUG_ASSERT(dyL * dyR <= 0, logicErr,
+               "Boolean manifold error: no intersection");
+  const bool useL = fabs(dyL) < fabs(dyR);
+  const double dx = aR.x - aL.x;
+  double lambda = (useL ? dyL : dyR) / (dyL - dyR);
+  if (!std::isfinite(lambda)) lambda = 0.0;
+  vec4 xyzz;
+  xyzz.x = lambda * dx + (useL ? aL.x : aR.x);
+  const double aDy = aR.y - aL.y;
+  const double bDy = bR.y - bL.y;
+  const bool useA = fabs(aDy) < fabs(bDy);
+  xyzz.y = lambda * (useA ? aDy : bDy) +
+           (useL ? (useA ? aL.y : bL.y) : (useA ? aR.y : bR.y));
+  xyzz.z = lambda * (aR.z - aL.z) + (useL ? aL.z : aR.z);
+  xyzz.w = lambda * (bR.z - bL.z) + (useL ? bL.z : bR.z);
+  return xyzz;
+}
+
+/**
+ * `p < q` with symbolic perturbation: when `p == q` exactly, `dir < 0`
+ * acts as the tiebreaker. Used to give consistent strict-ordering answers
+ * regardless of which side of an FP equality we land on. Values within tol are
+ * treated as equal.
+ */
+inline bool Shadows(double p, double q, double dir, double tol) {
+  return p + (dir > 0 ? 1 : -1) * tol < q;
+}
+
+/**
+ * The long edge and short edge vectors start from the same point. Returns true
+ * if they are colinear within epsilon.
+ */
+inline bool IsColinear(vec3 longEdge, vec3 shortEdge, double epsilon) {
+  return length2(cross(longEdge, shortEdge)) <=
+         length2(longEdge) * epsilon * epsilon;
 }
 
 /**
@@ -98,8 +196,10 @@ inline vec3 GetBarycentric(const vec3& v, const mat3& triPos,
       // Return exactly equal if within tolerance of edge.
       uvw[i] = area2v < d2[i] * tol2 ? 0 : la::dot(crossPv, crossP);
     }
-    uvw /= (uvw[0] + uvw[1] + uvw[2]);
-    return uvw;
+    const double sum = uvw[0] + uvw[1] + uvw[2];
+    // If all weights are zero, give each corner equal weight rather than
+    // dividing by zero.
+    return sum == 0 ? vec3(1.0 / 3.0) : uvw / sum;
   } else {  // line
     const int nextV = Next3(longSide);
     const double alpha =
@@ -113,8 +213,8 @@ inline vec3 GetBarycentric(const vec3& v, const mat3& triPos,
 }
 
 /**
- * The fundamental component of the halfedge data structure used for storing and
- * operating on the Manifold.
+ * Temporary or value-style halfedge record. Persistent Manifold storage uses
+ * Halfedges below, which derives endVert from the next halfedge in each face.
  */
 struct Halfedge {
   int startVert, endVert;
@@ -125,6 +225,110 @@ struct Halfedge {
     return startVert == other.startVert ? endVert < other.endVert
                                         : startVert < other.startVert;
   }
+};
+
+class Halfedges {
+ public:
+  Halfedges() = default;
+  explicit Halfedges(size_t size) { resize_nofill(size); }
+  explicit Halfedges(const VecView<const Halfedge>& edges) { FromData(edges); }
+
+  size_t size() const { return start_.size(); }
+  bool empty() const { return start_.empty(); }
+
+  bool Valid(int idx) const { return Pair(idx) >= 0; }
+  int Tri(int idx) const { return idx / 3; }
+  int Start(int idx) const { return start_[idx]; }
+  int End(int idx) const { return start_[NextHalfedge(idx)]; }
+  int Pair(int idx) const { return paired_[idx]; }
+  int Prop(int idx) const { return propVert_[idx]; }
+  int PropEnd(int idx) const { return propVert_[NextHalfedge(idx)]; }
+
+  void MakeInvalid(int idx) {
+    paired_[idx] = -1;
+    start_[idx] = -1;
+    start_[NextHalfedge(idx)] = -1;
+    propVert_[idx] = -1;
+  }
+  void SetStart(int idx, int vert) { start_[idx] = vert; }
+  void SetEnd(int idx, int vert) { start_[NextHalfedge(idx)] = vert; }
+  void SetPair(int idx, int pair) { paired_[idx] = pair; }
+  void SetProp(int idx, int prop) { propVert_[idx] = prop; }
+
+  bool IsForward(int idx) const { return Start(idx) < End(idx); }
+
+  Halfedge Get(int idx) const {
+    return {Start(idx), End(idx), Pair(idx), Prop(idx)};
+  }
+
+  void Set(int idx, int startVert, int pairedHalfedge, int propVert) {
+    SetStart(idx, startVert);
+    SetPair(idx, pairedHalfedge);
+    SetProp(idx, propVert);
+  }
+
+  void push_back(int startVert, int pairedHalfedge, int propVert) {
+    start_.push_back(startVert);
+    paired_.push_back(pairedHalfedge);
+    propVert_.push_back(propVert);
+  }
+
+  void resize(size_t newSize) {
+    start_.resize(newSize, -1);
+    paired_.resize(newSize, -1);
+    propVert_.resize(newSize, -1);
+  }
+
+  void resize_nofill(size_t newSize) {
+    start_.resize_nofill(newSize);
+    paired_.resize_nofill(newSize);
+    propVert_.resize_nofill(newSize);
+  }
+
+  void clear(bool shrink = true) {
+    start_.clear(shrink);
+    paired_.clear(shrink);
+    propVert_.clear(shrink);
+  }
+
+  void MakeUnique() {
+    start_.MakeUnique();
+    paired_.MakeUnique();
+    propVert_.MakeUnique();
+  }
+
+  Vec<Halfedge> ToData() const {
+    Vec<Halfedge> data(size());
+    for_each_n(autoPolicy(size()), countAt(0), size(),
+               [this, &data](int idx) { data[idx] = Get(idx); });
+    return data;
+  }
+
+  void FromData(const VecView<const Halfedge>& data) {
+    clear(true);
+    resize_nofill(data.size());
+    for_each_n(autoPolicy(data.size()), countAt(0), data.size(),
+               [this, &data](int idx) {
+                 start_[idx] = data[idx].startVert;
+                 paired_[idx] = data[idx].pairedHalfedge;
+                 propVert_[idx] = data[idx].propVert;
+               });
+#ifdef MANIFOLD_DEBUG
+    DEBUG_ASSERT(data.size() % 3 == 0, topologyErr,
+                 "Halfedges::FromData requires triangle faces!");
+    for (size_t idx = 0; idx < data.size(); ++idx) {
+      const int next = NextHalfedge(static_cast<int>(idx));
+      if (data[idx].endVert >= 0 && data[next].startVert >= 0) {
+        DEBUG_ASSERT(data[idx].endVert == data[next].startVert, topologyErr,
+                     "Halfedges::FromData requires triangle-ordered edges!");
+      }
+    }
+#endif
+  }
+
+  SharedVec<int> start_;
+  SharedVec<int> paired_;
+  SharedVec<int> propVert_;
 };
 
 struct Barycentric {
@@ -140,16 +344,14 @@ struct TriRef {
   /// The OriginalID of the mesh this triangle came from. This ID is ideal for
   /// reapplying properties like UV coordinates to the output mesh.
   int originalID;
-  /// Probably the triangle index of the original triangle this was part of:
-  /// Mesh.triVerts[tri], but it's an input, so just pass it along unchanged.
+  /// If set as an input of MeshGL, it is passed along unchanged. This is how
+  /// the user can tell us not to collapse certain edges: those that divide
+  /// difference faceIDs. If not set, this is always -1.
   int faceID;
-  /// Triangles with the same coplanar ID are coplanar.
-  int coplanarID;
-
-  bool SameFace(const TriRef& other) const {
-    return meshID == other.meshID && coplanarID == other.coplanarID &&
-           faceID == other.faceID;
-  }
+  /// Starts as a canonical
+  /// triangle index, but after boolean operations it may refer to a triangle
+  /// that is no longer present in this mesh.
+  int triID;
 };
 
 /**
@@ -171,13 +373,12 @@ struct TmpEdge {
   }
 };
 
-Vec<TmpEdge> inline CreateTmpEdges(const VecView<const Halfedge>& halfedge) {
+Vec<TmpEdge> inline CreateTmpEdges(const Halfedges& halfedge) {
   Vec<TmpEdge> edges(halfedge.size());
   for_each_n(autoPolicy(edges.size()), countAt(0), edges.size(),
              [&edges, &halfedge](const int idx) {
-               const Halfedge& half = halfedge[idx];
-               edges[idx] = TmpEdge(half.startVert, half.endVert,
-                                    half.IsForward() ? idx : -1);
+               edges[idx] = TmpEdge(halfedge.Start(idx), halfedge.End(idx),
+                                    halfedge.IsForward(idx) ? idx : -1);
              });
 
   size_t numEdge =
@@ -204,8 +405,7 @@ inline std::ostream& operator<<(std::ostream& stream, const Barycentric& bary) {
 inline std::ostream& operator<<(std::ostream& stream, const TriRef& ref) {
   return stream << "meshID: " << ref.meshID
                 << ", originalID: " << ref.originalID
-                << ", faceID: " << ref.faceID
-                << ", coplanarID: " << ref.coplanarID;
+                << ", faceID: " << ref.faceID << ", triID: " << ref.triID;
 }
 #endif
 }  // namespace manifold
