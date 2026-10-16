@@ -1090,14 +1090,11 @@ TEST(Boolean, BatchBoolean) {
 }
 
 TEST(Boolean, Offset) {
-  ManifoldParamGuard guard;
-  ManifoldParams().processOverlaps = true;
-
   Manifold cutout = Manifold::Cube(vec3(100), true) - Manifold::Sphere(60, 12);
   Manifold fat = cutout.Offset(5);
   Manifold thin = cutout.Offset(-5);
   EXPECT_EQ(fat.Genus(), cutout.Genus());
-  EXPECT_EQ(thin.Genus(), -7);
+  EXPECT_EQ(thin.Genus(), cutout.Genus());
 
   if (options.exportModels) {
     WriteTestOBJ("offset_fat.obj", fat);

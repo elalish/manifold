@@ -1139,20 +1139,20 @@ double Manifold::MinGap(const Manifold& other, double searchLength) const {
 // same diagonal, preventing slivers.
 Manifold MakePrism(const vec3 innerPos[3], const vec3 outerPos[3],
                    const int origIdx[3]) {
-  MeshGL prism;
+  MeshGL64 prism;
   prism.numProp = 3;
 
   // Add vertices: for each triangle vertex, inner then outer
   // Vertex layout: 0=inner0, 1=outer0, 2=inner1, 3=outer1, 4=inner2, 5=outer2
   for (int v = 0; v < 3; v++) {
     // Inner vertex (2*v)
-    prism.vertProperties.push_back(static_cast<float>(innerPos[v].x));
-    prism.vertProperties.push_back(static_cast<float>(innerPos[v].y));
-    prism.vertProperties.push_back(static_cast<float>(innerPos[v].z));
+    prism.vertProperties.push_back(static_cast<double>(innerPos[v].x));
+    prism.vertProperties.push_back(static_cast<double>(innerPos[v].y));
+    prism.vertProperties.push_back(static_cast<double>(innerPos[v].z));
     // Outer vertex (2*v + 1)
-    prism.vertProperties.push_back(static_cast<float>(outerPos[v].x));
-    prism.vertProperties.push_back(static_cast<float>(outerPos[v].y));
-    prism.vertProperties.push_back(static_cast<float>(outerPos[v].z));
+    prism.vertProperties.push_back(static_cast<double>(outerPos[v].x));
+    prism.vertProperties.push_back(static_cast<double>(outerPos[v].y));
+    prism.vertProperties.push_back(static_cast<double>(outerPos[v].z));
   }
 
   // Inner face (reversed winding): vertices 4, 2, 0
@@ -1171,10 +1171,10 @@ Manifold MakePrism(const vec3 innerPos[3], const vec3 outerPos[3],
     const int idx1 = origIdx[v1];
 
     // Prism vertex indices for this edge
-    const uint32_t inner0 = 2 * v0;
-    const uint32_t outer0 = 2 * v0 + 1;
-    const uint32_t inner1 = 2 * v1;
-    const uint32_t outer1 = 2 * v1 + 1;
+    const uint64_t inner0 = 2 * v0;
+    const uint64_t outer0 = 2 * v0 + 1;
+    const uint64_t inner1 = 2 * v1;
+    const uint64_t outer1 = 2 * v1 + 1;
 
     // Choose diagonal based on original vertex index ordering
     // This ensures adjacent triangles use the same diagonal for shared edges
@@ -1269,7 +1269,6 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
   }
 
   const Manifold faces = BatchBoolean(batch, OpType::Add);
-  std::cout << faces.NumTri() << std::endl;
 
   std::vector<Manifold> batch2(convexEdges.size() + convexVerts.size() + 1);
 
@@ -1314,8 +1313,11 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
 
   batch2.back() = faces;
 
-  const Manifold shell = BatchBoolean(batch2, OpType::Add);
-  std::cout << shell.NumTri() << std::endl;
+  Manifold shell = BatchBoolean(batch2, OpType::Add);
+  if (shell.Status() != Manifold::Error::NoError) {  // force evaluation
+    ASSERT(false, "Offset shell boolean operation failed");
+    return shell = Manifold();
+  }
 
   return Boolean(shell, inset ? OpType::Subtract : OpType::Add);
 }
