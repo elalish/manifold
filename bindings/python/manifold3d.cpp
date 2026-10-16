@@ -702,7 +702,8 @@ NB_MODULE(manifold3d, m) {
       .def_ro("face_id", &RayHit::faceID)
       .def_ro("distance", &RayHit::distance)
       .def_ro("position", &RayHit::position)
-      .def_ro("normal", &RayHit::normal);
+      .def_ro("normal", &RayHit::normal)
+      .def_ro("crossing", &RayHit::crossing);
 
   nb::class_<ExecutionContext>(m, "ExecutionContext")
       .def(nb::init<>())

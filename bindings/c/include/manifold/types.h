@@ -95,6 +95,7 @@ typedef struct ManifoldRayHit {
   double distance;
   ManifoldVec3 position;
   ManifoldVec3 normal;
+  int crossing;
 } ManifoldRayHit;
 
 // enums

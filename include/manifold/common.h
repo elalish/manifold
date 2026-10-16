@@ -174,6 +174,13 @@ struct RayHit {
   vec3 position = vec3(0.0);
   /// The geometric face normal at the hit.
   vec3 normal = vec3(0.0);
+  /// +1 if the ray enters the solid here, -1 if it exits. Summing these
+  /// along the ray gives the change in winding number from origin to
+  /// endpoint. Prefer this over the sign of dot(normal, direction), which
+  /// can disagree with the mesh's internal crossing in degenerate cases.
+  /// A ray grazing a vertex or edge can return a +1/-1 pair at the same
+  /// distance; such ties are ordered by faceID.
+  int crossing = 0;
 };
 
 /**

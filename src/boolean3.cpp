@@ -677,7 +677,9 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
       // Compute parametric t ∈ [0,1] along the ray segment.
       const double t = (v[tAxis] - origin[tAxis]) / dir[tAxis];
       if (t >= 0.0 && t <= 1.0) {
-        hits.push_back({static_cast<uint64_t>(tri), t, v, faceNormal_[tri]});
+        // Kernel12's sign is negative where the ray enters the solid.
+        hits.push_back(
+            {static_cast<uint64_t>(tri), t, v, faceNormal_[tri], -s});
       }
     }
   };
@@ -685,8 +687,11 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
   auto f = [&rayBox](int) { return rayBox; };
   collider_.Collisions<false>(recorder, f, 1, false);
 
+  // Break distance ties by faceID so the order doesn't depend on the
+  // std::sort implementation, e.g. for canceling hits at a grazed vertex.
   std::sort(hits.begin(), hits.end(), [](const RayHit& a, const RayHit& b) {
-    return a.distance < b.distance;
+    return a.distance != b.distance ? a.distance < b.distance
+                                    : a.faceID < b.faceID;
   });
   return hits;
 }

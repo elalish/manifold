@@ -615,6 +615,8 @@ TEST(CBIND, ray_cast) {
   EXPECT_FLOAT_EQ(h0.normal.z, -1.0);
   EXPECT_FLOAT_EQ(h1.position.z, 0.5);
   EXPECT_FLOAT_EQ(h1.normal.z, 1.0);
+  EXPECT_EQ(h0.crossing, 1);
+  EXPECT_EQ(h1.crossing, -1);
   manifold_destruct_ray_hit_vec(hits);
   free(mem);
 
