@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #pragma once
+#include <array>
 #include <map>
 
 #include "collider.h"
@@ -215,14 +216,22 @@ struct Manifold::Impl {
   };
 
   void CleanupTopology();
-  void RemoveDegenerates(int firstNewVert = 0);
+  // For a boolean's own simplification: the operands, and for each triangle
+  // which operand it came from (0 for P, 1 for Q) and that operand's triangle.
+  struct SeamGuide {
+    const Impl* in[2];
+    Vec<int> side;
+    Vec<int> opTri;
+  };
+  void RemoveDegenerates(int firstNewVert = 0,
+                         const SeamGuide* seams = nullptr);
   void Decimate(double tolerance);
   TriResult IsDegenerate(int tri) const;
   bool IsFolded(int edge) const;
   Merger CheckEdge(int edge) const;
   bool Continuous(int edge) const;
   bool Swappable(int edge) const;
-  bool Colinear(int edge) const;
+  bool Colinear(int edge, const SeamGuide* seams = nullptr) const;
   void SwapEdge(int edge, double a);
   bool IsDuplicated(int edge) const;
   void DedupeEdge(int edge);

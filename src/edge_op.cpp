@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <algorithm>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -35,6 +36,79 @@ bool Is01Longest(vec3 v0, vec3 v1, vec3 v2) {
   double l[3];
   for (int i : {0, 1, 2}) l[i] = la::dot(e[i], e[i]);
   return l[0] > l[1] && l[0] > l[2];
+}
+
+// Twice the signed area of a 2D polygon.
+double Area2(const std::vector<vec2>& poly) {
+  double a = 0;
+  for (size_t i = 0; i < poly.size(); ++i)
+    a += la::cross(poly[i], poly[(i + 1) % poly.size()]);
+  return a;
+}
+
+// The part of the convex polygon poly on the left of a -> b.
+std::vector<vec2> ClipLeft(const std::vector<vec2>& poly, vec2 a, vec2 b) {
+  std::vector<vec2> out;
+  for (size_t i = 0; i < poly.size(); ++i) {
+    const vec2 p = poly[i], q = poly[(i + 1) % poly.size()];
+    const double sp = la::cross(b - a, p - a), sq = la::cross(b - a, q - a);
+    if (sp >= 0) out.push_back(p);
+    if ((sp > 0 && sq < 0) || (sp < 0 && sq > 0))
+      out.push_back(p + (q - p) * (sp / (sp - sq)));
+  }
+  return out;
+}
+
+// Does the triangle abc lie in the face of mesh m that triangle tri belongs
+// to: the triangles reached from tri across edges that are Continuous (no
+// seam, the same properties) and stay on its plane, where the properties of
+// that face are defined? By area: abc's overlaps with them must add up to
+// all of it.
+bool InOperandFace(const Manifold::Impl& m, int tri,
+                   const std::array<vec3, 3>& abc, double epsilon) {
+  const vec3 n = m.faceNormal_[tri];
+  const vec3 origin = m.vertPos_[m.halfedge_.Start(3 * tri)];
+  const mat2x3 projection = GetAxisAlignedProjection(n);
+  std::vector<vec2> target;
+  for (const vec3& v : abc) {
+    if (std::abs(la::dot(v - origin, n)) > epsilon) return false;
+    target.push_back(projection * v);
+  }
+  if (Area2(target) < 0) std::reverse(target.begin(), target.end());
+  const double need = Area2(target);
+  double perimeter = 0;
+  for (int i : {0, 1, 2})
+    perimeter += la::length(target[(i + 1) % 3] - target[i]);
+  double have = 0;
+  std::vector<int> stack = {tri};
+  std::unordered_set<int> seen = {tri};
+  while (!stack.empty()) {
+    const int t = stack.back();
+    stack.pop_back();
+    std::vector<vec2> corner;
+    for (const int i : {0, 1, 2})
+      corner.push_back(projection * m.vertPos_[m.halfedge_.Start(3 * t + i)]);
+    if (Area2(corner) < 0) std::reverse(corner.begin(), corner.end());
+    std::vector<vec2> part = target;
+    for (int i : {0, 1, 2})
+      if (!part.empty()) part = ClipLeft(part, corner[i], corner[(i + 1) % 3]);
+    if (part.size() >= 3) have += Area2(part);
+    for (const int i : {0, 1, 2}) {
+      const int edge = 3 * t + i;
+      if (!m.Continuous(edge)) continue;
+      const int u = m.halfedge_.Pair(edge) / 3;
+      if (seen.count(u) || la::dot(m.faceNormal_[u], n) < 1 - epsilon) continue;
+      bool flat = true;
+      for (const int j : {0, 1, 2})
+        if (std::abs(la::dot(m.vertPos_[m.halfedge_.Start(3 * u + j)] - origin,
+                             n)) > epsilon)
+          flat = false;
+      if (!flat) continue;
+      seen.insert(u);
+      stack.push_back(u);
+    }
+  }
+  return have >= need - 2 * epsilon * perimeter;
 }
 }  // namespace
 
@@ -76,7 +150,8 @@ void Manifold::Impl::CleanupTopology() {
  * Rather than actually removing the edges, this step merely marks them for
  * removal, by setting vertPos to NaN and halfedge to {-1, -1, -1, -1}.
  */
-void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
+void Manifold::Impl::RemoveDegenerates(int firstNewVert,
+                                       const SeamGuide* seams) {
   if (halfedge_.empty()) return;
   halfedge_.MakeUnique();
 
@@ -116,7 +191,7 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
   for (int edge = 0; edge < static_cast<int>(halfedge_.size()); ++edge) {
     if (!halfedge_.Valid(edge)) continue;
 
-    if (Colinear(edge)) {
+    if (Colinear(edge, seams)) {
       CollapseDegenerate(edge, scratch);
       ++colinear;
     }
@@ -130,7 +205,7 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
   CalculateVertNormals();
 }
 
-bool Manifold::Impl::Colinear(int edge) const {
+bool Manifold::Impl::Colinear(int edge, const SeamGuide* seams) const {
   const int pair = halfedge_.Pair(edge);
   const ivec3 tri0edge = TriOf(edge);
   const ivec3 tri1edge = TriOf(pair);
@@ -139,11 +214,23 @@ bool Manifold::Impl::Colinear(int edge) const {
   const vec3 pNew = vertPos_[endVert];
   const vec3 pOld = vertPos_[startVert];
 
+  // A seam between P's and Q's faces in a boolean may also bend, so long as
+  // every triangle that grows still lies in the face of the operand it came
+  // from, where its properties are defined: checked after the orbit.
+  bool bent = false;
   auto alignedProps = [&](int current, const vec3& pNext) {
     if (Continuous(current)) return true;
     const vec3 across = pNext - pNew;
-    return length2(cross(across, pOld - pNew)) <=
-           epsilon_ * epsilon_ * length2(across);
+    if (length2(cross(across, pOld - pNew)) <=
+        epsilon_ * epsilon_ * length2(across))
+      return true;
+    if (seams == nullptr) return false;
+    // triangles the cleanup added after the boolean have no operand triangle
+    const size_t t0 = current / 3, t1 = halfedge_.Pair(current) / 3;
+    if (t0 >= seams->side.size() || t1 >= seams->side.size()) return false;
+    if (seams->side[t0] == seams->side[t1]) return false;
+    bent = true;
+    return true;
   };
 
   // Orbit startVert
@@ -171,6 +258,24 @@ bool Manifold::Impl::Colinear(int edge) const {
     current = halfedge_.Pair(current);
   }
 
+  if (bent) {
+    // the triangles around startVert other than the two the collapse removes
+    current = start;
+    while (current != tri0edge[2]) {
+      current = NextHalfedge(current);
+      const int tri = current / 3;
+      if (static_cast<size_t>(tri) >= seams->side.size()) return false;
+      std::array<vec3, 3> grown;
+      for (const int i : {0, 1, 2}) {
+        const int v = halfedge_.Start(3 * tri + i);
+        grown[i] = v == startVert ? pNew : vertPos_[v];
+      }
+      if (!InOperandFace(*seams->in[seams->side[tri]], seams->opTri[tri], grown,
+                         epsilon_))
+        return false;
+      current = halfedge_.Pair(current);
+    }
+  }
   return true;
 }
 

@@ -949,10 +949,22 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   CreateProperties(outR, inP_, inQ_, invertQ, ctx_);
   if (auto c = phase(__LINE__)) return *c;
 
+  // Each triangle's operand triangle, while triRef still names it: where P's
+  // and Q's coplanar faces overlap, the seam between them may then be
+  // straightened within those triangles.
+  Manifold::Impl::SeamGuide seams{{&inP_, &inQ_}, {}, {}};
+  seams.side.resize(outR.NumTri());
+  seams.opTri.resize(outR.NumTri());
+  for (size_t tri = 0; tri < outR.NumTri(); ++tri) {
+    const TriRef ref = outR.meshRelation_.triRef[tri];
+    seams.side[tri] = ref.meshID;
+    seams.opTri[tri] = ref.faceID;
+  }
+
   UpdateReference(outR, inP_, inQ_, invertQ, ctx_);
   if (auto c = phase(__LINE__)) return *c;
 
-  outR.RemoveDegenerates(nPv + nQv);
+  outR.RemoveDegenerates(nPv + nQv, &seams);
   outR.RemoveUnreferencedVerts();
 
   if (ManifoldParams().intermediateChecks) {
