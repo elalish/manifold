@@ -76,7 +76,7 @@ TEST(Boolean, MeshGLRoundTrip) {
   Manifold result = cube + cube.Translate({1, 1, 0});
 
   ASSERT_LT(result.OriginalID(), 0);
-  ExpectMeshes(result, {{16, 28}});
+  ExpectMeshes(result, {{18, 32}});
   RelatedGL(result, {original});
 
   MeshGL inGL = result.TriID2FaceID().GetMeshGL();
@@ -84,7 +84,7 @@ TEST(Boolean, MeshGLRoundTrip) {
   const Manifold result2(inGL);
 
   ASSERT_LT(result2.OriginalID(), 0);
-  ExpectMeshes(result2, {{16, 28}});
+  ExpectMeshes(result2, {{18, 32}});
   RelatedGL(result2, {original});
 
   const MeshGL outGL = result2.GetMeshGL();
@@ -231,7 +231,7 @@ TEST(Boolean, CubeUnion) {
 TEST(Boolean, CubeUnionProp) {
   Manifold cube = WithPositionColors(Manifold::Cube());
   Manifold result = cube + cube.Translate({0.5, 0.5, 0});
-  EXPECT_EQ(result.NumVert(), 16);
+  EXPECT_EQ(result.NumVert(), 18);
   if (options.exportModels) WriteTestOBJ("cubeUnionProp.obj", result);
 }
 
@@ -253,7 +253,7 @@ TEST(Boolean, Simplify) {
   resultGL.faceID.clear();
   Manifold result2(resultGL);
   EXPECT_EQ(result2.NumTri(), nStarting);
-  EXPECT_EQ(result2.RemoveDegenerates().NumTri(), 36);
+  EXPECT_EQ(result2.RemoveDegenerates().NumTri(), 34);
   EXPECT_EQ(result2.Simplify().NumTri(), 12);
 }
 
@@ -1102,6 +1102,125 @@ TEST(Boolean, BatchBoolean) {
   ExpectMeshes(subtract, {{102, 200}});
   EXPECT_FLOAT_EQ(subtract.Volume(), 7226.043);
   EXPECT_FLOAT_EQ(subtract.SurfaceArea(), 14904.597);
+}
+
+namespace {
+// Convex face pieces, as lists of x, y, z corners, swept by a cube of the
+// given half-size (a Minkowski sum of a voxel shape's faces, which is full of
+// exactly coplanar faces): their union in one batch must come out as the
+// union taken one piece at a time.
+void ExpectSweptPiecesUnion(const std::vector<std::vector<double>>& pieces,
+                            double size) {
+  std::vector<Manifold> hulls;
+  for (const auto& corners : pieces) {
+    std::vector<vec3> points;
+    for (size_t i = 0; i < corners.size(); i += 3)
+      for (const int x : {-1, 1})
+        for (const int y : {-1, 1})
+          for (const int z : {-1, 1})
+            points.push_back(vec3(corners[i], corners[i + 1], corners[i + 2]) +
+                             vec3(x, y, z) * size);
+    hulls.push_back(Manifold::Hull(points));
+  }
+  const Manifold batch = Manifold::BatchBoolean(hulls, OpType::Add);
+  Manifold oneByOne = hulls[0];
+  for (size_t i = 1; i < hulls.size(); ++i) oneByOne += hulls[i];
+  EXPECT_NEAR(batch.Volume(), oneByOne.Volume(), 1e-9 * oneByOne.Volume());
+  EXPECT_NEAR(batch.SurfaceArea(), oneByOne.SurfaceArea(),
+              1e-9 * oneByOne.SurfaceArea());
+}
+}  // namespace
+
+// Where a face normal component was exactly zero, the earlier tie-break
+// directions, which follow the normals, could decide a tie both ways, and
+// BatchBoolean's unions left a zero-volume flap of overlapping triangles.
+TEST(Boolean, CoplanarBatchUnion) {
+  const std::vector<std::vector<double>> pieces = {
+      {8390772, 25172316, 41953860, 8390772, 114489228, 131270772, 97707684,
+       114489228, 131270772},
+      {8390772, 25172316, 41953860, 97707684, 114489228, 131270772, 8390772,
+       25172316, 220587684},
+      {97707684, 131270772, 131270772, 106098456, 139661544, 122880000, 8390772,
+       237369228, 220587684},
+      {8390772, 237369228, 220587684, 8390772, 25172316, 220587684, 97707684,
+       114489228, 131270772, 97707684, 131270772, 131270772},
+      {16781544, 245760000, 16781544, 106098456, 139661544, 122880000, 97707684,
+       131270772, 131270772, 8390772, 131270772, 131270772, 8390772, 245760000,
+       16781544},
+      {106098456, 139661544, 122880000, 139661544, 139661544, 122880000,
+       237369228, 245760000, 228978456, 8390772, 245760000, 228978456, 8390772,
+       237369228, 220587684},
+  };
+  ExpectSweptPiecesUnion(pieces, 2457600);
+}
+
+// Edges of P and Q on one line, with the same faces either side, are parallel
+// in projection, where a tie was decided by the old rule from the faces'
+// normals: equal, so by their rounding or not at all. BatchBoolean's unions
+// left a zero-volume flap.
+TEST(Boolean, CollinearEdgesBatchUnion) {
+  const std::vector<std::vector<double>> pieces = {
+      {73728000, 201523200, 22118400, 137625600, 137625600, 86016000, 231014400,
+       208896000, 14745600, 73728000, 208896000, 14745600},
+      {122880000, 108134400, 144998400, 137625600, 108134400, 159744000,
+       208896000, 36864000, 231014400, 208896000, 14745600, 231014400,
+       122880000, 14745600, 144998400},
+      {346521600, 122880000, 122880000, 346521600, 14745600,  122880000,
+       260505600, 14745600,  36864000,  231014400, 44236800,  7372800,
+       231014400, 201523200, 7372800,   245760000, 216268800, 22118400,
+       253132800, 216268800, 29491200},
+      {14745600, 36864000, 231014400, 14745600, 44236800, 238387200, 7372800,
+       44236800, 231014400},
+      {7372800, 201523200, 231014400, 14745600, 201523200, 238387200, 14745600,
+       208896000, 231014400},
+      {108134400, 115507200, 231014400, 108134400, 108134400, 238387200,
+       137625600, 108134400, 238387200, 137625600, 115507200, 231014400},
+      {137625600, 115507200, 231014400, 137625600, 108134400, 238387200,
+       245760000, 216268800, 238387200, 245760000, 223641600, 231014400},
+      {152371200, 238387200, 122880000, 231014400, 238387200, 201523200,
+       231014400, 238387200, 44236800},
+      {7372800, 44236800, 231014400, 7372800, 201523200, 231014400, 7372800,
+       122880000, 152371200},
+      {253132800, 208896000, 238387200, 253132800, 201523200, 245760000,
+       260505600, 208896000, 231014400},
+      {260505600, 208896000, 231014400, 245760000, 223641600, 231014400,
+       245760000, 216268800, 238387200, 253132800, 208896000, 238387200},
+      {144998400, 231014400, 122880000, 144998400, 122880000, 122880000,
+       242073600, 219955200, 219955200, 231014400, 231014400, 208896000},
+      {108134400, 115507200, 231014400, 137625600, 115507200, 231014400,
+       137625600, 115507200, 167116800, 122880000, 115507200, 152371200,
+       108134400, 115507200, 167116800},
+      {231014400, 231014400, 36864000, 144998400, 231014400, 122880000,
+       152371200, 238387200, 122880000, 231014400, 238387200, 44236800},
+      {231014400, 231014400, 208896000, 242073600, 219955200, 219955200,
+       245760000, 223641600, 216268800, 231014400, 238387200, 201523200},
+      {122880000, 115507200, 152371200, 122880000, 108134400, 144998400,
+       108134400, 108134400, 159744000, 110592000, 113049600, 162201600},
+      {152371200, 238387200, 122880000, 144998400, 231014400, 122880000,
+       231014400, 231014400, 208896000, 231014400, 238387200, 201523200},
+      {14745600, 208896000, 231014400, 14745600, 122880000, 144998400, 7372800,
+       122880000, 152371200, 7372800, 201523200, 231014400},
+      {245760000, 216268800, 22118400, 245760000, 223641600, 29491200,
+       253132800, 216268800, 29491200},
+      {122880000, 115507200, 152371200, 137625600, 115507200, 167116800,
+       135168000, 113049600, 162201600},
+      {137625600, 108134400, 159744000, 122880000, 108134400, 144998400,
+       122880000, 115507200, 152371200, 135168000, 113049600, 162201600},
+      {148684800, 119193600, 148684800, 137625600, 108134400, 159744000,
+       135168000, 113049600, 162201600, 144998400, 122880000, 152371200},
+      {245760000, 223641600, 216268800, 245760000, 223641600, 231014400,
+       260505600, 208896000, 231014400, 346521600, 122880000, 122880000},
+      {346521600, 122880000, 122880000, 260505600, 208896000, 231014400,
+       260505600, 208896000, 260505600, 339148800, 130252800, 339148800,
+       346521600, 122880000, 339148800},
+      {93388800, 122880000, 144998400, 14745600, 122880000, 144998400, 14745600,
+       208896000, 231014400, 93388800, 130252800, 152371200},
+      {14745600, 122880000, 144998400, 14745600, 36864000, 231014400, 7372800,
+       44236800, 231014400, 7372800, 122880000, 152371200},
+      {245760000, 223641600, 231014400, 245760000, 223641600, 216268800,
+       242073600, 219955200, 219955200},
+  };
+  ExpectSweptPiecesUnion(pieces, 7372800);
 }
 
 // Regression for #1672: a sub-tree shared between two trees must survive when

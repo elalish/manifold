@@ -120,16 +120,6 @@ inline vec4 Intersect(const vec3& aL, const vec3& aR, vec3 bL, vec3 bR,
 }
 
 /**
- * `p < q` with symbolic perturbation: when `p == q` exactly, `dir < 0`
- * acts as the tiebreaker. Used to give consistent strict-ordering answers
- * regardless of which side of an FP equality we land on. Values within tol are
- * treated as equal.
- */
-inline bool Shadows(double p, double q, double dir, double tol) {
-  return p + (dir > 0 ? 1 : -1) * tol < q;
-}
-
-/**
  * The long edge and short edge vectors start from the same point. Returns true
  * if they are colinear within epsilon.
  */
