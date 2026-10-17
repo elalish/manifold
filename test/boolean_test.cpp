@@ -1104,6 +1104,56 @@ TEST(Boolean, BatchBoolean) {
   EXPECT_FLOAT_EQ(subtract.SurfaceArea(), 14904.597);
 }
 
+namespace {
+// A unit cube and a box from the given corners, unioned in both orders with
+// the relative precision at 1e-3, so the tie tolerance is 1e-3 and the box
+// is placed less than that from the cube: the two orders must agree.
+void ExpectNearTouchUnion(const std::vector<vec3>& corners) {
+  Quality::SetRelativePrecision(1e-3);
+  const Manifold cube = Manifold::Cube({1, 1, 1});
+  const Manifold box = Manifold::Hull(corners);
+  const Manifold ab = cube + box;
+  const Manifold ba = box + cube;
+  EXPECT_EQ(ab.Decompose().size(), ba.Decompose().size());
+  EXPECT_NEAR(ab.Volume(), ba.Volume(), 0.01);
+  EXPECT_NEAR(ab.SurfaceArea(), ba.SurfaceArea(), 0.01);
+  Quality::ResetToDefaults();
+}
+}  // namespace
+
+// Known failure: a box against a face of the cube, its corners all within
+// the tie tolerance of the cube's planes and of each other (moved out by up to
+// 0.9 of it), a gap smaller than the tolerance. One order joins the two, the
+// other keeps them apart, with 0.5 too much surface area.
+TEST(Boolean, DISABLED_SubToleranceGap) {
+  ExpectNearTouchUnion({
+      {4.2305513691247656e-05, 0.0004101080052802256, 0.50030121801972094},
+      {0.50053519338506225, 0.00018497575089581171, 0.50074771410554231},
+      {0.00072646617929091365, 0.5004616092565275, 0.50026025790033013},
+      {0.50057235287932189, 0.50012625760785812, 0.50036904940931959},
+      {0.00025012766703549357, 0.00030662112333544595, 1.5002824548696865},
+      {0.50005200091363811, 0.00071464607878978252, 1.500213050503866},
+      {0.00024624347799829919, 0.50076401406700077, 1.5008865125616493},
+      {0.50040508704489417, 0.50005180042454966, 1.5005867762603811},
+  });
+}
+
+// Known failure: as SubToleranceGap, but the corners are moved both ways by
+// up to 0.9 of the tolerance, so two of them can be more than the tolerance
+// apart while each ties the same plane of the cube: ties that don't chain.
+TEST(Boolean, DISABLED_SubToleranceChain) {
+  ExpectNearTouchUnion({
+      {0.00059630804383206551, 0.00037357921435193379, 0.99969786310436926},
+      {0.50023433061111144, 0.00031631728481459865, 1.0008217743510628},
+      {0.00061013905607634159, 0.49942451377642988, 0.99923664981470461},
+      {0.500328464410847, 0.500290337040737, 1.0003425133483372},
+      {0.00069635272412468688, -0.00053867906546014894, 1.4995124872205421},
+      {0.49958960790207457, 0.00037508958538637528, 1.5001469332242117},
+      {4.2118658654985302e-05, 0.49997064865747626, 1.4997720547537445},
+      {0.50079509057829774, 0.49950925466041363, 1.5004351275413961},
+  });
+}
+
 // Regression for #1672: a sub-tree shared between two trees must survive when
 // one of those trees is destroyed without being evaluated. Previously the
 // CsgOpNode destructor emptied descendant impls regardless of whether they
