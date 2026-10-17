@@ -14,8 +14,10 @@
 
 #include "boolean3.h"
 
+#include <array>
 #include <limits>
 #include <unordered_set>
+#include <vector>
 
 #include "disjoint_sets.h"
 #include "parallel.h"
@@ -63,43 +65,346 @@ inline void LoadFaceEdges(const Halfedges& halfedges, int tri,
   }
 }
 
+// Symbolic perturbation. Every vertex is displaced by an infinitesimal eps
+// times its displacement - the verts of Q outward, the verts of P outward
+// when expanding and inward otherwise; P is displaced once more by a smaller
+// infinitesimal g, so that where P's and Q's faces coincide P's is the outer
+// one alike on every side; and then P is translated along +x, +y and +z by
+// infinitesimals tx >> ty >> tz. Each is infinitely smaller than anything
+// before it. Every comparison between P and Q is decided as it would come out
+// in that perturbed configuration, so all of them agree with one another.
+//
+// Two values within the tie tolerance (TieTol) are a tie: they are taken as
+// equal, and the comparison is decided by the perturbation alone. The
+// comparisons at a tie are signs of 2D cross products and 3x3
+// determinants of vertex differences, so polynomials of degree at most 3 in
+// (eps, g, tx, ty, tz). Their sign is that of the most significant nonzero
+// coefficient: the fewest tz first, then ty, tx, g, then eps. Coefficients
+// are computed one at a time in that order from the multilinear expansion,
+// and the first nonzero one, nearly always the first, settles it.
+constexpr int kVars = 6;  // the constant, then eps, g, tx, ty, tz
+
+struct SymTables {
+  // for each nonconstant monomial of degree <= 3, in order of significance,
+  // the ways to pick one variable from each of 2 (resp. 3) factors to make it
+  std::vector<std::vector<std::array<int, 2>>> picks2;
+  std::vector<std::vector<std::array<int, 3>>> picks3;
+  SymTables() {
+    for (int tz = 0; tz <= 3; ++tz)
+      for (int ty = 0; ty + tz <= 3; ++ty)
+        for (int tx = 0; tx + ty + tz <= 3; ++tx)
+          for (int g = 0; g + tx + ty + tz <= 3; ++g)
+            for (int e = 0; e + g + tx + ty + tz <= 3; ++e) {
+              const std::array<int, kVars> want = {0, e, g, tx, ty, tz};
+              const int degree = e + g + tx + ty + tz;
+              if (degree == 0) continue;
+              auto matches = [&](std::initializer_list<int> pick) {
+                std::array<int, kVars> n{};
+                for (int v : pick) ++n[v];
+                for (int k = 1; k < kVars; ++k)
+                  if (n[k] != want[k]) return false;
+                return true;
+              };
+              std::vector<std::array<int, 2>> p2;
+              std::vector<std::array<int, 3>> p3;
+              for (int a = 0; a < kVars; ++a)
+                for (int b = 0; b < kVars; ++b) {
+                  if (degree <= 2 && matches({a, b})) p2.push_back({a, b});
+                  for (int c = 0; c < kVars; ++c)
+                    if (matches({a, b, c})) p3.push_back({a, b, c});
+                }
+              if (degree <= 2) picks2.push_back(p2);
+              picks3.push_back(p3);
+            }
+  }
+};
+
+inline const SymTables& Tables() {
+  static const SymTables tables;
+  return tables;
+}
+
+// A point or vector of the perturbed configuration: its value and its
+// derivative along each infinitesimal, each with a bound on its magnitude.
+// The displacements come from normals and the arithmetic rounds, so a
+// coefficient within that error of zero is taken as zero - which is what it
+// is whenever the configuration is symmetric, e.g. two edges in a plane that
+// all the displacements involved lie in, where noise of either sign would
+// otherwise decide.
+struct SymVec {
+  std::array<vec3, kVars> t{};
+  std::array<double, kVars> mag{};
+};
+
+constexpr double kNoise = 64 * std::numeric_limits<double>::epsilon();
+
+inline SymVec operator-(const SymVec& a, const SymVec& b) {
+  SymVec r;
+  for (int k = 0; k < kVars; ++k) {
+    r.t[k] = a.t[k] - b.t[k];
+    r.mag[k] = a.mag[k] + b.mag[k];
+  }
+  return r;
+}
+
+inline int Sign(double c, double bound) {
+  return std::abs(c) <= kNoise * bound ? 0 : c > 0 ? 1 : -1;
+}
+
+// The sign of the most significant nonconstant term of component k of a, or 0.
+inline int LeadSign1(const SymVec& a, int k) {
+  for (int v = 1; v < kVars; ++v)
+    if (const int s = Sign(a.t[v][k], a.mag[v])) return s;
+  return 0;
+}
+
+// The sign of the most significant nonconstant term of Cross2(a, b), or 0.
+inline int LeadSign2(const SymVec& a, const SymVec& b) {
+  for (const auto& picks : Tables().picks2) {
+    double c = 0, bound = 0;
+    for (const auto& p : picks) {
+      const vec3 &u = a.t[p[0]], &v = b.t[p[1]];
+      c += u.x * v.y - u.y * v.x;
+      bound += a.mag[p[0]] * b.mag[p[1]];
+    }
+    if (const int s = Sign(c, bound)) return s;
+  }
+  return 0;
+}
+
+// The sign of the most significant nonconstant term of Det3(a, b, c), or 0.
+inline int LeadSign3(const SymVec& a, const SymVec& b, const SymVec& c) {
+  for (const auto& picks : Tables().picks3) {
+    double d = 0, bound = 0;
+    for (const auto& p : picks) {
+      d += la::dot(la::cross(a.t[p[0]], b.t[p[1]]), c.t[p[2]]);
+      bound += a.mag[p[0]] * b.mag[p[1]] * c.mag[p[2]];
+    }
+    if (const int s = Sign(d, bound)) return s;
+  }
+  return 0;
+}
+
+using Disp = const vec3*;
+
+constexpr double kPlaneTolerance = 1e-9;
+
+inline SymVec SymVert(const Manifold::Impl& m, Disp d, int vert, bool isP,
+                      bool expandP) {
+  const vec3 pos = m.vertPos_[vert];
+  const vec3 disp = isP && !expandP ? -d[vert] : d[vert];
+  SymVec v;
+  v.t[0] = pos;
+  v.mag[0] = la::length(pos);
+  v.t[1] = disp;
+  v.mag[1] = std::max(1.0, la::length(disp));
+  if (isP) {
+    v.t[2] = disp;
+    v.mag[2] = v.mag[1];
+    for (const int i : {0, 1, 2}) {
+      v.t[3 + i][i] = 1;
+      v.mag[3 + i] = 1;
+    }
+  }
+  return v;
+}
+
+// The displacement of each vertex: where it touches at most three distinct
+// face planes, the one that moves each of them outward by exactly the same
+// distance, so that a face stays parallel to itself and faces of P and Q
+// that coincide stay tied, to be settled by the translation alike all over;
+// elsewhere the vertex normal.
+Vec<vec3> Displacements(const Manifold::Impl& m) {
+  const int numVert = m.NumVert();
+  Vec<vec3> disp(m.vertNormal_);
+  std::vector<std::array<vec3, 3>> planes(numVert);
+  std::vector<int> numPlanes(numVert, 0);
+  for (size_t tri = 0; tri < m.NumTri(); ++tri) {
+    const vec3 n = m.faceNormal_[tri];
+    for (const int i : {0, 1, 2}) {
+      const int v = m.halfedge_.Start(3 * tri + i);
+      if (v < 0 || numPlanes[v] < 0) continue;
+      bool seen = false;
+      for (int k = 0; k < numPlanes[v]; ++k)
+        if (la::dot(planes[v][k], n) > 1 - kPlaneTolerance) seen = true;
+      if (seen) continue;
+      if (numPlanes[v] == 3) {
+        numPlanes[v] = -1;
+        continue;
+      }
+      planes[v][numPlanes[v]++] = n;
+    }
+  }
+  for (int v = 0; v < numVert; ++v) {
+    const std::array<vec3, 3>& n = planes[v];
+    if (numPlanes[v] == 1) {
+      disp[v] = n[0];
+    } else if (numPlanes[v] == 2) {
+      disp[v] = (n[0] + n[1]) / (1 + la::dot(n[0], n[1]));
+    } else if (numPlanes[v] == 3) {
+      const double det = la::dot(n[0], la::cross(n[1], n[2]));
+      // three planes through a common line have no common offset
+      if (std::abs(det) > kPlaneTolerance)
+        disp[v] = (la::cross(n[1], n[2]) + la::cross(n[2], n[0]) +
+                   la::cross(n[0], n[1])) /
+                  det;
+    }
+  }
+  return disp;
+}
+
+// Ties are rare, so their handling is kept out of line, leaving the hot
+// comparisons as small as they were.
+#if defined(_MSC_VER)
+#define BOOLEAN3_COLD __declspec(noinline)
+#define BOOLEAN3_HOT __forceinline
+#else
+#define BOOLEAN3_COLD __attribute__((noinline))
+#define BOOLEAN3_HOT inline __attribute__((always_inline))
+#endif
+#if defined(__GNUC__) || defined(__clang__)
+#define BOOLEAN3_TIE(x) __builtin_expect(!!(x), 0)
+#else
+#define BOOLEAN3_TIE(x) (x)
+#endif
+
+// P before Q in x, at a tie: by P minus Q along eps, then along g
+// (P's own displacement), each taken as zero within the displacements'
+// rounding error like every other term; then +x translation of P decides,
+// putting P after Q.
+template <bool expandP>
+BOOLEAN3_COLD bool BeforeAtTie(vec3 dP, vec3 dQ) {
+  const double dPx = withSign(expandP, dP.x);
+  const double magP = std::max(1.0, la::length(dP));
+  const double magQ = std::max(1.0, la::length(dQ));
+  const double d = dPx - dQ.x;
+  if (std::abs(d) > kNoise * (magP + magQ)) return d < 0;
+  return std::abs(dPx) > kNoise * magP && dPx < 0;
+}
+
+template <bool expandP>
+inline bool Before(double pX, double qX, Disp dP, int p, Disp dQ, int q,
+                   double tol) {
+  if (!BOOLEAN3_TIE(std::abs(pX - qX) <= tol)) return pX < qX;
+  return BeforeAtTie<expandP>(dP[p], dQ[q]);
+}
+
+// Whether P is below Q in y where vertex a0 of A meets edge b1 of B, at a
+// tie.
 template <bool expandP, bool forward>
-inline std::pair<int, vec2> Shadow01(const int a0, const int b1, const int b1s,
-                                     const int b1e, const Manifold::Impl& inA,
-                                     const Manifold::Impl& inB) {
+BOOLEAN3_COLD bool BelowAtTie01(const int a0, const int b1, const int b1s,
+                                const int b1e, const Manifold::Impl& inA,
+                                const Manifold::Impl& inB, Disp dA, Disp dB) {
+  const vec3 s = inB.vertPos_[b1s];
+  const vec3 e = inB.vertPos_[b1e];
+  // a.y - (the edge's y at a.x) = Cross2(e - s, a - s) / (e.x - s.x);
+  // P minus Q is that forward and its negation backward
+  const SymVec sa = SymVert(inA, dA, a0, forward, expandP);
+  const SymVec ss = SymVert(inB, dB, b1s, !forward, expandP);
+  const SymVec se = SymVert(inB, dB, b1e, !forward, expandP);
+  // e.x - s.x, or for an edge perpendicular to x, as the perturbation turns it
+  const int dx = e.x > s.x ? 1 : e.x < s.x ? -1 : LeadSign1(se - ss, 0);
+  if (dx == 0) {
+    // Perpendicular to x even perturbed: the earlier, per-edge rule.
+    const int b1pair = inB.halfedge_.Pair(b1);
+    const double dir =
+        inB.faceNormal_[b1 / 3].y + inB.faceNormal_[b1pair / 3].y;
+    return (forward ? -dir : withSign(expandP, dir)) < 0;
+  }
+  return LeadSign2(se - ss, sa - ss) * dx * (forward ? 1 : -1) < 0;
+}
+
+template <bool expandP, bool forward>
+BOOLEAN3_HOT std::pair<int, vec2> Shadow01(const int a0, const int b1,
+                                           const int b1s, const int b1e,
+                                           const Manifold::Impl& inA,
+                                           const Manifold::Impl& inB, Disp dA,
+                                           Disp dB) {
   const double a0x = inA.vertPos_[a0].x;
   const double b1sx = inB.vertPos_[b1s].x;
   const double b1ex = inB.vertPos_[b1e].x;
-  const double a0xp = inA.vertNormal_[a0].x;
-  const double b1sxp = inB.vertNormal_[b1s].x;
-  const double b1exp = inB.vertNormal_[b1e].x;
   const double tol = TieTol(inA, inB);
-  int s01 = forward
-                ? Shadows(a0x, b1ex, withSign(expandP, a0xp) - b1exp, tol) -
-                      Shadows(a0x, b1sx, withSign(expandP, a0xp) - b1sxp, tol)
-                : Shadows(b1sx, a0x, withSign(expandP, b1sxp) - a0xp, tol) -
-                      Shadows(b1ex, a0x, withSign(expandP, b1exp) - a0xp, tol);
+  int s01 = forward ? Before<expandP>(a0x, b1ex, dA, a0, dB, b1e, tol) -
+                          Before<expandP>(a0x, b1sx, dA, a0, dB, b1s, tol)
+                    : Before<expandP>(b1sx, a0x, dB, b1s, dA, a0, tol) -
+                          Before<expandP>(b1ex, a0x, dB, b1e, dA, a0, tol);
   vec2 yz01(NAN);
 
   if (s01 != 0) {
     yz01 = Interpolate(inB.vertPos_[b1s], inB.vertPos_[b1e], a0x, tol);
-    const int b1pair = inB.halfedge_.Pair(b1);
-    const double dir =
-        inB.faceNormal_[b1 / 3].y + inB.faceNormal_[b1pair / 3].y;
-    if (forward) {
-      if (!Shadows(inA.vertPos_[a0].y, yz01[0], -dir, tol)) s01 = 0;
-    } else {
-      if (!Shadows(yz01[0], inA.vertPos_[a0].y, withSign(expandP, dir), tol))
-        s01 = 0;
+    const double ay = inA.vertPos_[a0].y;
+    if (!BOOLEAN3_TIE(std::abs(ay - yz01[0]) <= tol)) {
+      if (forward ? !(ay < yz01[0]) : !(yz01[0] < ay)) s01 = 0;
+    } else if (!BelowAtTie01<expandP, forward>(a0, b1, b1s, b1e, inA, inB, dA,
+                                               dB)) {
+      s01 = 0;
     }
   }
   return std::make_pair(s01, yz01);
+}
+
+// Whether edge p1 of P is below edge q1 of Q where they cross, at a tie.
+template <bool expandP>
+BOOLEAN3_COLD bool BelowAtTie11(int p1, int p1s, int p1e, int q1, int q1s,
+                                int q1e, const Manifold::Impl& inP,
+                                const Manifold::Impl& inQ, Disp dP, Disp dQ) {
+  const vec3 p0 = inP.vertPos_[p1s], q0 = inQ.vertPos_[q1s];
+  const vec3 dp = inP.vertPos_[p1e] - p0, dq = inQ.vertPos_[q1e] - q0;
+  const double cross = dp.x * dq.y - dp.y * dq.x;
+  // zP - zQ at the crossing = -Det3(dp, dq, q0 - p0) / Cross2(dp, dq)
+  const SymVec sp0 = SymVert(inP, dP, p1s, true, expandP);
+  const SymVec sq0 = SymVert(inQ, dQ, q1s, false, expandP);
+  const SymVec sdp = SymVert(inP, dP, p1e, true, expandP) - sp0;
+  const SymVec sdq = SymVert(inQ, dQ, q1e, false, expandP) - sq0;
+  // Cross2(dp, dq), or for edges parallel in projection, as the perturbation
+  // turns them
+  const int c = cross > 0 ? 1 : cross < 0 ? -1 : LeadSign2(sdp, sdq);
+  if (c == 0) {
+    // Parallel in projection even perturbed: the earlier, per-edge rule.
+    const int p1pair = inP.halfedge_.Pair(p1);
+    const double dirP =
+        inP.faceNormal_[p1 / 3].z + inP.faceNormal_[p1pair / 3].z;
+    const int q1pair = inQ.halfedge_.Pair(q1);
+    const double dirQ =
+        inQ.faceNormal_[q1 / 3].z + inQ.faceNormal_[q1pair / 3].z;
+    return withSign(expandP, dirP) - dirQ < 0;
+  }
+  return -LeadSign3(sdp, sdq, sq0 - sp0) * c < 0;
+}
+
+// Whether P is below Q in z where vertex a0 of A meets face b2 of B, at a
+// tie.
+template <bool expandP, bool forward>
+BOOLEAN3_COLD bool BelowAtTie02(int a0, int b2, const Manifold::Impl& inA,
+                                const Manifold::Impl& inB, Disp dA, Disp dB) {
+  const int vb = inB.halfedge_.Start(3 * b2);
+  const int vc = inB.halfedge_.Start(3 * b2 + 1);
+  const int vd = inB.halfedge_.Start(3 * b2 + 2);
+  const vec3 cb = inB.vertPos_[vc] - inB.vertPos_[vb];
+  const vec3 db = inB.vertPos_[vd] - inB.vertPos_[vb];
+  const double nz = cb.x * db.y - cb.y * db.x;
+  // a.z - (the face's z at a) = Det3(c - b, d - b, a - b) / n.z;
+  // P minus Q is that forward and its negation backward
+  const SymVec sa = SymVert(inA, dA, a0, forward, expandP);
+  const SymVec sb = SymVert(inB, dB, vb, !forward, expandP);
+  const SymVec scb = SymVert(inB, dB, vc, !forward, expandP) - sb;
+  const SymVec sdb = SymVert(inB, dB, vd, !forward, expandP) - sb;
+  // n.z, or for a face parallel to z, as the perturbation turns it
+  const int n = nz > 0 ? 1 : nz < 0 ? -1 : LeadSign2(scb, sdb);
+  if (n == 0) {
+    // Parallel to z even perturbed: the earlier, per-face rule.
+    const double nBz = inB.faceNormal_[b2].z;
+    return (forward ? -nBz : withSign(expandP, nBz)) < 0;
+  }
+  return LeadSign3(scb, sdb, sa - sb) * n * (forward ? 1 : -1) < 0;
 }
 
 template <bool expandP>
 struct Kernel11 {
   const Manifold::Impl& inP;
   const Manifold::Impl& inQ;
+  Disp dP;
+  Disp dQ;
 
   std::pair<int, vec4> operator()(int p1, int p1s, int p1e, int q1, int q1s,
                                   int q1e) {
@@ -117,7 +422,7 @@ struct Kernel11 {
     const int p0[2] = {p1s, p1e};
     for (int i : {0, 1}) {
       const auto [s01, yz01] =
-          Shadow01<expandP, true>(p0[i], q1, q1s, q1e, inP, inQ);
+          Shadow01<expandP, true>(p0[i], q1, q1s, q1e, inP, inQ, dP, dQ);
       // If the value is NaN, then these do not overlap.
       if (std::isfinite(yz01[0])) {
         s11 += s01 * (i == 0 ? -1 : 1);
@@ -133,7 +438,7 @@ struct Kernel11 {
     const int q0[2] = {q1s, q1e};
     for (int i : {0, 1}) {
       const auto [s10, yz10] =
-          Shadow01<expandP, false>(q0[i], p1, p1s, p1e, inQ, inP);
+          Shadow01<expandP, false>(q0[i], p1, p1s, p1e, inQ, inP, dQ, dP);
       // If the value is NaN, then these do not overlap.
       if (std::isfinite(yz10[0])) {
         s11 += s10 * (i == 0 ? -1 : 1);
@@ -152,15 +457,12 @@ struct Kernel11 {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s11");
       const double tol = TieTol(inP, inQ);
       xyzz11 = Intersect(pRL[0], pRL[1], qRL[0], qRL[1], tol);
-
-      const int p1pair = inP.halfedge_.Pair(p1);
-      const double dirP =
-          inP.faceNormal_[p1 / 3].z + inP.faceNormal_[p1pair / 3].z;
-      const int q1pair = inQ.halfedge_.Pair(q1);
-      const double dirQ =
-          inQ.faceNormal_[q1 / 3].z + inQ.faceNormal_[q1pair / 3].z;
-      if (!Shadows(xyzz11.z, xyzz11.w, withSign(expandP, dirP) - dirQ, tol))
+      if (!BOOLEAN3_TIE(std::abs(xyzz11.z - xyzz11.w) <= tol)) {
+        if (!(xyzz11.z < xyzz11.w)) s11 = 0;
+      } else if (!BelowAtTie11<expandP>(p1, p1s, p1e, q1, q1s, q1e, inP, inQ,
+                                        dP, dQ)) {
         s11 = 0;
+      }
     }
 
     return std::make_pair(s11, xyzz11);
@@ -171,6 +473,8 @@ template <bool expandP, bool forward>
 struct Kernel02 {
   const Manifold::Impl& inA;
   const Manifold::Impl& inB;
+  Disp dA;
+  Disp dB;
 
   std::pair<int, double> operator()(int a0, int b2) {
     FaceEdge edgeB[3];
@@ -191,7 +495,7 @@ struct Kernel02 {
 
     for (const int i : {0, 1, 2}) {
       const auto syz01 = Shadow01<expandP, forward>(
-          a0, edgeB[i].edge, edgeB[i].start, edgeB[i].end, inA, inB);
+          a0, edgeB[i].edge, edgeB[i].start, edgeB[i].end, inA, inB, dA, dB);
       const int s01 = syz01.first;
       const vec2 yz01 = syz01.second;
       // If the value is NaN, then these do not overlap.
@@ -211,12 +515,10 @@ struct Kernel02 {
       vec3 vertPosA = inA.vertPos_[a0];
       const double tol = TieTol(inA, inB);
       z02 = Interpolate(yzzRL[0], yzzRL[1], vertPosA.y, tol)[1];
-      if (forward) {
-        if (!Shadows(vertPosA.z, z02, -inB.faceNormal_[b2].z, tol)) s02 = 0;
-      } else {
-        if (!Shadows(z02, vertPosA.z, withSign(expandP, inB.faceNormal_[b2].z),
-                     tol))
-          s02 = 0;
+      if (!BOOLEAN3_TIE(std::abs(vertPosA.z - z02) <= tol)) {
+        if (forward ? !(vertPosA.z < z02) : !(z02 < vertPosA.z)) s02 = 0;
+      } else if (!BelowAtTie02<expandP, forward>(a0, b2, inA, inB, dA, dB)) {
+        s02 = 0;
       }
     }
     return std::make_pair(s02, z02);
@@ -356,7 +658,7 @@ struct Kernel12Recorder {
 
 template <bool expandP, bool forward>
 Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                           ExecutionContext::Impl* ctx) {
+                           Disp dP, Disp dQ, ExecutionContext::Impl* ctx) {
   ZoneScoped;
   // Invariant: every ctx-passing parallel op is followed by IsCancelled to
   // keep partial output from feeding unconditional downstream consumers.
@@ -364,8 +666,8 @@ Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   const Manifold::Impl& a = forward ? inP : inQ;
   const Manifold::Impl& b = forward ? inQ : inP;
 
-  Kernel02<expandP, forward> k02{a, b};
-  Kernel11<expandP> k11{inP, inQ};
+  Kernel02<expandP, forward> k02{a, b, forward ? dP : dQ, forward ? dQ : dP};
+  Kernel11<expandP> k11{inP, inQ, dP, dQ};
 
   Kernel12<expandP, forward> k12{a, b, k02, k11};
   Kernel12Recorder<expandP, forward> recorder{k12, {}};
@@ -400,16 +702,17 @@ Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
 template <bool forward>
 Intersections Intersect12(const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                          bool expandP, ExecutionContext::Impl* ctx) {
+                          Disp dP, Disp dQ, bool expandP,
+                          ExecutionContext::Impl* ctx) {
   if (expandP)
-    return Intersect12_<true, forward>(inP, inQ, ctx);
+    return Intersect12_<true, forward>(inP, inQ, dP, dQ, ctx);
   else
-    return Intersect12_<false, forward>(inP, inQ, ctx);
+    return Intersect12_<false, forward>(inP, inQ, dP, dQ, ctx);
 }
 
 template <bool expandP, bool forward>
 Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                    const VecView<std::array<int, 2>> p1q2,
+                    Disp dP, Disp dQ, const VecView<std::array<int, 2>> p1q2,
                     ExecutionContext::Impl* ctx) {
   ZoneScoped;
   // a: 0 (vert), b: 2 (face)
@@ -459,7 +762,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   for (size_t c : components) verts.push_back(static_cast<int>(c));
 
   Vec<int> w03(a.NumVert(), 0);
-  Kernel02<expandP, forward> k02{a, b};
+  Kernel02<expandP, forward> k02{a, b, forward ? dP : dQ, forward ? dQ : dP};
   auto recorderf = [&](int i, int b) {
     const auto [s02, z02] = k02(verts[i], b);
     // note that i is distinct on each thread, and verts contains unique
@@ -484,12 +787,12 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
 template <bool forward>
 Vec<int> Winding03(const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                   const VecView<std::array<int, 2>> p1q2, bool expandP,
-                   ExecutionContext::Impl* ctx) {
+                   Disp dP, Disp dQ, const VecView<std::array<int, 2>> p1q2,
+                   bool expandP, ExecutionContext::Impl* ctx) {
   if (expandP)
-    return Winding03_<true, forward>(inP, inQ, p1q2, ctx);
+    return Winding03_<true, forward>(inP, inQ, dP, dQ, p1q2, ctx);
   else
-    return Winding03_<false, forward>(inP, inQ, p1q2, ctx);
+    return Winding03_<false, forward>(inP, inQ, dP, dQ, p1q2, ctx);
 }
 }  // namespace
 
@@ -526,18 +829,23 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   intersect12P.Start();
 #endif
 
+  const Vec<vec3> dispP = Displacements(inP);
+  const Vec<vec3> dispQ = Displacements(inQ);
+
   // Level 3
   // Build up the intersection of the edges and triangles, keeping only those
   // that intersect, and record the direction the edge is passing through the
   // triangle.
   if (IsCancelled(ctx_)) return;
-  xv12_ = Intersect12<true>(inP, inQ, expandP_, ctx_);
+  xv12_ =
+      Intersect12<true>(inP, inQ, dispP.data(), dispQ.data(), expandP_, ctx_);
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   intersect12P.Stop();
   intersect12Q.Start();
 #endif
   if (IsCancelled(ctx_)) return;
-  xv21_ = Intersect12<false>(inP, inQ, expandP_, ctx_);
+  xv21_ =
+      Intersect12<false>(inP, inQ, dispP.data(), dispQ.data(), expandP_, ctx_);
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   intersect12Q.Stop();
 #endif
@@ -553,13 +861,15 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   winding03P.Start();
 #endif
   if (IsCancelled(ctx_)) return;
-  w03_ = Winding03<true>(inP, inQ, xv12_.p1q2, expandP_, ctx_);
+  w03_ = Winding03<true>(inP, inQ, dispP.data(), dispQ.data(), xv12_.p1q2,
+                         expandP_, ctx_);
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   winding03P.Stop();
   winding03Q.Start();
 #endif
   if (IsCancelled(ctx_)) return;
-  w30_ = Winding03<false>(inP, inQ, xv21_.p1q2, expandP_, ctx_);
+  w30_ = Winding03<false>(inP, inQ, dispP.data(), dispQ.data(), xv21_.p1q2,
+                          expandP_, ctx_);
   // No trailing check: Winding03_ already returns empty on cancel and
   // Boolean3::Result re-checks on entry.
 
@@ -603,7 +913,8 @@ Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
   // forward=true: project along +Z to count signed face crossings above each
   // point. The query box spans all Z and is widened by epsilon_ in XY,
   // so all faces with XY overlap within tolerance are returned regardless of Z.
-  Kernel02<false, true> k02{pointImpl, *this};
+  Kernel02<false, true> k02{pointImpl, *this, pointImpl.vertNormal_.data(),
+                            vertNormal_.data()};
   auto recorderf = [&](int localIdx, int tri) {
     const auto [s02, z02] = k02(localIdx, tri);
     if (std::isfinite(z02)) winding[query2input[localIdx]] += s02;
@@ -650,8 +961,10 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
   // expandP=false with zero vertNormal means the ray-side perturbation is
   // zero. forward=true means we project along +Z for the lower-dimensional
   // kernel cascade (Shadow01 → Kernel02 → Kernel11 → Kernel12).
-  Kernel02<false, true> k02{rayImpl, *this};
-  Kernel11<false> k11{rayImpl, *this};
+  Kernel02<false, true> k02{rayImpl, *this, rayImpl.vertNormal_.data(),
+                            vertNormal_.data()};
+  Kernel11<false> k11{rayImpl, *this, rayImpl.vertNormal_.data(),
+                      vertNormal_.data()};
   Kernel12<false, true> k12{rayImpl, *this, k02, k11};
 
   // Use the component with largest magnitude for stable t computation.
