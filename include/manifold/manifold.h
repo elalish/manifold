@@ -241,6 +241,7 @@ class Manifold {
   std::pair<Manifold, Manifold> SplitByPlane(vec3 normal,
                                              double originOffset) const;
   Manifold TrimByPlane(vec3 normal, double originOffset) const;
+  Manifold Offset(double delta, int circularSegments = 0) const;
   Manifold MinkowskiSum(const Manifold&) const;
   Manifold MinkowskiDifference(const Manifold&) const;
   ///@}

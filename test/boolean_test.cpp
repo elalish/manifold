@@ -1104,6 +1104,51 @@ TEST(Boolean, BatchBoolean) {
   EXPECT_FLOAT_EQ(subtract.SurfaceArea(), 14904.597);
 }
 
+TEST(Boolean, Offset) {
+  ManifoldParamGuard guard;
+  ManifoldParams().processOverlaps = true;
+  Manifold cutout = Manifold::Cube(vec3(100), true) - Manifold::Sphere(60, 50);
+  Manifold fat = cutout.Offset(5);
+  Manifold thin = cutout.Offset(-3);
+  EXPECT_EQ(fat.Genus(), cutout.Genus());
+  EXPECT_EQ(thin.Genus(), cutout.Genus());
+
+  if (options.exportModels) {
+    WriteTestOBJ("offset_fat.obj", fat);
+    WriteTestOBJ("offset_thin.obj", thin);
+  }
+}
+
+TEST(Boolean, Offset1) {
+  Manifold rounded =
+      Manifold::Cube(vec3(1), true).Rotate(180, 0, 0).Offset(0.25, 32);
+  EXPECT_EQ(rounded.Genus(), 0);
+  const Box bbox = rounded.BoundingBox();
+  EXPECT_FLOAT_EQ(bbox.max.x, 0.75);
+  EXPECT_FLOAT_EQ(bbox.min.x, -0.75);
+  EXPECT_FLOAT_EQ(bbox.max.y, 0.75);
+  EXPECT_FLOAT_EQ(bbox.min.y, -0.75);
+  EXPECT_FLOAT_EQ(bbox.max.z, 0.75);
+  EXPECT_FLOAT_EQ(bbox.min.z, -0.75);
+  if (options.exportModels) {
+    WriteTestOBJ("offset1.obj", rounded);
+  }
+}
+
+TEST(Boolean, Offset2) {
+  SimplePolygon sq = {{1, -0.25}, {1.5, -0.25}, {1.5, 0.25}, {1, 0.25}};
+  Manifold rounded =
+      Manifold::Revolve({sq}, 6).Rotate(10, 25, 40).Offset(-0.1, 16);
+  // 2 components, one with 4 triangles, area 0.076, volume ~0
+
+  EXPECT_EQ(rounded.Genus(), 1);
+  EXPECT_FLOAT_EQ(rounded.Volume(), 0.52548647);
+  EXPECT_LT(rounded.SurfaceArea(), 8);
+  if (options.exportModels) {
+    WriteTestOBJ("offset2.obj", rounded);
+  }
+}
+
 // Regression for #1672: a sub-tree shared between two trees must survive when
 // one of those trees is destroyed without being evaluated. Previously the
 // CsgOpNode destructor emptied descendant impls regardless of whether they
