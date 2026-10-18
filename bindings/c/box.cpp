@@ -19,11 +19,11 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-ManifoldBox* manifold_box(void* mem, double x1, double y1, double z1, double x2,
-                          double y2, double z2) {
+ManifoldBox* manifold_box(double x1, double y1, double z1, double x2, double y2,
+                          double z2) {
   auto p1 = vec3(x1, y1, z1);
   auto p2 = vec3(x2, y2, z2);
-  auto box = new (mem) Box(p1, p2);
+  auto box = new Box(p1, p2);
   return to_c(box);
 }
 
@@ -60,32 +60,31 @@ void manifold_box_include_pt(ManifoldBox* b, double x, double y, double z) {
   box.Union(p);
 }
 
-ManifoldBox* manifold_box_union(void* mem, ManifoldBox* a, ManifoldBox* b) {
+ManifoldBox* manifold_box_union(ManifoldBox* a, ManifoldBox* b) {
   auto box = from_c(a)->Union(*from_c(b));
-  return to_c(new (mem) Box(box));
+  return to_c(new Box(box));
 }
 
-ManifoldBox* manifold_box_transform(void* mem, ManifoldBox* b, double x1,
-                                    double y1, double z1, double x2, double y2,
-                                    double z2, double x3, double y3, double z3,
-                                    double x4, double y4, double z4) {
+ManifoldBox* manifold_box_transform(ManifoldBox* b, double x1, double y1,
+                                    double z1, double x2, double y2, double z2,
+                                    double x3, double y3, double z3, double x4,
+                                    double y4, double z4) {
   auto mat = mat3x4({x1, y1, z1}, {x2, y2, z2}, {x3, y3, z3}, {x4, y4, z4});
   auto transformed = from_c(b)->Transform(mat);
-  return to_c(new (mem) Box(transformed));
+  return to_c(new Box(transformed));
 }
 
-ManifoldBox* manifold_box_translate(void* mem, ManifoldBox* b, double x,
-                                    double y, double z) {
+ManifoldBox* manifold_box_translate(ManifoldBox* b, double x, double y,
+                                    double z) {
   auto p = vec3(x, y, z);
   auto translated = (*from_c(b)) + p;
-  return to_c(new (mem) Box(translated));
+  return to_c(new Box(translated));
 }
 
-ManifoldBox* manifold_box_mul(void* mem, ManifoldBox* b, double x, double y,
-                              double z) {
+ManifoldBox* manifold_box_mul(ManifoldBox* b, double x, double y, double z) {
   auto p = vec3(x, y, z);
   auto scaled = (*from_c(b)) * p;
-  return to_c(new (mem) Box(scaled));
+  return to_c(new Box(scaled));
 }
 
 int manifold_box_does_overlap_pt(ManifoldBox* b, double x, double y, double z) {

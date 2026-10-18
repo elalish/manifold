@@ -237,27 +237,3 @@ vec4 from_c(ManifoldVec4 v) { return vec4(v.x, v.y, v.z, v.w); }
 std::vector<ivec3>* from_c(ManifoldTriangulation* m) {
   return reinterpret_cast<std::vector<ivec3>*>(m);
 }
-
-std::vector<vec3> vector_of_vec_array(ManifoldVec3* vs, size_t length) {
-  auto vec = std::vector<vec3>();
-  for (size_t i = 0; i < length; ++i) {
-    vec.push_back(from_c(vs[i]));
-  }
-  return vec;
-}
-
-std::vector<ivec3> vector_of_vec_array(ManifoldIVec3* vs, size_t length) {
-  auto vec = std::vector<ivec3>();
-  for (size_t i = 0; i < length; ++i) {
-    vec.push_back(from_c(vs[i]));
-  }
-  return vec;
-}
-
-std::vector<vec4> vector_of_vec_array(ManifoldVec4* vs, size_t length) {
-  auto vec = std::vector<vec4>();
-  for (size_t i = 0; i < length; ++i) {
-    vec.push_back(from_c(vs[i]));
-  }
-  return vec;
-}

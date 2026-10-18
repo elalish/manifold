@@ -1178,22 +1178,12 @@ export class Manifold {
    * reset may allow triangles of flat faces to be further collapsed with
    * Simplify().
    *
-<<<<<<< HEAD
-   * This function also condenses all coplanar faces in the relation, and
-   * collapses those edges. If you want to have inconsistent properties across
-   * these faces, meaning you want to preserve some of these edges, you should
-   * instead call GetMesh(), calculate your properties and use these to
-   * construct a new manifold.
-   *
-   * @group Mesh ID
-=======
    * @param id The ID to assign to this manifold. If negative (the default), a
    *     new ID is assigned. Use zero to match all default-constructed
    *     manifolds, thus not keeping track of the joints between input
    *     manifolds. Ensure separate IDs are used for mesh inputs containing
    *     properties, generally by calling this function without arguments just
    *     after construction.
->>>>>>> c15c7025 (switch meshID tracking to opt-in)
    */
   asOriginal(id?: number): Manifold;
 
