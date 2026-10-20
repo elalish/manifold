@@ -160,7 +160,10 @@ inline void LoadFaceEdges(const Halfedges& halfedges, int tri,
 }
 
 // p < q, where p belongs to P and q to Q. At a tie the two are taken as
-// equal, and the moves decide: by how much each changes.
+// equal, and the moves decide: by how much each changes. Not movedP < movedQ:
+// the moves are a fraction of tol, so a real gap inside tol could outweigh
+// them, and values within tol would no longer count as equal, which breaks
+// Precision2 and PointWithinToleranceOfCoincidentEdge among others.
 inline bool Shadows(double p, double q, double movedP, double movedQ,
                     double tol) {
   return std::abs(p - q) > tol ? p < q : movedP - p < movedQ - q;
