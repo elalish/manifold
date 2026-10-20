@@ -159,23 +159,6 @@ inline void LoadFaceEdges(const Halfedges& halfedges, int tri,
   }
 }
 
-// The y and z of the line through aL and aR at x, extrapolated, without the
-// domain checks of Interpolate: moved positions can lie a little outside.
-inline vec2 Along(vec3 aL, vec3 aR, double x) {
-  const double dx = aR.x - aL.x;
-  const double t = dx == 0 ? 0.5 : (x - aL.x) / dx;
-  return vec2(aL.y + t * (aR.y - aL.y), aL.z + t * (aR.z - aL.z));
-}
-
-// The z of P's and of Q's segment where their y meet: pRL and qRL are each
-// segment at the same two x (the left and right ends), as in Kernel11.
-inline vec2 CrossingZ(const vec3 pRL[2], const vec3 qRL[2]) {
-  const double dyL = qRL[0].y - pRL[0].y, dyR = qRL[1].y - pRL[1].y;
-  const double t = dyL == dyR ? 0.5 : dyL / (dyL - dyR);
-  return vec2(pRL[0].z + t * (pRL[1].z - pRL[0].z),
-              qRL[0].z + t * (qRL[1].z - qRL[0].z));
-}
-
 // p < q, where p belongs to P and q to Q. At a tie the two are taken as
 // equal, and the moves decide: by how much each changes.
 inline bool Shadows(double p, double q, double movedP, double movedQ,
@@ -204,9 +187,9 @@ inline std::pair<int, vec2> Shadow01(const int a0, const int b1, const int b1s,
     const double ay = inA.vertPos_[a0].y;
     double y = yz01[0], may = ay, myz = yz01[0];
     if (std::abs(ay - yz01[0]) <= tol) {
-      y = Along(inB.vertPos_[b1s], inB.vertPos_[b1e], a0x)[0];
+      y = InterpolateLine(inB.vertPos_[b1s], inB.vertPos_[b1e], a0x)[0];
       may = mA[a0].y;
-      myz = Along(mB[b1s], mB[b1e], ma0x)[0];
+      myz = InterpolateLine(mB[b1s], mB[b1e], ma0x)[0];
     }
     if (forward ? !Shadows(ay, y, may, myz, tol)
                 : !Shadows(y, ay, myz, may, tol))
@@ -287,15 +270,16 @@ struct Kernel11 {
         for (const int j : {0, 1}) {
           if (ofPRL[j]) {
             mpRL[j] = mP[vertRL[j]];
-            const vec2 yz = Along(mQ[q1s], mQ[q1e], mpRL[j].x);
+            const vec2 yz = InterpolateLine(mQ[q1s], mQ[q1e], mpRL[j].x);
             mqRL[j] = vec3(mpRL[j].x, yz.x, yz.y);
           } else {
             mqRL[j] = mQ[vertRL[j]];
-            const vec2 yz = Along(mP[p1s], mP[p1e], mqRL[j].x);
+            const vec2 yz = InterpolateLine(mP[p1s], mP[p1e], mqRL[j].x);
             mpRL[j] = vec3(mqRL[j].x, yz.x, yz.y);
           }
         }
-        const vec2 zw = CrossingZ(pRL, qRL), mzw = CrossingZ(mpRL, mqRL);
+        const vec2 zw = IntersectZ(pRL[0], pRL[1], qRL[0], qRL[1]);
+        const vec2 mzw = IntersectZ(mpRL[0], mpRL[1], mqRL[0], mqRL[1]);
         z = zw[0];
         w = zw[1];
         mz = mzw[0];
@@ -365,15 +349,15 @@ struct Kernel02 {
         vec3 zRL[2], mzRL[2];
         for (const int j : {0, 1}) {
           const FaceEdge& e = edgeB[edgeRL[j]];
-          const vec2 yz =
-              Along(inB.vertPos_[e.start], inB.vertPos_[e.end], vertPosA.x);
-          const vec2 myz = Along(mB[e.start], mB[e.end], ma.x);
+          const vec2 yz = InterpolateLine(inB.vertPos_[e.start],
+                                          inB.vertPos_[e.end], vertPosA.x);
+          const vec2 myz = InterpolateLine(mB[e.start], mB[e.end], ma.x);
           zRL[j] = vec3(yz[0], yz[1], yz[1]);
           mzRL[j] = vec3(myz[0], myz[1], myz[1]);
         }
-        z = Along(zRL[0], zRL[1], vertPosA.y)[1];
+        z = InterpolateLine(zRL[0], zRL[1], vertPosA.y)[1];
         maz = ma.z;
-        mz02 = Along(mzRL[0], mzRL[1], ma.y)[1];
+        mz02 = InterpolateLine(mzRL[0], mzRL[1], ma.y)[1];
       }
       if (forward ? !Shadows(vertPosA.z, z, maz, mz02, tol)
                   : !Shadows(z, vertPosA.z, mz02, maz, tol))

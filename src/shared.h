@@ -89,6 +89,18 @@ inline vec2 Interpolate(vec3 aL, vec3 aR, double x, double tol = 0) {
 }
 
 /**
+ * Interpolate on the whole line through aL and aR: no clamping to the segment,
+ * and always measured from aL. A tie decision compares a value with the same
+ * value after its vertices are moved, so both must come from one formula, and
+ * a moved point can lie a little outside its moved segment.
+ */
+inline vec2 InterpolateLine(vec3 aL, vec3 aR, double x) {
+  const double dx = aR.x - aL.x;
+  const double t = dx == 0 ? 0.5 : (x - aL.x) / dx;
+  return vec2(aL.y + t * (aR.y - aL.y), aL.z + t * (aR.z - aL.z));
+}
+
+/**
  * Intersect two projected segments aL-aR and bL-bR. The segments are ordered
  * over the same x interval, and their y gaps must bracket zero. The returned
  * value is (x, y, a.z, b.z) at the crossing. Positive tol snaps b's endpoint
@@ -117,6 +129,19 @@ inline vec4 Intersect(const vec3& aL, const vec3& aR, vec3 bL, vec3 bR,
   xyzz.z = lambda * (aR.z - aL.z) + (useL ? aL.z : aR.z);
   xyzz.w = lambda * (bR.z - bL.z) + (useL ? bL.z : bR.z);
   return xyzz;
+}
+
+/**
+ * The (a.z, b.z) of Intersect, on the whole lines: no snapping of y within a
+ * tolerance, and always measured from the left. For tie decisions, like
+ * InterpolateLine.
+ */
+inline vec2 IntersectZ(const vec3& aL, const vec3& aR, const vec3& bL,
+                       const vec3& bR) {
+  const double dyL = bL.y - aL.y;
+  const double dyR = bR.y - aR.y;
+  const double t = dyL == dyR ? 0.5 : dyL / (dyL - dyR);
+  return vec2(aL.z + t * (aR.z - aL.z), bL.z + t * (bR.z - bL.z));
 }
 
 /**
