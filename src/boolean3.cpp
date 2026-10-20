@@ -90,36 +90,53 @@ Vec<vec3> Displacements(const Manifold::Impl& m) {
   return disp;
 }
 
-// A vertex as moved to decide ties: its position plus scale times its
-// displacement plus shift. At a tie (two values within TieTol) the two are
+// The verts of a mesh as moved to decide ties: each position plus scale times
+// its direction plus shift. At a tie (two values within TieTol) the two are
 // taken as equal, and the comparison is decided by how much the moves change
 // each. The moves are one real configuration, so all the ties are decided
 // alike, and they are less than half the tolerance, far above the rounding
 // that makes values which should be equal into ties.
-struct Moved {
-  const vec3* pos;
-  const vec3* disp;
-  double scale;
-  vec3 shift;
-  vec3 operator[](int vert) const {
-    return pos[vert] + scale * disp[vert] + shift;
+class Moved {
+ public:
+  // The operands of a boolean, along their Displacements by a quarter of the
+  // tolerance: the verts of Q outward, those of P outward when expanding and
+  // inward otherwise and an eighth further, so that where faces of P and Q
+  // coincide, P's is the outer one; and P shifted a little more, for the ties
+  // the displacements leave exact: along an axis where neither vert's
+  // displacement has a component, the moves are equal. The shift differs per
+  // axis so that a slope of 1, common on grids, can't cancel it.
+  static Moved P(const Manifold::Impl& m, double tol, bool expandP) {
+    const double step = tol / 4;
+    return Moved(m, Displacements(m), (expandP ? 1.125 : -1.125) * step,
+                 step * vec3(1.0 / 61, 1.0 / 89, 1.0 / 113));
   }
-};
+  static Moved Q(const Manifold::Impl& m, double tol) {
+    return Moved(m, Displacements(m), tol / 4, vec3(0.0));
+  }
+  // A mesh queried by points or a ray, outward along its vertex normals.
+  static Moved Queried(const Manifold::Impl& m, double tol) {
+    return Moved(m, {}, tol / 4, vec3(0.0));
+  }
+  // The points or the ray of a query, which don't move.
+  static Moved Still(const Manifold::Impl& m) {
+    return Moved(m, {}, 0, vec3(0.0));
+  }
 
-// The moves: a quarter of the tolerance per displacement, the verts of Q
-// outward, those of P outward when expanding and inward otherwise and an
-// eighth further, so that where faces of P and Q coincide, P's is the outer
-// one; and P shifted a little more, in incommensurate proportions, for what
-// is left.
-inline Moved MovedP(const Manifold::Impl& m, const vec3* disp, double tol,
-                    bool expandP) {
-  const double step = tol / 4;
-  return {m.vertPos_.data(), disp, (expandP ? 1.125 : -1.125) * step,
-          step * vec3(1.0 / 61, 1.0 / 89, 1.0 / 113)};
-}
-inline Moved MovedQ(const Manifold::Impl& m, const vec3* disp, double tol) {
-  return {m.vertPos_.data(), disp, tol / 4, vec3(0.0)};
-}
+  vec3 operator[](int vert) const {
+    if (scale_ == 0) return mesh_.vertPos_[vert] + shift_;
+    const vec3 dir = disp_.empty() ? mesh_.vertNormal_[vert] : disp_[vert];
+    return mesh_.vertPos_[vert] + scale_ * dir + shift_;
+  }
+
+ private:
+  Moved(const Manifold::Impl& mesh, Vec<vec3> disp, double scale, vec3 shift)
+      : mesh_(mesh), disp_(std::move(disp)), scale_(scale), shift_(shift) {}
+
+  const Manifold::Impl& mesh_;
+  Vec<vec3> disp_;  // empty: along the vertex normals
+  double scale_;
+  vec3 shift_;
+};
 
 struct FaceEdge {
   int edge;
@@ -161,8 +178,8 @@ inline vec2 CrossingZ(const vec3 pRL[2], const vec3 qRL[2]) {
 
 // p < q, where p belongs to P and q to Q. At a tie the two are taken as
 // equal, and the moves decide: by how much each changes.
-inline bool Before(double p, double q, double movedP, double movedQ,
-                   double tol) {
+inline bool Shadows(double p, double q, double movedP, double movedQ,
+                    double tol) {
   return std::abs(p - q) > tol ? p < q : movedP - p < movedQ - q;
 }
 
@@ -176,10 +193,10 @@ inline std::pair<int, vec2> Shadow01(const int a0, const int b1, const int b1s,
   const double b1ex = inB.vertPos_[b1e].x;
   const double tol = TieTol(inA, inB);
   const double ma0x = mA[a0].x;
-  int s01 = forward ? Before(a0x, b1ex, ma0x, mB[b1e].x, tol) -
-                          Before(a0x, b1sx, ma0x, mB[b1s].x, tol)
-                    : Before(b1sx, a0x, mB[b1s].x, ma0x, tol) -
-                          Before(b1ex, a0x, mB[b1e].x, ma0x, tol);
+  int s01 = forward ? Shadows(a0x, b1ex, ma0x, mB[b1e].x, tol) -
+                          Shadows(a0x, b1sx, ma0x, mB[b1s].x, tol)
+                    : Shadows(b1sx, a0x, mB[b1s].x, ma0x, tol) -
+                          Shadows(b1ex, a0x, mB[b1e].x, ma0x, tol);
   vec2 yz01(NAN);
 
   if (s01 != 0) {
@@ -191,7 +208,8 @@ inline std::pair<int, vec2> Shadow01(const int a0, const int b1, const int b1s,
       may = mA[a0].y;
       myz = Along(mB[b1s], mB[b1e], ma0x)[0];
     }
-    if (forward ? !Before(ay, y, may, myz, tol) : !Before(y, ay, myz, may, tol))
+    if (forward ? !Shadows(ay, y, may, myz, tol)
+                : !Shadows(y, ay, myz, may, tol))
       s01 = 0;
   }
   return std::make_pair(s01, yz01);
@@ -201,8 +219,8 @@ template <bool expandP>
 struct Kernel11 {
   const Manifold::Impl& inP;
   const Manifold::Impl& inQ;
-  Moved mP;
-  Moved mQ;
+  const Moved& mP;
+  const Moved& mQ;
 
   std::pair<int, vec4> operator()(int p1, int p1s, int p1e, int q1, int q1s,
                                   int q1e) {
@@ -218,7 +236,7 @@ struct Kernel11 {
     s11 = 0;
     // which vertex each of pRL/qRL came from, P's (true) or Q's
     int vertRL[2];
-    bool ofP[2];
+    bool ofPRL[2];
 
     const int p0[2] = {p1s, p1e};
     for (int i : {0, 1}) {
@@ -232,7 +250,7 @@ struct Kernel11 {
           pRL[k] = inP.vertPos_[p0[i]];
           qRL[k] = vec3(pRL[k].x, yz01.x, yz01.y);
           vertRL[k] = p0[i];
-          ofP[k] = true;
+          ofPRL[k] = true;
           ++k;
         }
       }
@@ -250,7 +268,7 @@ struct Kernel11 {
           qRL[k] = inQ.vertPos_[q0[i]];
           pRL[k] = vec3(qRL[k].x, yz10.x, yz10.y);
           vertRL[k] = q0[i];
-          ofP[k] = false;
+          ofPRL[k] = false;
           ++k;
         }
       }
@@ -267,7 +285,7 @@ struct Kernel11 {
         // the crossing as it is and as moved, by the same formula
         vec3 mpRL[2], mqRL[2];
         for (const int j : {0, 1}) {
-          if (ofP[j]) {
+          if (ofPRL[j]) {
             mpRL[j] = mP[vertRL[j]];
             const vec2 yz = Along(mQ[q1s], mQ[q1e], mpRL[j].x);
             mqRL[j] = vec3(mpRL[j].x, yz.x, yz.y);
@@ -283,7 +301,7 @@ struct Kernel11 {
         mz = mzw[0];
         mw = mzw[1];
       }
-      if (!Before(z, w, mz, mw, tol)) s11 = 0;
+      if (!Shadows(z, w, mz, mw, tol)) s11 = 0;
     }
 
     return std::make_pair(s11, xyzz11);
@@ -294,8 +312,8 @@ template <bool expandP, bool forward>
 struct Kernel02 {
   const Manifold::Impl& inA;
   const Manifold::Impl& inB;
-  Moved mA;
-  Moved mB;
+  const Moved& mA;
+  const Moved& mB;
 
   std::pair<int, double> operator()(int a0, int b2) {
     FaceEdge edgeB[3];
@@ -357,8 +375,8 @@ struct Kernel02 {
         maz = ma.z;
         mz02 = Along(mzRL[0], mzRL[1], ma.y)[1];
       }
-      if (forward ? !Before(vertPosA.z, z, maz, mz02, tol)
-                  : !Before(z, vertPosA.z, mz02, maz, tol))
+      if (forward ? !Shadows(vertPosA.z, z, maz, mz02, tol)
+                  : !Shadows(z, vertPosA.z, mz02, maz, tol))
         s02 = 0;
     }
     return std::make_pair(s02, z02);
@@ -673,10 +691,8 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 #endif
 
   // the moved verts that decide ties
-  const Vec<vec3> dispP = Displacements(inP);
-  const Vec<vec3> dispQ = Displacements(inQ);
-  const Moved mP = MovedP(inP, dispP.data(), tol, expandP_);
-  const Moved mQ = MovedQ(inQ, dispQ.data(), tol);
+  const Moved mP = Moved::P(inP, tol, expandP_);
+  const Moved mQ = Moved::Q(inQ, tol);
 
   // Level 3
   // Build up the intersection of the edges and triangles, keeping only those
@@ -756,10 +772,9 @@ Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
   // point. The query box spans all Z and is widened by epsilon_ in XY,
   // so all faces with XY overlap within tolerance are returned regardless of Z.
   const double tol = epsilon_;
-  const Moved still{pointImpl.vertPos_.data(), pointImpl.vertNormal_.data(), 0,
-                    vec3(0.0)};
-  Kernel02<false, true> k02{pointImpl, *this, still,
-                            MovedQ(*this, vertNormal_.data(), tol)};
+  const Moved still = Moved::Still(pointImpl);
+  const Moved moved = Moved::Queried(*this, tol);
+  Kernel02<false, true> k02{pointImpl, *this, still, moved};
   auto recorderf = [&](int localIdx, int tri) {
     const auto [s02, z02] = k02(localIdx, tri);
     if (std::isfinite(z02)) winding[query2input[localIdx]] += s02;
@@ -806,9 +821,8 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
   // expandP=false with zero vertNormal means the ray-side perturbation is
   // zero. forward=true means we project along +Z for the lower-dimensional
   // kernel cascade (Shadow01 → Kernel02 → Kernel11 → Kernel12).
-  const Moved still{rayImpl.vertPos_.data(), rayImpl.vertNormal_.data(), 0,
-                    vec3(0.0)};
-  const Moved moved = MovedQ(*this, vertNormal_.data(), epsilon_);
+  const Moved still = Moved::Still(rayImpl);
+  const Moved moved = Moved::Queried(*this, epsilon_);
   Kernel02<false, true> k02{rayImpl, *this, still, moved};
   Kernel11<false> k11{rayImpl, *this, still, moved};
   Kernel12<false, true> k12{rayImpl, *this, k02, k11};
