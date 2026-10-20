@@ -1746,7 +1746,8 @@ export declare type RayHit = {
     faceID: number,
     distance: number,
     position: Vec3,
-    normal: Vec3
+    normal: Vec3,
+    crossing: number
 };
 
 /**

@@ -217,6 +217,13 @@ The 3D position of the hit point. </td></tr>
 normal = vec3(0.0)</td>
 <td class="fielddoc">
 The geometric face normal at the hit. </td></tr>
+<tr><td class="fieldtype">
+<a id="af0ce4c760b3a1b6642b4c67f02108b14" name="af0ce4c760b3a1b6642b4c67f02108b14"></a>int</td>
+<td class="fieldname">
+crossing = 0</td>
+<td class="fielddoc">
+<p>+1 if the ray enters the solid here, -1 if it exits. Summing these along the ray gives the change in winding number from origin to endpoint. Prefer this over the sign of dot(normal, direction), which can disagree with the mesh's internal crossing in degenerate cases. A ray grazing a vertex or edge can return a +1/-1 pair at the same distance; such ties are ordered by faceID. </p>
+</td></tr>
 </table>
 
 </div>

@@ -8,7 +8,8 @@ var group___structs =
       [ "faceID", "group___structs.html#a46de78de02bc26b0f04d09b055b9ff4c", null ],
       [ "distance", "group___structs.html#a79b8e036dca6911e3295a47d99f21f43", null ],
       [ "position", "group___structs.html#a2807b9fb4b79e01dfde022b613d2575f", null ],
-      [ "normal", "group___structs.html#a7f9900a7305f0a389e52eb9aef7b1f13", null ]
+      [ "normal", "group___structs.html#a7f9900a7305f0a389e52eb9aef7b1f13", null ],
+      [ "crossing", "group___structs.html#af0ce4c760b3a1b6642b4c67f02108b14", null ]
     ] ],
     [ "ExecutionContext", "classmanifold_1_1_execution_context.html", [
       [ "Cancel", "classmanifold_1_1_execution_context.html#a98fd5d588027adeb8d4545c78347cd26", null ],
