@@ -64,10 +64,6 @@ std::vector<ivec3>* from_c(ManifoldTriangulation* m);
 RayHitVec* from_c(ManifoldRayHitVec* v);
 ExecutionContext* from_c(ManifoldExecutionContext* ctx);
 
-std::vector<vec3> vector_of_vec_array(ManifoldVec3* vs, size_t length);
-std::vector<ivec3> vector_of_vec_array(ManifoldIVec3* vs, size_t length);
-std::vector<vec4> vector_of_vec_array(ManifoldVec4* vs, size_t length);
-
 template <typename T>
 std::vector<T> vector_of_array(T* ts, size_t length) {
   auto vec = std::vector<T>();
@@ -75,11 +71,4 @@ std::vector<T> vector_of_array(T* ts, size_t length) {
     vec.push_back(ts[i]);
   }
   return vec;
-}
-
-template <typename T>
-T* copy_data(void* mem, std::vector<T> v) {
-  T* ts = reinterpret_cast<T*>(mem);
-  memcpy(ts, v.data(), sizeof(T) * v.size());
-  return ts;
 }
