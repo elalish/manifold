@@ -59,6 +59,8 @@ suite('Manifold Bindings', () => {
     expect(hits).toHaveLength(2);
     expect(hits[0].position[2]).toEqual(-0.5);
     expect(hits[1].position[2]).toEqual(0.5);
+    expect(hits[0].crossing).toEqual(1);
+    expect(hits[1].crossing).toEqual(-1);
   });
 
   test('rayCast returns empty on miss', () => {

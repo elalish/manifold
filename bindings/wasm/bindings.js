@@ -344,6 +344,7 @@ Module.setup = function() {
                        distance: hit.distance,
                        position: ['x', 'y', 'z'].map(f => hit.position[f]),
                        normal: ['x', 'y', 'z'].map(f => hit.normal[f]),
+                       crossing: hit.crossing,
                      }));
     vec.delete();
     return result;

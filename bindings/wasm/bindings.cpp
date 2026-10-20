@@ -99,7 +99,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("faceID", &RayHit::faceID)
       .field("distance", &RayHit::distance)
       .field("position", &RayHit::position)
-      .field("normal", &RayHit::normal);
+      .field("normal", &RayHit::normal)
+      .field("crossing", &RayHit::crossing);
 
   class_<ExecutionContext>("ExecutionContext")
       .constructor<>()

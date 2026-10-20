@@ -37,6 +37,8 @@ TEST(Measurement, RayCastHitCube) {
   // Bottom face normal should point -Z, top +Z
   EXPECT_FLOAT_EQ(hits[0].normal.z, -1.0);
   EXPECT_FLOAT_EQ(hits[1].normal.z, 1.0);
+  EXPECT_EQ(hits[0].crossing, 1);
+  EXPECT_EQ(hits[1].crossing, -1);
 }
 
 TEST(Measurement, RayCastMiss) {
@@ -123,6 +125,60 @@ TEST(Measurement, RayCastSilhouetteEdge) {
 
   auto hits = cube.RayCast(vec3(0.5, 0, -5), vec3(0.5, 0, 5));
   EXPECT_TRUE(hits.size() == 0 || hits.size() == 2);
+}
+
+TEST(Measurement, RayCastCrossingMatchesWinding) {
+  // The crossings along a ray must account for the change in winding number
+  // between its ends. Aim rays at every vertex of a rotated cube, where
+  // dot(normal, direction) is least reliable.
+  const Manifold cube = Manifold::Cube(vec3(1.0), true).Rotate(30, 40, 50);
+  const MeshGL64 mesh = cube.GetMeshGL64();
+  for (size_t v = 0; v < mesh.NumVert(); ++v) {
+    const double* p = &mesh.vertProperties[mesh.numProp * v];
+    const vec3 vert(p[0], p[1], p[2]);
+    for (int k = 0; k < 16; ++k) {
+      const double theta = 0.7 * k;
+      const vec3 dir =
+          la::normalize(vec3(cos(theta), sin(theta), 0.5 * sin(3 * theta)));
+      for (const double reach : {0.0, 1.0, 2.0}) {
+        const vec3 origin = vert - 2.0 * dir;
+        const vec3 endpoint = vert + reach * dir;
+        const std::vector<int> w = cube.WindingNumber({origin, endpoint});
+        int sum = 0;
+        for (const RayHit& hit : cube.RayCast(origin, endpoint)) {
+          EXPECT_TRUE(hit.crossing == 1 || hit.crossing == -1);
+          sum += hit.crossing;
+        }
+        EXPECT_EQ(w[0] + sum, w[1])
+            << "vert " << v << " dir " << k << " reach " << reach;
+      }
+    }
+  }
+}
+
+TEST(Measurement, RayCastTiesSortedByFaceID) {
+  // A ray through the same vertex of a row of rotated cubes grazes each one,
+  // giving a pair of hits at equal distance per cube. With more than 16 hits
+  // std::sort is no longer stable in practice, so ties must be ordered by
+  // faceID explicitly.
+  const Manifold cube = Manifold::Cube(vec3(1.0), true).Rotate(30, 40, 50);
+  std::vector<Manifold> cubes;
+  for (int i = 0; i < 20; ++i) cubes.push_back(cube.Translate({3.0 * i, 0, 0}));
+  const Manifold row = Manifold::BatchBoolean(cubes, OpType::Add);
+  const MeshGL64 mesh = cube.GetMeshGL64();
+  int ties = 0;
+  for (size_t v = 0; v < mesh.NumVert(); ++v) {
+    const double* p = &mesh.vertProperties[mesh.numProp * v];
+    const vec3 vert(p[0], p[1], p[2]);
+    const std::vector<RayHit> hits =
+        row.RayCast(vert - vec3(3, 0, 0), vert + vec3(60, 0, 0));
+    for (size_t i = 1; i < hits.size(); ++i) {
+      if (hits[i - 1].distance != hits[i].distance) continue;
+      ++ties;
+      EXPECT_LT(hits[i - 1].faceID, hits[i].faceID) << "vert " << v;
+    }
+  }
+  EXPECT_GT(ties, 0);
 }
 
 TEST(Measurement, MinGapCubeCube) {

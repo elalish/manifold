@@ -42,6 +42,102 @@ inline Box VerticalQueryBox(const vec3& point, double tol) {
              vec3(point.x + tol, point.y + tol, inf));
 }
 
+constexpr double kPlaneTolerance = 1e-9;
+
+// The direction each vertex moves to decide ties: where it touches at most
+// three distinct face planes, the one that moves each of them outward by
+// exactly the same distance, so that a face stays parallel to itself;
+// elsewhere the vertex normal. At most twice the length of a normal, so that
+// a sharp wedge doesn't move a vertex by more than the tolerance.
+Vec<vec3> Displacements(const Manifold::Impl& m) {
+  const int numVert = m.NumVert();
+  Vec<vec3> disp(m.vertNormal_);
+  std::vector<std::array<vec3, 3>> planes(numVert);
+  std::vector<int> numPlanes(numVert, 0);
+  for (size_t tri = 0; tri < m.NumTri(); ++tri) {
+    const vec3 n = m.faceNormal_[tri];
+    for (const int i : {0, 1, 2}) {
+      const int v = m.halfedge_.Start(3 * tri + i);
+      if (v < 0 || numPlanes[v] < 0) continue;
+      bool seen = false;
+      for (int k = 0; k < numPlanes[v]; ++k)
+        if (la::dot(planes[v][k], n) > 1 - kPlaneTolerance) seen = true;
+      if (seen) continue;
+      if (numPlanes[v] == 3) {
+        numPlanes[v] = -1;
+        continue;
+      }
+      planes[v][numPlanes[v]++] = n;
+    }
+  }
+  for (int v = 0; v < numVert; ++v) {
+    const std::array<vec3, 3>& n = planes[v];
+    if (numPlanes[v] == 1) {
+      disp[v] = n[0];
+    } else if (numPlanes[v] == 2) {
+      disp[v] = (n[0] + n[1]) / (1 + la::dot(n[0], n[1]));
+    } else if (numPlanes[v] == 3) {
+      const double det = la::dot(n[0], la::cross(n[1], n[2]));
+      // three planes through a common line have no common offset
+      if (std::abs(det) > kPlaneTolerance)
+        disp[v] = (la::cross(n[1], n[2]) + la::cross(n[2], n[0]) +
+                   la::cross(n[0], n[1])) /
+                  det;
+    }
+  }
+  for (vec3& d : disp)
+    if (la::length(d) > 2) d = 2.0 * la::normalize(d);
+  return disp;
+}
+
+// The verts of a mesh as moved to decide ties: each position plus scale times
+// its direction plus shift. At a tie (two values within TieTol) the two are
+// taken as equal, and the comparison is decided by how much the moves change
+// each. The moves are one real configuration, so all the ties are decided
+// alike, and they are less than half the tolerance, far above the rounding
+// that makes values which should be equal into ties.
+class Moved {
+ public:
+  // The operands of a boolean, along their Displacements by a quarter of the
+  // tolerance: the verts of Q outward, those of P outward when expanding and
+  // inward otherwise and an eighth further, so that where faces of P and Q
+  // coincide, P's is the outer one; and P shifted a little more, for the ties
+  // the displacements leave exact: along an axis where neither vert's
+  // displacement has a component, the moves are equal. The shift differs per
+  // axis so that a slope of 1, common on grids, can't cancel it.
+  static Moved P(const Manifold::Impl& m, double tol, bool expandP) {
+    const double step = tol / 4;
+    return Moved(m, Displacements(m), (expandP ? 1.125 : -1.125) * step,
+                 step * vec3(1.0 / 61, 1.0 / 89, 1.0 / 113));
+  }
+  static Moved Q(const Manifold::Impl& m, double tol) {
+    return Moved(m, Displacements(m), tol / 4, vec3(0.0));
+  }
+  // A mesh queried by points or a ray, outward along its vertex normals.
+  static Moved Queried(const Manifold::Impl& m, double tol) {
+    return Moved(m, {}, tol / 4, vec3(0.0));
+  }
+  // The points or the ray of a query, which don't move.
+  static Moved Still(const Manifold::Impl& m) {
+    return Moved(m, {}, 0, vec3(0.0));
+  }
+
+  vec3 operator[](int vert) const {
+    if (scale_ == 0) return mesh_.vertPos_[vert] + shift_;
+    const vec3 dir = disp_.empty() ? mesh_.vertNormal_[vert] : disp_[vert];
+    return mesh_.vertPos_[vert] + scale_ * dir + shift_;
+  }
+
+ private:
+  Moved(const Manifold::Impl& mesh, Vec<vec3> disp, double scale, vec3 shift)
+      : mesh_(mesh), disp_(std::move(disp)), scale_(scale), shift_(shift) {}
+
+  const Manifold::Impl& mesh_;
+  Vec<vec3> disp_;  // empty: along the vertex normals
+  double scale_;
+  vec3 shift_;
+};
+
 struct FaceEdge {
   int edge;
   int start;
@@ -63,35 +159,44 @@ inline void LoadFaceEdges(const Halfedges& halfedges, int tri,
   }
 }
 
-template <bool expandP, bool forward>
+// p < q, where p belongs to P and q to Q. At a tie the two are taken as
+// equal, and the moves decide: by how much each changes. Not movedP < movedQ:
+// the moves are a fraction of tol, so a real gap inside tol could outweigh
+// them, and values within tol would no longer count as equal, which breaks
+// Precision2 and PointWithinToleranceOfCoincidentEdge among others.
+inline bool Shadows(double p, double q, double movedP, double movedQ,
+                    double tol) {
+  return std::abs(p - q) > tol ? p < q : movedP - p < movedQ - q;
+}
+
+template <bool forward>
 inline std::pair<int, vec2> Shadow01(const int a0, const int b1, const int b1s,
                                      const int b1e, const Manifold::Impl& inA,
-                                     const Manifold::Impl& inB) {
+                                     const Manifold::Impl& inB, const Moved& mA,
+                                     const Moved& mB) {
   const double a0x = inA.vertPos_[a0].x;
   const double b1sx = inB.vertPos_[b1s].x;
   const double b1ex = inB.vertPos_[b1e].x;
-  const double a0xp = inA.vertNormal_[a0].x;
-  const double b1sxp = inB.vertNormal_[b1s].x;
-  const double b1exp = inB.vertNormal_[b1e].x;
   const double tol = TieTol(inA, inB);
-  int s01 = forward
-                ? Shadows(a0x, b1ex, withSign(expandP, a0xp) - b1exp, tol) -
-                      Shadows(a0x, b1sx, withSign(expandP, a0xp) - b1sxp, tol)
-                : Shadows(b1sx, a0x, withSign(expandP, b1sxp) - a0xp, tol) -
-                      Shadows(b1ex, a0x, withSign(expandP, b1exp) - a0xp, tol);
+  const double ma0x = mA[a0].x;
+  int s01 = forward ? Shadows(a0x, b1ex, ma0x, mB[b1e].x, tol) -
+                          Shadows(a0x, b1sx, ma0x, mB[b1s].x, tol)
+                    : Shadows(b1sx, a0x, mB[b1s].x, ma0x, tol) -
+                          Shadows(b1ex, a0x, mB[b1e].x, ma0x, tol);
   vec2 yz01(NAN);
 
   if (s01 != 0) {
     yz01 = Interpolate(inB.vertPos_[b1s], inB.vertPos_[b1e], a0x, tol);
-    const int b1pair = inB.halfedge_.Pair(b1);
-    const double dir =
-        inB.faceNormal_[b1 / 3].y + inB.faceNormal_[b1pair / 3].y;
-    if (forward) {
-      if (!Shadows(inA.vertPos_[a0].y, yz01[0], -dir, tol)) s01 = 0;
-    } else {
-      if (!Shadows(yz01[0], inA.vertPos_[a0].y, withSign(expandP, dir), tol))
-        s01 = 0;
+    const double ay = inA.vertPos_[a0].y;
+    double y = yz01[0], may = ay, myz = yz01[0];
+    if (std::abs(ay - yz01[0]) <= tol) {
+      y = InterpolateLine(inB.vertPos_[b1s], inB.vertPos_[b1e], a0x)[0];
+      may = mA[a0].y;
+      myz = InterpolateLine(mB[b1s], mB[b1e], ma0x)[0];
     }
+    if (forward ? !Shadows(ay, y, may, myz, tol)
+                : !Shadows(y, ay, myz, may, tol))
+      s01 = 0;
   }
   return std::make_pair(s01, yz01);
 }
@@ -100,6 +205,8 @@ template <bool expandP>
 struct Kernel11 {
   const Manifold::Impl& inP;
   const Manifold::Impl& inQ;
+  const Moved& mP;
+  const Moved& mQ;
 
   std::pair<int, vec4> operator()(int p1, int p1s, int p1e, int q1, int q1s,
                                   int q1e) {
@@ -113,11 +220,14 @@ struct Kernel11 {
     // intersection is between the left and right.
     bool shadows = false;
     s11 = 0;
+    // which vertex each of pRL/qRL came from, P's (true) or Q's
+    int vertRL[2];
+    bool ofPRL[2];
 
     const int p0[2] = {p1s, p1e};
     for (int i : {0, 1}) {
       const auto [s01, yz01] =
-          Shadow01<expandP, true>(p0[i], q1, q1s, q1e, inP, inQ);
+          Shadow01<true>(p0[i], q1, q1s, q1e, inP, inQ, mP, mQ);
       // If the value is NaN, then these do not overlap.
       if (std::isfinite(yz01[0])) {
         s11 += s01 * (i == 0 ? -1 : 1);
@@ -125,6 +235,8 @@ struct Kernel11 {
           shadows = s01 != 0;
           pRL[k] = inP.vertPos_[p0[i]];
           qRL[k] = vec3(pRL[k].x, yz01.x, yz01.y);
+          vertRL[k] = p0[i];
+          ofPRL[k] = true;
           ++k;
         }
       }
@@ -133,7 +245,7 @@ struct Kernel11 {
     const int q0[2] = {q1s, q1e};
     for (int i : {0, 1}) {
       const auto [s10, yz10] =
-          Shadow01<expandP, false>(q0[i], p1, p1s, p1e, inQ, inP);
+          Shadow01<false>(q0[i], p1, p1s, p1e, inQ, inP, mQ, mP);
       // If the value is NaN, then these do not overlap.
       if (std::isfinite(yz10[0])) {
         s11 += s10 * (i == 0 ? -1 : 1);
@@ -141,6 +253,8 @@ struct Kernel11 {
           shadows = s10 != 0;
           qRL[k] = inQ.vertPos_[q0[i]];
           pRL[k] = vec3(qRL[k].x, yz10.x, yz10.y);
+          vertRL[k] = q0[i];
+          ofPRL[k] = false;
           ++k;
         }
       }
@@ -152,15 +266,29 @@ struct Kernel11 {
       DEBUG_ASSERT(k == 2, logicErr, "Boolean manifold error: s11");
       const double tol = TieTol(inP, inQ);
       xyzz11 = Intersect(pRL[0], pRL[1], qRL[0], qRL[1], tol);
-
-      const int p1pair = inP.halfedge_.Pair(p1);
-      const double dirP =
-          inP.faceNormal_[p1 / 3].z + inP.faceNormal_[p1pair / 3].z;
-      const int q1pair = inQ.halfedge_.Pair(q1);
-      const double dirQ =
-          inQ.faceNormal_[q1 / 3].z + inQ.faceNormal_[q1pair / 3].z;
-      if (!Shadows(xyzz11.z, xyzz11.w, withSign(expandP, dirP) - dirQ, tol))
-        s11 = 0;
+      double z = xyzz11.z, w = xyzz11.w, mz = z, mw = w;
+      if (std::abs(z - w) <= tol) {
+        // the crossing as it is and as moved, by the same formula
+        vec3 mpRL[2], mqRL[2];
+        for (const int j : {0, 1}) {
+          if (ofPRL[j]) {
+            mpRL[j] = mP[vertRL[j]];
+            const vec2 yz = InterpolateLine(mQ[q1s], mQ[q1e], mpRL[j].x);
+            mqRL[j] = vec3(mpRL[j].x, yz.x, yz.y);
+          } else {
+            mqRL[j] = mQ[vertRL[j]];
+            const vec2 yz = InterpolateLine(mP[p1s], mP[p1e], mqRL[j].x);
+            mpRL[j] = vec3(mqRL[j].x, yz.x, yz.y);
+          }
+        }
+        const vec2 zw = IntersectZ(pRL[0], pRL[1], qRL[0], qRL[1]);
+        const vec2 mzw = IntersectZ(mpRL[0], mpRL[1], mqRL[0], mqRL[1]);
+        z = zw[0];
+        w = zw[1];
+        mz = mzw[0];
+        mw = mzw[1];
+      }
+      if (!Shadows(z, w, mz, mw, tol)) s11 = 0;
     }
 
     return std::make_pair(s11, xyzz11);
@@ -171,6 +299,8 @@ template <bool expandP, bool forward>
 struct Kernel02 {
   const Manifold::Impl& inA;
   const Manifold::Impl& inB;
+  const Moved& mA;
+  const Moved& mB;
 
   std::pair<int, double> operator()(int a0, int b2) {
     FaceEdge edgeB[3];
@@ -188,10 +318,12 @@ struct Kernel02 {
     // Either the left or right must shadow, but not both. This ensures the
     // intersection is between the left and right.
     bool shadows = false;
+    // which of the face's edges each of yzzRL came from
+    int edgeRL[2];
 
     for (const int i : {0, 1, 2}) {
-      const auto syz01 = Shadow01<expandP, forward>(
-          a0, edgeB[i].edge, edgeB[i].start, edgeB[i].end, inA, inB);
+      const auto syz01 = Shadow01<forward>(a0, edgeB[i].edge, edgeB[i].start,
+                                           edgeB[i].end, inA, inB, mA, mB);
       const int s01 = syz01.first;
       const vec2 yz01 = syz01.second;
       // If the value is NaN, then these do not overlap.
@@ -199,6 +331,7 @@ struct Kernel02 {
         s02 += s01 * (forward == edgeB[i].isForward ? -1 : 1);
         if (k < 2 && (k == 0 || (s01 != 0) != shadows)) {
           shadows = s01 != 0;
+          edgeRL[k] = i;
           yzzRL[k++] = vec3(yz01[0], yz01[1], yz01[1]);
         }
       }
@@ -211,13 +344,27 @@ struct Kernel02 {
       vec3 vertPosA = inA.vertPos_[a0];
       const double tol = TieTol(inA, inB);
       z02 = Interpolate(yzzRL[0], yzzRL[1], vertPosA.y, tol)[1];
-      if (forward) {
-        if (!Shadows(vertPosA.z, z02, -inB.faceNormal_[b2].z, tol)) s02 = 0;
-      } else {
-        if (!Shadows(z02, vertPosA.z, withSign(expandP, inB.faceNormal_[b2].z),
-                     tol))
-          s02 = 0;
+      double z = z02, maz = vertPosA.z, mz02 = z02;
+      if (std::abs(vertPosA.z - z02) <= tol) {
+        // the face's z under the vertex as it is and as moved, by the same
+        // formula
+        const vec3 ma = mA[a0];
+        vec3 zRL[2], mzRL[2];
+        for (const int j : {0, 1}) {
+          const FaceEdge& e = edgeB[edgeRL[j]];
+          const vec2 yz = InterpolateLine(inB.vertPos_[e.start],
+                                          inB.vertPos_[e.end], vertPosA.x);
+          const vec2 myz = InterpolateLine(mB[e.start], mB[e.end], ma.x);
+          zRL[j] = vec3(yz[0], yz[1], yz[1]);
+          mzRL[j] = vec3(myz[0], myz[1], myz[1]);
+        }
+        z = InterpolateLine(zRL[0], zRL[1], vertPosA.y)[1];
+        maz = ma.z;
+        mz02 = InterpolateLine(mzRL[0], mzRL[1], ma.y)[1];
       }
+      if (forward ? !Shadows(vertPosA.z, z, maz, mz02, tol)
+                  : !Shadows(z, vertPosA.z, mz02, maz, tol))
+        s02 = 0;
     }
     return std::make_pair(s02, z02);
   }
@@ -356,6 +503,7 @@ struct Kernel12Recorder {
 
 template <bool expandP, bool forward>
 Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
+                           const Moved& mP, const Moved& mQ,
                            ExecutionContext::Impl* ctx) {
   ZoneScoped;
   // Invariant: every ctx-passing parallel op is followed by IsCancelled to
@@ -364,18 +512,21 @@ Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   const Manifold::Impl& a = forward ? inP : inQ;
   const Manifold::Impl& b = forward ? inQ : inP;
 
-  Kernel02<expandP, forward> k02{a, b};
-  Kernel11<expandP> k11{inP, inQ};
+  Kernel02<expandP, forward> k02{a, b, forward ? mP : mQ, forward ? mQ : mP};
+  Kernel11<expandP> k11{inP, inQ, mP, mQ};
 
   Kernel12<expandP, forward> k12{a, b, k02, k11};
   Kernel12Recorder<expandP, forward> recorder{k12, {}};
   const double tol = TieTol(inP, inQ);
+  // Ties shift comparisons by up to tol, so a pair can interact a little
+  // beyond tol once rounding is counted. Twice tol strictly contains that.
   auto f = [&a, tol](int i) {
     const int start = a.halfedge_.Start(i);
     const int end = a.halfedge_.End(i);
-    return start < end ? Box(la::min(a.vertPos_[start], a.vertPos_[end]) - tol,
-                             la::max(a.vertPos_[start], a.vertPos_[end]) + tol)
-                       : Box();
+    return start < end
+               ? Box(la::min(a.vertPos_[start], a.vertPos_[end]) - 2 * tol,
+                     la::max(a.vertPos_[start], a.vertPos_[end]) + 2 * tol)
+               : Box();
   };
   b.collider_.Collisions<false>(recorder, f, a.halfedge_.size(), true, ctx);
   if (IsCancelled(ctx)) return Intersections{};
@@ -400,15 +551,17 @@ Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
 template <bool forward>
 Intersections Intersect12(const Manifold::Impl& inP, const Manifold::Impl& inQ,
-                          bool expandP, ExecutionContext::Impl* ctx) {
+                          const Moved& mP, const Moved& mQ, bool expandP,
+                          ExecutionContext::Impl* ctx) {
   if (expandP)
-    return Intersect12_<true, forward>(inP, inQ, ctx);
+    return Intersect12_<true, forward>(inP, inQ, mP, mQ, ctx);
   else
-    return Intersect12_<false, forward>(inP, inQ, ctx);
+    return Intersect12_<false, forward>(inP, inQ, mP, mQ, ctx);
 }
 
 template <bool expandP, bool forward>
 Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
+                    const Moved& mP, const Moved& mQ,
                     const VecView<std::array<int, 2>> p1q2,
                     ExecutionContext::Impl* ctx) {
   ZoneScoped;
@@ -459,7 +612,7 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   for (size_t c : components) verts.push_back(static_cast<int>(c));
 
   Vec<int> w03(a.NumVert(), 0);
-  Kernel02<expandP, forward> k02{a, b};
+  Kernel02<expandP, forward> k02{a, b, forward ? mP : mQ, forward ? mQ : mP};
   auto recorderf = [&](int i, int b) {
     const auto [s02, z02] = k02(verts[i], b);
     // note that i is distinct on each thread, and verts contains unique
@@ -468,7 +621,9 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   };
   auto recorder = MakeSimpleRecorder(recorderf);
   const double tol = TieTol(inP, inQ);
-  auto f = [&](int i) { return VerticalQueryBox(a.vertPos_[verts[i]], tol); };
+  auto f = [&](int i) {
+    return VerticalQueryBox(a.vertPos_[verts[i]], 2 * tol);
+  };
   b.collider_.Collisions<false>(recorder, f, verts.size(), true, ctx);
   if (IsCancelled(ctx)) return Vec<int>{};
   // flood fill
@@ -484,12 +639,13 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
 template <bool forward>
 Vec<int> Winding03(const Manifold::Impl& inP, const Manifold::Impl& inQ,
+                   const Moved& mP, const Moved& mQ,
                    const VecView<std::array<int, 2>> p1q2, bool expandP,
                    ExecutionContext::Impl* ctx) {
   if (expandP)
-    return Winding03_<true, forward>(inP, inQ, p1q2, ctx);
+    return Winding03_<true, forward>(inP, inQ, mP, mQ, p1q2, ctx);
   else
-    return Winding03_<false, forward>(inP, inQ, p1q2, ctx);
+    return Winding03_<false, forward>(inP, inQ, mP, mQ, p1q2, ctx);
 }
 }  // namespace
 
@@ -513,7 +669,8 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
   const double tol = TieTol(inP, inQ);
   if (inP.IsEmpty() || inQ.IsEmpty() ||
-      !Box(inP.bBox_.min - tol, inP.bBox_.max + tol).DoesOverlap(inQ.bBox_)) {
+      !Box(inP.bBox_.min - 2 * tol, inP.bBox_.max + 2 * tol)
+           .DoesOverlap(inQ.bBox_)) {
     PRINT("No overlap, early out");
     w03_.resize(inP.NumVert(), 0);
     w30_.resize(inQ.NumVert(), 0);
@@ -530,18 +687,22 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   intersect12P.Start();
 #endif
 
+  // the moved verts that decide ties
+  const Moved mP = Moved::P(inP, tol, expandP_);
+  const Moved mQ = Moved::Q(inQ, tol);
+
   // Level 3
   // Build up the intersection of the edges and triangles, keeping only those
   // that intersect, and record the direction the edge is passing through the
   // triangle.
   if (IsCancelled(ctx_)) return;
-  xv12_ = Intersect12<true>(inP, inQ, expandP_, ctx_);
+  xv12_ = Intersect12<true>(inP, inQ, mP, mQ, expandP_, ctx_);
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   intersect12P.Stop();
   intersect12Q.Start();
 #endif
   if (IsCancelled(ctx_)) return;
-  xv21_ = Intersect12<false>(inP, inQ, expandP_, ctx_);
+  xv21_ = Intersect12<false>(inP, inQ, mP, mQ, expandP_, ctx_);
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   intersect12Q.Stop();
 #endif
@@ -557,13 +718,13 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   winding03P.Start();
 #endif
   if (IsCancelled(ctx_)) return;
-  w03_ = Winding03<true>(inP, inQ, xv12_.p1q2, expandP_, ctx_);
+  w03_ = Winding03<true>(inP, inQ, mP, mQ, xv12_.p1q2, expandP_, ctx_);
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
   winding03P.Stop();
   winding03Q.Start();
 #endif
   if (IsCancelled(ctx_)) return;
-  w30_ = Winding03<false>(inP, inQ, xv21_.p1q2, expandP_, ctx_);
+  w30_ = Winding03<false>(inP, inQ, mP, mQ, xv21_.p1q2, expandP_, ctx_);
   // No trailing check: Winding03_ already returns empty on cancel and
   // Boolean3::Result re-checks on entry.
 
@@ -607,7 +768,10 @@ Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
   // forward=true: project along +Z to count signed face crossings above each
   // point. The query box spans all Z and is widened by epsilon_ in XY,
   // so all faces with XY overlap within tolerance are returned regardless of Z.
-  Kernel02<false, true> k02{pointImpl, *this};
+  const double tol = epsilon_;
+  const Moved still = Moved::Still(pointImpl);
+  const Moved moved = Moved::Queried(*this, tol);
+  Kernel02<false, true> k02{pointImpl, *this, still, moved};
   auto recorderf = [&](int localIdx, int tri) {
     const auto [s02, z02] = k02(localIdx, tri);
     if (std::isfinite(z02)) winding[query2input[localIdx]] += s02;
@@ -654,8 +818,10 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
   // expandP=false with zero vertNormal means the ray-side perturbation is
   // zero. forward=true means we project along +Z for the lower-dimensional
   // kernel cascade (Shadow01 → Kernel02 → Kernel11 → Kernel12).
-  Kernel02<false, true> k02{rayImpl, *this};
-  Kernel11<false> k11{rayImpl, *this};
+  const Moved still = Moved::Still(rayImpl);
+  const Moved moved = Moved::Queried(*this, epsilon_);
+  Kernel02<false, true> k02{rayImpl, *this, still, moved};
+  Kernel11<false> k11{rayImpl, *this, still, moved};
   Kernel12<false, true> k12{rayImpl, *this, k02, k11};
 
   // Use the component with largest magnitude for stable t computation.
@@ -675,7 +841,9 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
       // Compute parametric t ∈ [0,1] along the ray segment.
       const double t = (v[tAxis] - origin[tAxis]) / dir[tAxis];
       if (t >= 0.0 && t <= 1.0) {
-        hits.push_back({static_cast<uint64_t>(tri), t, v, faceNormal_[tri]});
+        // Kernel12's sign is negative where the ray enters the solid.
+        hits.push_back(
+            {static_cast<uint64_t>(tri), t, v, faceNormal_[tri], -s});
       }
     }
   };
@@ -683,8 +851,11 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
   auto f = [&rayBox](int) { return rayBox; };
   collider_.Collisions<false>(recorder, f, 1, false);
 
+  // Break distance ties by faceID so the order doesn't depend on the
+  // std::sort implementation, e.g. for canceling hits at a grazed vertex.
   std::sort(hits.begin(), hits.end(), [](const RayHit& a, const RayHit& b) {
-    return a.distance < b.distance;
+    return a.distance != b.distance ? a.distance < b.distance
+                                    : a.faceID < b.faceID;
   });
   return hits;
 }
