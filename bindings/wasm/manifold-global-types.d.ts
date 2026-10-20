@@ -104,7 +104,8 @@ export type RayHit = {
   faceID: number,
   distance: number,
   position: Vec3,
-  normal: Vec3
+  normal: Vec3,
+  crossing: number
 };
 
 export type JoinType = 'Square'|'Round'|'Miter'|'Bevel';

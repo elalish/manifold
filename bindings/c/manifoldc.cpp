@@ -845,7 +845,8 @@ size_t manifold_ray_hit_vec_length(ManifoldRayHitVec* v) {
 
 ManifoldRayHit manifold_ray_hit_vec_get(ManifoldRayHitVec* v, size_t idx) {
   const auto& hit = (*from_c(v))[idx];
-  return {hit.faceID, hit.distance, to_c(hit.position), to_c(hit.normal)};
+  return {hit.faceID, hit.distance, to_c(hit.position), to_c(hit.normal),
+          hit.crossing};
 }
 
 int manifold_winding_number(ManifoldManifold* m, double x, double y, double z) {
