@@ -69,7 +69,7 @@ inline double withSign(bool pos, double v) { return pos ? v : -v; }
 inline vec2 Interpolate(vec3 aL, vec3 aR, double x, double tol = 0) {
   const double clamped =
       la::clamp(x, std::min(aL.x, aR.x), std::max(aL.x, aR.x));
-  DEBUG_ASSERT(std::abs(clamped - x) <= tol, logicErr,
+  DEBUG_ASSERT(std::abs(clamped - x) <= 2 * tol, logicErr,
                "Boolean manifold error: not in domain");
   x = clamped;
 
@@ -101,12 +101,13 @@ inline vec4 Intersect(const vec3& aL, const vec3& aR, vec3 bL, vec3 bR,
 
   const double dyL = bL.y - aL.y;
   const double dyR = bR.y - aR.y;
-  DEBUG_ASSERT(dyL * dyR <= 0, logicErr,
-               "Boolean manifold error: no intersection");
+  DEBUG_ASSERT(dyL * dyR <= 0 || std::min(fabs(dyL), fabs(dyR)) <= 2 * tol,
+               logicErr, "Boolean manifold error: no intersection");
   const bool useL = fabs(dyL) < fabs(dyR);
   const double dx = aR.x - aL.x;
   double lambda = (useL ? dyL : dyR) / (dyL - dyR);
   if (!std::isfinite(lambda)) lambda = 0.0;
+  lambda = useL ? la::clamp(lambda, 0.0, 1.0) : la::clamp(lambda, -1.0, 0.0);
   vec4 xyzz;
   xyzz.x = lambda * dx + (useL ? aL.x : aR.x);
   const double aDy = aR.y - aL.y;

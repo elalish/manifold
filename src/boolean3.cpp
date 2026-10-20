@@ -370,12 +370,15 @@ Intersections Intersect12_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   Kernel12<expandP, forward> k12{a, b, k02, k11};
   Kernel12Recorder<expandP, forward> recorder{k12, {}};
   const double tol = TieTol(inP, inQ);
+  // Ties shift comparisons by up to tol, so a pair can interact a little
+  // beyond tol once rounding is counted. Twice tol strictly contains that.
   auto f = [&a, tol](int i) {
     const int start = a.halfedge_.Start(i);
     const int end = a.halfedge_.End(i);
-    return start < end ? Box(la::min(a.vertPos_[start], a.vertPos_[end]) - tol,
-                             la::max(a.vertPos_[start], a.vertPos_[end]) + tol)
-                       : Box();
+    return start < end
+               ? Box(la::min(a.vertPos_[start], a.vertPos_[end]) - 2 * tol,
+                     la::max(a.vertPos_[start], a.vertPos_[end]) + 2 * tol)
+               : Box();
   };
   b.collider_.Collisions<false>(recorder, f, a.halfedge_.size(), true, ctx);
   if (IsCancelled(ctx)) return Intersections{};
@@ -468,7 +471,9 @@ Vec<int> Winding03_(const Manifold::Impl& inP, const Manifold::Impl& inQ,
   };
   auto recorder = MakeSimpleRecorder(recorderf);
   const double tol = TieTol(inP, inQ);
-  auto f = [&](int i) { return VerticalQueryBox(a.vertPos_[verts[i]], tol); };
+  auto f = [&](int i) {
+    return VerticalQueryBox(a.vertPos_[verts[i]], 2 * tol);
+  };
   b.collider_.Collisions<false>(recorder, f, verts.size(), true, ctx);
   if (IsCancelled(ctx)) return Vec<int>{};
   // flood fill
@@ -509,7 +514,8 @@ Boolean3::Boolean3(const Manifold::Impl& inP, const Manifold::Impl& inQ,
 
   const double tol = TieTol(inP, inQ);
   if (inP.IsEmpty() || inQ.IsEmpty() ||
-      !Box(inP.bBox_.min - tol, inP.bBox_.max + tol).DoesOverlap(inQ.bBox_)) {
+      !Box(inP.bBox_.min - 2 * tol, inP.bBox_.max + 2 * tol)
+           .DoesOverlap(inQ.bBox_)) {
     PRINT("No overlap, early out");
     w03_.resize(inP.NumVert(), 0);
     w30_.resize(inQ.NumVert(), 0);
