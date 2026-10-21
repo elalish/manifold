@@ -1111,8 +1111,8 @@ TEST(Boolean, Offset) {
   Manifold fat = cutout.Offset(5);
   Manifold thin = cutout.Offset(-3);
   EXPECT_EQ(fat.Genus(), cutout.Genus());
-  EXPECT_FLOAT_EQ(fat.Volume(), 569437.62);
-  EXPECT_FLOAT_EQ(fat.SurfaceArea(), 82709.375);
+  EXPECT_FLOAT_EQ(fat.Volume(), 569431.56);
+  EXPECT_FLOAT_EQ(fat.SurfaceArea(), 82706.828);
   EXPECT_EQ(thin.Genus(), cutout.Genus());
   EXPECT_FLOAT_EQ(thin.Volume(), 63886.531);
   EXPECT_FLOAT_EQ(thin.SurfaceArea(), 32371.498);

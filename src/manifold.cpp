@@ -1239,7 +1239,10 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
 
   // Find convex edges and vertices
   std::vector<int> convexEdges;
-  std::vector<bool> vertConvex(numVert, false);
+  struct ConvexEdgeInfo {
+    vec3 dir, normal0, normal1;
+  };
+  std::vector<std::vector<ConvexEdgeInfo>> vertConvexEdges(numVert);
   std::vector<bool> vertSharp(numVert, false);
   std::vector<bool> halfedgeSharp(pImpl->halfedge_.size(), false);
 
@@ -1266,14 +1269,32 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
 
     if (convexity > 0) {
       convexEdges.push_back(idx);
-      vertConvex[edge.startVert] = true;
-      vertConvex[edge.endVert] = true;
+      const vec3 dir = la::normalize(edgeVec);
+      vertConvexEdges[edge.startVert].push_back({dir, normal0, normal1});
+      vertConvexEdges[edge.endVert].push_back({-dir, normal0, normal1});
     }
   }
 
+  // The edge cylinders leave part of the sphere uncovered only when a vertex
+  // has a convex edge and every pair of them bends convexly.
+  const double sign = inset ? -1.0 : 1.0;
+  const double sinTol = std::sin(minDihedral);
   std::vector<int> convexVerts;
-  for (size_t i = 0; i < vertConvex.size(); i++) {
-    if (vertConvex[i]) convexVerts.push_back(i);
+  for (int i = 0; i < numVert; i++) {
+    const auto& edges = vertConvexEdges[i];
+    if (edges.empty()) continue;
+    bool allConvex = true;
+    for (size_t a = 0; a < edges.size() && allConvex; a++) {
+      for (size_t b = 0; b < edges.size(); b++) {
+        if (a == b) continue;
+        if (sign * la::dot(edges[b].dir, edges[a].normal0) > -sinTol &&
+            sign * la::dot(edges[b].dir, edges[a].normal1) > -sinTol) {
+          allConvex = false;
+          break;
+        }
+      }
+    }
+    if (allConvex) convexVerts.push_back(i);
   }
 
   // Sharp edges (of either sign) split a vertex's faces into sets; the normal
@@ -1286,23 +1307,18 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
   std::vector<vec3> faceSetNormal(pImpl->halfedge_.size(), vec3(0.0));
   for (int h = 0; h < static_cast<int>(halfedgeSharp.size()); h++) {
     if (!halfedgeSharp[h]) continue;
-    vec3 normal(0.0);
     int e = h;
     while (true) {
-      const vec3 start = pImpl->vertPos_[pImpl->halfedge_.Start(e)];
-      const vec3 currEdge =
-          la::normalize(pImpl->vertPos_[pImpl->halfedge_.End(e)] - start);
-      const vec3 prevEdge = la::normalize(
-          start - pImpl->vertPos_[pImpl->halfedge_.End(NextHalfedge(e))]);
-      if (la::isfinite(currEdge[0]) && la::isfinite(prevEdge[0])) {
-        const double dot = -la::dot(prevEdge, currEdge);
-        const double phi = dot >= 1 ? 0 : (dot <= -1 ? kPi : std::acos(dot));
-        normal += phi * pImpl->faceNormal_[e / 3];
-      }
-      if (halfedgeSharp[prev(e)]) break;
       e = pImpl->halfedge_.Pair(prev(e));
+      if (halfedgeSharp[e]) break;
     }
-    faceSetNormal[h] = SafeNormalize(normal);
+    // e is the other sharp edge from h.
+    const vec3 start = pImpl->vertPos_[pImpl->halfedge_.Start(h)];
+    const vec3 edgeA = pImpl->vertPos_[pImpl->halfedge_.End(h)] - start;
+    const vec3 edgeB = pImpl->vertPos_[pImpl->halfedge_.Start(e)] - start;
+    const vec3 crossN = la::normalize(la::cross(edgeB, edgeA));
+    faceSetNormal[h] =
+        la::isfinite(crossN[0]) ? crossN : pImpl->faceNormal_[h / 3];
   }
 
   auto cornerNormal = [&](int corner) {
