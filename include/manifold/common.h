@@ -188,9 +188,9 @@ struct RayHit {
  *
  * Attach to a Manifold via Manifold::WithContext(ctx); the next *eager* op
  * invoked on the result (Status, Refine / RefineToLength / RefineToTolerance,
- * Hull, MinkowskiSum / MinkowskiDifference) snapshots the ctx and reports
- * progress and observes cancellation through it. Safe to read/write from any
- * thread.
+ * Hull, Offset, MinkowskiSum / MinkowskiDifference) snapshots the ctx and
+ * reports progress and observes cancellation through it. Safe to read/write
+ * from any thread.
  *
  * Copyable and movable: copies share the same underlying state via a
  * shared_ptr, so one thread can evaluate while another holds a copy and
