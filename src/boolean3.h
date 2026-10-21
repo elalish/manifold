@@ -66,6 +66,7 @@ class Boolean3 {
   const bool expandP_;
   Intersections xv12_, xv21_;
   Vec<int> w03_, w30_;
+  double tol_;
   bool valid = true;
   ExecutionContext::Impl* ctx_ = nullptr;
 };

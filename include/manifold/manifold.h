@@ -156,8 +156,9 @@ class Manifold {
   /// Returns a copy of this Manifold with the given ExecutionContext attached.
   /// The attachment is consumed only by `Status()` (for deferred CSG trees)
   /// and the eager ops (`Refine` / `RefineToLength` / `RefineToTolerance`,
-  /// `Hull`, `MinkowskiSum` / `MinkowskiDifference`); those snapshot the ctx
-  /// and report progress / observe cancellation through it. Other queries
+  /// `Hull`, `Offset`, `MinkowskiSum` / `MinkowskiDifference`); those
+  /// snapshot the ctx and report progress / observe cancellation through it.
+  /// Other queries
   /// that force evaluation (`Volume`, `GetMeshGL`, `BoundingBox`, etc.) do
   /// not currently observe attached ctx.
   ///
@@ -241,6 +242,7 @@ class Manifold {
   std::pair<Manifold, Manifold> SplitByPlane(vec3 normal,
                                              double originOffset) const;
   Manifold TrimByPlane(vec3 normal, double originOffset) const;
+  Manifold Offset(double delta, int circularSegments = 0) const;
   Manifold MinkowskiSum(const Manifold&) const;
   Manifold MinkowskiDifference(const Manifold&) const;
   ///@}

@@ -1104,6 +1104,57 @@ TEST(Boolean, BatchBoolean) {
   EXPECT_FLOAT_EQ(subtract.SurfaceArea(), 14904.597);
 }
 
+TEST(Boolean, Offset) {
+  ManifoldParamGuard guard;
+  ManifoldParams().processOverlaps = true;
+  Manifold cutout = Manifold::Cube(vec3(100), true) - Manifold::Sphere(60, 50);
+  Manifold fat = cutout.Offset(5);
+  Manifold thin = cutout.Offset(-3);
+  EXPECT_EQ(fat.Genus(), cutout.Genus());
+  EXPECT_FLOAT_EQ(fat.Volume(), 569431.56);
+  EXPECT_FLOAT_EQ(fat.SurfaceArea(), 82706.828);
+  EXPECT_EQ(thin.Genus(), cutout.Genus());
+  EXPECT_FLOAT_EQ(thin.Volume(), 63886.531);
+  EXPECT_FLOAT_EQ(thin.SurfaceArea(), 32371.498);
+
+  if (options.exportModels) {
+    WriteTestOBJ("offset_fat.obj", fat);
+    WriteTestOBJ("offset_thin.obj", thin);
+  }
+}
+
+TEST(Boolean, Offset1) {
+  Manifold rounded =
+      Manifold::Cube(vec3(1), true).Rotate(180, 0, 0).Offset(0.25, 32);
+  EXPECT_EQ(rounded.Genus(), 0);
+  EXPECT_FLOAT_EQ(rounded.Volume(), 3.1492589);
+  EXPECT_FLOAT_EQ(rounded.SurfaceArea(), 11.480652);
+  const Box bbox = rounded.BoundingBox();
+  EXPECT_FLOAT_EQ(bbox.max.x, 0.75);
+  EXPECT_FLOAT_EQ(bbox.min.x, -0.75);
+  EXPECT_FLOAT_EQ(bbox.max.y, 0.75);
+  EXPECT_FLOAT_EQ(bbox.min.y, -0.75);
+  EXPECT_FLOAT_EQ(bbox.max.z, 0.75);
+  EXPECT_FLOAT_EQ(bbox.min.z, -0.75);
+  if (options.exportModels) {
+    WriteTestOBJ("offset1.obj", rounded);
+  }
+}
+
+TEST(Boolean, Offset2) {
+  SimplePolygon sq = {{1, -0.25}, {1.5, -0.25}, {1.5, 0.25}, {1, 0.25}};
+  Manifold rounded =
+      Manifold::Revolve({sq}, 6).Rotate(10, 25, 40).Offset(-0.1, 16);
+  // 2 components, one with 4 triangles, area 0.076, volume ~0
+
+  EXPECT_EQ(rounded.Genus(), 1);
+  EXPECT_FLOAT_EQ(rounded.Volume(), 0.52548647);
+  EXPECT_FLOAT_EQ(rounded.SurfaceArea(), 7.9869018);
+  if (options.exportModels) {
+    WriteTestOBJ("offset2.obj", rounded);
+  }
+}
+
 namespace {
 // Convex face pieces, as lists of x, y, z corners, swept by a cube of the
 // given half-size (a Minkowski sum of a voxel shape's faces, which is full of
