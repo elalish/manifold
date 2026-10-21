@@ -1201,7 +1201,10 @@ double Manifold::MinGap(const Manifold& other, double searchLength) const {
 }
 
 /**
- * Inflate the Manifold by the specified delta, rounding convex vertices.
+ * Inflate the Manifold by the specified delta, rounding convex vertices. Unlike
+ * Minkowski, this will not add faces on edges less bent than facets of the
+ * requested cylinder resolution. Due to this and other optimizations, Offset is
+ * much faster than an equivalent Minkowski sum with a sphere.
  *
  * @param delta Positive deltas will add volume to all surfaces of the Manifold,
  * dilating it. Negative deltas will have the opposite effect, eroding it.
@@ -1209,13 +1212,18 @@ double Manifold::MinGap(const Manifold& other, double searchLength) const {
  * vertices. Default is calculated by the static Quality defaults according to
  * the radius, which is delta.
  */
-/**
- * Simple offset implementation using cylinders on convex edges and spheres
- * on convex vertices. Based on PR #668.
- */
 Manifold Manifold::Offset(double delta, int circularSegments) const {
-  auto pImpl = GetCsgLeafNode().GetImpl();
+  auto ctx = AtomicLoadShared(&ctx_);
+  auto pImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (pImpl->status_ != Error::NoError) return PropagateStatus(pImpl->status_);
+  if (IsCancelled(ctx.get())) return PropagateStatus(Error::Cancelled);
+
+  // Force ctx-observed evaluation so a cancel fires inside the Boolean.
+  auto evalBatch = [&ctx](const std::vector<Manifold>& items, OpType op) {
+    Manifold tree = BatchBoolean(items, op);
+    tree.GetCsgLeafNode(ctx.get());
+    return tree;
+  };
 
   const bool inset = delta < 0;
   const double radius = std::abs(delta);
@@ -1320,7 +1328,10 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
     batch[tri] = MakePrism(innerPos, outerPos, origIdx);
   }
 
-  const Manifold faces = BatchBoolean(batch, OpType::Add);
+  if (IsCancelled(ctx.get())) return PropagateStatus(Error::Cancelled);
+
+  const Manifold faces = evalBatch(batch, OpType::Add);
+  if (IsCancelled(ctx.get())) return PropagateStatus(Error::Cancelled);
 
   std::vector<Manifold> batch2(convexEdges.size() + convexVerts.size() + 1);
 
@@ -1370,13 +1381,18 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
 
   batch2.back() = faces;
 
-  Manifold shell = BatchBoolean(batch2, OpType::Add);
-  if (shell.Status() != Manifold::Error::NoError) {  // force evaluation
+  Manifold shell = evalBatch(batch2, OpType::Add);
+  const auto shellStatus = shell.GetCsgLeafNode(ctx.get()).GetImpl()->status_;
+  if (IsCancelled(ctx.get())) return PropagateStatus(Error::Cancelled);
+  if (shellStatus != Manifold::Error::NoError) {
     ASSERT(false, "Offset shell boolean operation failed");
-    return shell = Manifold();
+    return Manifold();
   }
 
-  return Boolean(shell, inset ? OpType::Subtract : OpType::Add);
+  Manifold result = Boolean(shell, inset ? OpType::Subtract : OpType::Add);
+  result.GetCsgLeafNode(ctx.get());
+  if (IsCancelled(ctx.get())) return PropagateStatus(Error::Cancelled);
+  return result;
 }
 
 /**
