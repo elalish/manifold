@@ -1133,73 +1133,6 @@ double Manifold::MinGap(const Manifold& other, double searchLength) const {
                                             searchLength);
 }
 
-// Creates a prism extruding a triangle from innerPos to outerPos.
-// The quad diagonal direction is determined by comparing original vertex
-// indices (origIdx) to ensure adjacent triangles sharing an edge use the
-// same diagonal, preventing slivers.
-Manifold MakePrism(const vec3 innerPos[3], const vec3 outerPos[3],
-                   const int origIdx[3]) {
-  MeshGL64 prism;
-  prism.numProp = 3;
-
-  // Add vertices: for each triangle vertex, inner then outer
-  // Vertex layout: 0=inner0, 1=outer0, 2=inner1, 3=outer1, 4=inner2, 5=outer2
-  for (int v = 0; v < 3; v++) {
-    // Inner vertex (2*v)
-    prism.vertProperties.push_back(static_cast<double>(innerPos[v].x));
-    prism.vertProperties.push_back(static_cast<double>(innerPos[v].y));
-    prism.vertProperties.push_back(static_cast<double>(innerPos[v].z));
-    // Outer vertex (2*v + 1)
-    prism.vertProperties.push_back(static_cast<double>(outerPos[v].x));
-    prism.vertProperties.push_back(static_cast<double>(outerPos[v].y));
-    prism.vertProperties.push_back(static_cast<double>(outerPos[v].z));
-  }
-
-  // Inner face (reversed winding): vertices 4, 2, 0
-  prism.triVerts.push_back(4);
-  prism.triVerts.push_back(2);
-  prism.triVerts.push_back(0);
-  // Outer face (normal winding): vertices 1, 3, 5
-  prism.triVerts.push_back(1);
-  prism.triVerts.push_back(3);
-  prism.triVerts.push_back(5);
-
-  // Add quad faces for each edge, with diagonal based on original vertex order
-  for (int v0 = 0; v0 < 3; v0++) {
-    const int v1 = (v0 + 1) % 3;
-    const int idx0 = origIdx[v0];
-    const int idx1 = origIdx[v1];
-
-    // Prism vertex indices for this edge
-    const uint64_t inner0 = 2 * v0;
-    const uint64_t outer0 = 2 * v0 + 1;
-    const uint64_t inner1 = 2 * v1;
-    const uint64_t outer1 = 2 * v1 + 1;
-
-    // Choose diagonal based on original vertex index ordering
-    // This ensures adjacent triangles use the same diagonal for shared edges
-    if (idx1 > idx0) {
-      // Diagonal from inner0 to outer1
-      prism.triVerts.push_back(inner0);
-      prism.triVerts.push_back(inner1);
-      prism.triVerts.push_back(outer1);
-      prism.triVerts.push_back(inner0);
-      prism.triVerts.push_back(outer1);
-      prism.triVerts.push_back(outer0);
-    } else {
-      // Diagonal from inner1 to outer0
-      prism.triVerts.push_back(inner0);
-      prism.triVerts.push_back(inner1);
-      prism.triVerts.push_back(outer0);
-      prism.triVerts.push_back(inner1);
-      prism.triVerts.push_back(outer1);
-      prism.triVerts.push_back(outer0);
-    }
-  }
-
-  return Manifold(prism);
-}
-
 /**
  * Inflate the Manifold by the specified delta, rounding convex vertices.
  *
@@ -1223,6 +1156,8 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
                                      : Quality::GetCircularSegments(radius) / 4;
   const Manifold sphere = Manifold::Sphere(radius, 4 * n);
   const Manifold cylinder = Manifold::Cylinder(1, radius, radius, 4 * n);
+  const SimplePolygon triangle = {{-1, -1}, {1, 0}, {0, 1}};
+  const Manifold block = Manifold::Extrude({triangle}, 1);
 
   const double minDihedral = kPi / (2 * n);
   const double maxDot = std::cos(minDihedral);
@@ -1312,12 +1247,16 @@ Manifold Manifold::Offset(double delta, int circularSegments) const {
     vec3 innerPos[3], outerPos[3];
     int origIdx[3];
     for (int i = 0; i < 3; i++) {
-      origIdx[i] = pImpl->halfedge_.Start(3 * tri + i);
+      const int vert = pImpl->halfedge_.Start(3 * tri + i);
       const vec3 normal = radius * cornerNormal(3 * tri + i);
-      innerPos[i] = pImpl->vertPos_[origIdx[i]] - (inset ? normal : vec3(0.0));
-      outerPos[i] = pImpl->vertPos_[origIdx[i]] + (inset ? vec3(0.0) : normal);
+      innerPos[i] = pImpl->vertPos_[vert] - (inset ? normal : vec3(0.0));
+      outerPos[i] = pImpl->vertPos_[vert] + (inset ? vec3(0.0) : normal);
     }
-    batch[tri] = MakePrism(innerPos, outerPos, origIdx);
+    batch[tri] = block.Warp([&](vec3& pos) {
+      const auto& triPos = pos.z > 0 ? outerPos : innerPos;
+      const int i = pos.x < 0 ? 0 : (pos.x > 0 ? 1 : 2);
+      pos = triPos[i];
+    });
   }
 
   const Manifold faces = BatchBoolean(batch, OpType::Add);
