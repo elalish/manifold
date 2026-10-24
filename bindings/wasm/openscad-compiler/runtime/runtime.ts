@@ -3,20 +3,21 @@
  * Loaded via import from compiled files. Initializes manifold-3d and provides
  * OpenSCAD built-ins and helpers. Exports all symbols for use by compiled code.
  */
-import Module from 'manifold-3d';
+import Module, { type Polygons, type SimplePolygon } from 'manifold-3d';
 import * as opentype from 'opentype.js';
 
 import {computeFontData} from './utils/font.js';
 import {computeSurfaceData} from './utils/surface.js';
 
-const opentypeParse = opentype.parse || (opentype as any).default?.parse;
+const opentypeParse = opentype.parse || (opentype).default?.parse;
 
-declare const document: any;
-declare const OffscreenCanvas: any;
+declare const document: Document | undefined;
+declare const OffscreenCanvas: OffscreenCanvas | undefined;
+type Vec = (number | Vec)[];
 
 const wasm = await Module();
 wasm.setup();
-const {Manifold, CrossSection} = wasm;
+const {Manifold, CrossSection, Mesh} = wasm;
 
 function is_undef(x: any): boolean|undefined {
   return arguments.length === 1 ? (x === undefined || x === null) : undefined;
@@ -186,7 +187,7 @@ function round(x: number): number {
 let sqrt = Math.sqrt;
 let exp = Math.exp;
 // ln() is the natural log and takes exactly one argument
-function ln(x: any) {
+function ln<T extends number>(x: T): number | undefined {
   if (arguments.length !== 1) return undefined;
   return Math.log(x);
 }
@@ -195,120 +196,152 @@ function ln(x: any) {
   so log(b, x) is log_b(x) - note the order, which is the reverse of how most
   languages spell it. Any other arity is undef.
 */
-function log(base: any, x?: any) {
+function log<B extends number, X extends number>(base: B, x?: X): number | undefined {
   if (arguments.length === 1) return Math.log10(base);
-  if (arguments.length === 2) return Math.log(x) / Math.log(base);
+  if (arguments.length === 2 && x !== undefined) return Math.log(x) / Math.log(base);
   return undefined;
 }
 
-function minmax(reduce: (a: number, b: number) => number, a: any[]) {
-  const vals = a.length === 1 && Array.isArray(a[0]) ? a[0] : a;
+type NumericReducer = (a: number, b: number) => number;
+
+function minmax(reduce: NumericReducer, a: unknown[]): number | undefined {
+  const vals: unknown[] = a.length === 1 && Array.isArray(a[0]) ? a[0] : a;
+
   if (vals.length === 0) return undefined;
-  let acc: number|undefined = undefined;
+
+  let acc: number | undefined = undefined;
+
   for (const v of vals) {
-    if (typeof v !== 'number') return undefined;
+    if (typeof v !== "number") return undefined;
+
     acc = acc === undefined ? v : reduce(acc, v);
   }
+
   return acc;
 }
 
-function min(...a: any[]) {
+function min(...a: unknown[]): number | undefined {
   return minmax(Math.min, a);
 }
-function max(...a: any[]) {
+
+function max(...a: unknown[]): number | undefined {
   return minmax(Math.max, a);
 }
 
-function norm(...args: any[]) {
+function norm<T extends Vec>(...args: [T]): number | undefined {
   if (args.length !== 1 || !isVec(args[0])) return undefined;
+
   let sum = 0;
+
   for (const x of args[0]) {
-    if (typeof x !== 'number') return undefined;
+    if (typeof x !== "number") return undefined;
     sum += x * x;
   }
+
   return Math.sqrt(sum);
 }
 
-function cross(a: any, b: any) {
+function cross(a: number[], b: number[]): number | Vec3 | undefined {
   if (!Array.isArray(a) || !Array.isArray(b)) return undefined;
-  if ((a.length !== 2 || b.length !== 2) &&
-      (a.length !== 3 || b.length !== 3)) {
-    console.warn('WARNING: Invalid arguments to cross()');
+
+  if ((a.length !== 2 || b.length !== 2) && (a.length !== 3 || b.length !== 3)) {
+    console.warn("WARNING: Invalid arguments to cross()");
     return undefined;
   }
-  // rejects vectors whose elements aren't finite numbers (NaN, INF, strings,
-  // nested vectors) - returns undef
-  if (![...a, ...b].every((x) => typeof x === 'number' && Number.isFinite(x))) {
-    console.warn('WARNING: Invalid value in parameter vector for cross()');
+
+  if (![...a, ...b].every((x) => typeof x === "number" && Number.isFinite(x))) {
+    console.warn("WARNING: Invalid value in parameter vector for cross()");
     return undefined;
   }
-  // 2D vector yields the scalar z-component and 3D vector yields the vector
-  if (a.length === 2) return a[0] * b[1] - a[1] * b[0];
+
+  if (a.length === 2) {
+    return a[0]! * b[1]! - a[1]! * b[0]!;
+  }
+
   return [
-    a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0]
+    a[1]! * b[2]! - a[2]! * b[1]!,
+    a[2]! * b[0]! - a[0]! * b[2]!,
+    a[0]! * b[1]! - a[1]! * b[0]!,
   ];
 }
 
 // String & list (OpenSCAD built-ins)
-function len(x: any) {
-  // returns undef when called with the wrong number of arguments
+function len<T extends string | Vec>(x: T): number | undefined {
   if (arguments.length !== 1) return undefined;
-  if (typeof x === 'string') return Array.from(x).length;
-  if (Array.isArray(x)) return x.length;
 
-  // returns undef and emits a warning for non-string/non-list inputs
-  console.warn('WARNING: len() parameter could not be converted');
+  if (typeof x === "string") {
+    return Array.from(x).length;
+  }
+
+  if (Array.isArray(x)) {
+    return x.length;
+  }
+
+  console.warn("WARNING: len() parameter could not be converted");
   return undefined;
 }
 
-function ostr(x: any): string {
-  if (x === undefined || x === null) return 'undef';
-  if (typeof x === 'boolean') return x ? 'true' : 'false';
-  if (typeof x === 'string') return x;
-  if (Array.isArray(x)) return '[' + x.map(ostrInner).join(', ') + ']';
-  if (typeof x === 'function') return x.__oscadSrc ?? String(x);
+function ostr<T>(x: T): string {
+  if (x === undefined || x === null) return "undef";
+  if (typeof x === "boolean") return x ? "true" : "false";
+  if (typeof x === "string") return x;
+  if (Array.isArray(x)) return "[" + x.map(ostrInner).join(", ") + "]";
+  if (typeof x === "function") return (x as any).__oscadSrc ?? String(x);
+
   return String(x);
 }
 
 // prints `function(args) body` like OpenSCAD
-function fnlit(fn: any, src: string) {
+type OpenSCADFunction = (...args: never[]) => unknown;
+
+type OpenSCADFunctionWithSource = OpenSCADFunction & {
+  __oscadSrc?: string;
+};
+
+function fnlit<F extends OpenSCADFunction>(fn: F, src: string): F {
   try {
-    fn.__oscadSrc = src;
+    (fn as OpenSCADFunctionWithSource).__oscadSrc = src;
   } catch {
+    // Ignore if the function is not extensible
   }
+
   return fn;
 }
 
 // Trampolines tail calls made via function values by wrapping them in `TC`
 // thunks that `call` iterates instead of recursing, keeping self-recursion
 // through function values off the JS call stack
+type AnyFunction = (...args: never[]) => unknown;
 class TC {
-  fn: any;
-  args: any[];
-  constructor(fn: any, args: any[]) {
+  fn: unknown;
+  args: unknown[];
+
+  constructor(fn: unknown, args: unknown[]) {
     this.fn = fn;
     this.args = args;
   }
 }
-function tc(fn: any, ...args: any[]): any {
+function tc<F extends AnyFunction>(fn: F, ...args: Parameters<F>): TC {
   return new TC(fn, args);
 }
-function call(fn: any, ...args: any[]): any {
-  // Calling a non-function evaluates to undef in OpenSCAD
-  if (typeof fn !== 'function') return undefined;
-  let r: any = fn(...args);
+function call<F extends AnyFunction>(fn: F, ...args: Parameters<F>): ReturnType<F> | undefined {
+  if (typeof fn !== "function") return undefined;
+
+  let r: unknown = fn(...args);
+
   while (r instanceof TC) {
-    if (typeof r.fn !== 'function') return undefined;
-    r = r.fn(...r.args);
+    if (typeof r.fn !== "function") return undefined;
+
+    r = (r.fn as AnyFunction)(...(r.args as never[]));
   }
-  return r;
+
+  return r as ReturnType<F>;
 }
-function ostrInner(x: any): string {
-  return typeof x === 'string' ? `"${x}"` : ostr(x);
+function ostrInner(x: unknown): string {
+  return typeof x === "string" ? `"${x}"` : ostr(x);
 }
-function str(...a: any[]) {
-  return a.map(ostr).join('');
+function str(...a: unknown[]): string {
+  return a.map(ostr).join("");
 }
 
 // OpenSCAD echo formatting
@@ -332,9 +365,9 @@ function echoEscape(s: string): string {
   return r;
 }
 
-function oecho(x: any): string {
-  if (typeof x === 'string') return '"' + echoEscape(x) + '"';
-  if (Array.isArray(x)) return '[' + x.map(oecho).join(', ') + ']';
+function oecho(x: unknown): string {
+  if (typeof x === "string") return '"' + echoEscape(x) + '"';
+  if (Array.isArray(x)) return "[" + x.map(oecho).join(", ") + "]";
   return ostr(x);
 }
 
@@ -342,7 +375,7 @@ function echo(...parts: string[]) {
   console.log(parts.join(', '));
 }
 
-function chrOne(c: any): string {
+function chrOne(c: number): string {
   const n = Math.trunc(c);
   if (!Number.isFinite(n) || n < 1 || n > 0x10FFFF ||
       (n >= 0xD800 && n <= 0xDFFF))
@@ -351,41 +384,48 @@ function chrOne(c: any): string {
 }
 
 
-function chrCollect(x: any, out: string[]) {
+function chrCollect(x: unknown, out: string[]): void {
   if (Array.isArray(x)) {
-    for (const e of x) chrCollect(e, out);
+    for (const e of x) {
+      chrCollect(e, out);
+    }
     return;
   }
-  if (typeof x === 'number') {
+
+  if (typeof x === "number") {
     const c = chrOne(x);
     if (c) out.push(c);
   }
 }
 
 // OpenSCAD chr()
-function chr(...args: any[]) {
+function chr(...args: unknown[]): string {
   const out: string[] = [];
   for (const a of args) chrCollect(a, out);
-  return out.join('');
+  return out.join("");
 }
 
 // OpenSCAD ord()
-function ord(...args: any[]) {
+function ord(...args: unknown[]): number | undefined {
   if (args.length !== 1) return undefined;
+  
   const s = args[0];
-  if (typeof s !== 'string' || s.length === 0) return undefined;
+  if (typeof s !== "string" || s.length === 0) return undefined;
   return s.codePointAt(0);
 }
 
 // OpenSCAD's concat
-function concat(...a: any[]) {
-  const out: any[] = [];
+function concat(...a: unknown[]): unknown[] {
+  const out: unknown[] = [];
+
   for (const x of a) {
-    if (isVec(x))
+    if (isVec(x)) {
       out.push(...x);
-    else
+    } else {
       out.push(x);
+    }
   }
+
   return out;
 }
 
@@ -479,405 +519,649 @@ function generateCanonical(): number {
   return ret;
 }
 
-function rands(...args: any[]) {
-  // Requires 3 or 4 numeric arguments; any other shape warns and yields undef.
+function rands(...args: unknown[]): number[] | undefined {
+  // Requires 3 or 4 numeric arguments
   if (args.length < 3 || args.length > 4) return undefined;
-  for (const a of args) {
-    if (typeof a !== 'number') return undefined;
-  }
+  if (!args.every((a): a is number => typeof a === "number")) return undefined;
+
   const DBL_MAX = Number.MAX_VALUE;
-  let min = args[0];
+
+  let min = args[0]!;
   if (!Number.isFinite(min)) min = -DBL_MAX / 2;
-  let max = args[1];
+
+  let max = args[1]!;
   if (!Number.isFinite(max)) max = DBL_MAX / 2;
+
   if (max < min) {
     const t = min;
     min = max;
     max = t;
   }
-  let numresultsd = Math.abs(args[2]);
-  if (!Number.isFinite(numresultsd)) numresultsd = 1;
+
+  let numresultsd = Math.abs(args[2]!);
+
+  if (!Number.isFinite(numresultsd)) {
+    numresultsd = 1;
+  }
+
   const numresults = Math.trunc(numresultsd);
-  if (args.length > 3) {
-    rng.seed(hashFloatingPoint(args[3]) >>> 0);
-  }
+
+  if (args.length > 3) rng.seed(hashFloatingPoint(args[3]!) >>> 0);
+
   const out: number[] = [];
+
   if (min >= max) {
-    for (let i = 0; i < numresults; i++) out.push(min);
+    for (let i = 0; i < numresults; i++) {
+      out.push(min);
+    }
   } else {
-    for (let i = 0; i < numresults; i++)
+    for (let i = 0; i < numresults; i++) {
       out.push(generateCanonical() * (max - min) + min);
+    }
   }
+
   return out;
 }
 
-function search_match(needle: any, entry: any, idx_col: any) {
+function search_match(needle: unknown, entry: unknown, idx_col: number | undefined): boolean {
   const col = idx_col !== undefined ? idx_col : 0;
+
   if (col === 0 && eq(entry, needle)) return true;
-  return Array.isArray(entry) && col < entry.length && eq(entry[col], needle);
+
+  return (
+    Array.isArray(entry) &&
+    col < entry.length &&
+    eq(entry[col], needle)
+  );
 }
 
-function search(needle: any, haystack: any, num_returns: any, idx_col: any) {
+function search(needle: unknown, haystack: unknown, num_returns: number | undefined, idx_col: number | undefined): unknown {
   if (needle === undefined || haystack === undefined) {
     console.warn(
-        `WARNING: search() needs to be called with at least 2 arguments`);
+      "WARNING: search() needs to be called with at least 2 arguments"
+    );
     return undefined;
   }
+
   if (!is_list(needle) && !is_string(needle)) {
-    const indices: any[] = [];
+    const indices: number[] = [];
+
+    if (!Array.isArray(haystack)) return undefined;
+
     for (let i = 0; i < haystack.length; i++) {
-      if (search_match(needle, haystack[i], idx_col)) indices.push(i);
+      if (search_match(needle, haystack[i], idx_col)) {
+        indices.push(i);
+      }
     }
+
     if (num_returns === 0) return indices;
+
     return indices.slice(0, num_returns === undefined ? 1 : num_returns);
   }
+
   if (is_string(needle) && is_string(haystack)) {
-    let result: any[] = [];
-    const hs = [...haystack];
-    for (let ch of needle) {
-      let indices = [];
+    const result: unknown[] = [];
+    const hs = [...(haystack as string)];
+
+    for (const ch of (needle as string)) {
+      const indices: number[] = [];
+
       for (let i = 0; i < hs.length; i++) {
         if (hs[i] === ch) indices.push(i);
       }
+
       if (num_returns === 1 || num_returns === undefined) {
         if (indices.length > 0) result.push(indices[0]);
       } else {
         result.push(
-            num_returns === 0 ? indices : indices.slice(0, num_returns));
+          num_returns === 0 ? indices : indices.slice(0, num_returns)
+        );
       }
     }
+
     return result;
   }
+
   if (is_list(haystack) && is_list(needle)) {
-    return needle.map(function(n: any) {
-      let indices = [];
-      for (let i = 0; i < haystack.length; i++) {
-        if (search_match(n, haystack[i], idx_col)) indices.push(i);
+    return (needle as unknown[]).map((n: unknown) => {
+      const indices: number[] = [];
+
+      for (let i = 0; i < (haystack as unknown[]).length; i++) {
+        if (search_match(n, (haystack as unknown[])[i], idx_col)) {
+          indices.push(i);
+        }
       }
-      return num_returns === 0 ? indices :
-                                 (indices.length > 0 ? indices[0] : []);
+
+      return num_returns === 0
+        ? indices
+        : indices.length > 0
+          ? indices[0]
+          : [];
     });
   }
+
   if (is_string(needle) && is_list(haystack)) {
     const col = idx_col !== undefined ? idx_col : 0;
-    const result: any[] = [];
-    for (const n of needle) {
-      let indices = [];
-      for (let i = 0; i < haystack.length; i++) {
-        const entry = haystack[i];
+    const result: unknown[] = [];
+
+    for (const n of (needle as string)) {
+      const indices: number[] = [];
+
+      for (let i = 0; i < (haystack as unknown[]).length; i++) {
+        const entry: unknown = (haystack as unknown[])[i];
+
         if (!Array.isArray(entry) || col >= entry.length) {
-          console.warn(`WARNING: Invalid entry in search vector at index ${
-              i}, required number of values in the entry: ${
-              col + 1}. Invalid entry: ${entry}`);
+          console.warn(
+            `WARNING: Invalid entry in search vector at index ${i}, ` +
+              `required number of values in the entry: ${col + 1}. ` +
+              `Invalid entry: ${entry}`
+          );
           return [];
         }
+
         if (eq(entry[col], n)) indices.push(i);
       }
-      if (num_returns === 0)
+
+      if (num_returns === 0) {
         result.push(indices);
-      else if (indices.length === 0)
+      } else if (indices.length === 0) {
         result.push([]);
-      else
+      } else {
         result.push(
-            num_returns === 1 || num_returns === undefined ?
-                indices[0] :
-                indices.slice(0, num_returns));
+          num_returns === 1 || num_returns === undefined
+            ? indices[0]
+            : indices.slice(0, num_returns)
+        );
+      }
     }
+
     return result;
   }
+
   return undefined;
 }
 
-function lookup(key: any, table: any, ...rest: any[]) {
-  // OpenSCAD's lookup() takes exactly 2 parameters and a numeric key. Any other
-  // shape is warned about yields undef
+function lookup(key: unknown, table: unknown, ...rest: unknown[]): number | unknown | undefined {
+  // OpenSCAD's lookup() takes exactly 2 parameters.
   if (rest.length > 0) {
     console.warn(
-        `WARNING: lookup() number of parameters does not match: expected 2, found ${
-            2 + rest.length}`);
+      `WARNING: lookup() number of parameters does not match: expected 2, found ${
+        2 + rest.length
+      }`
+    );
     return undefined;
   }
+
   if (table === undefined) {
     console.warn(
-        `WARNING: lookup() number of parameters does not match: expected 2, found 1`);
+      "WARNING: lookup() number of parameters does not match: expected 2, found 1"
+    );
     return undefined;
   }
-  if (typeof key !== 'number') {
+
+  if (typeof key !== "number") {
     console.warn(
-        `WARNING: lookup() parameter could not be converted: argument 0: expected number, found ${
-            typeof key === 'string' ? `string ("${key}")` : typeof key}`);
+      `WARNING: lookup() parameter could not be converted: argument 0: expected number, found ${
+        typeof key === "string" ? `string ("${key}")` : typeof key
+      }`
+    );
     return undefined;
   }
+
   if (!Array.isArray(table)) return undefined;
-  let lowSet = false, highSet = false;
-  let low_p = 0, low_v: any, high_p = 0, high_v: any;
+
+  let lowSet = false;
+  let highSet = false;
+
+  let low_p = 0;
+  let high_p = 0;
+
+  let low_v: unknown;
+  let high_v: unknown;
+
   for (const entry of table) {
     if (!Array.isArray(entry) || entry.length < 2) continue;
-    const this_p = entry[0], this_v = entry[1];
-    if (typeof this_p !== 'number') continue;
+
+    const this_p: unknown = entry[0];
+    const this_v: unknown = entry[1];
+
+    if (typeof this_p !== "number") continue;
+
     if (this_p <= key && (!lowSet || this_p > low_p)) {
       low_p = this_p;
       low_v = this_v;
       lowSet = true;
     }
+
     if (this_p >= key && (!highSet || this_p < high_p)) {
       high_p = this_p;
       high_v = this_v;
       highSet = true;
     }
   }
+
   if (!lowSet && !highSet) return undefined;
   if (!lowSet) return high_v;
   if (!highSet) return low_v;
   if (high_p === low_p) return low_v;
-  return low_v + (high_v - low_v) * (key - low_p) / (high_p - low_p);
+
+  // Interpolation requires numeric values.
+  if (typeof low_v !== "number" || typeof high_v !== "number") {
+    return undefined;
+  }
+
+  return (
+    low_v +
+    ((high_v - low_v) * (key - low_p)) / (high_p - low_p)
+  );
 }
 
-function truthy(x: any) {
+function truthy(x: unknown): boolean {
   if (x === undefined || x === null || x === false) return false;
-  if (typeof x === 'number') return x !== 0;
-  if (typeof x === 'string' || Array.isArray(x)) return x.length > 0;
+  if (typeof x === "number") return x !== 0;
+  if (typeof x === "string" || Array.isArray(x)) return x.length > 0;
+
   return true;
 }
 
 // Control
-function assert(cond: any, msg: any) {
+function assert(cond: unknown, msg: unknown): asserts cond {
   if (!truthy(cond)) {
-    console.trace('Assertion failed:', msg);
-    throw new Error(msg || 'Assertion failed');
+    console.trace("Assertion failed:", msg);
+    throw new Error(
+      typeof msg === "string" && msg.length > 0
+        ? msg
+        : "Assertion failed"
+    );
   }
 }
 
-function eq(a: any, b: any) {
+function eq(a: unknown, b: unknown): boolean {
   if (a === b) return true;
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false;
+
     for (let i = 0; i < a.length; i++) {
       if (!eq(a[i], b[i])) return false;
     }
+
     return true;
   }
+
   return false;
 }
 
-function cmpCat(x: any): string {
-  const t = typeof x;
-  if (t === 'number') return 'n';
-  if (t === 'boolean') return 'b';
-  if (t === 'string') return 's';
-  if (Array.isArray(x)) return (x as any).__isRange ? 'r' : 'v';
-  return 'u';
+
+function cmpCat(x: unknown): string {
+  if (typeof x === "number") return "n";
+  if (typeof x === "boolean") return "b";
+  if (typeof x === "string") return "s";
+
+  if (Array.isArray(x)) return (x as { __isRange?: boolean }).__isRange ? "r" : "v";
+
+  return "u";
 }
-function veccmp(a: any[], b: any[]): number {
+function veccmp(a: unknown[], b: unknown[]): number {
   const n = Math.min(a.length, b.length);
+
   for (let i = 0; i < n; i++) {
-    if (a[i] < b[i]) return -1;
-    if (a[i] > b[i]) return 1;
+    const av = a[i];
+    const bv = b[i];
+
+    if (av === bv) continue;
+
+    if (Array.isArray(av) && Array.isArray(bv)) {
+      const result = veccmp(av, bv);
+      if (result !== 0) return result;
+      continue;
+    }
+
+    if (av! < bv!) return -1;
+    if (av! > bv!) return 1;
   }
+
   return Math.sign(a.length - b.length);
 }
-function lt(a: any, b: any): any {
+function lt(a: unknown, b: unknown): boolean | undefined {
   const ca = cmpCat(a);
-  if (ca !== cmpCat(b) || ca === 'u') return undefined;
-  return (ca === 'v' || ca === 'r') ? veccmp(a, b) < 0 : a < b;
+
+  if (ca !== cmpCat(b) || ca === "u") return undefined;
+
+  return ca === "v" || ca === "r"
+    ? veccmp(a as unknown[], b as unknown[]) < 0
+    : a! < b!;
 }
-function gt(a: any, b: any): any {
+function gt(a: unknown, b: unknown): boolean | undefined {
   const ca = cmpCat(a);
-  if (ca !== cmpCat(b) || ca === 'u') return undefined;
-  return (ca === 'v' || ca === 'r') ? veccmp(a, b) > 0 : a > b;
+
+  if (ca !== cmpCat(b) || ca === "u") return undefined;
+
+  return ca === "v" || ca === "r"
+    ? veccmp(a as unknown[], b as unknown[]) > 0
+    : a! > b!;
 }
-function le(a: any, b: any): any {
+function le(a: unknown, b: unknown): boolean | undefined {
   const ca = cmpCat(a);
-  if (ca !== cmpCat(b) || ca === 'u') return undefined;
-  return (ca === 'v' || ca === 'r') ? veccmp(a, b) <= 0 : a <= b;
+
+  if (ca !== cmpCat(b) || ca === "u") return undefined;
+
+  return ca === "v" || ca === "r"
+    ? veccmp(a as unknown[], b as unknown[]) <= 0
+    : a! <= b!;
 }
-function ge(a: any, b: any): any {
+function ge(a: unknown, b: unknown): boolean | undefined {
   const ca = cmpCat(a);
-  if (ca !== cmpCat(b) || ca === 'u') return undefined;
-  return (ca === 'v' || ca === 'r') ? veccmp(a, b) >= 0 : a >= b;
+
+  if (ca !== cmpCat(b) || ca === "u") return undefined;
+
+  return ca === "v" || ca === "r"
+    ? veccmp(a as unknown[], b as unknown[]) >= 0
+    : a! >= b!;
 }
-function isNum(x: any): boolean {
+
+
+function isNum(x: unknown): x is number {
   return typeof x === 'number';
 }
-function isVec(x: any): boolean {
+function isVec(x: unknown): x is Vec {
   return Array.isArray(x) && !(x as any).__isRange;
 }
 
-function add(a: any, b: any): any {
-  if (isNum(a) && isNum(b)) return a + b;
+type NumOrVec = number | NumOrVec[];
+
+function add<T extends NumOrVec>(a: T, b: T): T | undefined {
+  if (isNum(a) && isNum(b)) {
+    return (a + b) as T;
+  }
+
   if (isVec(a) && isVec(b)) {
-    let n = Math.min(a.length, b.length), r: any[] = [];
-    for (let i = 0; i < n; i++) r.push(add(a[i], b[i]));
-    return r;
+    const n = Math.min(a.length, b.length);
+    const r: NumOrVec[] = [];
+
+    for (let i = 0; i < n; i++) {
+      const result = add(a[i]!, b[i]!);
+      if (result !== undefined) {
+        r.push(result);
+      }
+    }
+
+    return r as T;
+  }
+
+  return undefined;
+}
+
+function sub<T extends NumOrVec>(a: T, b: T): T | undefined {
+  if (isNum(a) && isNum(b)) return (a - b) as T;
+  if (isVec(a) && isVec(b)) {
+    let n = Math.min(a.length, b.length), r: NumOrVec[] = [];
+    for (let i = 0; i < n; i++) {
+      const result = sub(a[i]!, b[i]!);
+      if (result !== undefined) r.push(result);
+    }
+    return r as T;
   }
   return undefined;
 }
-function sub(a: any, b: any): any {
-  if (isNum(a) && isNum(b)) return a - b;
-  if (isVec(a) && isVec(b)) {
-    let n = Math.min(a.length, b.length), r: any[] = [];
-    for (let i = 0; i < n; i++) r.push(sub(a[i], b[i]));
-    return r;
+
+function mul<A extends NumOrVec, B extends NumOrVec>(a: A, b: B): NumOrVec | undefined {
+  if (isNum(a) && isNum(b)) {
+    return a * b;
   }
-  return undefined;
-}
-function mul(a: any, b: any): any {
-  if (isNum(a) && isNum(b)) return a * b;
-  if (isNum(a) && isVec(b))
-    return b.map((x: any): any => mul(a, x));  // scalar * vector
-  if (isVec(a) && isNum(b))
-    return a.map((x: any): any => mul(x, b));  // vector * scalar
+
+  if (isNum(a) && isVec(b)) {
+    return b.map((x) => mul(a, x)) as Vec;
+  }
+
+  if (isVec(a) && isNum(b)) {
+    return a.map((x) => mul(x, b)) as Vec;
+  }
+
   if (isVec(a) && isVec(b)) {
     const aMat = a.length > 0 && isVec(a[0]);
     const bMat = b.length > 0 && isVec(b[0]);
-    if (aMat && bMat) {  // matrix * matrix
-      const aCols = a[0].length, bRows = b.length;
+
+    if (aMat && bMat) {
+      // Matrix * Matrix
+      const aCols = (a[0] as Vec).length;
+      const bRows = b.length;
+
       if (aCols !== bRows) {
         console.warn(
-            `WARNING: matrix*matrix requires left operand column count to match right operand row count (${
-                aCols} != ${bRows})`);
+          `WARNING: matrix*matrix requires left operand column count to match right operand row count (${aCols} != ${bRows})`
+        );
         return undefined;
       }
+
       for (let i = 0; i < a.length; i++) {
-        const rowLen = isVec(a[i]) ? a[i].length : 0;
+        const rowLen = isVec(a[i]) ? (a[i] as Vec).length : 0;
+
         if (rowLen !== bRows) {
           console.warn(
-              `WARNING: matrix*matrix left operand row length does not match right operand row count (${
-                  rowLen} != ${bRows}) at row ${i}`);
+            `WARNING: matrix*matrix left operand row length does not match right operand row count (${rowLen} != ${bRows}) at row ${i}`
+          );
           return undefined;
         }
       }
-      const res: any[] = [];
+
+      const res: Vec = [];
+
       for (let i = 0; i < a.length; i++) {
         res[i] = [];
-        for (let j = 0; j < b[0].length; j++) {
+
+        for (let j = 0; j < (b[0] as Vec).length; j++) {
           let sum = 0;
-          for (let k = 0; k < aCols; k++) sum += a[i][k] * b[k][j];
-          res[i].push(sum);
+
+          for (let k = 0; k < aCols; k++) {
+            sum += ((a[i] as Vec)[k] as number) * ((b[k] as Vec)[j] as number);
+          }
+
+          (res[i] as Vec).push(sum);
         }
       }
+
       return res;
     }
-    if (aMat) {  // matrix * vector
-      const aCols = a[0].length;
+
+    if (aMat) {
+      // Matrix * Vector
+      const aCols = (a[0] as Vec).length;
+
       if (aCols !== b.length) {
         console.warn(
-            `WARNING: matrix*vector requires matrix column count to match vector length (${
-                aCols} != ${b.length})`);
+          `WARNING: matrix*vector requires matrix column count to match vector length (${aCols} != ${b.length})`
+        );
         return undefined;
       }
-      const res: any[] = [];
+
+      const res: number[] = [];
+
       for (let i = 0; i < a.length; i++) {
         const row = a[i];
         const rowLen = isVec(row) ? row.length : 0;
+
         if (rowLen !== b.length) {
           console.warn(
-              `WARNING: matrix*vector left operand row length does not match vector length (${
-                  rowLen} != ${b.length}) at row ${i}`);
+            `WARNING: matrix*vector left operand row length does not match vector length (${rowLen} != ${b.length}) at row ${i}`
+          );
           return undefined;
         }
+
         let sum = 0;
-        for (let k = 0; k < b.length; k++) sum += row[k] * b[k];
+
+        for (let k = 0; k < b.length; k++) {
+          sum += ((row as Vec)[k] as number) * (b[k] as number);
+        }
+
         res.push(sum);
       }
+
       return res;
     }
-    if (bMat) {  // vector * matrix
+
+    if (bMat) {
+      // Vector * Matrix
       if (a.length !== b.length) {
         console.warn(
-            `WARNING: vector*matrix requires vector length to match matrix row count (${
-                a.length} != ${b.length})`);
+          `WARNING: vector*matrix requires vector length to match matrix row count (${a.length} != ${b.length})`
+        );
         return undefined;
       }
-      const res: any[] = [];
-      for (let j = 0; j < b[0].length; j++) {
+
+      const res: number[] = [];
+
+      for (let j = 0; j < (b[0] as Vec).length; j++) {
         let sum = 0;
-        for (let k = 0; k < a.length; k++) sum += a[k] * b[k][j];
+
+        for (let k = 0; k < a.length; k++) {
+          sum += (a[k] as number) * ((b[k] as Vec)[j] as number);
+        }
+
         res.push(sum);
       }
+
       return res;
     }
-    if (a.length !== b.length) {  // vector . vector
-      console.warn(`WARNING: vector*vector requires matching lengths (${
-          a.length} != ${b.length})`);
+
+    // Vector * Vector (Dot Product)
+    if (a.length !== b.length) {
+      console.warn(
+        `WARNING: vector*vector requires matching lengths (${a.length} != ${b.length})`
+      );
       return undefined;
     }
-    let sum3 = 0;
-    for (let i3 = 0; i3 < a.length; i3++) sum3 += a[i3] * b[i3];
-    return sum3;
+
+    let sum = 0;
+
+    for (let i = 0; i < a.length; i++) {
+      sum += (a[i] as number) * (b[i] as number);
+    }
+
+    return sum;
   }
+
   return undefined;
 }
-function div(a: any, b: any): any {
-  if (isNum(a) && isNum(b)) return a / b;
-  if (isVec(a) && isNum(b))
-    return a.map((x: any): any => div(x, b));  // vector / scalar
-  if (isNum(a) && isVec(b))
-    return b.map((x: any): any => div(a, x));  // scalar / vector
+
+function div<A extends NumOrVec, B extends NumOrVec>(a: A, b: B): NumOrVec | undefined {
+  if (isNum(a) && isNum(b)) {
+    return a / b;
+  }
+
+  if (isVec(a) && isNum(b)) {
+    // vector / scalar
+    return a.map((x) => div(x, b)) as Vec;
+  }
+
+  if (isNum(a) && isVec(b)) {
+    // scalar / vector
+    return b.map((x) => div(a, x)) as Vec;
+  }
+
   if (isVec(a) && isVec(b)) {
-    let n = Math.min(a.length, b.length), r: any[] = [];
-    for (let i = 0; i < n; i++) r.push(div(a[i], b[i]));
+    // vector / vector (element-wise)
+    const n = Math.min(a.length, b.length);
+    const r: Vec = [];
+
+    for (let i = 0; i < n; i++) {
+      const result = div(a[i]!, b[i]!);
+
+      if (result !== undefined) {
+        r.push(result);
+      }
+    }
+
     return r;
   }
+
   return undefined;
 }
-function mod(a: any, b: any): any {
-  if (isNum(a) && isNum(b)) return a % b;
+
+function mod<A extends number, B extends number>(a: A, b: B): number | undefined {
+  if (isNum(a) && isNum(b)) {
+    return a % b;
+  }
+
   return undefined;
+}
+
+
+function toI64(x: unknown): bigint | undefined {
+  if (typeof x !== "number" || !Number.isFinite(x)) {
+    return undefined;
+  }
+
+  return BigInt.asIntN(64, BigInt(Math.trunc(x)));
 }
 
 // Bitwise operators
-function toI64(x: any): bigint|undefined {
-  if (typeof x !== 'number' || !isFinite(x)) return undefined;
-  return BigInt.asIntN(64, BigInt(Math.trunc(x)));
-}
-function band(a: any, b: any): any {
-  const ia = toI64(a), ib = toI64(b);
+function band(a: unknown, b: unknown): number | undefined {
+  const ia = toI64(a);
+  const ib = toI64(b);
+
   if (ia === undefined || ib === undefined) return undefined;
+
   return Number(BigInt.asIntN(64, ia & ib));
 }
-function bor(a: any, b: any): any {
-  const ia = toI64(a), ib = toI64(b);
+function bor(a: unknown, b: unknown): number | undefined {
+  const ia = toI64(a);
+  const ib = toI64(b);
+
   if (ia === undefined || ib === undefined) return undefined;
+
   return Number(BigInt.asIntN(64, ia | ib));
 }
-function bnot(a: any): any {
+function bnot(a: unknown): number | undefined {
   const ia = toI64(a);
+
   if (ia === undefined) return undefined;
+
   return Number(BigInt.asIntN(64, ~ia));
 }
-function shl(a: any, b: any): any {
-  const ia = toI64(a), ib = toI64(b);
-  if (ia === undefined || ib === undefined) return undefined;
-  if (ib < 0n || ib >= 64n) return undefined;  // shifts of 64+ bits are undef
-  return Number(BigInt.asIntN(64, ia << ib));
-}
-function shr(a: any, b: any): any {
-  const ia = toI64(a), ib = toI64(b);
+function shl(a: unknown, b: unknown): number | undefined {
+  const ia = toI64(a);
+  const ib = toI64(b);
+
   if (ia === undefined || ib === undefined) return undefined;
   if (ib < 0n || ib >= 64n) return undefined;
+
+  return Number(BigInt.asIntN(64, ia << ib));
+}
+function shr(a: unknown, b: unknown): number | undefined {
+  const ia = toI64(a);
+  const ib = toI64(b);
+
+  if (ia === undefined || ib === undefined) return undefined;
+  if (ib < 0n || ib >= 64n) return undefined;
+
   return Number(BigInt.asIntN(64, ia >> ib));
 }
-function neg(a: any): any {
+
+// Unary operators
+function neg(a: unknown): number | Vec | undefined {
   if (isNum(a)) return -a;
-  if (isVec(a)) return a.map(neg);
+  if (isVec(a)) return a.map(neg) as Vec;
   return undefined;
 }
-function pos(a: any): any {
+function pos(a: unknown): number | Vec | undefined {
   if (isNum(a)) return +a;
-  if (isVec(a)) return a.map(pos);
+  if (isVec(a)) return a.map(pos) as Vec;
   return undefined;
 }
 
 
-function index(obj: any, idx: any): any {
-  if (typeof idx !== 'number' || obj == null) return undefined;
-  if (typeof obj === 'string') {
+function index(obj: unknown, idx: unknown): unknown {
+  if (typeof idx !== "number" || obj == null) return undefined;
+
+  const i = Math.floor(idx);
+
+  if (typeof obj === "string") {
     const cps = Array.from(obj);
-    const i = Math.floor(idx);
     return i >= 0 && i < cps.length ? cps[i] : undefined;
   }
-  if (Array.isArray(obj)) return obj[Math.floor(idx)];
+
+  if (Array.isArray(obj)) return obj[i];
+
   return undefined;
 }
 
@@ -949,35 +1233,64 @@ function with_children(
 }
 
 // Resolve a children() selector into the ordered list of child fns to invoke
-function pick_children(childFns: any[], i: any): any[] {
+function pick_children<T>(childFns: T[], i: unknown): T[] {
   if (i === undefined) return childFns;
+
   if (Array.isArray(i)) {
-    const out: any[] = [];
+    const out: T[] = [];
+
     for (const v of i) {
-      if (Number.isInteger(v) && v >= 0 && v < childFns.length)
-        out.push(childFns[v]);
+      if (
+        typeof v === "number" &&
+        Number.isInteger(v) &&
+        v >= 0 &&
+        v < childFns.length
+      ) {
+        out.push(childFns[v]!);
+      }
     }
+
     return out;
   }
-  if (Number.isInteger(i) && i >= 0 && i < childFns.length)
-    return [childFns[i]];
+
+  if (
+    typeof i === "number" &&
+    Number.isInteger(i) &&
+    i >= 0 &&
+    i < childFns.length
+  ) {
+    return [childFns[i]!];
+  }
+
   return [];
 }
 
-function parent_module(d: any = 1) {
+function parent_module(d: unknown = 1): string {
   const depth = Number(d);
-  if (!Number.isInteger(depth) || depth < 0) return '';
+
+  if (!Number.isInteger(depth) || depth < 0) return "";
+
   const idx = children_stack.length - 1 - depth;
-  if (idx < 0 || idx >= children_stack.length) return '';
-  return children_stack[idx]?.name || '';
+
+  if (idx < 0 || idx >= children_stack.length) return "";
+
+  return children_stack[idx]?.name || "";
 }
 
-function is_finite_matrix4(m: any) {
-  return Array.isArray(m) && m.length === 4 &&
-      m.every(
-          (row: any) => Array.isArray(row) && row.length === 4 &&
-              row.every(
-                  (v: any) => typeof v === 'number' && Number.isFinite(v)));
+function is_finite_matrix4(m: unknown): m is number[][] {
+  return (
+    Array.isArray(m) &&
+    m.length === 4 &&
+    m.every(
+      (row: unknown) =>
+        Array.isArray(row) &&
+        row.length === 4 &&
+        row.every(
+          (v: unknown) =>
+            typeof v === "number" && Number.isFinite(v)
+        )
+    )
+  );
 }
 
 // Pad smaller matrices to 4×4 with identity, then normalize by the bottom-right
@@ -1024,11 +1337,19 @@ function to_manifold_mat3(m: number[][]) {
   return [n[0]![0], n[1]![0], 0, n[0]![1], n[1]![1], 0, n[0]![3], n[1]![3], 1];
 }
 
-function transform(shape: any, m: number[][]) {
-  const mm = is2D(shape) ? to_manifold_mat3(m) : to_manifold_mat4(m);
+interface TransformableShape<TResult = unknown> {
+  transform(matrix: unknown): TResult;
+}
+
+function transform<T extends TransformableShape>(shape: T, m: number[][]): T | ReturnType<T["transform"]> {
+  const mm = is2D(shape)
+    ? to_manifold_mat3(m)
+    : to_manifold_mat4(m);
+
   if (!mm) return shape;
+
   try {
-    return shape.transform(mm);
+    return shape.transform(mm) as ReturnType<T["transform"]>;
   } catch {
     return shape;
   }
@@ -1040,28 +1361,28 @@ function identity4() {
 
 // 2D helpers used by offset()/projection() fallbacks
 function offset(
-    shape: any, delta: any, joinType = 'Round', miterLimit = 2,
+    shape: unknown, delta: number, joinType = 'Round', miterLimit = 2,
     circularSegments = 0, fa = 12, fs = 2) {
   try {
-    if (shape && typeof shape.offset === 'function') {
+    if (shape && typeof (shape as InstanceType<typeof CrossSection>).offset === 'function') {
       if (circularSegments <= 0) {
         sync_quality(fa, fs);
       }
-      return shape.offset(delta, joinType, miterLimit, circularSegments);
+      return (shape as InstanceType<typeof CrossSection>).offset(delta, joinType as "Miter" | "Round", miterLimit, circularSegments);
     }
   } catch {
   }
   return shape;
 }
 
-function projection(shape: any, cut = false) {
+function projection(shape: unknown, cut = false) {
   try {
     if (shape) {
-      if (cut && typeof shape.slice === 'function') {
-        return shape.slice(0);
+      if (cut && typeof (shape as InstanceType<typeof Manifold>).slice === 'function') {
+        return (shape as InstanceType<typeof Manifold>).slice(0);
       }
-      if (typeof shape.project === 'function') {
-        return shape.project();
+      if (typeof (shape as InstanceType<typeof Manifold>).project === 'function') {
+        return (shape as InstanceType<typeof Manifold>).project();
       }
     }
   } catch {
@@ -1106,46 +1427,72 @@ const named_colors: Record<string, number[]> = {
   yellow: [1, 1, 0],
 };
 
-function clamp01(v: any) {
+function clamp01(v: unknown): number {
   const n = Number(v);
+
   if (!Number.isFinite(n)) return 0;
   if (n <= 0) return 0;
   if (n >= 1) return 1;
+
   return n;
 }
 
-function parse_hex_color(s: any) {
-  if (!s.startsWith('#')) return undefined;
+function parse_hex_color(s: unknown): number[] | undefined {
+  if (typeof s !== "string" || !s.startsWith("#")) {
+    return undefined;
+  }
+
   const h = s.slice(1);
+
   if (h.length === 3 || h.length === 4) {
-    const r = parseInt(h[0] + h[0], 16);
-    const g = parseInt(h[1] + h[1], 16);
-    const b = parseInt(h[2] + h[2], 16);
-    const a = h.length === 4 ? parseInt(h[3] + h[3], 16) : 255;
-    if ([r, g, b, a].some((x) => Number.isNaN(x))) return undefined;
+    const r = parseInt(h[0] + h[0]!, 16);
+    const g = parseInt(h[1] + h[1]!, 16);
+    const b = parseInt(h[2] + h[2]!, 16);
+    const a = h.length === 4 ? parseInt(h[3] + h[3]!, 16) : 255;
+
+    if ([r, g, b, a].some((x) => Number.isNaN(x))) {
+      return undefined;
+    }
+
     return [r / 255, g / 255, b / 255, a / 255];
   }
+
   if (h.length === 6 || h.length === 8) {
     const r = parseInt(h.slice(0, 2), 16);
     const g = parseInt(h.slice(2, 4), 16);
     const b = parseInt(h.slice(4, 6), 16);
     const a = h.length === 8 ? parseInt(h.slice(6, 8), 16) : 255;
-    if ([r, g, b, a].some((x) => Number.isNaN(x))) return undefined;
+
+    if ([r, g, b, a].some((x) => Number.isNaN(x))) {
+      return undefined;
+    }
+
     return [r / 255, g / 255, b / 255, a / 255];
   }
+
   return undefined;
 }
 
-function parse_color_value(c: any) {
+function parse_color_value(c: unknown): number[] | undefined {
   if (Array.isArray(c)) {
     if (c.length < 3) return undefined;
+
     let r = Number(c[0]);
     let g = Number(c[1]);
     let b = Number(c[2]);
     let a = c.length >= 4 ? Number(c[3]) : 1;
-    if (![r, g, b, a].every(Number.isFinite)) return undefined;
-    const maxChan =
-        Math.max(Math.abs(r), Math.abs(g), Math.abs(b), Math.abs(a));
+
+    if (![r, g, b, a].every(Number.isFinite)) {
+      return undefined;
+    }
+
+    const maxChan = Math.max(
+      Math.abs(r),
+      Math.abs(g),
+      Math.abs(b),
+      Math.abs(a)
+    );
+
     // Support accidental [0..255] style vectors.
     if (maxChan > 1) {
       r /= 255;
@@ -1153,16 +1500,23 @@ function parse_color_value(c: any) {
       b /= 255;
       a /= 255;
     }
+
     return [r, g, b, a];
   }
 
-  if (typeof c === 'string') {
+  if (typeof c === "string") {
     const key = c.trim().toLowerCase();
-    if (key === '' || key === 'default') return undefined;
+
+    if (key === "" || key === "default") return undefined;
+
     const named = named_colors[key];
+
     if (named) {
-      return named.length === 4 ? named : [named[0], named[1], named[2], 1];
+      return named.length === 4
+        ? named
+        : [named[0]!, named[1]!, named[2]!, 1];
     }
+
     return parse_hex_color(key);
   }
 
@@ -1170,21 +1524,57 @@ function parse_color_value(c: any) {
 }
 
 // Apply OpenSCAD color() by appending custom RGBA + marker channels.
-function color(shape: any, c: any, alpha: any) {
-  if (!shape || typeof shape.setProperties !== 'function' ||
-      typeof shape.numProp !== 'function') {
+type ColorPropertyLayout = {
+  colorOffset: number;
+  markerOffset: number;
+};
+
+type SetPropertiesCallback = (
+  newProp: number[],
+  position: number[],
+  oldProp: number[]
+) => void;
+
+interface ColorableShape<TResult = unknown> {
+  setProperties(
+    numProperties: number,
+    callback: (
+      newProp: number[],
+      position: number[],
+      oldProp: number[]
+    ) => void
+  ): TResult;
+
+  numProp(): number;
+}
+
+function color<T>(shape: T, c: unknown, alpha: unknown): T | unknown {
+  if (
+    shape == null ||
+    typeof shape !== "object" ||
+    !("setProperties" in shape) ||
+    typeof shape.setProperties !== "function" ||
+    !("numProp" in shape) ||
+    typeof shape.numProp !== "function"
+  ) {
     return shape;
   }
 
   let base = parse_color_value(c);
+
   if (!base) {
-    // Allow color(alpha = x) form by assuming white base if alpha is provided.
+    // Allow color(alpha = x) by assuming white as the base color.
     if (alpha === undefined || alpha === null) return shape;
     base = [1, 1, 1, 1];
   }
 
   let outAlpha = base[3];
-  if (alpha !== undefined && alpha !== null && Number.isFinite(Number(alpha))) {
+
+  if (
+    alpha !== undefined &&
+    alpha !== null &&
+    Number.isFinite(Number(alpha))
+  ) {
     outAlpha = Number(alpha);
   }
 
@@ -1197,16 +1587,24 @@ function color(shape: any, c: any, alpha: any) {
 
   const oldNumProp = Math.max(0, Number(shape.numProp()) || 0);
   const trackedLayout = color_prop_layout.get(shape);
+
   let colorOffset = Math.max(3, oldNumProp);
   let markerOffset = colorOffset + 4;
   let newNumProp = markerOffset + 1;
-  if (trackedLayout && Number.isInteger(trackedLayout.colorOffset) &&
-      Number.isInteger(trackedLayout.markerOffset)) {
+
+  if (
+    trackedLayout &&
+    Number.isInteger(trackedLayout.colorOffset) &&
+    Number.isInteger(trackedLayout.markerOffset)
+  ) {
     const trackedColorOffset = trackedLayout.colorOffset;
     const trackedMarkerOffset = trackedLayout.markerOffset;
-    if (trackedColorOffset >= 0 &&
-        trackedMarkerOffset === trackedColorOffset + 4 &&
-        trackedMarkerOffset < oldNumProp) {
+
+    if (
+      trackedColorOffset >= 0 &&
+      trackedMarkerOffset === trackedColorOffset + 4 &&
+      trackedMarkerOffset < oldNumProp
+    ) {
       colorOffset = trackedColorOffset;
       markerOffset = trackedMarkerOffset;
       newNumProp = oldNumProp;
@@ -1215,43 +1613,48 @@ function color(shape: any, c: any, alpha: any) {
 
   try {
     const painted = shape.setProperties(
-        newNumProp, (newProp: any, position: any, oldProp: any) => {
-          for (let i = 0; i < newNumProp; i++) {
-            if (i < oldProp.length) {
-              newProp[i] = oldProp[i];
-            } else if (i < 3) {
-              newProp[i] = position[i];
-            } else {
-              newProp[i] = 0;
-            }
+      newNumProp,
+      (newProp: number[], position: number[], oldProp: number[]) => {
+        for (let i = 0; i < newNumProp; i++) {
+          if (i < oldProp.length) {
+            newProp[i] = oldProp[i]!;
+          } else if (i < 3) {
+            newProp[i] = position[i]!;
+          } else {
+            newProp[i] = 0;
           }
-          newProp[colorOffset] = rgba[0];
-          newProp[colorOffset + 1] = rgba[1];
-          newProp[colorOffset + 2] = rgba[2];
-          newProp[colorOffset + 3] = rgba[3];
-          // Marker channel lets the viewer distinguish custom RGBA from
-          // manifold built-in properties.
-          newProp[markerOffset] = 1;
-        });
-    color_prop_layout.set(painted, {colorOffset, markerOffset});
+        }
+
+        newProp[colorOffset] = rgba[0]!;
+        newProp[colorOffset + 1] = rgba[1]!;
+        newProp[colorOffset + 2] = rgba[2]!;
+        newProp[colorOffset + 3] = rgba[3]!;
+
+        // Marker channel distinguishes custom RGBA from built-in properties.
+        newProp[markerOffset] = 1;
+      }
+    );
+
+    color_prop_layout.set(painted, { colorOffset, markerOffset });
+
     return painted;
   } catch {
     return shape;
   }
 }
 
-function each(v: any) {
-  if (v === undefined || v === null) return [];
-  if (Array.isArray(v)) return v;
-  if (typeof v === 'string') return Array.from(v);
-  return [v];
+function each(v: unknown): unknown[] {
+   if (v === undefined || v === null) return [];
+   if (Array.isArray(v)) return v;
+   if (typeof v === "string") return Array.from(v);
+   return [v];
 }
 
-function flat_map_iter(v: any, fn: any) {
+function flat_map_iter<T>(v: unknown, fn: (item: unknown, index: number) => T | T[]): T[] {
   if (v === undefined || v === null) return [];
-  if (Array.isArray(v)) return v.flatMap((item, i) => fn(item, i));
-  if (typeof v === 'string') return Array.from(v).flatMap(fn);
-  return [v].flatMap(fn);
+  if (Array.isArray(v)) return v.flatMap((item: unknown, i: number) => fn(item, i));
+  if (typeof v === "string") return Array.from(v).flatMap((item, i) => fn(item, i));
+  return [v].flatMap((item, i) => fn(item, i));
 }
 
 const UINT32_MAX = 4294967295;
@@ -1278,142 +1681,244 @@ function rangeNumValues(start: number, step: number, end: number): number {
   return numSteps >= UINT32_MAX ? UINT32_MAX : numSteps + 1;
 }
 
-function rangeCount(start: any, step: any, end: any): number {
-  if (typeof start !== 'number' || typeof step !== 'number' ||
-      typeof end !== 'number')
-    return 0;
-  const n = rangeNumValues(start, step, end);
-  if (n >= 1000000) {
-    console.warn(
-        `WARNING: Bad range parameter in for statement: too many elements (${
-            n}).`);
+function rangeCount(start: unknown, step: unknown, end: unknown): number {
+  if (
+    typeof start !== "number" ||
+    typeof step !== "number" ||
+    typeof end !== "number"
+  ) {
     return 0;
   }
+
+  const n = rangeNumValues(start, step, end);
+
+  if (n >= 1000000) {
+    console.warn(
+      `WARNING: Bad range parameter in for statement: too many elements (${n}).`
+    );
+    return 0;
+  }
+
   // Starts at the end when step is 0, so [0:0:0] yields nothing
   if (step === 0) return 0;
+
   return n;
 }
 
-function range(start: any, step: any, end: any) {
-  let result: any[] = [];
-  let n = rangeCount(start, step, end);
+type RangeArray = number[] & {
+  __isRange?: boolean;
+};
+
+function range(start: unknown, step: unknown, end: unknown): RangeArray {
+  const result: RangeArray = [];
+
+  if (
+    typeof start !== "number" ||
+    typeof step !== "number" ||
+    typeof end !== "number"
+  ) {
+    return result;
+  }
+
+  const n = rangeCount(start, step, end);
+
   // Yield begin_val itself first, so an infinite step still yields start
-  for (let i = 0; i < n; i++) result.push(i === 0 ? start : start + i * step);
-  Object.defineProperty(result, '__isRange', {
+  for (let i = 0; i < n; i++) {
+    result.push(i === 0 ? start : start + i * step);
+  }
+
+  Object.defineProperty(result, "__isRange", {
     value: true,
     enumerable: false,
     writable: true,
     configurable: true,
   });
+
   return result;
 }
 
 // Detect CrossSection (2D) vs Manifold (3D) for dispatch
-function is2D(x: any) {
-  return x != null && typeof x.offset === 'function' &&
-      typeof x.toPolygons === 'function';
+function is2D(x: unknown): boolean {
+  if (x === null || typeof x !== "object") return false;
+
+  const obj = x as Record<string, unknown>;
+
+  return (
+    typeof obj.offset === "function" &&
+    typeof obj.toPolygons === "function"
+  );
 }
 
-function isEmpty(x: any) {
+function isEmpty(x: unknown): boolean {
   if (!x) return true;
-  if (typeof x.isEmpty === 'function' && x.isEmpty()) return true;
-  if (typeof x.numTri === 'function' && x.numTri() === 0) return true;
-  if (typeof x.numVert === 'function' && x.numVert() === 0) return true;
+  if (typeof x !== "object") return false;
+
+  const obj = x as Record<string, unknown>;
+
+  if (typeof obj.isEmpty === "function" && obj.isEmpty()) return true;
+  if (typeof obj.numTri === "function" && obj.numTri() === 0) return true;
+  if (typeof obj.numVert === "function" && obj.numVert() === 0) return true;
+
   return false;
 }
 
 const TOL_FACTOR = Math.pow(2, -24);
-function maxBBoxDim3d(items: any[]): number {
-  let lo = [Infinity, Infinity, Infinity];
-  let hi = [-Infinity, -Infinity, -Infinity];
+type Vec3 = [number, number, number];
+
+type BoundingBox3D = {
+  min: Vec3;
+  max: Vec3;
+};
+
+type Item3D = {
+  boundingBox?: () => BoundingBox3D | null | undefined;
+  setTolerance?: (tolerance: number) => unknown;
+  tolerance?: () => number;
+};
+
+function maxBBoxDim3d(items: unknown[]): number {
+  const lo = [Infinity, Infinity, Infinity];
+  const hi = [-Infinity, -Infinity, -Infinity];
+
   for (const it of items) {
-    if (!it || typeof it.boundingBox !== 'function') continue;
-    const bb = it.boundingBox();
+    if (!it || typeof it !== "object") continue;
+
+    const item = it as Item3D;
+    if (typeof item.boundingBox !== "function") continue;
+
+    const bb = item.boundingBox();
     if (!bb || !bb.min || !bb.max) continue;
+
     for (let i = 0; i < 3; i++) {
-      if (bb.min[i] < lo[i]!) lo[i] = bb.min[i];
-      if (bb.max[i] > hi[i]!) hi[i] = bb.max[i];
+      const min = bb.min[i];
+      const max = bb.max[i];
+
+      if (typeof min === "number" && min < lo[i]!) lo[i] = min;
+      if (typeof max === "number" && max > hi[i]!) hi[i] = max;
     }
   }
+
   let maxDim = 0;
+
   for (let i = 0; i < 3; i++) {
     const d = hi[i]! - lo[i]!;
     if (Number.isFinite(d) && d > maxDim) maxDim = d;
   }
+
   return maxDim;
 }
-function withTol3d(items: any[]): any[] {
+
+function withTol3d(items: unknown[]): unknown[] {
   const maxDim = maxBBoxDim3d(items);
   if (!(maxDim > 0)) return items;
+
   const tol = maxDim * TOL_FACTOR;
+
   return items.map(it => {
-    if (it && typeof it.setTolerance === 'function' &&
-        typeof it.tolerance === 'function') {
-      return tol > it.tolerance() ? it.setTolerance(tol) : it;
+    if (!it || typeof it !== "object") return it;
+
+    const item = it as Item3D;
+
+    if (
+      typeof item.setTolerance === "function" &&
+      typeof item.tolerance === "function"
+    ) {
+      return tol > item.tolerance() ? item.setTolerance(tol) : it;
     }
+
     return it;
   });
 }
 
 // OpenSCAD cannot mix 2D and 3D in a boolean op - it keeps the dimension of the
 // first child and ignores (with a warning) any children of the other dimension.
-function sameDim(items: any[], ref2D: boolean): any[] {
+function sameDim<T>(items: T[], ref2D: boolean): T[] {
   return items.filter(x => is2D(x) === ref2D);
 }
 
 // Root modifier (!): the first geometry evaluated under a `!` statement becomes
 // the design root - OpenSCAD renders only that subtree and ignores the rest of
 // the design
-let root_item: any = null;
-function rootMod(g: any): any {
+let root_item: unknown = null;
+
+function rootMod<T>(g: T): T {
   if (root_item === null && g !== null && g !== undefined) root_item = g;
   return g;
 }
-function applyRoot(items: any[], isBackground = false): any[] {
+
+function applyRoot<T>(items: T[], isBackground = false): T[] {
   if (root_item === null) return items;
-  return isBackground ? [] : [root_item];
+  return isBackground ? [] : [root_item as T];
 }
 
 // Boolean ops: use CrossSection for 2D, Manifold for 3D
-function union(items: any[]) {
+function union(items: unknown[]): unknown {
   const valid = items.filter(x => !isEmpty(x));
+
   if (valid.length === 0) return Manifold.union([]);
+
   const flat = is2D(valid[0]);
   const same = sameDim(valid, flat);
-  return flat ? CrossSection.union(same) : Manifold.union(withTol3d(same));
+
+  return flat
+    ? CrossSection.union(same as InstanceType<typeof CrossSection>[])
+    : Manifold.union(withTol3d(same) as InstanceType<typeof Manifold>[]);
 }
-function difference(first: any, rest: any[]) {
+
+function difference(first: unknown, rest: unknown[]): unknown {
   if (isEmpty(first)) return first;
+
   const flat = is2D(first);
   const validRest = sameDim(rest.filter(x => !isEmpty(x)), flat);
+
   if (validRest.length === 0) return first;
-  if (flat) return CrossSection.difference([first, ...validRest]);
+
+  if (flat) {
+    return CrossSection.difference([first as InstanceType<typeof CrossSection> | Polygons, ...(validRest as InstanceType<typeof CrossSection>[] | Polygons[])]);
+  }
+
   const [tf, ...tr] = withTol3d([first, ...validRest]);
-  return tr.length === 1 ? tf.subtract(tr[0]) : tf.subtract(Manifold.union(tr));
+
+  return tr.length === 1
+    ? (tf as InstanceType<typeof Manifold>).subtract(tr[0] as InstanceType<typeof Manifold>)
+    : (tf as InstanceType<typeof Manifold>).subtract(Manifold.union(tr as InstanceType<typeof Manifold>[]));
 }
-function intersection(items: any[]) {
+
+function intersection(items: unknown[]): unknown {
   if (items.length === 0) return Manifold.union([]);
+
   const valid = items.filter(x => !isEmpty(x));
+
   if (valid.length < items.length) {
     const firstValid2D = valid.find(is2D);
     return firstValid2D ? CrossSection.union([]) : Manifold.union([]);
   }
+
   const flat = is2D(valid[0]);
   const same = sameDim(valid, flat);
+
   // Intersecting across dimensions (e.g. a 3D solid with a 2D shape) has no
   // common volume, so OpenSCAD yields an empty result.
-  if (same.length < valid.length)
+  if (same.length < valid.length) {
     return flat ? CrossSection.union([]) : Manifold.union([]);
-  return flat ? CrossSection.intersection(same) :
-                Manifold.intersection(withTol3d(same));
-}
-function hull(items: any[]) {
-  const valid = items.filter(x => !isEmpty(x));
-  if (valid.length === 0) return Manifold.union([]);
-  return is2D(valid[0]) ? CrossSection.hull(valid) : Manifold.hull(valid);
+  }
+
+  return flat
+    ? CrossSection.intersection(same as InstanceType<typeof CrossSection>[] | Polygons[])
+    : Manifold.intersection(withTol3d(same) as InstanceType<typeof Manifold>[]);
 }
 
-function minkowski(items: any[]) {
+function hull(items: unknown[]): unknown {
+  const valid = items.filter(x => !isEmpty(x));
+
+  if (valid.length === 0) return Manifold.union([]);
+
+  return is2D(valid[0])
+    ? CrossSection.hull(valid as InstanceType<typeof CrossSection>[] | Polygons[])
+    : Manifold.hull(valid as InstanceType<typeof Manifold>[]);
+}
+
+function minkowski(items: unknown[]) {
   const valid = items.filter(x => !isEmpty(x));
   if (valid.length === 0) return Manifold.union([]);
   if (valid.length === 1) return valid[0];
@@ -1421,24 +1926,23 @@ function minkowski(items: any[]) {
   // Check ALL items upfront
   for (const item of valid) {
     if (is2D(item)) throw new Error('2D minkowski not implemented');
-    if (typeof item.minkowskiSum !== 'function')
+    if (typeof (item as InstanceType<typeof Manifold>).minkowskiSum !== 'function')
       throw new Error('Your manifold-3d build does not expose minkowskiSum');
   }
 
-  let acc = valid[0];
+  let acc = valid[0] as InstanceType<typeof Manifold>;
   for (let i = 1; i < valid.length; i++) {
-    acc = acc.minkowskiSum(valid[i]);
+    acc = acc.minkowskiSum(valid[i] as InstanceType<typeof Manifold>);
   }
   return acc;
 }
 
 // Returns `x` when it is a finite number, otherwise `dflt`
-function finiteOr(x: any, dflt: number): number {
+function finiteOr(x: unknown, dflt: number): number {
   return (typeof x === 'number' && Number.isFinite(x)) ? x : dflt;
 }
 
-function normalizeScale(scale: number|number[]|undefined): [number, number]|
-    undefined {
+function normalizeScale(scale: number|number[]|undefined): [number, number]|undefined {
   if (scale === undefined || scale === null) return undefined;
   // OpenSCAD accepts only a finite scalar or a 2-element finite vector for
   // scaling; anything else is treated as no scaling
@@ -1462,7 +1966,7 @@ function archimedesLength(a: number, theta: number): number {
 }
 
 // Slice calculation logic for curves, helices, and conical helices
-function computeExtrudeDivisions(shape: any, height: number, options: {
+function computeExtrudeDivisions(shape: unknown, height: number, options: {
   twist?: number;
   scale?: number | number[] | undefined;
   fn?: number;
@@ -1494,7 +1998,7 @@ function computeExtrudeDivisions(shape: any, height: number, options: {
   let rSqr = 0;
   let maxDeltaSqr = 0;
   try {
-    const polys = shape.toPolygons();
+    const polys = (shape as InstanceType<typeof CrossSection>).toPolygons();
     for (const poly of polys) {
       for (const p of poly) {
         const dSqr0 = p[0] * p[0] + p[1] * p[1];
@@ -1686,10 +2190,10 @@ function dropCollinear(poly: [number, number][]): [number, number][] {
 }
 
 function extrudeTwisted(
-    shape: any, height: number, twistDeg: number, slices: number,
+    shape: unknown, height: number, twistDeg: number, slices: number,
     scaleVec: [number, number]|undefined, center: boolean|undefined, fn: number,
-    fa: number, fs: number, segments?: number): any {
-  const rawPolys: [number, number][][] = shape.toPolygons().map(dropCollinear);
+    fa: number, fs: number, segments?: number): InstanceType<typeof Manifold> {
+  const rawPolys: [number, number][][] = (shape as InstanceType<typeof CrossSection>).toPolygons().map(dropCollinear);
   if (!rawPolys.length) return Manifold.union([]);
 
   const sx = scaleVec ? scaleVec[0] : 1;
@@ -1745,7 +2249,7 @@ function extrudeTwisted(
   }
   if (!capTris || !capTris.length) {
     // Fall back to Manifold's own twist extrude if the cap mapping failed.
-    return shape.extrude(
+    return (shape as InstanceType<typeof CrossSection>).extrude(
         height, Math.max(0, slices - 1), Math.abs(twistDeg), scaleVec, center);
   }
 
@@ -1847,11 +2351,11 @@ function extrudeTwisted(
       any);
 }
 
-function linear_extrude(shape: any, height?: number, options: {
+function linear_extrude(shape: unknown, height?: number, options: {
   twist?: number;
   scale?: number | number[] | undefined;
   center?: boolean;
-  v?: any;
+  v?: Vec3;
   fn?: number;
   fa?: number;
   fs?: number;
@@ -1912,7 +2416,7 @@ function linear_extrude(shape: any, height?: number, options: {
       options.segments :
       undefined;
 
-  let result: any;
+  let result: InstanceType<typeof Manifold>;
   if (twist !== 0 ||
       (normScale !== undefined && normScale[0] !== normScale[1])) {
     // Even without twist, non-uniform scaling uses the manual mesh builder to
@@ -1930,7 +2434,7 @@ function linear_extrude(shape: any, height?: number, options: {
         segments,
     );
   } else {
-    result = shape.extrude(
+    result = (shape as InstanceType<typeof CrossSection>).extrude(
         height, Math.max(0, nDivisions - 1), undefined, normScale,
         options.center);
   }
@@ -1947,7 +2451,7 @@ function linear_extrude(shape: any, height?: number, options: {
   return result;
 }
 
-function rotate_extrude(shape: any, fn = 0, fa = 12, fs = 2, angle = 360) {
+function rotate_extrude(shape: unknown, fn = 0, fa = 12, fs = 2, angle = 360) {
   if (isEmpty(shape)) {
     return Manifold.union([]);
   }
@@ -1961,13 +2465,13 @@ function rotate_extrude(shape: any, fn = 0, fa = 12, fs = 2, angle = 360) {
       return Manifold.union([]);
     }
 
-    const bounds = shape.bounds();
+    const bounds = (shape as InstanceType<typeof CrossSection>).bounds();
     // OpenSCAD supports profiles entirely on the negative X side; mirror them
     // to +X for Manifold's revolve, then rotate the result back by 180° to
     // match
     const onNegativeSide = bounds.max[0] <= 0;
     if (onNegativeSide) {
-      shape = shape.mirror([1, 0]);
+      shape = (shape as InstanceType<typeof CrossSection>).mirror([1, 0]);
     }
 
     const absAngle = Math.abs(angle);
@@ -1985,10 +2489,10 @@ function rotate_extrude(shape: any, fn = 0, fa = 12, fs = 2, angle = 360) {
     const num_sections =
         Math.max(1, Math.floor(full_fragments * absAngle / 360));
 
-    let revolved: any;
+    let revolved: InstanceType<typeof Manifold>;
     if (num_sections < 3) {
       const arc = absAngle * Math.PI / 180;
-      revolved = shape.extrude(1, num_sections - 1).warp((v: number[]) => {
+      revolved = (shape as InstanceType<typeof CrossSection>).extrude(1, num_sections - 1).warp((v: number[]) => {
         const phi = (1 - v[2]!) * arc;
         const x = v[0]!;
         const y = v[1]!;
@@ -1997,7 +2501,7 @@ function rotate_extrude(shape: any, fn = 0, fa = 12, fs = 2, angle = 360) {
         v[2] = y;
       });
     } else {
-      revolved = shape.revolve(num_sections, absAngle);
+      revolved = (shape as InstanceType<typeof CrossSection>).revolve(num_sections, absAngle);
     }
     if (angle < 0) revolved = revolved.mirror([0, 1, 0]);
     if (onNegativeSide) revolved = revolved.rotate([0, 0, 180]);
@@ -2037,114 +2541,139 @@ function sampleCubic(
   return pts;
 }
 
-function pathToContours(commands: any[], fn: number): [number, number][][] {
+type PathCommand =
+  | { type: "M" | "L"; x: number; y: number }
+  | { type: "Q"; x1: number; y1: number; x: number; y: number }
+  | {
+      type: "C";
+      x1: number;
+      y1: number;
+      x2: number;
+      y2: number;
+      x: number;
+      y: number;
+    }
+  | { type: "Z" };
+
+function pathToContours(
+  commands: PathCommand[],
+  fn: number
+): [number, number][][] {
   const steps = Math.max(2, fn > 0 ? Math.round(fn / 4) : 4);
   const contours: [number, number][][] = [];
-  let current: [number, number][]|null = null;
+  let current: [number, number][] | null = null;
 
   for (const cmd of commands) {
     switch (cmd.type) {
-      case 'M':  // Move to — starts a new contour
+      case "M":
         if (current && current.length >= 3) contours.push(current);
         current = [[cmd.x, cmd.y]];
         break;
 
-      case 'L':  // Line to
+      case "L":
         current?.push([cmd.x, cmd.y]);
         break;
 
-      case 'Q': {  // Quadratic bezier
+      case "Q": {
         if (!current) break;
+
         const prev = current[current.length - 1]!;
         const pts = sampleQuadratic(
-            prev[0], prev[1], cmd.x1, cmd.y1, cmd.x, cmd.y, steps);
+          prev[0], prev[1],
+          cmd.x1, cmd.y1,
+          cmd.x, cmd.y,
+          steps
+        );
+
         for (const [px, py] of pts) current.push([px, py]);
         break;
       }
 
-      case 'C': {  // Cubic bezier
+      case "C": {
         if (!current) break;
+
         const prev = current[current.length - 1]!;
         const pts = sampleCubic(
-            prev[0], prev[1], cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x, cmd.y,
-            steps);
+          prev[0], prev[1],
+          cmd.x1, cmd.y1,
+          cmd.x2, cmd.y2,
+          cmd.x, cmd.y,
+          steps
+        );
+
         for (const [px, py] of pts) current.push([px, py]);
         break;
       }
 
-      case 'Z':  // Close contour
+      case "Z":
         if (current && current.length >= 3) contours.push(current);
         current = null;
         break;
     }
   }
+
   if (current && current.length >= 3) contours.push(current);
-  return contours.map(c => c.map(([x, y]): [number, number] => [x, -y]));
+
+  return contours.map(c =>
+    c.map(([x, y]): [number, number] => [x, -y])
+  );
 }
 
-const opentypeFontCache = new Map<string, any>();
+type OpenTypeFont = ReturnType<typeof opentypeParse>;
 
-function getOpentypeFont(base64DataUrl: string): any|undefined {
+const opentypeFontCache = new Map<string, OpenTypeFont>();
+
+function getOpentypeFont(base64DataUrl: string): OpenTypeFont | undefined {
   const cached = opentypeFontCache.get(base64DataUrl);
   if (cached) return cached;
 
   try {
-    const base64 = base64DataUrl.replace(/^data:[^;]+;base64,/, '');
+    const base64 = base64DataUrl.replace(/^data:[^;]+;base64,/, "");
     const binaryStr = atob(base64);
     const bytes = new Uint8Array(binaryStr.length);
+
     for (let i = 0; i < binaryStr.length; i++) {
       bytes[i] = binaryStr.charCodeAt(i);
     }
+
     const font = opentypeParse(bytes.buffer as ArrayBuffer);
     opentypeFontCache.set(base64DataUrl, font);
+
     return font;
-  } catch (e) {
-    console.log('err: ', e);
+  } catch (e: unknown) {
+    console.log("err: ", e);
     return undefined;
   }
 }
 
-function opentypeGlyphContours(ch: string, font: any, size: number, fn: number):
-    {contours: [number, number][][]; width: number}|undefined {
+function opentypeGlyphContours(ch: string, font: OpenTypeFont, size: number, fn: number): { contours: [number, number][][]; width: number } | undefined {
   const fontSize = size * 100 / 72;
 
-  if (ch === ' ') {
-    const spaceGlyph = font.charToGlyph(' ');
-
+  if (ch === " ") {
+    const spaceGlyph = font.charToGlyph(" ");
     const scale = fontSize / font.unitsPerEm;
+    const spaceWidth = (spaceGlyph?.advanceWidth ?? font.unitsPerEm * 0.25) * scale;
 
-    const spaceWidth =
-        (spaceGlyph?.advanceWidth ?? font.unitsPerEm * 0.25) * scale;
-
-    return {contours: [], width: spaceWidth};
+    return { contours: [], width: spaceWidth };
   }
 
   const glyph = font.charToGlyph(ch);
 
-  if (!glyph || glyph.index === 0) {
-    return undefined;
-  }
+  if (!glyph || glyph.index === 0) return undefined;
 
   const scale = fontSize / font.unitsPerEm;
-
   const advance = (glyph.advanceWidth ?? 0) * scale;
-
   const glyphPath = glyph.getPath(0, 0, fontSize);
-
   const commands = glyphPath.commands;
 
-  if (!commands || commands.length === 0) {
-    return {contours: [], width: advance};
-  }
+  if (!commands || commands.length === 0) return { contours: [], width: advance };
 
   const contours = pathToContours(commands, fn);
 
-  return {contours, width: advance};
+  return { contours, width: advance };
 }
 
-function opentypeTextContours(
-    chars: string[], size: number, spacing: number, direction: string,
-    fontBase64: string, fn: number): [number, number][][]|undefined {
+function opentypeTextContours(chars: string[], size: number, spacing: number, direction: string, fontBase64: string, fn: number): [number, number][][] | undefined {
   const font = getOpentypeFont(fontBase64);
 
   if (!font) return undefined;
@@ -2193,7 +2722,7 @@ function fontToCss(font: string, px: number): string {
   return `${style} ${weight} ${px}px "${family}", Arial, sans-serif`;
 }
 
-function canvasForText(): any {
+function canvasForText() {
   if (typeof document !== 'undefined' &&
       typeof document.createElement === 'function') {
     return document.createElement('canvas');
@@ -2204,8 +2733,7 @@ function canvasForText(): any {
   return undefined;
 }
 
-function canvasGlyphContours(ch: string, font: string, size: number):
-    {contours: [number, number][][], width: number}|undefined {
+function canvasGlyphContours(ch: string, font: string, size: number): {contours: [number, number][][], width: number}|undefined {
   if (ch === ' ') return {contours: [], width: size * 0.35};
 
   const px = 128;
@@ -2215,7 +2743,7 @@ function canvasGlyphContours(ch: string, font: string, size: number):
 
   const canvas = canvasForText();
   const ctx =
-      canvas?.getContext('2d', {willReadFrequently: true} as any) as any;
+      canvas?.getContext('2d', {willReadFrequently: true});
   if (!canvas || !ctx) return undefined;
 
   ctx.font = fontToCss(font, px);
@@ -2280,11 +2808,8 @@ function canvasGlyphContours(ch: string, font: string, size: number):
   return result;
 }
 
-function canvasTextContours(
-    chars: string[], size: number, spacing: number, direction: string,
-    font: string): [number, number][][]|undefined {
-  if (typeof document === 'undefined' && typeof OffscreenCanvas === 'undefined')
-    return undefined;
+function canvasTextContours(chars: string[], size: number, spacing: number, direction: string, font: string): [number, number][][]|undefined {
+  if (typeof document === 'undefined' && typeof OffscreenCanvas === 'undefined') return undefined;
 
   const contours: [number, number][][] = [];
   const isVertical = direction === 'ttb' || direction === 'btt';
@@ -2320,7 +2845,7 @@ function canvasTextContours(
 async function text(
     text: string, size: number = 10, font: string, halign: string = 'left',
     valign: string = 'baseline', spacing: number = 1, direction: string = 'ltr',
-    fn: number = 0): Promise<any> {
+    fn: number = 0): Promise<InstanceType<typeof CrossSection>> {
   if (!text || text.length === 0)
     return CrossSection.square([0.001, 0.001], false);
 
@@ -2378,26 +2903,27 @@ async function text(
   return CrossSection.ofPolygons(shifted, 'EvenOdd');
 }
 
-function sync_quality(fa: any, fs: any) {
-  if (typeof wasm.setMinCircularAngle === 'function') {
-    if (typeof fa === 'number' && fa > 0) {
+function sync_quality(fa: unknown, fs: unknown): void {
+  if (typeof wasm.setMinCircularAngle === "function") {
+    if (typeof fa === "number" && fa > 0) {
       wasm.setMinCircularAngle(fa);
     }
   }
-  if (typeof wasm.setMinCircularEdgeLength === 'function') {
-    if (typeof fs === 'number' && fs > 0) {
+
+  if (typeof wasm.setMinCircularEdgeLength === "function") {
+    if (typeof fs === "number" && fs > 0) {
       wasm.setMinCircularEdgeLength(fs);
     }
   }
 }
 
-// Only accepts actual finite numbers here; strings like "45", undef, bools,
+// Only accepts actual finite numbers here; strings like "45", undefined, bools,
 // etc. silently become 0
-function rot_angle(x: any): number {
-  return (typeof x === 'number' && isFinite(x)) ? x : 0;
+function rot_angle(x: unknown): number {
+  return typeof x === "number" && Number.isFinite(x) ? x : 0;
 }
 
-function rotate(shape: any, a: any, v?: any) {
+function rotate(shape: unknown, a: Vec, v?: Vec) {
   if (!shape) return shape;
 
   // Vector angle: XYZ euler rotation. OpenSCAD ignores 'v' entirely, uses only
@@ -2407,9 +2933,9 @@ function rotate(shape: any, a: any, v?: any) {
     const ey = rot_angle(a[1]);
     const ez = rot_angle(a[2]);
     if (is2D(shape)) {
-      return shape.rotate(ez);
+      return (shape as InstanceType<typeof CrossSection>).rotate(ez);
     }
-    return shape.rotate([ex, ey, ez]);
+    return (shape as InstanceType<typeof Manifold>).rotate([ex, ey, ez]);
   }
 
   // Scalar angle: rotate about axis 'v'. Defaults to Z and keeps that default
@@ -2417,16 +2943,16 @@ function rotate(shape: any, a: any, v?: any) {
   const angle = rot_angle(a);
   let vx = 0, vy = 0, vz = 1;
   if (Array.isArray(v) && (v.length === 2 || v.length === 3) &&
-      v.every((c: any) => typeof c === 'number' && isFinite(c))) {
-    vx = v[0];
-    vy = v[1];
-    vz = v.length === 3 ? v[2] : 0;
+      v.every((c: unknown) => typeof c === 'number' && isFinite(c))) {
+    vx = v[0] as number;
+    vy = v[1] as number;
+    vz = v.length === 3 ? v[2] as number : 0;
   } else if (
       v !== undefined && v !== null && !Array.isArray(v) &&
       typeof v === 'object') {
-    vx = Number(v.x) || 0;
-    vy = Number(v.y) || 0;
-    vz = Number(v.z) || 0;
+    vx = Number((v as {x: unknown}).x) || 0;
+    vy = Number((v as {y: unknown}).y) || 0;
+    vz = Number((v as {z: unknown}).z) || 0;
   }
 
   const len = Math.sqrt(vx * vx + vy * vy + vz * vz);
@@ -2434,13 +2960,13 @@ function rotate(shape: any, a: any, v?: any) {
 
   if (is2D(shape)) {
     if (Math.abs(vz) > 1e-9) {
-      return shape.rotate(angle * Math.sign(vz));
+      return (shape as InstanceType<typeof CrossSection>).rotate(angle * Math.sign(vz));
     }
     return shape;
   }
 
   if (vx === 0 && vy === 0) {
-    return shape.rotate([0, 0, angle * Math.sign(vz)]);
+    return (shape as InstanceType<typeof Manifold>).rotate([0, 0, angle * Math.sign(vz)]);
   }
 
   const theta = angle * Math.PI / 180;
@@ -2468,10 +2994,10 @@ function rotate(shape: any, a: any, v?: any) {
     [0, 0, 0, 1]
   ];
 
-  return transform(shape, R);
+  return transform(shape as InstanceType<typeof Manifold> | InstanceType<typeof CrossSection>, R);
 }
 
-function translate(shape: any, v: any) {
+function translate(shape: unknown, v: Vec) {
   if (!shape) return shape;
   if (is2D(shape)) {
     let x = 0, y = 0;
@@ -2479,12 +3005,12 @@ function translate(shape: any, v: any) {
       x = Number(v[0]) || 0;
       y = Number(v[1]) || 0;
     } else if (v && typeof v === 'object') {
-      x = Number(v.x || v[0]) || 0;
-      y = Number(v.y || v[1]) || 0;
+      x = Number((v as {x: unknown}).x || v[0]) || 0;
+      y = Number((v as {y: unknown}).y || v[1]) || 0;
     } else {
       x = Number(v) || 0;
     }
-    return shape.translate([x, y]);
+    return (shape as InstanceType<typeof CrossSection>).translate([x, y]);
   } else {
     let x = 0, y = 0, z = 0;
     if (Array.isArray(v)) {
@@ -2492,17 +3018,17 @@ function translate(shape: any, v: any) {
       y = Number(v[1]) || 0;
       z = Number(v[2]) || 0;
     } else if (v && typeof v === 'object') {
-      x = Number(v.x || v[0]) || 0;
-      y = Number(v.y || v[1]) || 0;
-      z = Number(v.z || v[2]) || 0;
+      x = Number((v as {x: unknown}).x || v[0]) || 0;
+      y = Number((v as {y: unknown}).y || v[1]) || 0;
+      z = Number((v as {z: unknown}).z || v[2]) || 0;
     } else {
       x = Number(v) || 0;
     }
-    return shape.translate([x, y, z]);
+    return (shape as InstanceType<typeof Manifold>).translate([x, y, z]);
   }
 }
 
-function scale(shape: any, v: any) {
+function scale(shape: unknown, v: Vec) {
   if (!shape) return shape;
   if (is2D(shape)) {
     let x = 1, y = 1;
@@ -2510,16 +3036,12 @@ function scale(shape: any, v: any) {
       x = v[0] !== undefined && v[0] !== null ? Number(v[0]) : 1;
       y = v[1] !== undefined && v[1] !== null ? Number(v[1]) : 1;
     } else if (v && typeof v === 'object') {
-      x = (v.x !== undefined ? v.x : v[0]) !== undefined ?
-          Number(v.x !== undefined ? v.x : v[0]) :
-          1;
-      y = (v.y !== undefined ? v.y : v[1]) !== undefined ?
-          Number(v.y !== undefined ? v.y : v[1]) :
-          1;
+      x = (v as {x: unknown}).x !== undefined ? Number((v as {x: unknown}).x) : 1;
+      y = (v as {y: unknown}).y !== undefined ? Number((v as {y: unknown}).y) : 1;
     } else if (typeof v === 'number' && !Number.isNaN(v)) {
       x = y = v;
     }
-    return shape.scale([x, y]);
+    return (shape as InstanceType<typeof CrossSection>).scale([x, y]);
   } else {
     let x = 1, y = 1, z = 1;
     if (Array.isArray(v)) {
@@ -2527,29 +3049,24 @@ function scale(shape: any, v: any) {
       y = v[1] !== undefined && v[1] !== null ? Number(v[1]) : 1;
       z = v[2] !== undefined && v[2] !== null ? Number(v[2]) : 1;
     } else if (v && typeof v === 'object') {
-      x = (v.x !== undefined ? v.x : v[0]) !== undefined ?
-          Number(v.x !== undefined ? v.x : v[0]) :
-          1;
-      y = (v.y !== undefined ? v.y : v[1]) !== undefined ?
-          Number(v.y !== undefined ? v.y : v[1]) :
-          1;
-      z = (v.z !== undefined ? v.z : v[2]) !== undefined ?
-          Number(v.z !== undefined ? v.z : v[2]) :
-          1;
+      x = (v as {x: unknown}).x !== undefined ? Number((v as {x: unknown}).x) : 1;
+      y = (v as {y: unknown}).y !== undefined ? Number((v as {y: unknown}).y) : 1;
+      z = (v as {z: unknown}).z !== undefined ? Number((v as {z: unknown}).z) : 1;
     } else if (typeof v === 'number' && !Number.isNaN(v)) {
       x = y = z = v;
     }
-    return shape.scale([x, y, z]);
+    return (shape as InstanceType<typeof Manifold>).scale([x, y, z]);
   }
 }
 
 // Scale about the origin to fit `newsize`, preserving zero-sized axes unless
 // `auto` is enabled, with the auto scale taken from the largest requested
 // dimension
-function resize(shape: any, newsizeRaw: any, autoRaw: any) {
+function resize(shape: unknown, newsizeRaw: number[], autoRaw: unknown): unknown {
   if (!shape || isEmpty(shape)) return shape;
 
   const newsize = [0, 0, 0];
+
   if (is_list(newsizeRaw)) {
     for (let i = 0; i < 3 && i < newsizeRaw.length; i++) {
       const n = Number(newsizeRaw[i]);
@@ -2558,47 +3075,70 @@ function resize(shape: any, newsizeRaw: any, autoRaw: any) {
   }
 
   const autosize = [false, false, false];
+
   if (is_list(autoRaw)) {
-    for (let i = 0; i < 3 && i < autoRaw.length; i++)
-      autosize[i] = truthy(autoRaw[i]);
-  } else if (typeof autoRaw === 'boolean') {
+    for (let i = 0; i < 3 && i < (autoRaw as boolean[]).length; i++) {
+      autosize[i] = truthy((autoRaw as boolean[])[i]);
+    }
+  } else if (typeof autoRaw === "boolean") {
     autosize[0] = autosize[1] = autosize[2] = autoRaw;
   }
 
   const flat = is2D(shape);
   const dim = flat ? 2 : 3;
-  const bb = flat ? shape.bounds() : shape.boundingBox();
+
+  const bb = flat
+    ? (shape as InstanceType<typeof CrossSection>).bounds()
+    : (shape as InstanceType<typeof Manifold>).boundingBox();
+
   const bboxSize = [0, 0, 0];
-  for (let i = 0; i < dim; i++) bboxSize[i] = bb.max[i] - bb.min[i];
+
+  for (let i = 0; i < dim; i++) {
+    bboxSize[i] = bb.max[i]! - bb.min[i]!;
+  }
 
   // Non-positive `newsize` components are treated as unspecified, and `auto`
   // uses the scale of the largest requested dimension
   let maxIdx = 0;
+
   for (let i = 1; i < 3; i++) {
     if (newsize[i]! > newsize[maxIdx]!) maxIdx = i;
   }
+
   const scale = [1, 1, 1];
+
   for (let i = 0; i < dim; i++) {
     if (newsize[i]! > 0) {
       if (bboxSize[i] === 0) {
         console.warn(
-            'WARNING: Resize in direction normal to flat object is not implemented');
+          "WARNING: Resize in direction normal to flat object is not implemented"
+        );
         return shape;
       }
+
       scale[i] = newsize[i]! / bboxSize[i]!;
     }
   }
+
   const autoscale = scale[maxIdx]!;
+
   for (let i = 0; i < dim; i++) {
-    if (autosize[i] && !(newsize[i]! > 0)) scale[i] = autoscale;
+    if (autosize[i] && !(newsize[i]! > 0)) {
+      scale[i] = autoscale;
+    }
   }
 
-  return flat ? shape.scale([scale[0], scale[1]]) : shape.scale(scale);
+  return flat
+    ? (shape as InstanceType<typeof CrossSection>).scale([
+        scale[0]!,
+        scale[1]!
+      ])
+    : (shape as InstanceType<typeof Manifold>).scale(scale as [number, number, number]);
 }
 
 // Build the reflection matrix to avoid rounding artifacts, and treat a
 // zero-length normal as an identity transform
-function mirror(shape: any, v: any) {
+function mirror(shape: unknown, v: Vec) {
   if (!shape) return shape;
   if (is2D(shape)) {
     let x = 0, y = 0;
@@ -2606,15 +3146,15 @@ function mirror(shape: any, v: any) {
       x = Number(v[0]) || 0;
       y = Number(v[1]) || 0;
     } else if (v && typeof v === 'object') {
-      x = Number(v.x || v[0]) || 0;
-      y = Number(v.y || v[1]) || 0;
+      x = Number((v as {x: number}).x || v[0]) || 0;
+      y = Number((v as {y: number}).y || v[1]) || 0;
     } else {
       x = Number(v) || 0;
     }
     const normSq = x * x + y * y;
     if (normSq === 0) return shape;
     const d = 2 / normSq;
-    return transform(shape, [
+    return transform(shape as InstanceType<typeof CrossSection>, [
       [1 - d * x * x, -d * x * y, 0, 0],
       [-d * x * y, 1 - d * y * y, 0, 0],
       [0, 0, 1, 0],
@@ -2626,16 +3166,16 @@ function mirror(shape: any, v: any) {
       y = Number(v[1]) || 0;
       z = Number(v[2]) || 0;
     } else if (v && typeof v === 'object') {
-      x = Number(v.x || v[0]) || 0;
-      y = Number(v.y || v[1]) || 0;
-      z = Number(v.z || v[2]) || 0;
+      x = Number((v as {x: number}).x || v[0]) || 0;
+      y = Number((v as {y: number}).y || v[1]) || 0;
+      z = Number((v as {z: number}).z || v[2]) || 0;
     } else {
       x = Number(v) || 0;
     }
     const normSq = x * x + y * y + z * z;
     if (normSq === 0) return shape;
     const d = 2 / normSq;
-    return transform(shape, [
+    return transform(shape as InstanceType<typeof Manifold>, [
       [1 - d * x * x, -d * x * y, -d * x * z, 0],
       [-d * x * y, 1 - d * y * y, -d * y * z, 0],
       [-d * x * z, -d * y * z, 1 - d * z * z, 0],
@@ -2643,7 +3183,7 @@ function mirror(shape: any, v: any) {
   }
 }
 
-function cube(size: any, center = false): InstanceType<typeof Manifold> {
+function cube(size: number | number[], center = false): InstanceType<typeof Manifold> {
   // Invalid or `undef` `size` uses the default (1,1,1), while only valid but
   // degenerate sizes produce empty geometry
   let v: number[] = [1, 1, 1];
@@ -2652,8 +3192,8 @@ function cube(size: any, center = false): InstanceType<typeof Manifold> {
       v = [size, size, size];
     } else if (
         is_list(size) && size.length === 3 &&
-        size.every((x: any) => typeof x === 'number')) {
-      v = [size[0], size[1], size[2]];
+        size.every((x) => typeof x === 'number')) {
+      v = [size[0]!, size[1]!, size[2]!];
     }
   }
   // A non-finite or non-positive dimension yields no geometry instead of
@@ -2664,7 +3204,7 @@ function cube(size: any, center = false): InstanceType<typeof Manifold> {
   return Manifold.cube(v as [number, number, number], center);
 }
 
-function square(size: any, center = false): InstanceType<typeof CrossSection> {
+function square(size: number | number[], center = false): InstanceType<typeof CrossSection> {
   // Invalid or `undef` `size` uses the default (1,1), while only valid but
   // degenerate sizes produce empty geometry
   let v: number[] = [1, 1];
@@ -2673,8 +3213,8 @@ function square(size: any, center = false): InstanceType<typeof CrossSection> {
       v = [size, size];
     } else if (
         is_list(size) && size.length === 2 &&
-        size.every((x: any) => typeof x === 'number')) {
-      v = [size[0], size[1]];
+        size.every((x: unknown) => typeof x === 'number')) {
+      v = [size[0]!, size[1]!];
     }
   }
   // A non-finite or non-positive dimension yields no geometry instead of
@@ -2686,7 +3226,7 @@ function square(size: any, center = false): InstanceType<typeof CrossSection> {
 }
 
 function sphere(
-    radius: any, fn = 0, fa = 12, fs = 2): InstanceType<typeof Manifold> {
+    radius: number, fn = 0, fa = 12, fs = 2): InstanceType<typeof Manifold> {
   // A non-finite (or non-positive) size produces no geometry instead of
   // crashing
   if (!Number.isFinite(radius) || radius <= 0) {
@@ -2746,24 +3286,28 @@ function sphere(
     tris.push(bot[0]!, bot[j + 1]!, bot[j]!);
   }
 
-  const mesh: any = {
+  const mesh = {
     vertProperties: new Float32Array(verts),
     triVerts: new Uint32Array(tris),
-    numProp: 3,
+    numProp: 3
   };
 
-  const sphere = new Manifold(mesh);
+  const sphere = new Manifold(mesh as InstanceType<typeof Mesh>);
 
   return sphere;
 }
 
-function radius(dSpec: any, rSpec: any, dGen: any, rGen: any, dflt: any) {
-  const def = (x: any) => x !== undefined && x !== null &&
-      !(typeof x === 'number' && Number.isNaN(x));
-  if (def(dSpec)) return dSpec / 2;
-  if (def(rSpec)) return rSpec;
-  if (def(dGen)) return dGen / 2;
-  if (def(rGen)) return rGen;
+function radius(dSpec: number | undefined | null, rSpec: number | undefined | null, dGen: number | undefined | null, rGen: number | undefined | null, dflt: number): number {
+  const def = (x: number | undefined | null) =>
+    x !== undefined &&
+    x !== null &&
+    !Number.isNaN(x);
+
+  if (def(dSpec)) return dSpec! / 2;
+  if (def(rSpec)) return rSpec!;
+  if (def(dGen)) return dGen! / 2;
+  if (def(rGen)) return rGen!;
+
   return dflt;
 }
 
@@ -2829,15 +3373,18 @@ function forceWinding(
   return contour;
 }
 
-function polygon(points: any, paths?: any): InstanceType<typeof CrossSection> {
+type Point2D = [number, number];
+type Path = number[];
+
+function polygon(points: Point2D[], paths?: Path | Path[]): InstanceType<typeof CrossSection> {
   if (!points || !Array.isArray(points) || points.length === 0) {
     return CrossSection.square(0);
   }
 
   // A point with a non-finite coordinate yields no geometry
   if (points.some(
-          (p: any) => Array.isArray(p) &&
-              p.some((c: any) => !Number.isFinite(Number(c))))) {
+          (p) => Array.isArray(p) &&
+              p.some((c) => !Number.isFinite(Number(c))))) {
     return CrossSection.square(0);
   }
 
@@ -2847,26 +3394,25 @@ function polygon(points: any, paths?: any): InstanceType<typeof CrossSection> {
   }
 
   if (Array.isArray(paths) && paths.length > 0 && !Array.isArray(paths[0])) {
-    const contour =
-        paths.map((idx: any) => points[Number(idx) || 0]).filter(Boolean);
-    const ccwContour = forceWinding(contour, true);
+    const contour = paths.map((idx) => points[Number(idx) || 0]).filter(Boolean);
+    const ccwContour = forceWinding(contour as Point2D[], true);
     return CrossSection.ofPolygons([ccwContour]);
   }
 
   if (Array.isArray(paths)) {
     const contours =
         paths
-            .map((path: any) => {
-              let contour: any[] = [];
+            .map((path) => {
+              let contour: Point2D[] = [];
               if (Array.isArray(path)) {
-                contour = path.map((idx: any) => points[Number(idx) || 0])
-                              .filter(Boolean);
+                contour = path.map((idx) => points[Number(idx) || 0])
+                              .filter(Boolean) as Point2D[];
               } else if (typeof path === 'number') {
-                contour = [points[path]];
+                contour = [points[path]] as Point2D[];
               }
               return contour;
             })
-            .filter((c: any) => c.length > 0);
+            .filter((c) => c.length > 0);
     // Use EvenOdd fill rule - OpenSCAD polygon() does not assume outer/hole
     // winding
     return CrossSection.ofPolygons(contours, 'EvenOdd');
@@ -2876,12 +3422,15 @@ function polygon(points: any, paths?: any): InstanceType<typeof CrossSection> {
   return CrossSection.ofPolygons([ccwPoints]);
 }
 
-function polyhedron(points: any, faces: any): InstanceType<typeof Manifold> {
+
+type Point3D = [number, number, number];
+type Face = number[];
+function polyhedron(points: Point3D[], faces: Face | Face[]): InstanceType<typeof Manifold> {
   // A point with a non-finite coordinate yields no geometry
   if (Array.isArray(points) &&
       points.some(
-          (p: any) => Array.isArray(p) &&
-              p.some((c: any) => !Number.isFinite(Number(c))))) {
+          (p) => Array.isArray(p) &&
+              p.some((c) => !Number.isFinite(Number(c))))) {
     return Manifold.union([]);
   }
   const verts: number[] = [];
@@ -2894,7 +3443,7 @@ function polyhedron(points: any, faces: any): InstanceType<typeof Manifold> {
   if (Array.isArray(faces)) {
     for (const face of faces) {
       if (!Array.isArray(face) || face.length < 3) continue;
-      const idx = face.map((i: any) => Number(i));
+      const idx = face.map((i) => Number(i));
       if (idx.length === 3) {
         tris.push(idx[2]!, idx[1]!, idx[0]!);
         continue;
@@ -2942,7 +3491,7 @@ function polyhedron(points: any, faces: any): InstanceType<typeof Manifold> {
                  p[0]! * vx + p[1]! * vy + p[2]! * vz,
         ]);
         try {
-          for (const t of wasm.triangulate([poly2d])) {
+          for (const t of wasm.triangulate([poly2d as SimplePolygon])) {
             tris.push(idx[t[2]!]!, idx[t[1]!]!, idx[t[0]!]!);
           }
           done = true;
@@ -2966,7 +3515,7 @@ function polyhedron(points: any, faces: any): InstanceType<typeof Manifold> {
   mesh.merge();
   try {
     return new Manifold(mesh);
-  } catch (e: any) {
+  } catch (e) {
     // OpenSCAD treats a non-manifold polyhedron as a soft error, produces empty
     // geometry
     console.warn('WARNING: Polyhedron is not manifold, object will be empty');
@@ -2974,14 +3523,20 @@ function polyhedron(points: any, faces: any): InstanceType<typeof Manifold> {
   }
 }
 
-function parse_color_for_scope(c: any, alpha: any): any {
+type RGBA = [number, number, number, number];
+
+function parse_color_for_scope(c: unknown, alpha: unknown): RGBA | undefined {
   const base = parse_color_value(c);
   if (!base) return undefined;
-  const a = (alpha !== undefined && alpha !== null &&
-             Number.isFinite(Number(alpha))) ?
-      Number(alpha) :
-      base[3];
-  return [base[0], base[1], base[2], a];
+
+  const a =
+    alpha !== undefined &&
+    alpha !== null &&
+    Number.isFinite(Number(alpha))
+      ? Number(alpha)
+      : base[3];
+
+  return [base[0]!, base[1]!, base[2]!, a!];
 }
 
 
