@@ -40,32 +40,37 @@ ManifoldError to_c(manifold::Manifold::Error error);
 ManifoldVec2 to_c(vec2 v);
 ManifoldVec3 to_c(vec3 v);
 ManifoldIVec3 to_c(ivec3 v);
-ManifoldTriangulation* to_c(std::vector<ivec3>* m);
+ManifoldTriangulation* to_c(std::vector<int>* m);
 ManifoldRayHitVec* to_c(RayHitVec* v);
 ManifoldExecutionContext* to_c(ExecutionContext* ctx);
 
-manifold::Manifold* from_c(ManifoldManifold* m);
+const manifold::Manifold* from_c(const ManifoldManifold* m);
+const ManifoldVec* from_c(const ManifoldManifoldVec* ms);
 ManifoldVec* from_c(ManifoldManifoldVec* ms);
-manifold::CrossSection* from_c(ManifoldCrossSection* cs);
+const manifold::CrossSection* from_c(const ManifoldCrossSection* cs);
 CrossSectionVec* from_c(ManifoldCrossSectionVec* csv);
-manifold::SimplePolygon* from_c(ManifoldSimplePolygon* m);
-manifold::Polygons* from_c(ManifoldPolygons* m);
-manifold::MeshGL* from_c(ManifoldMeshGL* m);
-manifold::MeshGL64* from_c(ManifoldMeshGL64* m);
+const CrossSectionVec* from_c(const ManifoldCrossSectionVec* csv);
+const manifold::SimplePolygon* from_c(const ManifoldSimplePolygon* m);
+const manifold::Polygons* from_c(const ManifoldPolygons* m);
+const manifold::MeshGL* from_c(const ManifoldMeshGL* m);
+const manifold::MeshGL64* from_c(const ManifoldMeshGL64* m);
 OpType from_c(ManifoldOpType op);
 CrossSection::JoinType from_c(ManifoldJoinType jt);
 manifold::Box* from_c(ManifoldBox* m);
+const manifold::Box* from_c(const ManifoldBox* m);
 manifold::Rect* from_c(ManifoldRect* r);
+const manifold::Rect* from_c(const ManifoldRect* r);
 vec2 from_c(ManifoldVec2 v);
 vec3 from_c(ManifoldVec3 v);
 ivec3 from_c(ManifoldIVec3 v);
 vec4 from_c(ManifoldVec4 v);
-std::vector<ivec3>* from_c(ManifoldTriangulation* m);
-RayHitVec* from_c(ManifoldRayHitVec* v);
+const std::vector<int>* from_c(const ManifoldTriangulation* m);
+const RayHitVec* from_c(const ManifoldRayHitVec* v);
+const ExecutionContext* from_c(const ManifoldExecutionContext* ctx);
 ExecutionContext* from_c(ManifoldExecutionContext* ctx);
 
 template <typename T>
-std::vector<T> vector_of_array(T* ts, size_t length) {
+std::vector<T> vector_of_array(const T* ts, size_t length) {
   auto vec = std::vector<T>();
   for (size_t i = 0; i < length; ++i) {
     vec.push_back(ts[i]);

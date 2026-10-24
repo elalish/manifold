@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include "conv.h"
+#include "include/manifold/manifoldc.h"
 #include "manifold/common.h"
 #include "manifold/cross_section.h"
 #include "manifold/types.h"
@@ -24,27 +25,29 @@ ManifoldCrossSection* manifold_cross_section_empty() {
   return to_c(new CrossSection());
 }
 
-ManifoldCrossSection* manifold_cross_section_copy(ManifoldCrossSection* cs) {
+ManifoldCrossSection* manifold_cross_section_copy(
+    const ManifoldCrossSection* cs) {
   auto cross = *from_c(cs);
   return to_c(new CrossSection(cross));
 }
 
 ManifoldCrossSection* manifold_cross_section_of_simple_polygon(
-    ManifoldSimplePolygon* p) {
+    const ManifoldSimplePolygon* p) {
   return to_c(new CrossSection(*from_c(p)));
 }
 
-ManifoldCrossSection* manifold_cross_section_of_polygons(ManifoldPolygons* p) {
+ManifoldCrossSection* manifold_cross_section_of_polygons(
+    const ManifoldPolygons* p) {
   return to_c(new CrossSection(*from_c(p)));
 }
 
 ManifoldCrossSection* manifold_cross_section_even_odd_simple_polygon(
-    ManifoldSimplePolygon* p) {
+    const ManifoldSimplePolygon* p) {
   return to_c(new CrossSection(CrossSection::EvenOdd(*from_c(p))));
 }
 
 ManifoldCrossSection* manifold_cross_section_even_odd_polygons(
-    ManifoldPolygons* p) {
+    const ManifoldPolygons* p) {
   return to_c(new CrossSection(CrossSection::EvenOdd(*from_c(p))));
 }
 
@@ -61,23 +64,23 @@ void manifold_cross_section_vec_reserve(ManifoldCrossSectionVec* csv,
   from_c(csv)->reserve(sz);
 }
 
-size_t manifold_cross_section_vec_length(ManifoldCrossSectionVec* csv) {
+size_t manifold_cross_section_vec_length(const ManifoldCrossSectionVec* csv) {
   return from_c(csv)->size();
 }
 
 ManifoldCrossSection* manifold_cross_section_vec_get(
-    ManifoldCrossSectionVec* csv, size_t idx) {
+    const ManifoldCrossSectionVec* csv, size_t idx) {
   auto cs = (*from_c(csv))[idx];
   return to_c(new CrossSection(cs));
 }
 
 void manifold_cross_section_vec_set(ManifoldCrossSectionVec* csv, size_t idx,
-                                    ManifoldCrossSection* cs) {
+                                    const ManifoldCrossSection* cs) {
   (*from_c(csv))[idx] = *from_c(cs);
 }
 
 void manifold_cross_section_vec_push_back(ManifoldCrossSectionVec* csv,
-                                          ManifoldCrossSection* cs) {
+                                          const ManifoldCrossSection* cs) {
   return from_c(csv)->push_back(*from_c(cs));
 }
 
@@ -93,95 +96,95 @@ ManifoldCrossSection* manifold_cross_section_circle(double radius,
   return to_c(new CrossSection(cs));
 }
 
-ManifoldCrossSection* manifold_cross_section_boolean(ManifoldCrossSection* a,
-                                                     ManifoldCrossSection* b,
-                                                     ManifoldOpType op) {
+ManifoldCrossSection* manifold_cross_section_boolean(
+    const ManifoldCrossSection* a, const ManifoldCrossSection* b,
+    ManifoldOpType op) {
   auto cs = from_c(a)->Boolean(*from_c(b), from_c(op));
   return to_c(new CrossSection(cs));
 }
 
 ManifoldCrossSection* manifold_cross_section_batch_boolean(
-    ManifoldCrossSectionVec* csv, ManifoldOpType op) {
+    const ManifoldCrossSectionVec* csv, ManifoldOpType op) {
   auto cs = CrossSection::BatchBoolean(*from_c(csv), from_c(op));
   return to_c(new CrossSection(cs));
 }
 
-ManifoldCrossSection* manifold_cross_section_union(ManifoldCrossSection* a,
-                                                   ManifoldCrossSection* b) {
+ManifoldCrossSection* manifold_cross_section_union(
+    const ManifoldCrossSection* a, const ManifoldCrossSection* b) {
   auto cs = (*from_c(a)) + (*from_c(b));
   return to_c(new CrossSection(cs));
 }
 
 ManifoldCrossSection* manifold_cross_section_difference(
-    ManifoldCrossSection* a, ManifoldCrossSection* b) {
+    const ManifoldCrossSection* a, const ManifoldCrossSection* b) {
   auto cs = (*from_c(a)) - (*from_c(b));
   return to_c(new CrossSection(cs));
 }
 
 ManifoldCrossSection* manifold_cross_section_intersection(
-    ManifoldCrossSection* a, ManifoldCrossSection* b) {
+    const ManifoldCrossSection* a, const ManifoldCrossSection* b) {
   auto cs = (*from_c(a)) ^ (*from_c(b));
   return to_c(new CrossSection(cs));
 }
 
-ManifoldCrossSection* manifold_cross_section_hull(ManifoldCrossSection* cs) {
+ManifoldCrossSection* manifold_cross_section_hull(
+    const ManifoldCrossSection* cs) {
   auto hulled = from_c(cs)->Hull();
   return to_c(new CrossSection(hulled));
 }
 
 ManifoldCrossSection* manifold_cross_section_batch_hull(
-    ManifoldCrossSectionVec* css) {
+    const ManifoldCrossSectionVec* css) {
   auto hulled = CrossSection::Hull(*from_c(css));
   return to_c(new CrossSection(hulled));
 }
 
 ManifoldCrossSection* manifold_cross_section_hull_simple_polygon(
-    ManifoldSimplePolygon* ps) {
+    const ManifoldSimplePolygon* ps) {
   auto hulled = CrossSection::Hull(*from_c(ps));
   return to_c(new CrossSection(hulled));
 }
 
 ManifoldCrossSection* manifold_cross_section_hull_polygons(
-    ManifoldPolygons* ps) {
+    const ManifoldPolygons* ps) {
   auto hulled = CrossSection::Hull(*from_c(ps));
   return to_c(new CrossSection(hulled));
 }
 
-ManifoldCrossSection* manifold_cross_section_translate(ManifoldCrossSection* cs,
-                                                       double x, double y) {
+ManifoldCrossSection* manifold_cross_section_translate(
+    const ManifoldCrossSection* cs, double x, double y) {
   auto translated = from_c(cs)->Translate(vec2(x, y));
   return to_c(new CrossSection(translated));
 }
 
-ManifoldCrossSection* manifold_cross_section_rotate(ManifoldCrossSection* cs,
-                                                    double deg) {
+ManifoldCrossSection* manifold_cross_section_rotate(
+    const ManifoldCrossSection* cs, double deg) {
   auto rotated = from_c(cs)->Rotate(deg);
   return to_c(new CrossSection(rotated));
 }
 
-ManifoldCrossSection* manifold_cross_section_scale(ManifoldCrossSection* cs,
-                                                   double x, double y) {
+ManifoldCrossSection* manifold_cross_section_scale(
+    const ManifoldCrossSection* cs, double x, double y) {
   auto scaled = from_c(cs)->Scale(vec2(x, y));
   return to_c(new CrossSection(scaled));
 }
 
-ManifoldCrossSection* manifold_cross_section_mirror(ManifoldCrossSection* cs,
-                                                    double ax_x, double ax_y) {
+ManifoldCrossSection* manifold_cross_section_mirror(
+    const ManifoldCrossSection* cs, double ax_x, double ax_y) {
   auto mirrored = from_c(cs)->Mirror(vec2(ax_x, ax_y));
   return to_c(new CrossSection(mirrored));
 }
 
-ManifoldCrossSection* manifold_cross_section_transform(ManifoldCrossSection* cs,
-                                                       double x1, double y1,
-                                                       double x2, double y2,
-                                                       double x3, double y3) {
+ManifoldCrossSection* manifold_cross_section_transform(
+    const ManifoldCrossSection* cs, double x1, double y1, double x2, double y2,
+    double x3, double y3) {
   auto mat = mat2x3({x1, y1}, {x2, y2}, {x3, y3});
   auto transformed = from_c(cs)->Transform(mat);
   return to_c(new CrossSection(transformed));
 }
 
 ManifoldCrossSection* manifold_cross_section_warp_context(
-    ManifoldCrossSection* cs, ManifoldVec2 (*fun)(double, double, void*),
+    const ManifoldCrossSection* cs, ManifoldVec2 (*fun)(double, double, void*),
     void* ctx) {
   // Bind function with context argument to one without
   using namespace std::placeholders;
@@ -193,50 +196,49 @@ ManifoldCrossSection* manifold_cross_section_warp_context(
   return to_c(new CrossSection(warped));
 }
 
-ManifoldCrossSection* manifold_cross_section_simplify(ManifoldCrossSection* cs,
-                                                      double tolerance) {
+ManifoldCrossSection* manifold_cross_section_simplify(
+    const ManifoldCrossSection* cs, double tolerance) {
   auto simplified = from_c(cs)->Simplify(tolerance);
   return to_c(new CrossSection(simplified));
 }
 
-ManifoldCrossSection* manifold_cross_section_offset(ManifoldCrossSection* cs,
-                                                    double delta,
-                                                    ManifoldJoinType jt,
-                                                    double miter_limit,
-                                                    int circular_segments) {
+ManifoldCrossSection* manifold_cross_section_offset(
+    const ManifoldCrossSection* cs, double delta, ManifoldJoinType jt,
+    double miter_limit, int circular_segments) {
   auto offset =
       from_c(cs)->Offset(delta, from_c(jt), miter_limit, circular_segments);
   return to_c(new CrossSection(offset));
 }
 
-double manifold_cross_section_area(ManifoldCrossSection* cs) {
+double manifold_cross_section_area(const ManifoldCrossSection* cs) {
   return from_c(cs)->Area();
 }
 
-size_t manifold_cross_section_num_vert(ManifoldCrossSection* cs) {
+size_t manifold_cross_section_num_vert(const ManifoldCrossSection* cs) {
   return from_c(cs)->NumVert();
 }
 
-size_t manifold_cross_section_num_contour(ManifoldCrossSection* cs) {
+size_t manifold_cross_section_num_contour(const ManifoldCrossSection* cs) {
   return from_c(cs)->NumContour();
 }
 
-int manifold_cross_section_is_empty(ManifoldCrossSection* cs) {
+int manifold_cross_section_is_empty(const ManifoldCrossSection* cs) {
   return from_c(cs)->IsEmpty();
 }
 
-ManifoldRect* manifold_cross_section_bounds(ManifoldCrossSection* cs) {
+ManifoldRect* manifold_cross_section_bounds(const ManifoldCrossSection* cs) {
   auto rect = from_c(cs)->Bounds();
   return to_c(new Rect(rect));
 }
 
-ManifoldPolygons* manifold_cross_section_to_polygons(ManifoldCrossSection* cs) {
+ManifoldPolygons* manifold_cross_section_to_polygons(
+    const ManifoldCrossSection* cs) {
   auto ps = from_c(cs)->ToPolygons();
   return to_c(new Polygons(ps));
 }
 
 ManifoldCrossSectionVec* manifold_cross_section_decompose(
-    ManifoldCrossSection* cs) {
+    const ManifoldCrossSection* cs) {
   auto comps = from_c(cs)->Decompose();
   return to_c(new CrossSectionVec(comps));
 }
