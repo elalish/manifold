@@ -3,7 +3,7 @@
  * Loaded via import from compiled files. Initializes manifold-3d and provides
  * OpenSCAD built-ins and helpers. Exports all symbols for use by compiled code.
  */
-import Module, { type Polygons, type SimplePolygon } from 'manifold-3d';
+import Module, {type Polygons, type SimplePolygon} from 'manifold-3d';
 import * as opentype from 'opentype.js';
 
 import {computeFontData} from './utils/font.js';
@@ -11,9 +11,9 @@ import {computeSurfaceData} from './utils/surface.js';
 
 const opentypeParse = opentype.parse || (opentype).default?.parse;
 
-declare const document: Document | undefined;
-declare const OffscreenCanvas: OffscreenCanvas | undefined;
-type Vec = (number | Vec)[];
+declare const document: Document|undefined;
+declare const OffscreenCanvas: OffscreenCanvas|undefined;
+type Vec = (number|Vec)[];
 
 const wasm = await Module();
 wasm.setup();
@@ -187,7 +187,7 @@ function round(x: number): number {
 let sqrt = Math.sqrt;
 let exp = Math.exp;
 // ln() is the natural log and takes exactly one argument
-function ln<T extends number>(x: T): number | undefined {
+function ln<T extends number>(x: T): number|undefined {
   if (arguments.length !== 1) return undefined;
   return Math.log(x);
 }
@@ -196,23 +196,25 @@ function ln<T extends number>(x: T): number | undefined {
   so log(b, x) is log_b(x) - note the order, which is the reverse of how most
   languages spell it. Any other arity is undef.
 */
-function log<B extends number, X extends number>(base: B, x?: X): number | undefined {
+function log<B extends number, X extends number>(base: B, x?: X): number|
+    undefined {
   if (arguments.length === 1) return Math.log10(base);
-  if (arguments.length === 2 && x !== undefined) return Math.log(x) / Math.log(base);
+  if (arguments.length === 2 && x !== undefined)
+    return Math.log(x) / Math.log(base);
   return undefined;
 }
 
 type NumericReducer = (a: number, b: number) => number;
 
-function minmax(reduce: NumericReducer, a: unknown[]): number | undefined {
+function minmax(reduce: NumericReducer, a: unknown[]): number|undefined {
   const vals: unknown[] = a.length === 1 && Array.isArray(a[0]) ? a[0] : a;
 
   if (vals.length === 0) return undefined;
 
-  let acc: number | undefined = undefined;
+  let acc: number|undefined = undefined;
 
   for (const v of vals) {
-    if (typeof v !== "number") return undefined;
+    if (typeof v !== 'number') return undefined;
 
     acc = acc === undefined ? v : reduce(acc, v);
   }
@@ -220,37 +222,38 @@ function minmax(reduce: NumericReducer, a: unknown[]): number | undefined {
   return acc;
 }
 
-function min(...a: unknown[]): number | undefined {
+function min(...a: unknown[]): number|undefined {
   return minmax(Math.min, a);
 }
 
-function max(...a: unknown[]): number | undefined {
+function max(...a: unknown[]): number|undefined {
   return minmax(Math.max, a);
 }
 
-function norm<T extends Vec>(...args: [T]): number | undefined {
+function norm<T extends Vec>(...args: [T]): number|undefined {
   if (args.length !== 1 || !isVec(args[0])) return undefined;
 
   let sum = 0;
 
   for (const x of args[0]) {
-    if (typeof x !== "number") return undefined;
+    if (typeof x !== 'number') return undefined;
     sum += x * x;
   }
 
   return Math.sqrt(sum);
 }
 
-function cross(a: number[], b: number[]): number | Vec3 | undefined {
+function cross(a: number[], b: number[]): number|Vec3|undefined {
   if (!Array.isArray(a) || !Array.isArray(b)) return undefined;
 
-  if ((a.length !== 2 || b.length !== 2) && (a.length !== 3 || b.length !== 3)) {
-    console.warn("WARNING: Invalid arguments to cross()");
+  if ((a.length !== 2 || b.length !== 2) &&
+      (a.length !== 3 || b.length !== 3)) {
+    console.warn('WARNING: Invalid arguments to cross()');
     return undefined;
   }
 
-  if (![...a, ...b].every((x) => typeof x === "number" && Number.isFinite(x))) {
-    console.warn("WARNING: Invalid value in parameter vector for cross()");
+  if (![...a, ...b].every((x) => typeof x === 'number' && Number.isFinite(x))) {
+    console.warn('WARNING: Invalid value in parameter vector for cross()');
     return undefined;
   }
 
@@ -266,10 +269,10 @@ function cross(a: number[], b: number[]): number | Vec3 | undefined {
 }
 
 // String & list (OpenSCAD built-ins)
-function len<T extends string | Vec>(x: T): number | undefined {
+function len<T extends string|Vec>(x: T): number|undefined {
   if (arguments.length !== 1) return undefined;
 
-  if (typeof x === "string") {
+  if (typeof x === 'string') {
     return Array.from(x).length;
   }
 
@@ -277,16 +280,16 @@ function len<T extends string | Vec>(x: T): number | undefined {
     return x.length;
   }
 
-  console.warn("WARNING: len() parameter could not be converted");
+  console.warn('WARNING: len() parameter could not be converted');
   return undefined;
 }
 
 function ostr<T>(x: T): string {
-  if (x === undefined || x === null) return "undef";
-  if (typeof x === "boolean") return x ? "true" : "false";
-  if (typeof x === "string") return x;
-  if (Array.isArray(x)) return "[" + x.map(ostrInner).join(", ") + "]";
-  if (typeof x === "function") return (x as any).__oscadSrc ?? String(x);
+  if (x === undefined || x === null) return 'undef';
+  if (typeof x === 'boolean') return x ? 'true' : 'false';
+  if (typeof x === 'string') return x;
+  if (Array.isArray(x)) return '[' + x.map(ostrInner).join(', ') + ']';
+  if (typeof x === 'function') return (x as any).__oscadSrc ?? String(x);
 
   return String(x);
 }
@@ -294,7 +297,7 @@ function ostr<T>(x: T): string {
 // prints `function(args) body` like OpenSCAD
 type OpenSCADFunction = (...args: never[]) => unknown;
 
-type OpenSCADFunctionWithSource = OpenSCADFunction & {
+type OpenSCADFunctionWithSource = OpenSCADFunction&{
   __oscadSrc?: string;
 };
 
@@ -324,13 +327,14 @@ class TC {
 function tc<F extends AnyFunction>(fn: F, ...args: Parameters<F>): TC {
   return new TC(fn, args);
 }
-function call<F extends AnyFunction>(fn: F, ...args: Parameters<F>): ReturnType<F> | undefined {
-  if (typeof fn !== "function") return undefined;
+function call<F extends AnyFunction>(
+    fn: F, ...args: Parameters<F>): ReturnType<F>|undefined {
+  if (typeof fn !== 'function') return undefined;
 
   let r: unknown = fn(...args);
 
   while (r instanceof TC) {
-    if (typeof r.fn !== "function") return undefined;
+    if (typeof r.fn !== 'function') return undefined;
 
     r = (r.fn as AnyFunction)(...(r.args as never[]));
   }
@@ -338,10 +342,10 @@ function call<F extends AnyFunction>(fn: F, ...args: Parameters<F>): ReturnType<
   return r as ReturnType<F>;
 }
 function ostrInner(x: unknown): string {
-  return typeof x === "string" ? `"${x}"` : ostr(x);
+  return typeof x === 'string' ? `"${x}"` : ostr(x);
 }
 function str(...a: unknown[]): string {
-  return a.map(ostr).join("");
+  return a.map(ostr).join('');
 }
 
 // OpenSCAD echo formatting
@@ -366,8 +370,8 @@ function echoEscape(s: string): string {
 }
 
 function oecho(x: unknown): string {
-  if (typeof x === "string") return '"' + echoEscape(x) + '"';
-  if (Array.isArray(x)) return "[" + x.map(oecho).join(", ") + "]";
+  if (typeof x === 'string') return '"' + echoEscape(x) + '"';
+  if (Array.isArray(x)) return '[' + x.map(oecho).join(', ') + ']';
   return ostr(x);
 }
 
@@ -392,7 +396,7 @@ function chrCollect(x: unknown, out: string[]): void {
     return;
   }
 
-  if (typeof x === "number") {
+  if (typeof x === 'number') {
     const c = chrOne(x);
     if (c) out.push(c);
   }
@@ -402,15 +406,15 @@ function chrCollect(x: unknown, out: string[]): void {
 function chr(...args: unknown[]): string {
   const out: string[] = [];
   for (const a of args) chrCollect(a, out);
-  return out.join("");
+  return out.join('');
 }
 
 // OpenSCAD ord()
-function ord(...args: unknown[]): number | undefined {
+function ord(...args: unknown[]): number|undefined {
   if (args.length !== 1) return undefined;
-  
+
   const s = args[0];
-  if (typeof s !== "string" || s.length === 0) return undefined;
+  if (typeof s !== 'string' || s.length === 0) return undefined;
   return s.codePointAt(0);
 }
 
@@ -519,10 +523,10 @@ function generateCanonical(): number {
   return ret;
 }
 
-function rands(...args: unknown[]): number[] | undefined {
+function rands(...args: unknown[]): number[]|undefined {
   // Requires 3 or 4 numeric arguments
   if (args.length < 3 || args.length > 4) return undefined;
-  if (!args.every((a): a is number => typeof a === "number")) return undefined;
+  if (!args.every((a): a is number => typeof a === 'number')) return undefined;
 
   const DBL_MAX = Number.MAX_VALUE;
 
@@ -563,23 +567,21 @@ function rands(...args: unknown[]): number[] | undefined {
   return out;
 }
 
-function search_match(needle: unknown, entry: unknown, idx_col: number | undefined): boolean {
+function search_match(
+    needle: unknown, entry: unknown, idx_col: number|undefined): boolean {
   const col = idx_col !== undefined ? idx_col : 0;
 
   if (col === 0 && eq(entry, needle)) return true;
 
-  return (
-    Array.isArray(entry) &&
-    col < entry.length &&
-    eq(entry[col], needle)
-  );
+  return (Array.isArray(entry) && col < entry.length && eq(entry[col], needle));
 }
 
-function search(needle: unknown, haystack: unknown, num_returns: number | undefined, idx_col: number | undefined): unknown {
+function search(
+    needle: unknown, haystack: unknown, num_returns: number|undefined,
+    idx_col: number|undefined): unknown {
   if (needle === undefined || haystack === undefined) {
     console.warn(
-      "WARNING: search() needs to be called with at least 2 arguments"
-    );
+        'WARNING: search() needs to be called with at least 2 arguments');
     return undefined;
   }
 
@@ -614,8 +616,7 @@ function search(needle: unknown, haystack: unknown, num_returns: number | undefi
         if (indices.length > 0) result.push(indices[0]);
       } else {
         result.push(
-          num_returns === 0 ? indices : indices.slice(0, num_returns)
-        );
+            num_returns === 0 ? indices : indices.slice(0, num_returns));
       }
     }
 
@@ -632,11 +633,7 @@ function search(needle: unknown, haystack: unknown, num_returns: number | undefi
         }
       }
 
-      return num_returns === 0
-        ? indices
-        : indices.length > 0
-          ? indices[0]
-          : [];
+      return num_returns === 0 ? indices : indices.length > 0 ? indices[0] : [];
     });
   }
 
@@ -652,10 +649,9 @@ function search(needle: unknown, haystack: unknown, num_returns: number | undefi
 
         if (!Array.isArray(entry) || col >= entry.length) {
           console.warn(
-            `WARNING: Invalid entry in search vector at index ${i}, ` +
+              `WARNING: Invalid entry in search vector at index ${i}, ` +
               `required number of values in the entry: ${col + 1}. ` +
-              `Invalid entry: ${entry}`
-          );
+              `Invalid entry: ${entry}`);
           return [];
         }
 
@@ -668,10 +664,9 @@ function search(needle: unknown, haystack: unknown, num_returns: number | undefi
         result.push([]);
       } else {
         result.push(
-          num_returns === 1 || num_returns === undefined
-            ? indices[0]
-            : indices.slice(0, num_returns)
-        );
+            num_returns === 1 || num_returns === undefined ?
+                indices[0] :
+                indices.slice(0, num_returns));
       }
     }
 
@@ -681,30 +676,26 @@ function search(needle: unknown, haystack: unknown, num_returns: number | undefi
   return undefined;
 }
 
-function lookup(key: unknown, table: unknown, ...rest: unknown[]): number | unknown | undefined {
+function lookup(key: unknown, table: unknown, ...rest: unknown[]): number|
+    unknown|undefined {
   // OpenSCAD's lookup() takes exactly 2 parameters.
   if (rest.length > 0) {
     console.warn(
-      `WARNING: lookup() number of parameters does not match: expected 2, found ${
-        2 + rest.length
-      }`
-    );
+        `WARNING: lookup() number of parameters does not match: expected 2, found ${
+            2 + rest.length}`);
     return undefined;
   }
 
   if (table === undefined) {
     console.warn(
-      "WARNING: lookup() number of parameters does not match: expected 2, found 1"
-    );
+        'WARNING: lookup() number of parameters does not match: expected 2, found 1');
     return undefined;
   }
 
-  if (typeof key !== "number") {
+  if (typeof key !== 'number') {
     console.warn(
-      `WARNING: lookup() parameter could not be converted: argument 0: expected number, found ${
-        typeof key === "string" ? `string ("${key}")` : typeof key
-      }`
-    );
+        `WARNING: lookup() parameter could not be converted: argument 0: expected number, found ${
+            typeof key === 'string' ? `string ("${key}")` : typeof key}`);
     return undefined;
   }
 
@@ -725,7 +716,7 @@ function lookup(key: unknown, table: unknown, ...rest: unknown[]): number | unkn
     const this_p: unknown = entry[0];
     const this_v: unknown = entry[1];
 
-    if (typeof this_p !== "number") continue;
+    if (typeof this_p !== 'number') continue;
 
     if (this_p <= key && (!lowSet || this_p > low_p)) {
       low_p = this_p;
@@ -746,20 +737,17 @@ function lookup(key: unknown, table: unknown, ...rest: unknown[]): number | unkn
   if (high_p === low_p) return low_v;
 
   // Interpolation requires numeric values.
-  if (typeof low_v !== "number" || typeof high_v !== "number") {
+  if (typeof low_v !== 'number' || typeof high_v !== 'number') {
     return undefined;
   }
 
-  return (
-    low_v +
-    ((high_v - low_v) * (key - low_p)) / (high_p - low_p)
-  );
+  return (low_v + ((high_v - low_v) * (key - low_p)) / (high_p - low_p));
 }
 
 function truthy(x: unknown): boolean {
   if (x === undefined || x === null || x === false) return false;
-  if (typeof x === "number") return x !== 0;
-  if (typeof x === "string" || Array.isArray(x)) return x.length > 0;
+  if (typeof x === 'number') return x !== 0;
+  if (typeof x === 'string' || Array.isArray(x)) return x.length > 0;
 
   return true;
 }
@@ -767,12 +755,9 @@ function truthy(x: unknown): boolean {
 // Control
 function assert(cond: unknown, msg: unknown): asserts cond {
   if (!truthy(cond)) {
-    console.trace("Assertion failed:", msg);
+    console.trace('Assertion failed:', msg);
     throw new Error(
-      typeof msg === "string" && msg.length > 0
-        ? msg
-        : "Assertion failed"
-    );
+        typeof msg === 'string' && msg.length > 0 ? msg : 'Assertion failed');
   }
 }
 
@@ -793,13 +778,14 @@ function eq(a: unknown, b: unknown): boolean {
 
 
 function cmpCat(x: unknown): string {
-  if (typeof x === "number") return "n";
-  if (typeof x === "boolean") return "b";
-  if (typeof x === "string") return "s";
+  if (typeof x === 'number') return 'n';
+  if (typeof x === 'boolean') return 'b';
+  if (typeof x === 'string') return 's';
 
-  if (Array.isArray(x)) return (x as { __isRange?: boolean }).__isRange ? "r" : "v";
+  if (Array.isArray(x))
+    return (x as {__isRange?: boolean}).__isRange ? 'r' : 'v';
 
-  return "u";
+  return 'u';
 }
 function veccmp(a: unknown[], b: unknown[]): number {
   const n = Math.min(a.length, b.length);
@@ -822,41 +808,39 @@ function veccmp(a: unknown[], b: unknown[]): number {
 
   return Math.sign(a.length - b.length);
 }
-function lt(a: unknown, b: unknown): boolean | undefined {
+function lt(a: unknown, b: unknown): boolean|undefined {
   const ca = cmpCat(a);
 
-  if (ca !== cmpCat(b) || ca === "u") return undefined;
+  if (ca !== cmpCat(b) || ca === 'u') return undefined;
 
-  return ca === "v" || ca === "r"
-    ? veccmp(a as unknown[], b as unknown[]) < 0
-    : a! < b!;
+  return ca === 'v' || ca === 'r' ? veccmp(a as unknown[], b as unknown[]) < 0 :
+                                    a! < b!;
 }
-function gt(a: unknown, b: unknown): boolean | undefined {
+function gt(a: unknown, b: unknown): boolean|undefined {
   const ca = cmpCat(a);
 
-  if (ca !== cmpCat(b) || ca === "u") return undefined;
+  if (ca !== cmpCat(b) || ca === 'u') return undefined;
 
-  return ca === "v" || ca === "r"
-    ? veccmp(a as unknown[], b as unknown[]) > 0
-    : a! > b!;
+  return ca === 'v' || ca === 'r' ? veccmp(a as unknown[], b as unknown[]) > 0 :
+                                    a! > b!;
 }
-function le(a: unknown, b: unknown): boolean | undefined {
+function le(a: unknown, b: unknown): boolean|undefined {
   const ca = cmpCat(a);
 
-  if (ca !== cmpCat(b) || ca === "u") return undefined;
+  if (ca !== cmpCat(b) || ca === 'u') return undefined;
 
-  return ca === "v" || ca === "r"
-    ? veccmp(a as unknown[], b as unknown[]) <= 0
-    : a! <= b!;
+  return ca === 'v' || ca === 'r' ?
+      veccmp(a as unknown[], b as unknown[]) <= 0 :
+      a! <= b!;
 }
-function ge(a: unknown, b: unknown): boolean | undefined {
+function ge(a: unknown, b: unknown): boolean|undefined {
   const ca = cmpCat(a);
 
-  if (ca !== cmpCat(b) || ca === "u") return undefined;
+  if (ca !== cmpCat(b) || ca === 'u') return undefined;
 
-  return ca === "v" || ca === "r"
-    ? veccmp(a as unknown[], b as unknown[]) >= 0
-    : a! >= b!;
+  return ca === 'v' || ca === 'r' ?
+      veccmp(a as unknown[], b as unknown[]) >= 0 :
+      a! >= b!;
 }
 
 
@@ -867,9 +851,9 @@ function isVec(x: unknown): x is Vec {
   return Array.isArray(x) && !(x as any).__isRange;
 }
 
-type NumOrVec = number | NumOrVec[];
+type NumOrVec = number|NumOrVec[];
 
-function add<T extends NumOrVec>(a: T, b: T): T | undefined {
+function add<T extends NumOrVec>(a: T, b: T): T|undefined {
   if (isNum(a) && isNum(b)) {
     return (a + b) as T;
   }
@@ -891,7 +875,7 @@ function add<T extends NumOrVec>(a: T, b: T): T | undefined {
   return undefined;
 }
 
-function sub<T extends NumOrVec>(a: T, b: T): T | undefined {
+function sub<T extends NumOrVec>(a: T, b: T): T|undefined {
   if (isNum(a) && isNum(b)) return (a - b) as T;
   if (isVec(a) && isVec(b)) {
     let n = Math.min(a.length, b.length), r: NumOrVec[] = [];
@@ -904,7 +888,8 @@ function sub<T extends NumOrVec>(a: T, b: T): T | undefined {
   return undefined;
 }
 
-function mul<A extends NumOrVec, B extends NumOrVec>(a: A, b: B): NumOrVec | undefined {
+function mul<A extends NumOrVec, B extends NumOrVec>(a: A, b: B): NumOrVec|
+    undefined {
   if (isNum(a) && isNum(b)) {
     return a * b;
   }
@@ -928,8 +913,8 @@ function mul<A extends NumOrVec, B extends NumOrVec>(a: A, b: B): NumOrVec | und
 
       if (aCols !== bRows) {
         console.warn(
-          `WARNING: matrix*matrix requires left operand column count to match right operand row count (${aCols} != ${bRows})`
-        );
+            `WARNING: matrix*matrix requires left operand column count to match right operand row count (${
+                aCols} != ${bRows})`);
         return undefined;
       }
 
@@ -938,8 +923,8 @@ function mul<A extends NumOrVec, B extends NumOrVec>(a: A, b: B): NumOrVec | und
 
         if (rowLen !== bRows) {
           console.warn(
-            `WARNING: matrix*matrix left operand row length does not match right operand row count (${rowLen} != ${bRows}) at row ${i}`
-          );
+              `WARNING: matrix*matrix left operand row length does not match right operand row count (${
+                  rowLen} != ${bRows}) at row ${i}`);
           return undefined;
         }
       }
@@ -969,8 +954,8 @@ function mul<A extends NumOrVec, B extends NumOrVec>(a: A, b: B): NumOrVec | und
 
       if (aCols !== b.length) {
         console.warn(
-          `WARNING: matrix*vector requires matrix column count to match vector length (${aCols} != ${b.length})`
-        );
+            `WARNING: matrix*vector requires matrix column count to match vector length (${
+                aCols} != ${b.length})`);
         return undefined;
       }
 
@@ -982,8 +967,8 @@ function mul<A extends NumOrVec, B extends NumOrVec>(a: A, b: B): NumOrVec | und
 
         if (rowLen !== b.length) {
           console.warn(
-            `WARNING: matrix*vector left operand row length does not match vector length (${rowLen} != ${b.length}) at row ${i}`
-          );
+              `WARNING: matrix*vector left operand row length does not match vector length (${
+                  rowLen} != ${b.length}) at row ${i}`);
           return undefined;
         }
 
@@ -1003,8 +988,8 @@ function mul<A extends NumOrVec, B extends NumOrVec>(a: A, b: B): NumOrVec | und
       // Vector * Matrix
       if (a.length !== b.length) {
         console.warn(
-          `WARNING: vector*matrix requires vector length to match matrix row count (${a.length} != ${b.length})`
-        );
+            `WARNING: vector*matrix requires vector length to match matrix row count (${
+                a.length} != ${b.length})`);
         return undefined;
       }
 
@@ -1025,9 +1010,8 @@ function mul<A extends NumOrVec, B extends NumOrVec>(a: A, b: B): NumOrVec | und
 
     // Vector * Vector (Dot Product)
     if (a.length !== b.length) {
-      console.warn(
-        `WARNING: vector*vector requires matching lengths (${a.length} != ${b.length})`
-      );
+      console.warn(`WARNING: vector*vector requires matching lengths (${
+          a.length} != ${b.length})`);
       return undefined;
     }
 
@@ -1043,7 +1027,8 @@ function mul<A extends NumOrVec, B extends NumOrVec>(a: A, b: B): NumOrVec | und
   return undefined;
 }
 
-function div<A extends NumOrVec, B extends NumOrVec>(a: A, b: B): NumOrVec | undefined {
+function div<A extends NumOrVec, B extends NumOrVec>(a: A, b: B): NumOrVec|
+    undefined {
   if (isNum(a) && isNum(b)) {
     return a / b;
   }
@@ -1077,7 +1062,7 @@ function div<A extends NumOrVec, B extends NumOrVec>(a: A, b: B): NumOrVec | und
   return undefined;
 }
 
-function mod<A extends number, B extends number>(a: A, b: B): number | undefined {
+function mod<A extends number, B extends number>(a: A, b: B): number|undefined {
   if (isNum(a) && isNum(b)) {
     return a % b;
   }
@@ -1086,8 +1071,8 @@ function mod<A extends number, B extends number>(a: A, b: B): number | undefined
 }
 
 
-function toI64(x: unknown): bigint | undefined {
-  if (typeof x !== "number" || !Number.isFinite(x)) {
+function toI64(x: unknown): bigint|undefined {
+  if (typeof x !== 'number' || !Number.isFinite(x)) {
     return undefined;
   }
 
@@ -1095,7 +1080,7 @@ function toI64(x: unknown): bigint | undefined {
 }
 
 // Bitwise operators
-function band(a: unknown, b: unknown): number | undefined {
+function band(a: unknown, b: unknown): number|undefined {
   const ia = toI64(a);
   const ib = toI64(b);
 
@@ -1103,7 +1088,7 @@ function band(a: unknown, b: unknown): number | undefined {
 
   return Number(BigInt.asIntN(64, ia & ib));
 }
-function bor(a: unknown, b: unknown): number | undefined {
+function bor(a: unknown, b: unknown): number|undefined {
   const ia = toI64(a);
   const ib = toI64(b);
 
@@ -1111,14 +1096,14 @@ function bor(a: unknown, b: unknown): number | undefined {
 
   return Number(BigInt.asIntN(64, ia | ib));
 }
-function bnot(a: unknown): number | undefined {
+function bnot(a: unknown): number|undefined {
   const ia = toI64(a);
 
   if (ia === undefined) return undefined;
 
   return Number(BigInt.asIntN(64, ~ia));
 }
-function shl(a: unknown, b: unknown): number | undefined {
+function shl(a: unknown, b: unknown): number|undefined {
   const ia = toI64(a);
   const ib = toI64(b);
 
@@ -1127,7 +1112,7 @@ function shl(a: unknown, b: unknown): number | undefined {
 
   return Number(BigInt.asIntN(64, ia << ib));
 }
-function shr(a: unknown, b: unknown): number | undefined {
+function shr(a: unknown, b: unknown): number|undefined {
   const ia = toI64(a);
   const ib = toI64(b);
 
@@ -1138,12 +1123,12 @@ function shr(a: unknown, b: unknown): number | undefined {
 }
 
 // Unary operators
-function neg(a: unknown): number | Vec | undefined {
+function neg(a: unknown): number|Vec|undefined {
   if (isNum(a)) return -a;
   if (isVec(a)) return a.map(neg) as Vec;
   return undefined;
 }
-function pos(a: unknown): number | Vec | undefined {
+function pos(a: unknown): number|Vec|undefined {
   if (isNum(a)) return +a;
   if (isVec(a)) return a.map(pos) as Vec;
   return undefined;
@@ -1151,11 +1136,11 @@ function pos(a: unknown): number | Vec | undefined {
 
 
 function index(obj: unknown, idx: unknown): unknown {
-  if (typeof idx !== "number" || obj == null) return undefined;
+  if (typeof idx !== 'number' || obj == null) return undefined;
 
   const i = Math.floor(idx);
 
-  if (typeof obj === "string") {
+  if (typeof obj === 'string') {
     const cps = Array.from(obj);
     return i >= 0 && i < cps.length ? cps[i] : undefined;
   }
@@ -1240,12 +1225,8 @@ function pick_children<T>(childFns: T[], i: unknown): T[] {
     const out: T[] = [];
 
     for (const v of i) {
-      if (
-        typeof v === "number" &&
-        Number.isInteger(v) &&
-        v >= 0 &&
-        v < childFns.length
-      ) {
+      if (typeof v === 'number' && Number.isInteger(v) && v >= 0 &&
+          v < childFns.length) {
         out.push(childFns[v]!);
       }
     }
@@ -1253,12 +1234,8 @@ function pick_children<T>(childFns: T[], i: unknown): T[] {
     return out;
   }
 
-  if (
-    typeof i === "number" &&
-    Number.isInteger(i) &&
-    i >= 0 &&
-    i < childFns.length
-  ) {
+  if (typeof i === 'number' && Number.isInteger(i) && i >= 0 &&
+      i < childFns.length) {
     return [childFns[i]!];
   }
 
@@ -1268,29 +1245,23 @@ function pick_children<T>(childFns: T[], i: unknown): T[] {
 function parent_module(d: unknown = 1): string {
   const depth = Number(d);
 
-  if (!Number.isInteger(depth) || depth < 0) return "";
+  if (!Number.isInteger(depth) || depth < 0) return '';
 
   const idx = children_stack.length - 1 - depth;
 
-  if (idx < 0 || idx >= children_stack.length) return "";
+  if (idx < 0 || idx >= children_stack.length) return '';
 
-  return children_stack[idx]?.name || "";
+  return children_stack[idx]?.name || '';
 }
 
 function is_finite_matrix4(m: unknown): m is number[][] {
   return (
-    Array.isArray(m) &&
-    m.length === 4 &&
-    m.every(
-      (row: unknown) =>
-        Array.isArray(row) &&
-        row.length === 4 &&
-        row.every(
-          (v: unknown) =>
-            typeof v === "number" && Number.isFinite(v)
-        )
-    )
-  );
+      Array.isArray(m) && m.length === 4 &&
+      m.every(
+          (row: unknown) => Array.isArray(row) && row.length === 4 &&
+              row.every(
+                  (v: unknown) =>
+                      typeof v === 'number' && Number.isFinite(v))));
 }
 
 // Pad smaller matrices to 4×4 with identity, then normalize by the bottom-right
@@ -1341,15 +1312,14 @@ interface TransformableShape<TResult = unknown> {
   transform(matrix: unknown): TResult;
 }
 
-function transform<T extends TransformableShape>(shape: T, m: number[][]): T | ReturnType<T["transform"]> {
-  const mm = is2D(shape)
-    ? to_manifold_mat3(m)
-    : to_manifold_mat4(m);
+function transform<T extends TransformableShape>(shape: T, m: number[][]): T|
+    ReturnType<T['transform']> {
+  const mm = is2D(shape) ? to_manifold_mat3(m) : to_manifold_mat4(m);
 
   if (!mm) return shape;
 
   try {
-    return shape.transform(mm) as ReturnType<T["transform"]>;
+    return shape.transform(mm) as ReturnType<T['transform']>;
   } catch {
     return shape;
   }
@@ -1364,11 +1334,16 @@ function offset(
     shape: unknown, delta: number, joinType = 'Round', miterLimit = 2,
     circularSegments = 0, fa = 12, fs = 2) {
   try {
-    if (shape && typeof (shape as InstanceType<typeof CrossSection>).offset === 'function') {
+    if (shape &&
+        typeof (shape as InstanceType<typeof CrossSection>).offset ===
+            'function') {
       if (circularSegments <= 0) {
         sync_quality(fa, fs);
       }
-      return (shape as InstanceType<typeof CrossSection>).offset(delta, joinType as "Miter" | "Round", miterLimit, circularSegments);
+      return (shape as InstanceType<typeof CrossSection>)
+          .offset(
+              delta, joinType as 'Miter' | 'Round', miterLimit,
+              circularSegments);
     }
   } catch {
   }
@@ -1378,10 +1353,13 @@ function offset(
 function projection(shape: unknown, cut = false) {
   try {
     if (shape) {
-      if (cut && typeof (shape as InstanceType<typeof Manifold>).slice === 'function') {
+      if (cut &&
+          typeof (shape as InstanceType<typeof Manifold>).slice ===
+              'function') {
         return (shape as InstanceType<typeof Manifold>).slice(0);
       }
-      if (typeof (shape as InstanceType<typeof Manifold>).project === 'function') {
+      if (typeof (shape as InstanceType<typeof Manifold>).project ===
+          'function') {
         return (shape as InstanceType<typeof Manifold>).project();
       }
     }
@@ -1437,8 +1415,8 @@ function clamp01(v: unknown): number {
   return n;
 }
 
-function parse_hex_color(s: unknown): number[] | undefined {
-  if (typeof s !== "string" || !s.startsWith("#")) {
+function parse_hex_color(s: unknown): number[]|undefined {
+  if (typeof s !== 'string' || !s.startsWith('#')) {
     return undefined;
   }
 
@@ -1473,7 +1451,7 @@ function parse_hex_color(s: unknown): number[] | undefined {
   return undefined;
 }
 
-function parse_color_value(c: unknown): number[] | undefined {
+function parse_color_value(c: unknown): number[]|undefined {
   if (Array.isArray(c)) {
     if (c.length < 3) return undefined;
 
@@ -1486,12 +1464,8 @@ function parse_color_value(c: unknown): number[] | undefined {
       return undefined;
     }
 
-    const maxChan = Math.max(
-      Math.abs(r),
-      Math.abs(g),
-      Math.abs(b),
-      Math.abs(a)
-    );
+    const maxChan =
+        Math.max(Math.abs(r), Math.abs(g), Math.abs(b), Math.abs(a));
 
     // Support accidental [0..255] style vectors.
     if (maxChan > 1) {
@@ -1504,17 +1478,15 @@ function parse_color_value(c: unknown): number[] | undefined {
     return [r, g, b, a];
   }
 
-  if (typeof c === "string") {
+  if (typeof c === 'string') {
     const key = c.trim().toLowerCase();
 
-    if (key === "" || key === "default") return undefined;
+    if (key === '' || key === 'default') return undefined;
 
     const named = named_colors[key];
 
     if (named) {
-      return named.length === 4
-        ? named
-        : [named[0]!, named[1]!, named[2]!, 1];
+      return named.length === 4 ? named : [named[0]!, named[1]!, named[2]!, 1];
     }
 
     return parse_hex_color(key);
@@ -1525,38 +1497,27 @@ function parse_color_value(c: unknown): number[] | undefined {
 
 // Apply OpenSCAD color() by appending custom RGBA + marker channels.
 type ColorPropertyLayout = {
-  colorOffset: number;
-  markerOffset: number;
+  colorOffset: number; markerOffset: number;
 };
 
-type SetPropertiesCallback = (
-  newProp: number[],
-  position: number[],
-  oldProp: number[]
-) => void;
+type SetPropertiesCallback =
+    (newProp: number[], position: number[], oldProp: number[]) => void;
 
 interface ColorableShape<TResult = unknown> {
   setProperties(
-    numProperties: number,
-    callback: (
-      newProp: number[],
-      position: number[],
-      oldProp: number[]
-    ) => void
-  ): TResult;
+      numProperties: number,
+      callback:
+          (newProp: number[], position: number[], oldProp: number[]) => void):
+      TResult;
 
   numProp(): number;
 }
 
-function color<T>(shape: T, c: unknown, alpha: unknown): T | unknown {
-  if (
-    shape == null ||
-    typeof shape !== "object" ||
-    !("setProperties" in shape) ||
-    typeof shape.setProperties !== "function" ||
-    !("numProp" in shape) ||
-    typeof shape.numProp !== "function"
-  ) {
+function color<T>(shape: T, c: unknown, alpha: unknown): T|unknown {
+  if (shape == null || typeof shape !== 'object' ||
+      !('setProperties' in shape) ||
+      typeof shape.setProperties !== 'function' || !('numProp' in shape) ||
+      typeof shape.numProp !== 'function') {
     return shape;
   }
 
@@ -1570,11 +1531,7 @@ function color<T>(shape: T, c: unknown, alpha: unknown): T | unknown {
 
   let outAlpha = base[3];
 
-  if (
-    alpha !== undefined &&
-    alpha !== null &&
-    Number.isFinite(Number(alpha))
-  ) {
+  if (alpha !== undefined && alpha !== null && Number.isFinite(Number(alpha))) {
     outAlpha = Number(alpha);
   }
 
@@ -1592,19 +1549,14 @@ function color<T>(shape: T, c: unknown, alpha: unknown): T | unknown {
   let markerOffset = colorOffset + 4;
   let newNumProp = markerOffset + 1;
 
-  if (
-    trackedLayout &&
-    Number.isInteger(trackedLayout.colorOffset) &&
-    Number.isInteger(trackedLayout.markerOffset)
-  ) {
+  if (trackedLayout && Number.isInteger(trackedLayout.colorOffset) &&
+      Number.isInteger(trackedLayout.markerOffset)) {
     const trackedColorOffset = trackedLayout.colorOffset;
     const trackedMarkerOffset = trackedLayout.markerOffset;
 
-    if (
-      trackedColorOffset >= 0 &&
-      trackedMarkerOffset === trackedColorOffset + 4 &&
-      trackedMarkerOffset < oldNumProp
-    ) {
+    if (trackedColorOffset >= 0 &&
+        trackedMarkerOffset === trackedColorOffset + 4 &&
+        trackedMarkerOffset < oldNumProp) {
       colorOffset = trackedColorOffset;
       markerOffset = trackedMarkerOffset;
       newNumProp = oldNumProp;
@@ -1613,29 +1565,28 @@ function color<T>(shape: T, c: unknown, alpha: unknown): T | unknown {
 
   try {
     const painted = shape.setProperties(
-      newNumProp,
-      (newProp: number[], position: number[], oldProp: number[]) => {
-        for (let i = 0; i < newNumProp; i++) {
-          if (i < oldProp.length) {
-            newProp[i] = oldProp[i]!;
-          } else if (i < 3) {
-            newProp[i] = position[i]!;
-          } else {
-            newProp[i] = 0;
+        newNumProp,
+        (newProp: number[], position: number[], oldProp: number[]) => {
+          for (let i = 0; i < newNumProp; i++) {
+            if (i < oldProp.length) {
+              newProp[i] = oldProp[i]!;
+            } else if (i < 3) {
+              newProp[i] = position[i]!;
+            } else {
+              newProp[i] = 0;
+            }
           }
-        }
 
-        newProp[colorOffset] = rgba[0]!;
-        newProp[colorOffset + 1] = rgba[1]!;
-        newProp[colorOffset + 2] = rgba[2]!;
-        newProp[colorOffset + 3] = rgba[3]!;
+          newProp[colorOffset] = rgba[0]!;
+          newProp[colorOffset + 1] = rgba[1]!;
+          newProp[colorOffset + 2] = rgba[2]!;
+          newProp[colorOffset + 3] = rgba[3]!;
 
-        // Marker channel distinguishes custom RGBA from built-in properties.
-        newProp[markerOffset] = 1;
-      }
-    );
+          // Marker channel distinguishes custom RGBA from built-in properties.
+          newProp[markerOffset] = 1;
+        });
 
-    color_prop_layout.set(painted, { colorOffset, markerOffset });
+    color_prop_layout.set(painted, {colorOffset, markerOffset});
 
     return painted;
   } catch {
@@ -1644,16 +1595,19 @@ function color<T>(shape: T, c: unknown, alpha: unknown): T | unknown {
 }
 
 function each(v: unknown): unknown[] {
-   if (v === undefined || v === null) return [];
-   if (Array.isArray(v)) return v;
-   if (typeof v === "string") return Array.from(v);
-   return [v];
+  if (v === undefined || v === null) return [];
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'string') return Array.from(v);
+  return [v];
 }
 
-function flat_map_iter<T>(v: unknown, fn: (item: unknown, index: number) => T | T[]): T[] {
+function flat_map_iter<T>(
+    v: unknown, fn: (item: unknown, index: number) => T | T[]): T[] {
   if (v === undefined || v === null) return [];
-  if (Array.isArray(v)) return v.flatMap((item: unknown, i: number) => fn(item, i));
-  if (typeof v === "string") return Array.from(v).flatMap((item, i) => fn(item, i));
+  if (Array.isArray(v))
+    return v.flatMap((item: unknown, i: number) => fn(item, i));
+  if (typeof v === 'string')
+    return Array.from(v).flatMap((item, i) => fn(item, i));
   return [v].flatMap((item, i) => fn(item, i));
 }
 
@@ -1682,11 +1636,8 @@ function rangeNumValues(start: number, step: number, end: number): number {
 }
 
 function rangeCount(start: unknown, step: unknown, end: unknown): number {
-  if (
-    typeof start !== "number" ||
-    typeof step !== "number" ||
-    typeof end !== "number"
-  ) {
+  if (typeof start !== 'number' || typeof step !== 'number' ||
+      typeof end !== 'number') {
     return 0;
   }
 
@@ -1694,8 +1645,8 @@ function rangeCount(start: unknown, step: unknown, end: unknown): number {
 
   if (n >= 1000000) {
     console.warn(
-      `WARNING: Bad range parameter in for statement: too many elements (${n}).`
-    );
+        `WARNING: Bad range parameter in for statement: too many elements (${
+            n}).`);
     return 0;
   }
 
@@ -1705,18 +1656,15 @@ function rangeCount(start: unknown, step: unknown, end: unknown): number {
   return n;
 }
 
-type RangeArray = number[] & {
+type RangeArray = number[]&{
   __isRange?: boolean;
 };
 
 function range(start: unknown, step: unknown, end: unknown): RangeArray {
   const result: RangeArray = [];
 
-  if (
-    typeof start !== "number" ||
-    typeof step !== "number" ||
-    typeof end !== "number"
-  ) {
+  if (typeof start !== 'number' || typeof step !== 'number' ||
+      typeof end !== 'number') {
     return result;
   }
 
@@ -1727,7 +1675,7 @@ function range(start: unknown, step: unknown, end: unknown): RangeArray {
     result.push(i === 0 ? start : start + i * step);
   }
 
-  Object.defineProperty(result, "__isRange", {
+  Object.defineProperty(result, '__isRange', {
     value: true,
     enumerable: false,
     writable: true,
@@ -1739,25 +1687,23 @@ function range(start: unknown, step: unknown, end: unknown): RangeArray {
 
 // Detect CrossSection (2D) vs Manifold (3D) for dispatch
 function is2D(x: unknown): boolean {
-  if (x === null || typeof x !== "object") return false;
+  if (x === null || typeof x !== 'object') return false;
 
   const obj = x as Record<string, unknown>;
 
   return (
-    typeof obj.offset === "function" &&
-    typeof obj.toPolygons === "function"
-  );
+      typeof obj.offset === 'function' && typeof obj.toPolygons === 'function');
 }
 
 function isEmpty(x: unknown): boolean {
   if (!x) return true;
-  if (typeof x !== "object") return false;
+  if (typeof x !== 'object') return false;
 
   const obj = x as Record<string, unknown>;
 
-  if (typeof obj.isEmpty === "function" && obj.isEmpty()) return true;
-  if (typeof obj.numTri === "function" && obj.numTri() === 0) return true;
-  if (typeof obj.numVert === "function" && obj.numVert() === 0) return true;
+  if (typeof obj.isEmpty === 'function' && obj.isEmpty()) return true;
+  if (typeof obj.numTri === 'function' && obj.numTri() === 0) return true;
+  if (typeof obj.numVert === 'function' && obj.numVert() === 0) return true;
 
   return false;
 }
@@ -1766,12 +1712,11 @@ const TOL_FACTOR = Math.pow(2, -24);
 type Vec3 = [number, number, number];
 
 type BoundingBox3D = {
-  min: Vec3;
-  max: Vec3;
+  min: Vec3; max: Vec3;
 };
 
 type Item3D = {
-  boundingBox?: () => BoundingBox3D | null | undefined;
+  boundingBox?: () => BoundingBox3D|null|undefined;
   setTolerance?: (tolerance: number) => unknown;
   tolerance?: () => number;
 };
@@ -1781,10 +1726,10 @@ function maxBBoxDim3d(items: unknown[]): number {
   const hi = [-Infinity, -Infinity, -Infinity];
 
   for (const it of items) {
-    if (!it || typeof it !== "object") continue;
+    if (!it || typeof it !== 'object') continue;
 
     const item = it as Item3D;
-    if (typeof item.boundingBox !== "function") continue;
+    if (typeof item.boundingBox !== 'function') continue;
 
     const bb = item.boundingBox();
     if (!bb || !bb.min || !bb.max) continue;
@@ -1793,8 +1738,8 @@ function maxBBoxDim3d(items: unknown[]): number {
       const min = bb.min[i];
       const max = bb.max[i];
 
-      if (typeof min === "number" && min < lo[i]!) lo[i] = min;
-      if (typeof max === "number" && max > hi[i]!) hi[i] = max;
+      if (typeof min === 'number' && min < lo[i]!) lo[i] = min;
+      if (typeof max === 'number' && max > hi[i]!) hi[i] = max;
     }
   }
 
@@ -1815,14 +1760,12 @@ function withTol3d(items: unknown[]): unknown[] {
   const tol = maxDim * TOL_FACTOR;
 
   return items.map(it => {
-    if (!it || typeof it !== "object") return it;
+    if (!it || typeof it !== 'object') return it;
 
     const item = it as Item3D;
 
-    if (
-      typeof item.setTolerance === "function" &&
-      typeof item.tolerance === "function"
-    ) {
+    if (typeof item.setTolerance === 'function' &&
+        typeof item.tolerance === 'function') {
       return tol > item.tolerance() ? item.setTolerance(tol) : it;
     }
 
@@ -1860,9 +1803,9 @@ function union(items: unknown[]): unknown {
   const flat = is2D(valid[0]);
   const same = sameDim(valid, flat);
 
-  return flat
-    ? CrossSection.union(same as InstanceType<typeof CrossSection>[])
-    : Manifold.union(withTol3d(same) as InstanceType<typeof Manifold>[]);
+  return flat ?
+      CrossSection.union(same as InstanceType<typeof CrossSection>[]) :
+      Manifold.union(withTol3d(same) as InstanceType<typeof Manifold>[]);
 }
 
 function difference(first: unknown, rest: unknown[]): unknown {
@@ -1874,14 +1817,19 @@ function difference(first: unknown, rest: unknown[]): unknown {
   if (validRest.length === 0) return first;
 
   if (flat) {
-    return CrossSection.difference([first as InstanceType<typeof CrossSection> | Polygons, ...(validRest as InstanceType<typeof CrossSection>[] | Polygons[])]);
+    return CrossSection.difference([
+      first as InstanceType<typeof CrossSection>| Polygons,
+      ...(validRest as InstanceType<typeof CrossSection>[] | Polygons[])
+    ]);
   }
 
   const [tf, ...tr] = withTol3d([first, ...validRest]);
 
-  return tr.length === 1
-    ? (tf as InstanceType<typeof Manifold>).subtract(tr[0] as InstanceType<typeof Manifold>)
-    : (tf as InstanceType<typeof Manifold>).subtract(Manifold.union(tr as InstanceType<typeof Manifold>[]));
+  return tr.length === 1 ?
+      (tf as InstanceType<typeof Manifold>)
+          .subtract(tr[0] as InstanceType<typeof Manifold>) :
+      (tf as InstanceType<typeof Manifold>)
+          .subtract(Manifold.union(tr as InstanceType<typeof Manifold>[]));
 }
 
 function intersection(items: unknown[]): unknown {
@@ -1903,9 +1851,10 @@ function intersection(items: unknown[]): unknown {
     return flat ? CrossSection.union([]) : Manifold.union([]);
   }
 
-  return flat
-    ? CrossSection.intersection(same as InstanceType<typeof CrossSection>[] | Polygons[])
-    : Manifold.intersection(withTol3d(same) as InstanceType<typeof Manifold>[]);
+  return flat ?
+      CrossSection.intersection(
+          same as InstanceType<typeof CrossSection>[] | Polygons[]) :
+      Manifold.intersection(withTol3d(same) as InstanceType<typeof Manifold>[]);
 }
 
 function hull(items: unknown[]): unknown {
@@ -1913,9 +1862,10 @@ function hull(items: unknown[]): unknown {
 
   if (valid.length === 0) return Manifold.union([]);
 
-  return is2D(valid[0])
-    ? CrossSection.hull(valid as InstanceType<typeof CrossSection>[] | Polygons[])
-    : Manifold.hull(valid as InstanceType<typeof Manifold>[]);
+  return is2D(valid[0]) ?
+      CrossSection.hull(
+          valid as InstanceType<typeof CrossSection>[] | Polygons[]) :
+      Manifold.hull(valid as InstanceType<typeof Manifold>[]);
 }
 
 function minkowski(items: unknown[]) {
@@ -1926,7 +1876,8 @@ function minkowski(items: unknown[]) {
   // Check ALL items upfront
   for (const item of valid) {
     if (is2D(item)) throw new Error('2D minkowski not implemented');
-    if (typeof (item as InstanceType<typeof Manifold>).minkowskiSum !== 'function')
+    if (typeof (item as InstanceType<typeof Manifold>).minkowskiSum !==
+        'function')
       throw new Error('Your manifold-3d build does not expose minkowskiSum');
   }
 
@@ -1942,7 +1893,8 @@ function finiteOr(x: unknown, dflt: number): number {
   return (typeof x === 'number' && Number.isFinite(x)) ? x : dflt;
 }
 
-function normalizeScale(scale: number|number[]|undefined): [number, number]|undefined {
+function normalizeScale(scale: number|number[]|undefined): [number, number]|
+    undefined {
   if (scale === undefined || scale === null) return undefined;
   // OpenSCAD accepts only a finite scalar or a 2-element finite vector for
   // scaling; anything else is treated as no scaling
@@ -2193,7 +2145,10 @@ function extrudeTwisted(
     shape: unknown, height: number, twistDeg: number, slices: number,
     scaleVec: [number, number]|undefined, center: boolean|undefined, fn: number,
     fa: number, fs: number, segments?: number): InstanceType<typeof Manifold> {
-  const rawPolys: [number, number][][] = (shape as InstanceType<typeof CrossSection>).toPolygons().map(dropCollinear);
+  const rawPolys: [number, number][][] =
+      (shape as InstanceType<typeof CrossSection>)
+          .toPolygons()
+          .map(dropCollinear);
   if (!rawPolys.length) return Manifold.union([]);
 
   const sx = scaleVec ? scaleVec[0] : 1;
@@ -2249,8 +2204,10 @@ function extrudeTwisted(
   }
   if (!capTris || !capTris.length) {
     // Fall back to Manifold's own twist extrude if the cap mapping failed.
-    return (shape as InstanceType<typeof CrossSection>).extrude(
-        height, Math.max(0, slices - 1), Math.abs(twistDeg), scaleVec, center);
+    return (shape as InstanceType<typeof CrossSection>)
+        .extrude(
+            height, Math.max(0, slices - 1), Math.abs(twistDeg), scaleVec,
+            center);
   }
 
   const S = Math.max(1, Math.round(slices));
@@ -2434,9 +2391,10 @@ function linear_extrude(shape: unknown, height?: number, options: {
         segments,
     );
   } else {
-    result = (shape as InstanceType<typeof CrossSection>).extrude(
-        height, Math.max(0, nDivisions - 1), undefined, normScale,
-        options.center);
+    result = (shape as InstanceType<typeof CrossSection>)
+                 .extrude(
+                     height, Math.max(0, nDivisions - 1), undefined, normScale,
+                     options.center);
   }
 
   // A non-vertical extrusion vector shears the straight extrusion sideways
@@ -2492,16 +2450,19 @@ function rotate_extrude(shape: unknown, fn = 0, fa = 12, fs = 2, angle = 360) {
     let revolved: InstanceType<typeof Manifold>;
     if (num_sections < 3) {
       const arc = absAngle * Math.PI / 180;
-      revolved = (shape as InstanceType<typeof CrossSection>).extrude(1, num_sections - 1).warp((v: number[]) => {
-        const phi = (1 - v[2]!) * arc;
-        const x = v[0]!;
-        const y = v[1]!;
-        v[0] = x * Math.cos(phi);
-        v[1] = x * Math.sin(phi);
-        v[2] = y;
-      });
+      revolved = (shape as InstanceType<typeof CrossSection>)
+                     .extrude(1, num_sections - 1)
+                     .warp((v: number[]) => {
+                       const phi = (1 - v[2]!) * arc;
+                       const x = v[0]!;
+                       const y = v[1]!;
+                       v[0] = x * Math.cos(phi);
+                       v[1] = x * Math.sin(phi);
+                       v[2] = y;
+                     });
     } else {
-      revolved = (shape as InstanceType<typeof CrossSection>).revolve(num_sections, absAngle);
+      revolved = (shape as InstanceType<typeof CrossSection>)
+                     .revolve(num_sections, absAngle);
     }
     if (angle < 0) revolved = revolved.mirror([0, 1, 0]);
     if (onNegativeSide) revolved = revolved.rotate([0, 0, 180]);
@@ -2541,71 +2502,70 @@ function sampleCubic(
   return pts;
 }
 
-type PathCommand =
-  | { type: "M" | "L"; x: number; y: number }
-  | { type: "Q"; x1: number; y1: number; x: number; y: number }
-  | {
-      type: "C";
-      x1: number;
-      y1: number;
-      x2: number;
-      y2: number;
-      x: number;
-      y: number;
-    }
-  | { type: "Z" };
+type PathCommand =|{
+  type: 'M'|'L';
+  x: number;
+  y: number
+}
+|{
+  type: 'Q';
+  x1: number;
+  y1: number;
+  x: number;
+  y: number
+}
+|{
+  type: 'C';
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  x: number;
+  y: number;
+}
+|{type: 'Z'};
 
 function pathToContours(
-  commands: PathCommand[],
-  fn: number
-): [number, number][][] {
+    commands: PathCommand[], fn: number): [number, number][][] {
   const steps = Math.max(2, fn > 0 ? Math.round(fn / 4) : 4);
   const contours: [number, number][][] = [];
-  let current: [number, number][] | null = null;
+  let current: [number, number][]|null = null;
 
   for (const cmd of commands) {
     switch (cmd.type) {
-      case "M":
+      case 'M':
         if (current && current.length >= 3) contours.push(current);
         current = [[cmd.x, cmd.y]];
         break;
 
-      case "L":
+      case 'L':
         current?.push([cmd.x, cmd.y]);
         break;
 
-      case "Q": {
+      case 'Q': {
         if (!current) break;
 
         const prev = current[current.length - 1]!;
         const pts = sampleQuadratic(
-          prev[0], prev[1],
-          cmd.x1, cmd.y1,
-          cmd.x, cmd.y,
-          steps
-        );
+            prev[0], prev[1], cmd.x1, cmd.y1, cmd.x, cmd.y, steps);
 
         for (const [px, py] of pts) current.push([px, py]);
         break;
       }
 
-      case "C": {
+      case 'C': {
         if (!current) break;
 
         const prev = current[current.length - 1]!;
         const pts = sampleCubic(
-          prev[0], prev[1],
-          cmd.x1, cmd.y1,
-          cmd.x2, cmd.y2,
-          cmd.x, cmd.y,
-          steps
-        );
+            prev[0], prev[1], cmd.x1, cmd.y1, cmd.x2, cmd.y2, cmd.x, cmd.y,
+            steps);
 
         for (const [px, py] of pts) current.push([px, py]);
         break;
       }
 
-      case "Z":
+      case 'Z':
         if (current && current.length >= 3) contours.push(current);
         current = null;
         break;
@@ -2614,21 +2574,19 @@ function pathToContours(
 
   if (current && current.length >= 3) contours.push(current);
 
-  return contours.map(c =>
-    c.map(([x, y]): [number, number] => [x, -y])
-  );
+  return contours.map(c => c.map(([x, y]): [number, number] => [x, -y]));
 }
 
 type OpenTypeFont = ReturnType<typeof opentypeParse>;
 
 const opentypeFontCache = new Map<string, OpenTypeFont>();
 
-function getOpentypeFont(base64DataUrl: string): OpenTypeFont | undefined {
+function getOpentypeFont(base64DataUrl: string): OpenTypeFont|undefined {
   const cached = opentypeFontCache.get(base64DataUrl);
   if (cached) return cached;
 
   try {
-    const base64 = base64DataUrl.replace(/^data:[^;]+;base64,/, "");
+    const base64 = base64DataUrl.replace(/^data:[^;]+;base64,/, '');
     const binaryStr = atob(base64);
     const bytes = new Uint8Array(binaryStr.length);
 
@@ -2641,20 +2599,23 @@ function getOpentypeFont(base64DataUrl: string): OpenTypeFont | undefined {
 
     return font;
   } catch (e: unknown) {
-    console.log("err: ", e);
+    console.log('err: ', e);
     return undefined;
   }
 }
 
-function opentypeGlyphContours(ch: string, font: OpenTypeFont, size: number, fn: number): { contours: [number, number][][]; width: number } | undefined {
+function opentypeGlyphContours(
+    ch: string, font: OpenTypeFont, size: number,
+    fn: number): {contours: [number, number][][]; width: number}|undefined {
   const fontSize = size * 100 / 72;
 
-  if (ch === " ") {
-    const spaceGlyph = font.charToGlyph(" ");
+  if (ch === ' ') {
+    const spaceGlyph = font.charToGlyph(' ');
     const scale = fontSize / font.unitsPerEm;
-    const spaceWidth = (spaceGlyph?.advanceWidth ?? font.unitsPerEm * 0.25) * scale;
+    const spaceWidth =
+        (spaceGlyph?.advanceWidth ?? font.unitsPerEm * 0.25) * scale;
 
-    return { contours: [], width: spaceWidth };
+    return {contours: [], width: spaceWidth};
   }
 
   const glyph = font.charToGlyph(ch);
@@ -2666,14 +2627,16 @@ function opentypeGlyphContours(ch: string, font: OpenTypeFont, size: number, fn:
   const glyphPath = glyph.getPath(0, 0, fontSize);
   const commands = glyphPath.commands;
 
-  if (!commands || commands.length === 0) return { contours: [], width: advance };
+  if (!commands || commands.length === 0) return {contours: [], width: advance};
 
   const contours = pathToContours(commands, fn);
 
-  return { contours, width: advance };
+  return {contours, width: advance};
 }
 
-function opentypeTextContours(chars: string[], size: number, spacing: number, direction: string, fontBase64: string, fn: number): [number, number][][] | undefined {
+function opentypeTextContours(
+    chars: string[], size: number, spacing: number, direction: string,
+    fontBase64: string, fn: number): [number, number][][]|undefined {
   const font = getOpentypeFont(fontBase64);
 
   if (!font) return undefined;
@@ -2733,7 +2696,8 @@ function canvasForText() {
   return undefined;
 }
 
-function canvasGlyphContours(ch: string, font: string, size: number): {contours: [number, number][][], width: number}|undefined {
+function canvasGlyphContours(ch: string, font: string, size: number):
+    {contours: [number, number][][], width: number}|undefined {
   if (ch === ' ') return {contours: [], width: size * 0.35};
 
   const px = 128;
@@ -2742,8 +2706,7 @@ function canvasGlyphContours(ch: string, font: string, size: number): {contours:
   if (cached) return cached;
 
   const canvas = canvasForText();
-  const ctx =
-      canvas?.getContext('2d', {willReadFrequently: true});
+  const ctx = canvas?.getContext('2d', {willReadFrequently: true});
   if (!canvas || !ctx) return undefined;
 
   ctx.font = fontToCss(font, px);
@@ -2808,8 +2771,11 @@ function canvasGlyphContours(ch: string, font: string, size: number): {contours:
   return result;
 }
 
-function canvasTextContours(chars: string[], size: number, spacing: number, direction: string, font: string): [number, number][][]|undefined {
-  if (typeof document === 'undefined' && typeof OffscreenCanvas === 'undefined') return undefined;
+function canvasTextContours(
+    chars: string[], size: number, spacing: number, direction: string,
+    font: string): [number, number][][]|undefined {
+  if (typeof document === 'undefined' && typeof OffscreenCanvas === 'undefined')
+    return undefined;
 
   const contours: [number, number][][] = [];
   const isVertical = direction === 'ttb' || direction === 'btt';
@@ -2904,14 +2870,14 @@ async function text(
 }
 
 function sync_quality(fa: unknown, fs: unknown): void {
-  if (typeof wasm.setMinCircularAngle === "function") {
-    if (typeof fa === "number" && fa > 0) {
+  if (typeof wasm.setMinCircularAngle === 'function') {
+    if (typeof fa === 'number' && fa > 0) {
       wasm.setMinCircularAngle(fa);
     }
   }
 
-  if (typeof wasm.setMinCircularEdgeLength === "function") {
-    if (typeof fs === "number" && fs > 0) {
+  if (typeof wasm.setMinCircularEdgeLength === 'function') {
+    if (typeof fs === 'number' && fs > 0) {
       wasm.setMinCircularEdgeLength(fs);
     }
   }
@@ -2920,7 +2886,7 @@ function sync_quality(fa: unknown, fs: unknown): void {
 // Only accepts actual finite numbers here; strings like "45", undefined, bools,
 // etc. silently become 0
 function rot_angle(x: unknown): number {
-  return typeof x === "number" && Number.isFinite(x) ? x : 0;
+  return typeof x === 'number' && Number.isFinite(x) ? x : 0;
 }
 
 function rotate(shape: unknown, a: Vec, v?: Vec) {
@@ -2960,13 +2926,16 @@ function rotate(shape: unknown, a: Vec, v?: Vec) {
 
   if (is2D(shape)) {
     if (Math.abs(vz) > 1e-9) {
-      return (shape as InstanceType<typeof CrossSection>).rotate(angle * Math.sign(vz));
+      return (shape as InstanceType<typeof CrossSection>)
+          .rotate(angle * Math.sign(vz));
     }
     return shape;
   }
 
   if (vx === 0 && vy === 0) {
-    return (shape as InstanceType<typeof Manifold>).rotate([0, 0, angle * Math.sign(vz)]);
+    return (shape as InstanceType<typeof Manifold>).rotate([
+      0, 0, angle * Math.sign(vz)
+    ]);
   }
 
   const theta = angle * Math.PI / 180;
@@ -2994,7 +2963,9 @@ function rotate(shape: unknown, a: Vec, v?: Vec) {
     [0, 0, 0, 1]
   ];
 
-  return transform(shape as InstanceType<typeof Manifold> | InstanceType<typeof CrossSection>, R);
+  return transform(
+      shape as InstanceType<typeof Manifold>| InstanceType<typeof CrossSection>,
+      R);
 }
 
 function translate(shape: unknown, v: Vec) {
@@ -3036,8 +3007,10 @@ function scale(shape: unknown, v: Vec) {
       x = v[0] !== undefined && v[0] !== null ? Number(v[0]) : 1;
       y = v[1] !== undefined && v[1] !== null ? Number(v[1]) : 1;
     } else if (v && typeof v === 'object') {
-      x = (v as {x: unknown}).x !== undefined ? Number((v as {x: unknown}).x) : 1;
-      y = (v as {y: unknown}).y !== undefined ? Number((v as {y: unknown}).y) : 1;
+      x = (v as {x: unknown}).x !== undefined ? Number((v as {x: unknown}).x) :
+                                                1;
+      y = (v as {y: unknown}).y !== undefined ? Number((v as {y: unknown}).y) :
+                                                1;
     } else if (typeof v === 'number' && !Number.isNaN(v)) {
       x = y = v;
     }
@@ -3049,9 +3022,12 @@ function scale(shape: unknown, v: Vec) {
       y = v[1] !== undefined && v[1] !== null ? Number(v[1]) : 1;
       z = v[2] !== undefined && v[2] !== null ? Number(v[2]) : 1;
     } else if (v && typeof v === 'object') {
-      x = (v as {x: unknown}).x !== undefined ? Number((v as {x: unknown}).x) : 1;
-      y = (v as {y: unknown}).y !== undefined ? Number((v as {y: unknown}).y) : 1;
-      z = (v as {z: unknown}).z !== undefined ? Number((v as {z: unknown}).z) : 1;
+      x = (v as {x: unknown}).x !== undefined ? Number((v as {x: unknown}).x) :
+                                                1;
+      y = (v as {y: unknown}).y !== undefined ? Number((v as {y: unknown}).y) :
+                                                1;
+      z = (v as {z: unknown}).z !== undefined ? Number((v as {z: unknown}).z) :
+                                                1;
     } else if (typeof v === 'number' && !Number.isNaN(v)) {
       x = y = z = v;
     }
@@ -3062,7 +3038,8 @@ function scale(shape: unknown, v: Vec) {
 // Scale about the origin to fit `newsize`, preserving zero-sized axes unless
 // `auto` is enabled, with the auto scale taken from the largest requested
 // dimension
-function resize(shape: unknown, newsizeRaw: number[], autoRaw: unknown): unknown {
+function resize(
+    shape: unknown, newsizeRaw: number[], autoRaw: unknown): unknown {
   if (!shape || isEmpty(shape)) return shape;
 
   const newsize = [0, 0, 0];
@@ -3080,16 +3057,15 @@ function resize(shape: unknown, newsizeRaw: number[], autoRaw: unknown): unknown
     for (let i = 0; i < 3 && i < (autoRaw as boolean[]).length; i++) {
       autosize[i] = truthy((autoRaw as boolean[])[i]);
     }
-  } else if (typeof autoRaw === "boolean") {
+  } else if (typeof autoRaw === 'boolean') {
     autosize[0] = autosize[1] = autosize[2] = autoRaw;
   }
 
   const flat = is2D(shape);
   const dim = flat ? 2 : 3;
 
-  const bb = flat
-    ? (shape as InstanceType<typeof CrossSection>).bounds()
-    : (shape as InstanceType<typeof Manifold>).boundingBox();
+  const bb = flat ? (shape as InstanceType<typeof CrossSection>).bounds() :
+                    (shape as InstanceType<typeof Manifold>).boundingBox();
 
   const bboxSize = [0, 0, 0];
 
@@ -3111,8 +3087,7 @@ function resize(shape: unknown, newsizeRaw: number[], autoRaw: unknown): unknown
     if (newsize[i]! > 0) {
       if (bboxSize[i] === 0) {
         console.warn(
-          "WARNING: Resize in direction normal to flat object is not implemented"
-        );
+            'WARNING: Resize in direction normal to flat object is not implemented');
         return shape;
       }
 
@@ -3128,12 +3103,11 @@ function resize(shape: unknown, newsizeRaw: number[], autoRaw: unknown): unknown
     }
   }
 
-  return flat
-    ? (shape as InstanceType<typeof CrossSection>).scale([
-        scale[0]!,
-        scale[1]!
-      ])
-    : (shape as InstanceType<typeof Manifold>).scale(scale as [number, number, number]);
+  return flat ? (shape as InstanceType<typeof CrossSection>).scale([
+    scale[0]!, scale[1]!
+  ]) :
+                (shape as InstanceType<typeof Manifold>)
+                    .scale(scale as [number, number, number]);
 }
 
 // Build the reflection matrix to avoid rounding artifacts, and treat a
@@ -3183,7 +3157,8 @@ function mirror(shape: unknown, v: Vec) {
   }
 }
 
-function cube(size: number | number[], center = false): InstanceType<typeof Manifold> {
+function cube(
+    size: number|number[], center = false): InstanceType<typeof Manifold> {
   // Invalid or `undef` `size` uses the default (1,1,1), while only valid but
   // degenerate sizes produce empty geometry
   let v: number[] = [1, 1, 1];
@@ -3204,7 +3179,8 @@ function cube(size: number | number[], center = false): InstanceType<typeof Mani
   return Manifold.cube(v as [number, number, number], center);
 }
 
-function square(size: number | number[], center = false): InstanceType<typeof CrossSection> {
+function square(
+    size: number|number[], center = false): InstanceType<typeof CrossSection> {
   // Invalid or `undef` `size` uses the default (1,1), while only valid but
   // degenerate sizes produce empty geometry
   let v: number[] = [1, 1];
@@ -3297,11 +3273,12 @@ function sphere(
   return sphere;
 }
 
-function radius(dSpec: number | undefined | null, rSpec: number | undefined | null, dGen: number | undefined | null, rGen: number | undefined | null, dflt: number): number {
-  const def = (x: number | undefined | null) =>
-    x !== undefined &&
-    x !== null &&
-    !Number.isNaN(x);
+function radius(
+    dSpec: number|undefined|null, rSpec: number|undefined|null,
+    dGen: number|undefined|null, rGen: number|undefined|null,
+    dflt: number): number {
+  const def = (x: number|undefined|null) =>
+      x !== undefined && x !== null && !Number.isNaN(x);
 
   if (def(dSpec)) return dSpec! / 2;
   if (def(rSpec)) return rSpec!;
@@ -3376,15 +3353,16 @@ function forceWinding(
 type Point2D = [number, number];
 type Path = number[];
 
-function polygon(points: Point2D[], paths?: Path | Path[]): InstanceType<typeof CrossSection> {
+function polygon(
+    points: Point2D[], paths?: Path|Path[]): InstanceType<typeof CrossSection> {
   if (!points || !Array.isArray(points) || points.length === 0) {
     return CrossSection.square(0);
   }
 
   // A point with a non-finite coordinate yields no geometry
   if (points.some(
-          (p) => Array.isArray(p) &&
-              p.some((c) => !Number.isFinite(Number(c))))) {
+          (p) =>
+              Array.isArray(p) && p.some((c) => !Number.isFinite(Number(c))))) {
     return CrossSection.square(0);
   }
 
@@ -3394,25 +3372,26 @@ function polygon(points: Point2D[], paths?: Path | Path[]): InstanceType<typeof 
   }
 
   if (Array.isArray(paths) && paths.length > 0 && !Array.isArray(paths[0])) {
-    const contour = paths.map((idx) => points[Number(idx) || 0]).filter(Boolean);
+    const contour =
+        paths.map((idx) => points[Number(idx) || 0]).filter(Boolean);
     const ccwContour = forceWinding(contour as Point2D[], true);
     return CrossSection.ofPolygons([ccwContour]);
   }
 
   if (Array.isArray(paths)) {
-    const contours =
-        paths
-            .map((path) => {
-              let contour: Point2D[] = [];
-              if (Array.isArray(path)) {
-                contour = path.map((idx) => points[Number(idx) || 0])
-                              .filter(Boolean) as Point2D[];
-              } else if (typeof path === 'number') {
-                contour = [points[path]] as Point2D[];
-              }
-              return contour;
-            })
-            .filter((c) => c.length > 0);
+    const contours = paths
+                         .map((path) => {
+                           let contour: Point2D[] = [];
+                           if (Array.isArray(path)) {
+                             contour =
+                                 path.map((idx) => points[Number(idx) || 0])
+                                     .filter(Boolean) as Point2D[];
+                           } else if (typeof path === 'number') {
+                             contour = [points[path]] as Point2D[];
+                           }
+                           return contour;
+                         })
+                         .filter((c) => c.length > 0);
     // Use EvenOdd fill rule - OpenSCAD polygon() does not assume outer/hole
     // winding
     return CrossSection.ofPolygons(contours, 'EvenOdd');
@@ -3425,12 +3404,13 @@ function polygon(points: Point2D[], paths?: Path | Path[]): InstanceType<typeof 
 
 type Point3D = [number, number, number];
 type Face = number[];
-function polyhedron(points: Point3D[], faces: Face | Face[]): InstanceType<typeof Manifold> {
+function polyhedron(
+    points: Point3D[], faces: Face|Face[]): InstanceType<typeof Manifold> {
   // A point with a non-finite coordinate yields no geometry
   if (Array.isArray(points) &&
       points.some(
-          (p) => Array.isArray(p) &&
-              p.some((c) => !Number.isFinite(Number(c))))) {
+          (p) =>
+              Array.isArray(p) && p.some((c) => !Number.isFinite(Number(c))))) {
     return Manifold.union([]);
   }
   const verts: number[] = [];
@@ -3525,16 +3505,14 @@ function polyhedron(points: Point3D[], faces: Face | Face[]): InstanceType<typeo
 
 type RGBA = [number, number, number, number];
 
-function parse_color_for_scope(c: unknown, alpha: unknown): RGBA | undefined {
+function parse_color_for_scope(c: unknown, alpha: unknown): RGBA|undefined {
   const base = parse_color_value(c);
   if (!base) return undefined;
 
   const a =
-    alpha !== undefined &&
-    alpha !== null &&
-    Number.isFinite(Number(alpha))
-      ? Number(alpha)
-      : base[3];
+      alpha !== undefined && alpha !== null && Number.isFinite(Number(alpha)) ?
+      Number(alpha) :
+      base[3];
 
   return [base[0]!, base[1]!, base[2]!, a!];
 }
