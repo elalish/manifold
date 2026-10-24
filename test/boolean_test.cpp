@@ -14,6 +14,7 @@
 
 #include <atomic>
 #include <limits>
+#include <numeric>
 #include <thread>
 
 #include "../src/utils.h"
@@ -78,7 +79,7 @@ TEST(Boolean, MeshGLRoundTrip) {
   ExpectMeshes(result, {{18, 32}});
   RelatedGL(result, {original});
 
-  MeshGL inGL = result.GetMeshGL();
+  MeshGL inGL = result.TriID2FaceID().GetMeshGL();
   ASSERT_EQ(inGL.runOriginalID.size(), 2);
   const Manifold result2(inGL);
 
@@ -104,7 +105,7 @@ TEST(Boolean, Normals) {
 
   RelatedGL(result, {cubeGL, sphereGL}, true, true);
 
-  MeshGL output = result.GetMeshGL();
+  MeshGL output = result.TriID2FaceID().GetMeshGL();
 
   if (options.exportModels) WriteTestOBJ("normals.obj", result);
 
@@ -238,21 +239,22 @@ TEST(Boolean, Simplify) {
   const int n = 10;
   MeshGL cubeGL = Manifold::Cube().Refine(n).GetMeshGL();
   // Give unique face IDs to stop edge removal
+  cubeGL.faceID.resize(cubeGL.NumTri());
   std::iota(cubeGL.faceID.begin(), cubeGL.faceID.end(), 0);
   Manifold cube(cubeGL);
 
-  const int nExpected = 20 * n * n;
+  const int nStarting = 20 * n * n;
   Manifold result = cube + cube.Translate({1, 0, 0});
-  EXPECT_EQ(result.NumTri(), nExpected);
-  result = result.Simplify();
-  EXPECT_EQ(result.NumTri(), nExpected);
+  EXPECT_EQ(result.NumTri(), nStarting);
+  EXPECT_EQ(result.RemoveDegenerates().NumTri(), nStarting);
+  EXPECT_EQ(result.Simplify().NumTri(), nStarting);
 
   MeshGL resultGL = result.GetMeshGL();
   resultGL.faceID.clear();
   Manifold result2(resultGL);
-  EXPECT_EQ(result2.NumTri(), nExpected);
-  result2 = result2.Simplify();
-  EXPECT_EQ(result2.NumTri(), 20);
+  EXPECT_EQ(result2.NumTri(), nStarting);
+  EXPECT_EQ(result2.RemoveDegenerates().NumTri(), 34);
+  EXPECT_EQ(result2.Simplify().NumTri(), 12);
 }
 
 TEST(Boolean, SimplifyCracks) {
@@ -275,6 +277,72 @@ TEST(Boolean, SimplifyCracks) {
 
   if (options.exportModels) WriteTestOBJ("cracks.obj", simplified);
 }
+
+TEST(Boolean, SimplifyShards) {
+  Manifold a = Manifold::Sphere(40, 10);
+  Manifold b = a.Translate({0, 0, 40}) ^ a;
+  Manifold result = a - b;
+  Box bounds = result.BoundingBox();
+  EXPECT_FLOAT_EQ(bounds.max.z, 20);
+}
+
+#ifndef MANIFOLD_NO_FILESYSTEM
+// Regression test for #1857: coincident meshes with different triangulations
+// made RemoveDegenerates cycle edge swaps for ~3e8 iterations.
+TEST(Boolean, DegenerateSwapCycle) {
+  ManifoldParamGuard guard;
+  ManifoldParams().intermediateChecks = false;
+  Manifold first = ReadTestOBJ("degenerate_swap_cycle_first.obj");
+  Manifold second = ReadTestOBJ("degenerate_swap_cycle_second.obj");
+  Manifold result = first + second;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_GT(result.NumTri(), 0u);
+  EXPECT_GT(result.Volume(), 0);
+}
+
+// Since #1869, SwapDegenerateEdges leaves a broken vertex orbit on these
+// coincident meshes, and a later orbit walk in RemoveDegenerates never ends.
+TEST(Boolean, DegenerateSwapLoop) {
+  ManifoldParamGuard guard;
+  ManifoldParams().intermediateChecks = false;
+  Manifold a = ReadTestOBJ("degenerate_swap_loop_a.obj");
+  Manifold b = ReadTestOBJ("degenerate_swap_loop_b.obj");
+  Manifold c = ReadTestOBJ("degenerate_swap_loop_c.obj");
+  Manifold result = (a + b) - c;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_GT(result.NumTri(), 0u);
+  EXPECT_GT(result.Volume(), 0);
+}
+
+// Regression test: SplitQuad clamped its new vert onto an end of the edge,
+// which only added a zero-length edge, so SwapDegenerateEdges split the same
+// quad again and again, growing the mesh until it crashed.
+TEST(Boolean, DegenerateSplitQuadAtEnd) {
+  ManifoldParamGuard guard;
+  ManifoldParams().intermediateChecks = false;
+  Manifold first = ReadTestOBJ("degenerate_split_quad_first.obj");
+  Manifold second = ReadTestOBJ("degenerate_split_quad_second.obj");
+  Manifold result = first + second;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_NEAR(result.Volume(), 1.480266544, 1e-6);
+}
+
+// Regression test: SplitQuad rewrote a triangle that shares an outer edge of
+// the quad with the triangle across the split edge, leaving stale pairs, and a
+// later vertex orbit in RemoveDegenerates never ended.
+TEST(Boolean, DegenerateSplitQuadSharedEdge) {
+  ManifoldParamGuard guard;
+  ManifoldParams().intermediateChecks = false;
+  Manifold a = ReadTestOBJ("degenerate_split_quad_shared_a.obj");
+  Manifold b = ReadTestOBJ("degenerate_split_quad_shared_b.obj");
+  Manifold c = ReadTestOBJ("degenerate_split_quad_shared_c.obj");
+  Manifold result = a + b + c;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_GT(result.NumTri(), 0u);
+  EXPECT_GT(result.Volume(), 0);
+}
+
+#endif
 
 TEST(Boolean, NoRetainedVerts) {
   Manifold cube = Manifold::Cube(vec3(1), true);
@@ -365,7 +433,7 @@ TEST(Boolean, SimpleProperties) {
   Manifold result = cube + flange;
   EXPECT_EQ(result.NumProp(), 3);
   EXPECT_NEAR(result.Volume(), 22.6666, 0.0001);
-  EXPECT_EQ(result.NumVert(), 16);
+  EXPECT_EQ(result.NumVert(), 12);
   EXPECT_TRUE(result.HasSimpleProps());
 }
 
@@ -729,7 +797,6 @@ TEST(Boolean, NonConvexConvexMinkowskiSum) {
 TEST(Boolean, NonConvexConvexMinkowskiDifference) {
   ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
-  ManifoldParams().verifyNoDegenerates = false;
 
   Manifold sphere = Manifold::Sphere(1.2, 20);
   Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
@@ -745,9 +812,6 @@ TEST(Boolean, NonConvexConvexMinkowskiDifference) {
 }
 
 TEST(Boolean, NonConvexNonConvexMinkowskiSum) {
-  ManifoldParamGuard guard;
-  ManifoldParams().processOverlaps = true;
-
   Manifold tet = Manifold::Tetrahedron();
   Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
 
@@ -761,10 +825,6 @@ TEST(Boolean, NonConvexNonConvexMinkowskiSum) {
 }
 
 TEST(Boolean, NonConvexNonConvexMinkowskiDifference) {
-  ManifoldParamGuard guard;
-  ManifoldParams().processOverlaps = true;
-  ManifoldParams().verifyNoDegenerates = false;
-
   Manifold tet = Manifold::Tetrahedron();
   Manifold nonConvex = tet - tet.Rotate(0, 0, 90).Translate(vec3(1));
 
@@ -834,7 +894,7 @@ TEST(Boolean, Precision) {
   Manifold cube2 = cube;
   Manifold cube3 = cube;
   double distance = 100;
-  double scale = distance * kPrecision;
+  double scale = distance * Quality::GetRelativePrecision();
   cube2 = cube2.Scale(vec3(scale)).Translate({distance, 0, 0});
 
   cube += cube2;
@@ -850,14 +910,34 @@ TEST(Boolean, Precision) {
 TEST(Boolean, Precision2) {
   double scale = 1000;
   Manifold cube = Manifold::Cube(vec3(scale));
-  Manifold cube2 = cube;
-  double distance = scale * (1 - kPrecision / 2);
+  const double epsilon = scale * Quality::GetRelativePrecision();
+  // An overlap within epsilon is a tie, resolved as no intersection.
+  double distance = scale - epsilon / 2;
+  EXPECT_TRUE((cube ^ cube.Translate(vec3(-distance))).IsEmpty());
+  EXPECT_TRUE((cube ^ cube.Translate(vec3(distance))).IsEmpty());
+  // An overlap beyond epsilon is an intersection.
+  distance = scale - 4 * epsilon;
+  EXPECT_FALSE((cube ^ cube.Translate(vec3(-distance))).IsEmpty());
+  EXPECT_FALSE((cube ^ cube.Translate(vec3(distance))).IsEmpty());
+}
 
-  cube2 = cube2.Translate(vec3(-distance));
-  EXPECT_TRUE((cube ^ cube2).IsEmpty());
-
-  cube2 = cube2.Translate(vec3(scale * kPrecision));
-  EXPECT_FALSE((cube ^ cube2).IsEmpty());
+TEST(Boolean, Precision3) {
+  Manifold cube1 = Manifold::Cube().Rotate(45);
+  Manifold cube2 = Manifold::Cube().Translate({0, 0.5, 0}).Rotate(45);
+  Manifold result = cube1 + cube2;
+  ExpectMeshes(result, {{8, 12}});
+  // Double precision round-trips through MeshGL64
+  Manifold result2 =
+      Manifold(cube1.GetMeshGL64()) + Manifold(cube2.GetMeshGL64());
+  EXPECT_EQ(result2.NumTri(), result.NumTri());
+  // MeshGL rounds to single precision, so the results are no longer coplanar.
+  Manifold result3 = Manifold(cube1.GetMeshGL()) + Manifold(cube2.GetMeshGL());
+  EXPECT_GT(result3.NumTri(), result.NumTri());
+  // Setting the precision to reflect this makes the faces coplanar again.
+  Quality::SetRelativePrecision(1e-7);
+  Manifold result4 = Manifold(cube1.GetMeshGL()) + Manifold(cube2.GetMeshGL());
+  EXPECT_EQ(result4.NumTri(), result.NumTri());
+  Quality::ResetToDefaults();
 }
 
 TEST(Boolean, SimpleCubeRegression) {
@@ -1024,6 +1104,220 @@ TEST(Boolean, BatchBoolean) {
   EXPECT_FLOAT_EQ(subtract.SurfaceArea(), 14904.597);
 }
 
+namespace {
+// Convex face pieces, as lists of x, y, z corners, swept by a cube of the
+// given half-size (a Minkowski sum of a voxel shape's faces, which is full of
+// exactly coplanar faces): their union in one batch must come out as the
+// union taken one piece at a time.
+void ExpectSweptPiecesUnion(const std::vector<std::vector<double>>& pieces,
+                            double size) {
+  std::vector<Manifold> hulls;
+  for (const auto& corners : pieces) {
+    std::vector<vec3> points;
+    for (size_t i = 0; i < corners.size(); i += 3)
+      for (const int x : {-1, 1})
+        for (const int y : {-1, 1})
+          for (const int z : {-1, 1})
+            points.push_back(vec3(corners[i], corners[i + 1], corners[i + 2]) +
+                             vec3(x, y, z) * size);
+    hulls.push_back(Manifold::Hull(points));
+  }
+  const Manifold batch = Manifold::BatchBoolean(hulls, OpType::Add);
+  Manifold oneByOne = hulls[0];
+  for (size_t i = 1; i < hulls.size(); ++i) oneByOne += hulls[i];
+  EXPECT_NEAR(batch.Volume(), oneByOne.Volume(), 1e-9 * oneByOne.Volume());
+  EXPECT_NEAR(batch.SurfaceArea(), oneByOne.SurfaceArea(),
+              1e-9 * oneByOne.SurfaceArea());
+}
+}  // namespace
+
+// Where a face normal component was exactly zero, the earlier tie-break
+// directions, which follow the normals, could decide a tie both ways, and
+// BatchBoolean's unions left a zero-volume flap of overlapping triangles.
+TEST(Boolean, CoplanarBatchUnion) {
+  const std::vector<std::vector<double>> pieces = {
+      {8390772, 25172316, 41953860, 8390772, 114489228, 131270772, 97707684,
+       114489228, 131270772},
+      {8390772, 25172316, 41953860, 97707684, 114489228, 131270772, 8390772,
+       25172316, 220587684},
+      {97707684, 131270772, 131270772, 106098456, 139661544, 122880000, 8390772,
+       237369228, 220587684},
+      {8390772, 237369228, 220587684, 8390772, 25172316, 220587684, 97707684,
+       114489228, 131270772, 97707684, 131270772, 131270772},
+      {16781544, 245760000, 16781544, 106098456, 139661544, 122880000, 97707684,
+       131270772, 131270772, 8390772, 131270772, 131270772, 8390772, 245760000,
+       16781544},
+      {106098456, 139661544, 122880000, 139661544, 139661544, 122880000,
+       237369228, 245760000, 228978456, 8390772, 245760000, 228978456, 8390772,
+       237369228, 220587684},
+  };
+  ExpectSweptPiecesUnion(pieces, 2457600);
+}
+
+// Edges of P and Q on one line, with the same faces either side, are parallel
+// in projection, where a tie was decided by the old rule from the faces'
+// normals: equal, so by their rounding or not at all. BatchBoolean's unions
+// left a zero-volume flap.
+TEST(Boolean, CollinearEdgesBatchUnion) {
+  const std::vector<std::vector<double>> pieces = {
+      {73728000, 201523200, 22118400, 137625600, 137625600, 86016000, 231014400,
+       208896000, 14745600, 73728000, 208896000, 14745600},
+      {122880000, 108134400, 144998400, 137625600, 108134400, 159744000,
+       208896000, 36864000, 231014400, 208896000, 14745600, 231014400,
+       122880000, 14745600, 144998400},
+      {346521600, 122880000, 122880000, 346521600, 14745600,  122880000,
+       260505600, 14745600,  36864000,  231014400, 44236800,  7372800,
+       231014400, 201523200, 7372800,   245760000, 216268800, 22118400,
+       253132800, 216268800, 29491200},
+      {14745600, 36864000, 231014400, 14745600, 44236800, 238387200, 7372800,
+       44236800, 231014400},
+      {7372800, 201523200, 231014400, 14745600, 201523200, 238387200, 14745600,
+       208896000, 231014400},
+      {108134400, 115507200, 231014400, 108134400, 108134400, 238387200,
+       137625600, 108134400, 238387200, 137625600, 115507200, 231014400},
+      {137625600, 115507200, 231014400, 137625600, 108134400, 238387200,
+       245760000, 216268800, 238387200, 245760000, 223641600, 231014400},
+      {152371200, 238387200, 122880000, 231014400, 238387200, 201523200,
+       231014400, 238387200, 44236800},
+      {7372800, 44236800, 231014400, 7372800, 201523200, 231014400, 7372800,
+       122880000, 152371200},
+      {253132800, 208896000, 238387200, 253132800, 201523200, 245760000,
+       260505600, 208896000, 231014400},
+      {260505600, 208896000, 231014400, 245760000, 223641600, 231014400,
+       245760000, 216268800, 238387200, 253132800, 208896000, 238387200},
+      {144998400, 231014400, 122880000, 144998400, 122880000, 122880000,
+       242073600, 219955200, 219955200, 231014400, 231014400, 208896000},
+      {108134400, 115507200, 231014400, 137625600, 115507200, 231014400,
+       137625600, 115507200, 167116800, 122880000, 115507200, 152371200,
+       108134400, 115507200, 167116800},
+      {231014400, 231014400, 36864000, 144998400, 231014400, 122880000,
+       152371200, 238387200, 122880000, 231014400, 238387200, 44236800},
+      {231014400, 231014400, 208896000, 242073600, 219955200, 219955200,
+       245760000, 223641600, 216268800, 231014400, 238387200, 201523200},
+      {122880000, 115507200, 152371200, 122880000, 108134400, 144998400,
+       108134400, 108134400, 159744000, 110592000, 113049600, 162201600},
+      {152371200, 238387200, 122880000, 144998400, 231014400, 122880000,
+       231014400, 231014400, 208896000, 231014400, 238387200, 201523200},
+      {14745600, 208896000, 231014400, 14745600, 122880000, 144998400, 7372800,
+       122880000, 152371200, 7372800, 201523200, 231014400},
+      {245760000, 216268800, 22118400, 245760000, 223641600, 29491200,
+       253132800, 216268800, 29491200},
+      {122880000, 115507200, 152371200, 137625600, 115507200, 167116800,
+       135168000, 113049600, 162201600},
+      {137625600, 108134400, 159744000, 122880000, 108134400, 144998400,
+       122880000, 115507200, 152371200, 135168000, 113049600, 162201600},
+      {148684800, 119193600, 148684800, 137625600, 108134400, 159744000,
+       135168000, 113049600, 162201600, 144998400, 122880000, 152371200},
+      {245760000, 223641600, 216268800, 245760000, 223641600, 231014400,
+       260505600, 208896000, 231014400, 346521600, 122880000, 122880000},
+      {346521600, 122880000, 122880000, 260505600, 208896000, 231014400,
+       260505600, 208896000, 260505600, 339148800, 130252800, 339148800,
+       346521600, 122880000, 339148800},
+      {93388800, 122880000, 144998400, 14745600, 122880000, 144998400, 14745600,
+       208896000, 231014400, 93388800, 130252800, 152371200},
+      {14745600, 122880000, 144998400, 14745600, 36864000, 231014400, 7372800,
+       44236800, 231014400, 7372800, 122880000, 152371200},
+      {245760000, 223641600, 231014400, 245760000, 223641600, 216268800,
+       242073600, 219955200, 219955200},
+  };
+  ExpectSweptPiecesUnion(pieces, 7372800);
+}
+
+// Swept face pieces with their corners moved by up to 8x the tie tolerance.
+// Ties shift comparisons by up to tol, and an extrapolated crossing could put
+// an edge-face pair beyond tol, where the broad phase didn't look for it; the
+// faces' new edges then didn't close into loops and a release build crashed.
+TEST(Boolean, TieReachWithinBroadPhase) {
+  const std::vector<std::vector<vec3>> hulls = {
+      {{5933171.9995238213, 22714716.000057332, 39496260.000251256},
+       {5933171.9989524754, 22714715.999117792, 44411459.999446616},
+       {5933171.9998154342, 27629915.999130972, 39496259.999150768},
+       {10848372.000114594, 22714716.000184383, 39496259.999733359},
+       {10848372.000912903, 22714715.999368619, 44411460.000444435},
+       {10848371.998934455, 27629916.000207659, 39496259.999489024},
+       {5933172.0005570957, 112031628.00054891, 133728372.00083925},
+       {5933172.0010065436, 116946828.00038597, 128813172.00080018},
+       {5933172.0000941679, 116946828.00035273, 133728371.99928208},
+       {100165284.00020041, 112031627.99903189, 128813171.99899341},
+       {100165284.00099257, 112031628.00062613, 133728372.00034028},
+       {100165284.00048369, 116946827.99981065, 128813172.00047664},
+       {100165283.99938406, 116946827.99997906, 133728371.99991706}},
+      {{5933172.0010318272, 234911628.00019982, 218130083.99929783},
+       {5933171.9997240566, 234911627.99973357, 223045284.00075388},
+       {5933171.999528789, 239826827.99938533, 218130083.99940264},
+       {5933172.0007925536, 239826828.00081331, 223045283.9993144},
+       {10848372.000566745, 234911627.99897727, 223045284.00104564},
+       {10848371.999838663, 239826828.00085419, 218130083.99933782},
+       {10848371.99930747, 239826827.99950826, 223045283.99933097},
+       {95250083.999651715, 128813171.99966849, 128813172.00061867},
+       {95250084.000075668, 128813172.00061968, 133728372.00091676},
+       {100165283.99966106, 128813171.99893782, 128813171.99991679},
+       {103640856.0000135, 137203943.99936268, 120422399.99971741},
+       {103640856.00007004, 142119144.00058144, 120422399.99977161},
+       {108556055.99949318, 137203944.00045016, 120422399.99916007},
+       {108556056.00018032, 137203944.00066164, 125337599.99902551},
+       {108556055.99934056, 142119144.00085351, 120422400.00104116},
+       {108556055.9994711, 142119144.00100523, 125337599.9995008},
+       {100165283.99948484, 128813172.00022171, 133728371.99896541}},
+      {{5933172.000579834, 22714715.999948882, 218130083.99910191},
+       {5933172.0006833691, 22714716.000324652, 223045284.0004262},
+       {10848371.999146832, 22714715.999958582, 218130083.99922636},
+       {10848371.999465054, 22714715.999797001, 223045283.99994576},
+       {5933171.9994299067, 239826827.99953941, 218130083.99998271},
+       {5933172.000743405, 239826828.00006032, 223045283.9997904},
+       {10848371.999528069, 239826828.00040245, 218130083.99983528},
+       {10848371.998996811, 239826827.99913597, 223045283.99894264},
+       {95250083.999432668, 112031628.00092712, 128813171.99958333},
+       {100165284.0007956, 112031627.99984427, 128813172.00017366},
+       {100165283.99927248, 112031627.99931455, 133728372.00068122},
+       {95250083.999126494, 133728371.99970494, 128813171.9991616},
+       {100165283.99913253, 133728371.99934672, 128813171.99983242},
+       {100165284.0005192, 133728371.99904262, 133728372.00004923}},
+      {{5933172.000852067, 128813171.99992201, 128813171.99993366},
+       {5933171.9993507266, 128813171.99978223, 133728371.99975634},
+       {5933171.999499443, 133728372.00010563, 133728371.99969386},
+       {5933171.9994109338, 243302399.9990561, 14323943.999855841},
+       {5933172.0001239982, 248217600.00015983, 14323943.999004491},
+       {5933172.0005210768, 248217599.99946705, 19239143.999449778},
+       {10848371.999505458, 248217600.00088385, 19239143.999857236},
+       {19239144.000821415, 243302399.99971455, 14323944.000301898},
+       {19239143.999894802, 248217600.00052258, 14323943.999240793},
+       {19239144.000947971, 248217599.9995406, 19239143.999882426},
+       {95250083.999684483, 128813171.99982558, 128813172.00011076},
+       {95250083.999071851, 128813171.99956167, 133728372.0005184},
+       {95250084.000028595, 133728372.00002801, 133728372.00027679},
+       {100165284.00050369, 128813172.00062722, 128813172.00081883},
+       {100165283.99979374, 128813172.00009625, 133728372.00002313},
+       {100165283.99920432, 133728371.99968459, 133728372.00088462},
+       {108556056.00007141, 137203943.99945047, 120422400.00081666},
+       {108556056.00089914, 137203944.00045934, 125337600.0006575},
+       {108556056.00052473, 142119143.99910617, 120422399.99943347},
+       {108556056.00076102, 142119143.99893531, 125337599.9991165}},
+      {{103640855.99964717, 137203944.00049761, 120422400.00087538},
+       {103640855.99947599, 137203944.00057408, 125337599.99965216},
+       {103640856.00102103, 142119143.99971345, 120422399.99975768},
+       {5933172.0000957195, 234911627.99976182, 218130083.99950951},
+       {5933172.000531178, 234911628.00087953, 223045283.99977997},
+       {5933171.9995087488, 239826827.99907085, 218130083.99976939},
+       {5933172.0003452608, 243302400.00031659, 231436056.00042355},
+       {5933172.0003472157, 248217600.00048625, 226520855.99969319},
+       {5933172.0006595477, 248217599.99998301, 231436055.99983546},
+       {142119144.00074229, 137203944.00026315, 120422399.99956721},
+       {142119143.99928084, 137203943.99926022, 125337599.99894974},
+       {142119143.99984926, 142119143.99927115, 120422400.00067087},
+       {239826828.00054792, 243302399.99984455, 226520855.99952969},
+       {239826827.99930415, 243302400.00035706, 231436056.00097376},
+       {239826827.99954858, 248217599.99906513, 226520856.00021729},
+       {234911627.9998562, 248217600.00037652, 231436055.9996461},
+       {239826827.99978614, 248217599.99950948, 231436056.00008646}},
+  };
+  std::vector<Manifold> parts;
+  for (const auto& points : hulls) parts.push_back(Manifold::Hull(points));
+  const Manifold batch = Manifold::BatchBoolean(parts, OpType::Add);
+  EXPECT_EQ(batch.Status(), Manifold::Error::NoError);
+  EXPECT_GT(batch.Volume(), 0.0);
+}
+
 // Regression for #1672: a sub-tree shared between two trees must survive when
 // one of those trees is destroyed without being evaluated. Previously the
 // CsgOpNode destructor emptied descendant impls regardless of whether they
@@ -1047,4 +1341,62 @@ TEST(Boolean, SharedSubtreeAfterSiblingDestroyed) {
                        Manifold::Cube(vec3(1)).Translate(vec3(1.0, 0, 0));
   EXPECT_EQ(tree2.Status(), Manifold::Error::NoError);
   EXPECT_EQ(tree2.NumTri(), reference.NumTri());
+}
+
+// Two cubes offset vertically and booleaned inside / outside a third cube.
+// A subsequent union of these two solids should not contain any internal
+// triangles along the shared internal face.
+//
+//             +--------+  z = 100
+//             |   b1   |
+//    +--------+        |  z = 70
+//    |   b2   :        |
+//    |        +--------+  z = 0
+//    |        |
+//    +--------+           z = -30
+//    : = shared internal face, should be removed by union
+TEST(Boolean, PartialCoincidentFaceUnion) {
+  MeshGL64 cube = Manifold::Cube(vec3(100)).Refine(8).GetMeshGL64();
+  cube.faceID.resize(cube.NumTri());
+  std::iota(cube.faceID.begin(), cube.faceID.end(), 0);
+  const Manifold block(cube);
+  for (int angle = 1; angle <= 45; ++angle) {
+    SCOPED_TRACE("angle = " + std::to_string(angle));
+    const Manifold clipper = Manifold::Cube(vec3(150, 300, 200))
+                                 .Translate(vec3(-150, -150, -50))
+                                 .Rotate(0, 0, -angle);
+    const Manifold b1 = block - clipper;
+    const Manifold b2 = block.Translate(vec3(0, 0, -30)) ^ clipper;
+    const Manifold result = b1 + b2;
+
+    EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+    EXPECT_EQ(result.Genus(), 0);
+    EXPECT_NEAR(result.Volume(), b1.Volume() + b2.Volume(), 1e-6);
+    // Check that the internal face is dropped
+    const double overlap = 100 / std::cos(angle * kPi / 180) * 70;
+    EXPECT_NEAR(result.SurfaceArea(),
+                b1.SurfaceArea() + b2.SurfaceArea() - 2 * overlap, 1e-6);
+  }
+}
+
+// A point outside but within tolerance of the surface counts as inside, before
+// and after a boolean operation, including along a coincident face.
+TEST(Boolean, PointWithinToleranceOfCoincidentEdge) {
+  const Manifold block = Manifold::Cube(vec3(100));
+  const Manifold clipper = Manifold::Cube(vec3(150, 300, 200))
+                               .Translate(vec3(-150, -150, -50))
+                               .Rotate(0, 0, -30);
+  const Manifold b1 = block - clipper;
+  const Manifold b2 = block.Translate(vec3(0, 0, -30)) ^ clipper;
+  const Manifold result = b1 + b2;
+  const double tol = 100 * Quality::GetRelativePrecision();
+  const vec3 edge(50 * std::tan(kPi / 6), 50, 70);
+  const vec3 out(-std::cos(kPi / 6), std::sin(kPi / 6), 1);
+  const vec3 within = edge + out * (tol / 4);
+  const vec3 beyond = edge + out * (4 * tol);
+  for (const Manifold& m : {b1, b2, result}) {
+    const auto w = m.WindingNumber({within, beyond});
+    EXPECT_NE(w[0], 0);
+    EXPECT_EQ(w[1], 0);
+  }
 }

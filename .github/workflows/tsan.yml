@@ -29,16 +29,16 @@ jobs:
       TBB_TAG: v2022.3.0
       TBB_PREFIX: ${{ github.workspace }}/.tbb-tsan
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install apt packages
-        uses: awalsh128/cache-apt-pkgs-action@v1.6.0
+        uses: awalsh128/cache-apt-pkgs-action@v1
         with:
           packages: libgtest-dev libassimp-dev pkg-config cmake
 
       - name: Cache TBB (TSAN build)
         id: cache-tbb
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ${{ env.TBB_PREFIX }}
           key: tbb-tsan-${{ env.TBB_TAG }}-gcc14-ubuntu-24.04-v1
@@ -87,7 +87,7 @@ jobs:
 
       - name: Upload TSAN log
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tsan-log
           path: tsan.log

@@ -246,16 +246,6 @@ ManifoldPolygons* manifold_cross_section_to_polygons(void* mem,
   return to_c(new (mem) Polygons(ps));
 }
 
-double manifold_cross_section_get_tolerance(ManifoldCrossSection* cs) {
-  return from_c(cs)->GetTolerance();
-}
-
-ManifoldCrossSection* manifold_cross_section_set_tolerance(
-    void* mem, ManifoldCrossSection* cs, double tolerance) {
-  auto out = from_c(cs)->SetTolerance(tolerance);
-  return to_c(new (mem) CrossSection(out));
-}
-
 ManifoldCrossSectionVec* manifold_cross_section_decompose(
     void* mem, ManifoldCrossSection* cs) {
   auto comps = from_c(cs)->Decompose();

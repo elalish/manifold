@@ -52,7 +52,6 @@ const manifoldMemberFunctions = [
   'refineToLength',
   'refineToTolerance',
   'setProperties',
-  'setTolerance',
   'simplify',
   'asOriginal',
   'trimByPlane',
@@ -71,8 +70,7 @@ const crossSectionStaticFunctions = [
 // CrossSection member functions (that return a new cross-section)
 const crossSectionMemberFunctions = [
   'add', 'subtract', 'intersect', 'rectClip', 'decompose', 'transform',
-  'translate', 'rotate', 'scale', 'mirror', 'simplify', 'setTolerance',
-  'offset', 'hull'
+  'translate', 'rotate', 'scale', 'mirror', 'simplify', 'offset', 'hull'
 ];
 
 /**

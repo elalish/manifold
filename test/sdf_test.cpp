@@ -180,6 +180,20 @@ TEST(SDF, SineSurface) {
   if (options.exportModels) WriteTestOBJ("sinesurface.obj", surface);
 }
 
+TEST(SDF, Determinism) {
+  const auto gyroid = [](vec3 p) {
+    return la::sin(p.x) * la::cos(p.y) + la::sin(p.y) * la::cos(p.z) +
+           la::sin(p.z) * la::cos(p.x);
+  };
+  const Box bounds = {vec3(-10), vec3(10)};
+  const MeshGL first = Manifold::LevelSet(gyroid, bounds, 1.0).GetMeshGL();
+  for (int i = 0; i < 10; ++i) {
+    const MeshGL mesh = Manifold::LevelSet(gyroid, bounds, 1.0).GetMeshGL();
+    ASSERT_EQ(mesh.vertProperties, first.vertProperties);
+    ASSERT_EQ(mesh.triVerts, first.triVerts);
+  }
+}
+
 TEST(SDF, Blobs) {
   const double blend = 1;
   std::vector<vec4> balls = {{0, 0, 0, 2},     //

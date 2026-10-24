@@ -836,6 +836,7 @@ TEST(BooleanComplex, InterpolatedNormals) {
   b.runOriginalID = {Manifold::ReserveIDs(1)};
 
   Manifold aManifold(a);
+
   Manifold bManifold(b);
 
   auto aMinusB = aManifold - bManifold;
@@ -1498,7 +1499,7 @@ TEST(BooleanComplex, CraycloudBool) {
   Manifold m2 = ReadTestOBJ("Cray_right.obj");
   Manifold res = m1 - m2;
   EXPECT_EQ(res.Status(), Manifold::Error::NoError);
-  EXPECT_TRUE(res.IsEmpty());
+  EXPECT_FALSE(res.IsEmpty());
 }
 
 TEST(BooleanComplex, HullMask) {
@@ -1531,7 +1532,6 @@ TEST(BooleanComplex, LazyCollider) {
 TEST(BooleanComplex, OffsetTriangulationFailure) {
   ManifoldParamGuard guard;
   ManifoldParams().selfIntersectionChecks = true;
-  manifold::ManifoldParams().verifyNoDegenerates = false;
   Manifold a = ReadTestOBJ("Offset1.obj");
   Manifold b = ReadTestOBJ("Offset2.obj");
   Manifold result = a + b;
@@ -1541,17 +1541,22 @@ TEST(BooleanComplex, OffsetTriangulationFailure) {
 TEST(BooleanComplex, OffsetSelfIntersect) {
   ManifoldParamGuard guard;
   ManifoldParams().selfIntersectionChecks = true;
-  manifold::ManifoldParams().verifyNoDegenerates = false;
   Manifold a = ReadTestOBJ("Offset3.obj");
   Manifold b = ReadTestOBJ("Offset4.obj");
   Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
 }
 
+TEST(BooleanComplex, InfiniteRecursion) {
+  Manifold a = ReadTestOBJ("r1.obj");
+  Manifold b = ReadTestOBJ("r2.obj");
+  Manifold result = a ^ b;
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+}
+
 TEST(BooleanComplex, OpenscadCrash) {
   ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
-  manifold::ManifoldParams().verifyNoDegenerates = false;
   Manifold m = ReadTestOBJ("openscad-nonmanifold-crash.obj");
   // m is not empty
   EXPECT_EQ(m.IsEmpty(), false);

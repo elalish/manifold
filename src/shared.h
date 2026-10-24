@@ -25,11 +25,6 @@ inline vec3 SafeNormalize(vec3 v) {
   return std::isfinite(v.x) ? v : vec3(0.0);
 }
 
-inline double MaxEpsilon(double minEpsilon, const Box& bBox) {
-  double epsilon = std::max(minEpsilon, kPrecision * bBox.Scale());
-  return std::isfinite(epsilon) ? epsilon : -1;
-}
-
 inline int NextHalfedge(int current) {
   current += current % 3 == 2 ? -2 : 1;
   return current;
@@ -68,9 +63,16 @@ inline double withSign(bool pos, double v) { return pos ? v : -v; }
 /**
  * Interpolate the (y, z) of segment aL-aR at the given x. The choice of
  * (x - aL) vs (x - aR) is the smaller in magnitude, which keeps FP error
- * low near either endpoint. Domain check via DEBUG_ASSERT.
+ * low near either endpoint. Positive tol allows clamping x to the segment
+ * within that tolerance. Domain check via DEBUG_ASSERT.
  */
-inline vec2 Interpolate(vec3 aL, vec3 aR, double x) {
+inline vec2 Interpolate(vec3 aL, vec3 aR, double x, double tol = 0) {
+  const double clamped =
+      la::clamp(x, std::min(aL.x, aR.x), std::max(aL.x, aR.x));
+  DEBUG_ASSERT(std::abs(clamped - x) <= 2 * tol, logicErr,
+               "Boolean manifold error: not in domain");
+  x = clamped;
+
   const double dxL = x - aL.x;
   const double dxR = x - aR.x;
   DEBUG_ASSERT(dxL * dxR <= 0, logicErr,
@@ -87,20 +89,37 @@ inline vec2 Interpolate(vec3 aL, vec3 aR, double x) {
 }
 
 /**
+ * Interpolate on the whole line through aL and aR: no clamping to the segment,
+ * and always measured from aL. A tie decision compares a value with the same
+ * value after its vertices are moved, so both must come from one formula, and
+ * a moved point can lie a little outside its moved segment.
+ */
+inline vec2 InterpolateLine(vec3 aL, vec3 aR, double x) {
+  const double dx = aR.x - aL.x;
+  const double t = dx == 0 ? 0.5 : (x - aL.x) / dx;
+  return vec2(aL.y + t * (aR.y - aL.y), aL.z + t * (aR.z - aL.z));
+}
+
+/**
  * Intersect two projected segments aL-aR and bL-bR. The segments are ordered
  * over the same x interval, and their y gaps must bracket zero. The returned
- * value is (x, y, a.z, b.z) at the crossing.
+ * value is (x, y, a.z, b.z) at the crossing. Positive tol snaps b's endpoint
+ * y coordinates to a's when they are within that tolerance.
  */
-inline vec4 Intersect(const vec3& aL, const vec3& aR, const vec3& bL,
-                      const vec3& bR) {
+inline vec4 Intersect(const vec3& aL, const vec3& aR, vec3 bL, vec3 bR,
+                      double tol = 0) {
+  if (std::abs(bL.y - aL.y) <= tol) bL.y = aL.y;
+  if (std::abs(bR.y - aR.y) <= tol) bR.y = aR.y;
+
   const double dyL = bL.y - aL.y;
   const double dyR = bR.y - aR.y;
-  DEBUG_ASSERT(dyL * dyR <= 0, logicErr,
-               "Boolean manifold error: no intersection");
+  DEBUG_ASSERT(dyL * dyR <= 0 || std::min(fabs(dyL), fabs(dyR)) <= 2 * tol,
+               logicErr, "Boolean manifold error: no intersection");
   const bool useL = fabs(dyL) < fabs(dyR);
   const double dx = aR.x - aL.x;
   double lambda = (useL ? dyL : dyR) / (dyL - dyR);
   if (!std::isfinite(lambda)) lambda = 0.0;
+  lambda = useL ? la::clamp(lambda, 0.0, 1.0) : la::clamp(lambda, -1.0, 0.0);
   vec4 xyzz;
   xyzz.x = lambda * dx + (useL ? aL.x : aR.x);
   const double aDy = aR.y - aL.y;
@@ -114,12 +133,25 @@ inline vec4 Intersect(const vec3& aL, const vec3& aR, const vec3& bL,
 }
 
 /**
- * `p < q` with symbolic perturbation: when `p == q` exactly, `dir < 0`
- * acts as the tiebreaker. Used to give consistent strict-ordering answers
- * regardless of which side of an FP equality we land on.
+ * The (a.z, b.z) of Intersect, on the whole lines: no snapping of y within a
+ * tolerance, and always measured from the left. For tie decisions, like
+ * InterpolateLine.
  */
-inline bool Shadows(double p, double q, double dir) {
-  return p == q ? dir < 0 : p < q;
+inline vec2 IntersectZ(const vec3& aL, const vec3& aR, const vec3& bL,
+                       const vec3& bR) {
+  const double dyL = bL.y - aL.y;
+  const double dyR = bR.y - aR.y;
+  const double t = dyL == dyR ? 0.5 : dyL / (dyL - dyR);
+  return vec2(aL.z + t * (aR.z - aL.z), bL.z + t * (bR.z - bL.z));
+}
+
+/**
+ * The long edge and short edge vectors start from the same point. Returns true
+ * if they are colinear within epsilon.
+ */
+inline bool IsColinear(vec3 longEdge, vec3 shortEdge, double epsilon) {
+  return length2(cross(longEdge, shortEdge)) <=
+         length2(longEdge) * epsilon * epsilon;
 }
 
 /**
@@ -180,8 +212,10 @@ inline vec3 GetBarycentric(const vec3& v, const mat3& triPos,
       // Return exactly equal if within tolerance of edge.
       uvw[i] = area2v < d2[i] * tol2 ? 0 : la::dot(crossPv, crossP);
     }
-    uvw /= (uvw[0] + uvw[1] + uvw[2]);
-    return uvw;
+    const double sum = uvw[0] + uvw[1] + uvw[2];
+    // If all weights are zero, give each corner equal weight rather than
+    // dividing by zero.
+    return sum == 0 ? vec3(1.0 / 3.0) : uvw / sum;
   } else {  // line
     const int nextV = Next3(longSide);
     const double alpha =
@@ -330,15 +364,10 @@ struct TriRef {
   /// the user can tell us not to collapse certain edges: those that divide
   /// difference faceIDs. If not set, this is always -1.
   int faceID;
-  /// Triangles with the same coplanar ID are coplanar. Starts as a canonical
+  /// Starts as a canonical
   /// triangle index, but after boolean operations it may refer to a triangle
   /// that is no longer present in this mesh.
   int triID;
-
-  bool SameFace(const TriRef& other) const {
-    return meshID == other.meshID && triID == other.triID &&
-           faceID == other.faceID;
-  }
 };
 
 /**
@@ -392,7 +421,7 @@ inline std::ostream& operator<<(std::ostream& stream, const Barycentric& bary) {
 inline std::ostream& operator<<(std::ostream& stream, const TriRef& ref) {
   return stream << "meshID: " << ref.meshID
                 << ", originalID: " << ref.originalID
-                << ", faceID: " << ref.faceID << ", coplanarID: " << ref.triID;
+                << ", faceID: " << ref.faceID << ", triID: " << ref.triID;
 }
 #endif
 }  // namespace manifold

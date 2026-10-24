@@ -7,6 +7,7 @@
 
 #include "gtest/gtest.h"
 #include "manifold/types.h"
+#include "manifold/version.h"
 #include "test.h"
 
 void* alloc_manifold_buffer() { return malloc(manifold_manifold_size()); }
@@ -27,6 +28,15 @@ void* alloc_polygons_buffer() { return malloc(manifold_polygons_size()); }
 
 void* alloc_manifold_vec_buffer() {
   return malloc(manifold_manifold_vec_size());
+}
+
+TEST(CBIND, version) {
+  int version[3];
+  manifold_version(version);
+
+  EXPECT_EQ(version[0], MANIFOLD_VERSION_MAJOR);
+  EXPECT_EQ(version[1], MANIFOLD_VERSION_MINOR);
+  EXPECT_EQ(version[2], MANIFOLD_VERSION_PATCH);
 }
 
 TEST(CBIND, sphere) {
@@ -605,6 +615,8 @@ TEST(CBIND, ray_cast) {
   EXPECT_FLOAT_EQ(h0.normal.z, -1.0);
   EXPECT_FLOAT_EQ(h1.position.z, 0.5);
   EXPECT_FLOAT_EQ(h1.normal.z, 1.0);
+  EXPECT_EQ(h0.crossing, 1);
+  EXPECT_EQ(h1.crossing, -1);
   manifold_destruct_ray_hit_vec(hits);
   free(mem);
 
@@ -619,17 +631,8 @@ TEST(CBIND, ray_cast) {
   free(cube);
 }
 
-TEST(CBIND, tolerance) {
+TEST(CBIND, simplify_smoke) {
   ManifoldManifold* sphere = manifold_sphere(alloc_manifold_buffer(), 1.0, 100);
-
-  // GetTolerance should return a non-negative value.
-  double tol = manifold_get_tolerance(sphere);
-  EXPECT_GE(tol, 0.0);
-
-  // SetTolerance should be reflected by GetTolerance.
-  ManifoldManifold* with_tol =
-      manifold_set_tolerance(alloc_manifold_buffer(), sphere, 0.5);
-  EXPECT_EQ(manifold_get_tolerance(with_tol), 0.5);
 
   // Simplify should produce a valid manifold with fewer or equal triangles.
   ManifoldManifold* simplified =
@@ -638,10 +641,8 @@ TEST(CBIND, tolerance) {
   EXPECT_LE(manifold_num_tri(simplified), manifold_num_tri(sphere));
 
   manifold_destruct_manifold(sphere);
-  manifold_destruct_manifold(with_tol);
   manifold_destruct_manifold(simplified);
   free(sphere);
-  free(with_tol);
   free(simplified);
 }
 
@@ -663,13 +664,13 @@ TEST(CBIND, meshgl_run_accessors) {
   ManifoldManifold* cube_tmp =
       manifold_cube(alloc_manifold_buffer(), 1, 1, 1, 0);
   ManifoldManifold* cube =
-      manifold_as_original(alloc_manifold_buffer(), cube_tmp);
+      manifold_as_original(alloc_manifold_buffer(), cube_tmp, -1);
   ManifoldManifold* sphere_tmp =
       manifold_sphere(alloc_manifold_buffer(), 0.6, 32);
   ManifoldManifold* sphere_trans =
       manifold_translate(alloc_manifold_buffer(), sphere_tmp, 0.5, 0.5, 0.5);
   ManifoldManifold* sphere =
-      manifold_as_original(alloc_manifold_buffer(), sphere_trans);
+      manifold_as_original(alloc_manifold_buffer(), sphere_trans, -1);
   ManifoldManifold* result =
       manifold_union(alloc_manifold_buffer(), cube, sphere);
   EXPECT_EQ(manifold_status(result), MANIFOLD_NO_ERROR);
@@ -724,10 +725,10 @@ TEST(CBIND, run_flag_accessors) {
   // gets backside set. Exercise the C accessors for both bits.
   ManifoldManifold* cube = manifold_as_original(
       alloc_manifold_buffer(),
-      manifold_cube(alloc_manifold_buffer(), 2.0, 2.0, 2.0, 1));
-  ManifoldManifold* sphere =
-      manifold_as_original(alloc_manifold_buffer(),
-                           manifold_sphere(alloc_manifold_buffer(), 1.0, 32));
+      manifold_cube(alloc_manifold_buffer(), 2.0, 2.0, 2.0, 1), -1);
+  ManifoldManifold* sphere = manifold_as_original(
+      alloc_manifold_buffer(),
+      manifold_sphere(alloc_manifold_buffer(), 1.0, 32), -1);
   ManifoldManifold* cut =
       manifold_difference(alloc_manifold_buffer(), cube, sphere);
   ManifoldManifold* with_normals =
@@ -811,29 +812,6 @@ TEST(CBIND, cross_section_even_odd) {
   free(evenOdd);
   free(cwPositive);
   free(cwEvenOdd);
-}
-
-TEST(CBIND, cross_section_tolerance) {
-  void* buf = malloc(manifold_cross_section_size());
-
-  ManifoldCrossSection* sq = manifold_cross_section_square(buf, 10.0, 5.0, 0);
-  double tol = manifold_cross_section_get_tolerance(sq);
-  EXPECT_GT(tol, 0.0);
-
-  ManifoldCrossSection* tighter = manifold_cross_section_set_tolerance(
-      malloc(manifold_cross_section_size()), sq, tol * 0.5);
-  EXPECT_NEAR(manifold_cross_section_get_tolerance(tighter), tol, tol * 0.5);
-
-  ManifoldCrossSection* wider = manifold_cross_section_set_tolerance(
-      malloc(manifold_cross_section_size()), sq, tol * 2.0);
-  EXPECT_NEAR(manifold_cross_section_get_tolerance(wider), tol * 2.0, tol);
-
-  manifold_destruct_cross_section(sq);
-  manifold_destruct_cross_section(tighter);
-  manifold_destruct_cross_section(wider);
-  free(sq);
-  free(tighter);
-  free(wider);
 }
 
 // Smoke test for the manifold_alloc_* + manifold_delete_* pattern. The

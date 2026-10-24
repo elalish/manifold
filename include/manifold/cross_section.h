@@ -89,8 +89,6 @@ class CrossSection {
   size_t NumContour() const;
   Rect Bounds() const;
   double Area() const;
-  double GetTolerance() const;
-  CrossSection SetTolerance(double tolerance) const;
   ///@}
 
   /** @name Transformation
@@ -136,8 +134,6 @@ class CrossSection {
   mutable std::mutex pathsMutex_;
   mutable std::shared_ptr<const PathImpl> paths_;
   mutable mat2x3 transform_ = la::identity;
-  // Propagated drift budget, analogous to Manifold::Impl::tolerance_.
-  mutable double tolerance_ = 0.0;
   CrossSection(std::shared_ptr<const PathImpl> paths);
   std::shared_ptr<const PathImpl> GetPaths() const;
 };

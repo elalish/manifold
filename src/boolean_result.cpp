@@ -508,13 +508,23 @@ void UpdateReference(Manifold::Impl& outR, const Manifold::Impl& inP,
   // Invariant: every ctx-passing parallel op is followed by IsCancelled to
   // keep partial output from feeding unconditional downstream consumers.
   const int offsetQ = Manifold::Impl::meshIDCounter_;
+  // Both inputs may use meshID 0 with different relations (e.g. only one has
+  // normals); Q's must then get its own ID so it isn't overwritten by P's.
+  const auto& relP = inP.meshRelation_.meshIDtransform;
+  const auto& relQ = inQ.meshRelation_.meshIDtransform;
+  const auto p0 = relP.find(0);
+  const auto q0 = relQ.find(0);
+  const bool splitQ0 = p0 != relP.end() && q0 != relQ.end() &&
+                       p0->second.hasNormals != q0->second.hasNormals;
   for_each_n(autoPolicy(outR.NumTri(), 1e5), outR.meshRelation_.triRef.begin(),
-             outR.NumTri(), ctx, [&inP, &inQ, offsetQ](TriRef& triRef) {
+             outR.NumTri(), ctx,
+             [&inP, &inQ, offsetQ, splitQ0](TriRef& triRef) {
                const int tri = triRef.faceID;
                const bool PQ = triRef.meshID == 0;
                triRef = PQ ? inP.meshRelation_.triRef[tri]
                            : inQ.meshRelation_.triRef[tri];
-               if (!PQ && triRef.meshID != 0) triRef.meshID += offsetQ;
+               if (!PQ && (triRef.meshID != 0 || splitQ0))
+                 triRef.meshID += offsetQ;
              });
   if (IsCancelled(ctx)) return;
 
@@ -522,7 +532,7 @@ void UpdateReference(Manifold::Impl& outR, const Manifold::Impl& inP,
     outR.meshRelation_.meshIDtransform[pair.first] = pair.second;
   }
   for (const auto& pair : inQ.meshRelation_.meshIDtransform) {
-    if (pair.first != 0) {
+    if (pair.first != 0 || splitQ0) {
       outR.meshRelation_.meshIDtransform[pair.first + offsetQ] = pair.second;
       outR.meshRelation_.meshIDtransform[pair.first + offsetQ].backSide ^=
           invertQ;
@@ -822,9 +832,6 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     return outR;
   }
 
-  outR.epsilon_ = std::max(inP_.epsilon_, inQ_.epsilon_);
-  outR.tolerance_ = std::max(inP_.tolerance_, inQ_.tolerance_);
-
   outR.vertPos_.resize_nofill(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].
   // Retained vertices from P and Q:
@@ -923,6 +930,8 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   vP2R.clear();
   vQ2R.clear();
 
+  outR.CalculateBBox();
+
   // Level 6
   outR.Face2Tri(faceEdge, faceHalfedges, halfedgeRef, /*allowConvex=*/false,
                 ctx_);
@@ -955,7 +964,6 @@ Manifold::Impl Boolean3::Result(OpType op) const {
                  "simplified mesh has degenerate triangles!");
   }
 
-  outR.CalculateBBox();
   outR.SortGeometry(ctx_);
   outR.IncrementMeshIDs();
   if (auto c = phase(__LINE__)) return *c;

@@ -2507,7 +2507,7 @@ TEST(CrossSection, SimplifyPostFiltersBoolean2Output) {
   const CrossSection twice = once.Simplify();
 
   // 10 verts (incl. the apex at ~1e-6, well above the geometry's natural eps):
-  // Simplify(0) uses tolerance_ (set from InferEps on construction) and
+  // Simplify(0) uses InferEps and
   // RDP-reduces at that scale, so the apex survives.
   EXPECT_EQ(once.NumContour(), 1);
   EXPECT_EQ(once.NumVert(), 10);
@@ -2711,14 +2711,14 @@ TEST(CrossSection, OffsetRoundNonFiniteAndHugeDelta) {
 
 TEST(CrossSection, OffsetDoesNotInflateToleranceDownstream) {
   // A Round offset must not fold its round-join faceting sagitta into
-  // tolerance_: that would silently over-merge features finer than the sagitta
+  // tol: that would silently over-merge features finer than the sagitta
   // in the next boolean. The offset output must behave like a fresh
   // reconstruction of the same paths.
   CrossSection sq = CrossSection::Square({100, 100}, true);
   CrossSection rounded = sq.Offset(50.0, CrossSection::JoinType::Round);
   CrossSection fresh(rounded.ToPolygons());  // same geometry, fresh tolerance
   // A thin sliver (~7.5 area) far below the faceting sagitta (~0.19); folding
-  // that sagitta into tolerance_ on `rounded` would over-merge it, diverging
+  // that sagitta into tol on `rounded` would over-merge it, diverging
   // from fresh.
   CrossSection slivR = rounded - rounded.Scale({0.9999, 0.9999});
   CrossSection slivF = fresh - fresh.Scale({0.9999, 0.9999});

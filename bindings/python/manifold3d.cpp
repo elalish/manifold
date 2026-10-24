@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// nanobind includes Python.h, which must come before any standard header: it
+// sets feature macros such as _POSIX_C_SOURCE that they would set otherwise.
+#include "nanobind/nanobind.h"
+// (keep the above first)
 #include <optional>
 #include <string>
 
@@ -19,7 +23,6 @@
 #include "manifold/cross_section.h"
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
-#include "nanobind/nanobind.h"
 #include "nanobind/ndarray.h"
 #include "nanobind/operators.h"
 #include "nanobind/stl/function.h"
@@ -203,6 +206,11 @@ const std::string manifold__rotate__v =
 NB_MODULE(manifold3d, m) {
   m.doc() = "Python binding for the Manifold library.";
 
+  m.def("set_relative_precision", Quality::SetRelativePrecision,
+        nb::arg("precision"));
+
+  m.def("get_relative_precision", Quality::GetRelativePrecision);
+
   m.def("set_min_circular_angle", Quality::SetMinCircularAngle,
         nb::arg("angle"), quality__set_min_circular_angle__angle);
 
@@ -356,9 +364,6 @@ NB_MODULE(manifold3d, m) {
           "Get the surface area of the manifold\n This is clamped to zero for "
           "a given face if they are within the Epsilon().")
       .def("original_id", &Manifold::OriginalID, manifold__original_id)
-      .def("get_tolerance", &Manifold::GetTolerance, manifold__get_tolerance)
-      .def("set_tolerance", &Manifold::SetTolerance,
-           manifold__set_tolerance__tolerance)
       .def("simplify", &Manifold::Simplify, manifold__simplify__tolerance)
       .def("as_original", &Manifold::AsOriginal, nb::arg("id") = -1,
            manifold__as_original__id)
@@ -697,7 +702,8 @@ NB_MODULE(manifold3d, m) {
       .def_ro("face_id", &RayHit::faceID)
       .def_ro("distance", &RayHit::distance)
       .def_ro("position", &RayHit::position)
-      .def_ro("normal", &RayHit::normal);
+      .def_ro("normal", &RayHit::normal)
+      .def_ro("crossing", &RayHit::crossing);
 
   nb::class_<ExecutionContext>(m, "ExecutionContext")
       .def(nb::init<>())
@@ -864,10 +870,6 @@ NB_MODULE(manifold3d, m) {
           nb::arg("warp_func"), cross_section__warp_batch__warp_func)
       .def("simplify", &CrossSection::Simplify, nb::arg("tolerance") = 0,
            cross_section__simplify__tolerance)
-      .def("get_tolerance", &CrossSection::GetTolerance,
-           cross_section__get_tolerance)
-      .def("set_tolerance", &CrossSection::SetTolerance, nb::arg("tolerance"),
-           cross_section__set_tolerance__tolerance)
       .def(
           "offset", &CrossSection::Offset, nb::arg("delta"),
           nb::arg("join_type") = CrossSection::JoinType::Round,

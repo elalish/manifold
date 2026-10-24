@@ -332,12 +332,6 @@ ManifoldManifold* manifold_refine_to_tolerance(void* mem, ManifoldManifold* m,
   return to_c(new (mem) Manifold(refined));
 }
 
-ManifoldManifold* manifold_set_tolerance(void* mem, ManifoldManifold* m,
-                                         double tolerance) {
-  auto result = from_c(m)->SetTolerance(tolerance);
-  return to_c(new (mem) Manifold(result));
-}
-
 ManifoldManifold* manifold_simplify(void* mem, ManifoldManifold* m,
                                     double tolerance) {
   auto simplified = from_c(m)->Simplify(tolerance);
@@ -802,10 +796,6 @@ ManifoldBox* manifold_bounding_box(void* mem, ManifoldManifold* m) {
 
 double manifold_epsilon(ManifoldManifold* m) { return from_c(m)->GetEpsilon(); }
 
-double manifold_get_tolerance(ManifoldManifold* m) {
-  return from_c(m)->GetTolerance();
-}
-
 size_t manifold_num_prop_vert(ManifoldManifold* m) {
   return from_c(m)->NumPropVert();
 }
@@ -855,7 +845,8 @@ size_t manifold_ray_hit_vec_length(ManifoldRayHitVec* v) {
 
 ManifoldRayHit manifold_ray_hit_vec_get(ManifoldRayHitVec* v, size_t idx) {
   const auto& hit = (*from_c(v))[idx];
-  return {hit.faceID, hit.distance, to_c(hit.position), to_c(hit.normal)};
+  return {hit.faceID, hit.distance, to_c(hit.position), to_c(hit.normal),
+          hit.crossing};
 }
 
 int manifold_winding_number(ManifoldManifold* m, double x, double y, double z) {
@@ -917,7 +908,24 @@ ManifoldManifold* manifold_calculate_normals(void* mem, ManifoldManifold* m,
   return to_c(new (mem) Manifold(man));
 }
 
+// Version
+
+void manifold_version(int version[3]) {
+  const auto v = manifold::Version();
+  version[0] = v[0];
+  version[1] = v[1];
+  version[2] = v[2];
+}
+
 // Static Quality Globals
+
+void manifold_set_relative_precision(double precision) {
+  Quality::SetRelativePrecision(precision);
+}
+
+double manifold_get_relative_precision() {
+  return Quality::GetRelativePrecision();
+}
 
 void manifold_set_min_circular_angle(double degrees) {
   Quality::SetMinCircularAngle(degrees);

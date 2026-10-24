@@ -20,143 +20,16 @@
 #include "parallel.h"
 
 namespace manifold {
-/**
- * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
- * and the rest at similarly symmetric points.
- */
-Manifold Manifold::Tetrahedron() {
-  return Manifold(std::make_shared<Impl>(Impl::Shape::Tetrahedron));
-}
-
-/**
- * Constructs a unit cube (edge lengths all one), by default in the first
- * octant, touching the origin. If any dimensions in size are negative, or if
- * all are zero, an empty Manifold will be returned.
- *
- * @param size The X, Y, and Z dimensions of the box.
- * @param center Set to true to shift the center to the origin.
- */
-Manifold Manifold::Cube(vec3 size, bool center) {
-  if (size.x < 0.0 || size.y < 0.0 || size.z < 0.0 || la::length(size) == 0.) {
-    return Invalid();
-  }
-  mat3x4 m({{size.x, 0.0, 0.0}, {0.0, size.y, 0.0}, {0.0, 0.0, size.z}},
-           center ? (-size / 2.0) : vec3(0.0));
-  return Manifold(std::make_shared<Impl>(Manifold::Impl::Shape::Cube, m));
-}
-
-/**
- * A convenience constructor for the common case of extruding a circle. Can also
- * form cones if both radii are specified.
- *
- * @param height Z-extent
- * @param radiusLow Radius of bottom circle. Must be non-negative. If zero,
- * radiusHigh must be positive and a cone with apex at the bottom is created.
- * @param radiusHigh Radius of top circle. Can equal zero. Default is equal to
- * radiusLow.
- * @param circularSegments How many line segments to use around the circle.
- * Default is calculated by the static Defaults.
- * @param center Set to true to shift the center to the origin. Default is
- * origin at the bottom.
- */
-Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
-                            int circularSegments, bool center) {
-  if (height <= 0.0 || radiusLow < 0.0) {
-    return Invalid();
-  }
-  if (radiusLow == 0.0) {
-    if (radiusHigh <= 0.0) {
-      return Invalid();
-    }
-    // Cone with apex at bottom: create the centered apex-at-top version and
-    // mirror it
-    Manifold cone = Cylinder(height, radiusHigh, 0.0, circularSegments, true);
-    cone = cone.Mirror(vec3(0.0, 0.0, 1.0));
-    if (!center) cone = cone.Translate(vec3(0.0, 0.0, height / 2.0));
-    return cone.AsOriginal();
-  }
-  const double scale = radiusHigh >= 0.0 ? radiusHigh / radiusLow : 1.0;
-  const double radius = fmax(radiusLow, radiusHigh);
-  const int n = circularSegments > 2 ? circularSegments
-                                     : Quality::GetCircularSegments(radius);
-
-  SimplePolygon circle(n);
-  const double dPhi = 360.0 / n;
-  for (int i = 0; i < n; ++i) {
-    circle[i] = {radiusLow * cosd(dPhi * i), radiusLow * sind(dPhi * i)};
-  }
-
-  Manifold cylinder = Manifold::Extrude({circle}, height, 0, 0.0, vec2(scale));
-  if (center)
-    cylinder = cylinder.Translate(vec3(0.0, 0.0, -height / 2.0)).AsOriginal();
-  return cylinder;
-}
-
-/**
- * Constructs a geodesic sphere of a given radius.
- *
- * @param radius Radius of the sphere. Must be positive.
- * @param circularSegments Number of segments along its
- * diameter. This number will always be rounded up to the nearest factor of
- * four, as this sphere is constructed by refining an octahedron. This means
- * there are a circle of vertices on all three of the axis planes. Default is
- * calculated by the static Defaults.
- */
-Manifold Manifold::Sphere(double radius, int circularSegments) {
-  if (radius <= 0.0) {
-    return Invalid();
-  }
-  int n = circularSegments > 0 ? (circularSegments + 3) / 4
-                               : Quality::GetCircularSegments(radius) / 4;
-  auto pImpl_ = std::make_shared<Impl>(Impl::Shape::Octahedron);
-  pImpl_->Subdivide([n](vec3, vec4, vec4) { return n - 1; });
-  for_each_n(autoPolicy(pImpl_->NumVert(), 1e5), pImpl_->vertPos_.begin(),
-             pImpl_->NumVert(), [radius](vec3& v) {
-               v = vec3(la::cos(kHalfPi * (1.0 - v.x)),
-                        la::cos(kHalfPi * (1.0 - v.y)),
-                        la::cos(kHalfPi * (1.0 - v.z)));
-               v = radius * la::normalize(v);
-               if (std::isnan(v.x)) v = vec3(0.0);
-             });
-  // Ignore preceding octahedron.
-  pImpl_->InitializeOriginal();
-  pImpl_->CalculateBBox();
-  pImpl_->SetEpsilon();
-  pImpl_->SortGeometry();
-  pImpl_->SetFaceAndVertNormals();
-  return Manifold(pImpl_);
-}
-
-/**
- * Constructs a manifold from a set of polygons by extruding them along the
- * Z-axis.
- * Note that high twistDegrees with small nDivisions may cause
- * self-intersection. This is not checked here and it is up to the user to
- * choose the correct parameters.
- *
- * @param crossSection A set of non-overlapping polygons to extrude.
- * @param height Z-extent of extrusion.
- * @param nDivisions Number of extra copies of the crossSection to insert into
- * the shape vertically; especially useful in combination with twistDegrees to
- * avoid interpolation artifacts. Default is none.
- * @param twistDegrees Amount to twist the top crossSection relative to the
- * bottom, interpolated linearly for the divisions in between.
- * @param scaleTop Amount to scale the top (independently in X and Y). If the
- * scale is {0, 0}, a pure cone is formed with only a single vertex at the top.
- * Note that scale is applied after twist.
- * Default {1, 1}.
- */
-Manifold Manifold::Extrude(const Polygons& crossSection, double height,
-                           int nDivisions, double twistDegrees, vec2 scaleTop) {
-  ZoneScoped;
-  if (crossSection.size() == 0 || height <= 0.0) {
-    return Invalid();
-  }
-
+namespace {
+std::shared_ptr<Manifold::Impl> ExtrudeImpl(const Polygons& crossSection,
+                                            double height, int nDivisions,
+                                            double twistDegrees, vec2 scaleTop,
+                                            double zOffset = 0.0,
+                                            bool flipZ = false) {
   scaleTop.x = std::max(scaleTop.x, 0.0);
   scaleTop.y = std::max(scaleTop.y, 0.0);
 
-  auto pImpl_ = std::make_shared<Impl>();
+  auto pImpl_ = std::make_shared<Manifold::Impl>();
   ++nDivisions;
   auto& vertPos = pImpl_->vertPos_;
   Vec<ivec3> triVertsDH;
@@ -214,13 +87,150 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
     if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
   }
 
+  if (flipZ) {
+    for (vec3& v : vertPos) v.z = zOffset - v.z;
+    for (ivec3& tri : triVerts) std::swap(tri[1], tri[2]);
+  } else if (zOffset != 0.0) {
+    for (vec3& v : vertPos) v.z += zOffset;
+  }
+
   pImpl_->CreateHalfedges(triVertsDH);
-  pImpl_->InitializeOriginal();
   pImpl_->CalculateBBox();
-  pImpl_->SetEpsilon();
   pImpl_->SortGeometry();
   pImpl_->SetFaceAndVertNormals();
+  pImpl_->InitializeOriginal();
+  return pImpl_;
+}
+}  // namespace
+
+/**
+ * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
+ * and the rest at similarly symmetric points.
+ */
+Manifold Manifold::Tetrahedron() {
+  return Manifold(std::make_shared<Impl>(Impl::Shape::Tetrahedron));
+}
+
+/**
+ * Constructs a unit cube (edge lengths all one), by default in the first
+ * octant, touching the origin. If any dimensions in size are negative, or if
+ * all are zero, an empty Manifold will be returned.
+ *
+ * @param size The X, Y, and Z dimensions of the box.
+ * @param center Set to true to shift the center to the origin.
+ */
+Manifold Manifold::Cube(vec3 size, bool center) {
+  if (size.x < 0.0 || size.y < 0.0 || size.z < 0.0 || la::length(size) == 0.) {
+    return Invalid();
+  }
+  mat3x4 m({{size.x, 0.0, 0.0}, {0.0, size.y, 0.0}, {0.0, 0.0, size.z}},
+           center ? (-size / 2.0) : vec3(0.0));
+  return Manifold(std::make_shared<Impl>(Manifold::Impl::Shape::Cube, m));
+}
+
+/**
+ * A convenience constructor for the common case of extruding a circle. Can also
+ * form cones if both radii are specified.
+ *
+ * @param height Z-extent
+ * @param radiusLow Radius of bottom circle. Must be non-negative. If zero,
+ * radiusHigh must be positive and a cone with apex at the bottom is created.
+ * @param radiusHigh Radius of top circle. Can equal zero. Default is equal to
+ * radiusLow.
+ * @param circularSegments How many line segments to use around the circle.
+ * Default is calculated by the static Defaults.
+ * @param center Set to true to shift the center to the origin. Default is
+ * origin at the bottom.
+ */
+Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
+                            int circularSegments, bool center) {
+  if (height <= 0.0 || radiusLow < 0.0) {
+    return Invalid();
+  }
+  const bool flip = radiusLow == 0.0;
+  if (flip) {
+    if (radiusHigh <= 0.0) {
+      return Invalid();
+    }
+    std::swap(radiusLow, radiusHigh);
+  }
+  const double scale = radiusHigh >= 0.0 ? radiusHigh / radiusLow : 1.0;
+  const double radius = fmax(radiusLow, radiusHigh);
+  const int n = circularSegments > 2 ? circularSegments
+                                     : Quality::GetCircularSegments(radius);
+
+  SimplePolygon circle(n);
+  const double dPhi = 360.0 / n;
+  for (int i = 0; i < n; ++i) {
+    circle[i] = {radiusLow * cosd(dPhi * i), radiusLow * sind(dPhi * i)};
+  }
+
+  const double zOffset = (flip ? height : 0.0) - (center ? height / 2.0 : 0.0);
+  return Manifold(
+      ExtrudeImpl({circle}, height, 0, 0.0, vec2(scale), zOffset, flip));
+}
+
+/**
+ * Constructs a geodesic sphere of a given radius.
+ *
+ * @param radius Radius of the sphere. Must be positive.
+ * @param circularSegments Number of segments along its
+ * diameter. This number will always be rounded up to the nearest factor of
+ * four, as this sphere is constructed by refining an octahedron. This means
+ * there are a circle of vertices on all three of the axis planes. Default is
+ * calculated by the static Defaults.
+ */
+Manifold Manifold::Sphere(double radius, int circularSegments) {
+  if (radius <= 0.0) {
+    return Invalid();
+  }
+  int n = circularSegments > 0 ? (circularSegments + 3) / 4
+                               : Quality::GetCircularSegments(radius) / 4;
+  auto pImpl_ = std::make_shared<Impl>(Impl::Shape::Octahedron);
+  pImpl_->Subdivide([n](vec3, vec4, vec4) { return n - 1; });
+  for_each_n(autoPolicy(pImpl_->NumVert(), 1e5), pImpl_->vertPos_.begin(),
+             pImpl_->NumVert(), [radius](vec3& v) {
+               v = vec3(la::cos(kHalfPi * (1.0 - v.x)),
+                        la::cos(kHalfPi * (1.0 - v.y)),
+                        la::cos(kHalfPi * (1.0 - v.z)));
+               v = radius * la::normalize(v);
+               if (std::isnan(v.x)) v = vec3(0.0);
+             });
+  // Ignore preceding octahedron.
+  pImpl_->CalculateBBox();
+  pImpl_->SortGeometry();
+  pImpl_->SetFaceAndVertNormals();
+  pImpl_->InitializeOriginal();
   return Manifold(pImpl_);
+}
+
+/**
+ * Constructs a manifold from a set of polygons by extruding them along the
+ * Z-axis.
+ * Note that high twistDegrees with small nDivisions may cause
+ * self-intersection. This is not checked here and it is up to the user to
+ * choose the correct parameters.
+ *
+ * @param crossSection A set of non-overlapping polygons to extrude.
+ * @param height Z-extent of extrusion.
+ * @param nDivisions Number of extra copies of the crossSection to insert into
+ * the shape vertically; especially useful in combination with twistDegrees to
+ * avoid interpolation artifacts. Default is none.
+ * @param twistDegrees Amount to twist the top crossSection relative to the
+ * bottom, interpolated linearly for the divisions in between.
+ * @param scaleTop Amount to scale the top (independently in X and Y). If the
+ * scale is {0, 0}, a pure cone is formed with only a single vertex at the top.
+ * Note that scale is applied after twist.
+ * Default {1, 1}.
+ */
+Manifold Manifold::Extrude(const Polygons& crossSection, double height,
+                           int nDivisions, double twistDegrees, vec2 scaleTop) {
+  ZoneScoped;
+  if (crossSection.size() == 0 || height <= 0.0) {
+    return Invalid();
+  }
+  return Manifold(
+      ExtrudeImpl(crossSection, height, nDivisions, twistDegrees, scaleTop));
 }
 
 /**
@@ -360,11 +370,10 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   }
 
   pImpl_->CreateHalfedges(triVertsDH);
-  pImpl_->InitializeOriginal();
   pImpl_->CalculateBBox();
-  pImpl_->SetEpsilon();
   pImpl_->SortGeometry();
   pImpl_->SetFaceAndVertNormals();
+  pImpl_->InitializeOriginal();
   return Manifold(pImpl_);
 }
 
@@ -412,9 +421,6 @@ std::vector<Manifold> Manifold::Decompose() const {
   std::vector<Manifold> meshes;
   for (int i = 0; i < numComponents; ++i) {
     auto impl = std::make_shared<Impl>();
-    // inherit original object's precision
-    impl->epsilon_ = pImpl_->epsilon_;
-    impl->tolerance_ = pImpl_->tolerance_;
 
     Vec<int> vertNew2Old(numVert);
     const int nVert =

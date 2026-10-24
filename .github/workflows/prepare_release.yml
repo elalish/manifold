@@ -19,9 +19,9 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
 
-    - uses: actions/setup-python@v5
+    - uses: actions/setup-python@v7
       with:
         python-version: '3.x'
 

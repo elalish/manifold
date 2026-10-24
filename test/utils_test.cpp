@@ -13,12 +13,99 @@
 // limitations under the License.
 
 #include <atomic>
+#include <cmath>
 #include <cstdint>
 
 #include "../src/atomic_compat.h"
+#include "../src/shared.h"
 #include "gtest/gtest.h"
 
 using namespace manifold;
+
+TEST(Utils, BarycentricAllWeightsSnappedToZero) {
+  // Both points are within tolerance of every edge, but not any vertex.
+  // Scaling both the triangle and tolerance must preserve the equal fallback.
+  for (const double scale : {1e-50, 1e-12, 1.0, 1e12, 1e50}) {
+    SCOPED_TRACE(testing::Message() << "scale = " << scale);
+    const mat3 tri(vec3(0, 0, 0), vec3(2, 0, 0), vec3(1, std::sqrt(3.0), 0));
+    for (const bool reversed : {false, true}) {
+      SCOPED_TRACE(testing::Message() << "reversed = " << reversed);
+      const mat3 scaled =
+          scale * (reversed ? mat3(tri[0], tri[2], tri[1]) : tri);
+      for (const vec3 inputWeights :
+           {vec3(1.0 / 3.0), vec3(0.30, 0.34, 0.36)}) {
+        SCOPED_TRACE(testing::Message()
+                     << "weights = " << inputWeights.x << ", " << inputWeights.y
+                     << ", " << inputWeights.z);
+        const vec3 point = inputWeights.x * scaled[0] +
+                           inputWeights.y * scaled[1] +
+                           inputWeights.z * scaled[2];
+        const double tolerance = inputWeights.x == inputWeights.y ? 0.6 : 0.65;
+        const vec3 weights = GetBarycentric(point, scaled, tolerance * scale);
+        for (int i : {0, 1, 2}) {
+          EXPECT_TRUE(std::isfinite(weights[i]));
+          EXPECT_DOUBLE_EQ(weights[i], 1.0 / 3.0);
+        }
+        EXPECT_NEAR(weights.x + weights.y + weights.z, 1.0, 1e-12);
+      }
+    }
+  }
+}
+
+TEST(Utils, BarycentricRawWeightsUnderflowToZero) {
+  const double scale = 68 * 1e-83;
+  const mat3 tri(vec3(0, 0, 0), vec3(2 * scale, 0, 0),
+                 vec3(scale, std::sqrt(3.0) * scale, 0));
+  const vec3 point = (tri[0] + tri[1] + tri[2]) / 3.0;
+  const double tolerance = 0.6 * scale;
+
+  // The triangle passes the area check, but all three raw weights underflow
+  // to zero. Normalizing those raw weights would still divide by zero.
+  const mat3 edges(tri[2] - tri[1], tri[0] - tri[2], tri[1] - tri[0]);
+  const vec3 crossP = la::cross(edges[0], edges[1]);
+  const double area2 = la::dot(crossP, crossP);
+  double longestSide2 = 0;
+  for (const int i : {0, 1, 2}) {
+    longestSide2 = std::max(longestSide2, la::dot(edges[i], edges[i]));
+    const vec3 crossPv = la::cross(edges[i], point - tri[Next3(i)]);
+    ASSERT_DOUBLE_EQ(la::dot(crossPv, crossP), 0.0);
+  }
+  ASSERT_GT(area2, longestSide2 * (tolerance * tolerance));
+
+  const vec3 weights = GetBarycentric(point, tri, tolerance);
+  for (const int i : {0, 1, 2}) {
+    EXPECT_TRUE(std::isfinite(weights[i]));
+    EXPECT_DOUBLE_EQ(weights[i], 1.0 / 3.0);
+  }
+  EXPECT_NEAR(weights.x + weights.y + weights.z, 1.0, 1e-12);
+}
+
+TEST(Utils, BarycentricRetainsSnapping) {
+  const mat3 tri(vec3(0, 0, 0), vec3(2, 0, 0), vec3(1, std::sqrt(3.0), 0));
+  const vec3 vertex = GetBarycentric(tri[0], tri, 1e-8);
+  EXPECT_DOUBLE_EQ(vertex.x, 1.0);
+  EXPECT_DOUBLE_EQ(vertex.y, 0.0);
+  EXPECT_DOUBLE_EQ(vertex.z, 0.0);
+
+  const vec3 edge = GetBarycentric(vec3(0.8, 1e-9, 0), tri, 1e-8);
+  EXPECT_NEAR(edge.x, 0.6, 1e-9);
+  EXPECT_NEAR(edge.y, 0.4, 1e-9);
+  EXPECT_DOUBLE_EQ(edge.z, 0.0);
+
+  const vec3 interior =
+      GetBarycentric(0.25 * tri[0] + 0.25 * tri[1] + 0.5 * tri[2], tri, 1e-8);
+  EXPECT_NEAR(interior.x, 0.25, 1e-12);
+  EXPECT_NEAR(interior.y, 0.25, 1e-12);
+  EXPECT_NEAR(interior.z, 0.5, 1e-12);
+}
+
+TEST(Utils, BarycentricNearDegenerateTriangle) {
+  const mat3 tri(vec3(0, 0, 0), vec3(2, 0, 0), vec3(1, 1e-8, 0));
+  const vec3 weights = GetBarycentric(vec3(0.5, 0, 0), tri, 1e-7);
+  EXPECT_DOUBLE_EQ(weights.x, 0.75);
+  EXPECT_DOUBLE_EQ(weights.y, 0.25);
+  EXPECT_DOUBLE_EQ(weights.z, 0.0);
+}
 
 // Which backend this build selected is not otherwise visible. Report it so a
 // CI log says whether the lane covered the std::atomic_ref path or a fallback.

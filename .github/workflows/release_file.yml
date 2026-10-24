@@ -15,7 +15,7 @@ jobs:
           echo "release_name=manifold-${REF#v}" >> $GITHUB_ENV
         env:
           REF: ${{ github.ref_name }}
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           path: ${{ env.release_name }}
           submodules: recursive

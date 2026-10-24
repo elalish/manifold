@@ -191,6 +191,16 @@ TEST(Manifold, InvalidInput5) {
   EXPECT_EQ(tet.Status(), Manifold::Error::MergeIndexOutOfBounds);
 }
 
+TEST(Manifold, InvalidInputOddHalfedgeCount) {
+  // An odd number of triangles leaves one halfedge without a partner; the
+  // mesh must be rejected, not paired through an uninitialized index.
+  MeshGL in = TetGL();
+  in.triVerts.insert(in.triVerts.end(), {2, 0, 1});
+  Manifold tet(in);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::NotManifold);
+}
+
 TEST(Manifold, InvalidInput6) {
   MeshGL tetGL = TetGL();
   tetGL.triVerts[tetGL.triVerts.size() - 1] = 7;
@@ -539,15 +549,6 @@ TEST(Manifold, ErrorPropagationRefine) {
             Manifold::Error::NonFiniteVertex);
 }
 
-TEST(Manifold, ErrorPropagationSetTolerance) {
-  MeshGL in = TetGL();
-  in.vertProperties[2 * 3 + 1] = NAN;
-  Manifold errored(in);
-  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
-  EXPECT_EQ(errored.SetTolerance(0.1).Status(),
-            Manifold::Error::NonFiniteVertex);
-}
-
 TEST(Manifold, ErrorPropagationAsOriginal) {
   MeshGL in = TetGL();
   in.vertProperties[2 * 3 + 1] = NAN;
@@ -759,6 +760,54 @@ TEST(Manifold, CylinderZeroRadiusLow) {
                         .Translate(vec3(-(r + 0.5), -(r + 0.5), 0.0));
   EXPECT_NEAR((coneApexBottom ^ slicer).Volume(), totalVol / 8.0, 0.01);
   EXPECT_NEAR((coneApexTop ^ slicer).Volume(), 7.0 * totalVol / 8.0, 0.01);
+}
+
+TEST(Manifold, CylinderCenter) {
+  const int n = 256;
+  const double h = 5.0, r = 3.0;
+  const Manifold cylinder = Manifold::Cylinder(h, r, r, n, true);
+  const Manifold coneApexTop = Manifold::Cylinder(h, r, 0.0, n, true);
+  const Manifold coneApexBottom = Manifold::Cylinder(h, 0.0, r, n, true);
+
+  for (const Manifold& m : {cylinder, coneApexTop, coneApexBottom}) {
+    EXPECT_EQ(m.Status(), Manifold::Error::NoError);
+    const Box box = m.BoundingBox();
+    EXPECT_DOUBLE_EQ(box.min.z, -h / 2);
+    EXPECT_DOUBLE_EQ(box.max.z, h / 2);
+  }
+  EXPECT_NEAR(cylinder.Volume(), Manifold::Cylinder(h, r, r, n).Volume(), 1e-6);
+
+  // Same orientation check as CylinderZeroRadiusLow, on the centered cones.
+  const double totalVol = coneApexTop.Volume();
+  EXPECT_NEAR(coneApexBottom.Volume(), totalVol, 1e-6);
+  Manifold slicer = Manifold::Cube(vec3(2 * r + 1, 2 * r + 1, h / 2))
+                        .Translate(vec3(-(r + 0.5), -(r + 0.5), -h / 2));
+  EXPECT_NEAR((coneApexBottom ^ slicer).Volume(), totalVol / 8.0, 0.01);
+  EXPECT_NEAR((coneApexTop ^ slicer).Volume(), 7.0 * totalVol / 8.0, 0.01);
+}
+
+TEST(Manifold, ConstructorsOriginalID) {
+  // Every constructor returns an original with the shared ID 0, including
+  // the centered cylinder and the apex-at-bottom cone.
+  const Polygons square = {{{1, 0}, {2, 0}, {2, 1}, {1, 1}}};
+  const std::vector<Manifold> shapes = {
+      Manifold::Tetrahedron(),
+      Manifold::Cube(vec3(1.0), true),
+      Manifold::Sphere(1.0),
+      Manifold::Cylinder(2, 1),
+      Manifold::Cylinder(2, 1, 1, 0, true),
+      Manifold::Cylinder(2, 0, 1),
+      Manifold::Cylinder(2, 0, 1, 0, true),
+      Manifold::Extrude(square, 1.0),
+      Manifold::Revolve(square),
+      Manifold::Hull({vec3(0.0), vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)}),
+      Manifold::Cube().MinkowskiSum(Manifold::Sphere(0.1, 8)),
+  };
+  for (const Manifold& m : shapes) {
+    EXPECT_EQ(m.Status(), Manifold::Error::NoError);
+    EXPECT_EQ(m.OriginalID(), 0);
+    EXPECT_EQ(m.GetMeshGL().runOriginalID, std::vector<uint32_t>{0});
+  }
 }
 
 TEST(Manifold, Extrude) {
@@ -1063,14 +1112,13 @@ TEST(Manifold, MeshID) {
   cubeGL.runIndex.clear();
   cubeGL.runOriginalID.clear();
   Manifold cube1 = Manifold(cubeGL);
-  Manifold cube2 = Manifold(cubeGL);
-  EXPECT_NE(cube1.GetMeshGL().runOriginalID[0],
-            cube2.GetMeshGL().runOriginalID[0]);
+  EXPECT_EQ(cube1.GetMeshGL().runOriginalID[0], 0);
 }
 
 TEST(Manifold, MeshRelation) {
   Manifold gyroid = WithPositionColors(Gyroid());
   MeshGL gyroidMeshGL = gyroid.GetMeshGL();
+
   gyroid = gyroid.Simplify();
 
   if (options.exportModels) WriteTestOBJ("gyroid.obj", gyroid);
@@ -1114,8 +1162,8 @@ TEST(Manifold, MeshRelationRefinePrecision) {
 
 TEST(Manifold, MeshGLRoundTrip) {
   const Manifold cylinder = Manifold::Cylinder(2, 1);
-  EXPECT_GE(cylinder.OriginalID(), 0);
-  MeshGL inGL = cylinder.GetMeshGL();
+  EXPECT_EQ(cylinder.OriginalID(), 0);
+  MeshGL inGL = cylinder.TriID2FaceID().GetMeshGL();
   const Manifold cylinder2(inGL);
   const MeshGL outGL = cylinder2.GetMeshGL();
 
@@ -1266,7 +1314,7 @@ TEST(Manifold, FaceIDRoundTrip) {
   const Manifold cube = Manifold::Cube();
   EXPECT_GE(cube.OriginalID(), 0);
   MeshGL inGL = cube.GetMeshGL();
-  EXPECT_EQ(NumUnique(inGL.faceID), 12);
+  EXPECT_TRUE(inGL.faceID.empty());
   inGL.faceID = {3, 3, 3, 3, 3, 3, 5, 5, 5, 5, 5, 5};
 
   const Manifold cube2(inGL);
@@ -1641,3 +1689,22 @@ TEST(Manifold, DeepChainDoesNotOverflowNumLeaves) {
   auto& privateCtx = *ctx.impl_;
   EXPECT_EQ(privateCtx.totalBooleans.load(), kDepth);
 }
+
+#ifndef MANIFOLD_NO_FILESYSTEM
+// DedupeEdges collects every duplicated edge in one pass and then repairs
+// them in turn. An earlier repair can resolve a later entry; repairing that
+// stale entry relabelled an orbit to a copy of the wrong vertex, moving
+// triangle corners and removing solid while reporting NoError. Splitting
+// duplicate edges only relabels vertices and adds zero-area triangles, so the
+// volume must not change.
+//
+// The fixture is cut from a 28060-triangle union around its duplicate edges,
+// with each cut boundary closed by a fan. Its triangle order sets how the
+// 4-way edges pair up on load, which is what reproduces the stale entry.
+TEST(Manifold, DedupeEdgesNeverMovesACorner) {
+  Manifold m = ReadTestOBJ("dedupe_stale_duplicate.obj");
+  EXPECT_EQ(m.Status(), Manifold::Error::NoError);
+  // Signed volume of the fixture's triangles, computed exactly.
+  EXPECT_NEAR(m.Volume(), 0.00099963253073879, 1e-12);
+}
+#endif

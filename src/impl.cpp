@@ -121,11 +121,10 @@ Manifold::Impl::Impl(Shape shape, const mat3x4 m) {
   vertPos_ = Vec(vertPos);
   for (auto& v : vertPos_) v = m * vec4(v, 1.0);
   CreateHalfedges(triVerts);
-  InitializeOriginal();
   CalculateBBox();
-  SetEpsilon();
   SortGeometry();
   SetFaceAndVertNormals();
+  InitializeOriginal();
 }
 
 void Manifold::Impl::RemoveUnreferencedVerts() {
@@ -193,7 +192,7 @@ void Manifold::Impl::InitializeOriginal(int id) {
   triRef.resize_nofill(NumTri());
   for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
              [meshID, &triRef](const int tri) {
-               triRef[tri] = {meshID, meshID, -1, triRef[tri].triID};
+               triRef[tri] = {meshID, meshID, -1, tri};
              });
   // Preserve the AND-across-old-Relations state so AsOriginal keeps the
   // recording when it builds a fresh Relation. Primitives start with an
@@ -214,7 +213,6 @@ void Manifold::Impl::SetFaceAndVertNormals() {
     const vec3 n = cross(vertPos_[halfedge_.End(3 * tri)] - v,
                          vertPos_[halfedge_.End(3 * tri + 1)] - v);
     faceNormal_[tri] = SafeNormalize(n);
-    meshRelation_.triRef[tri].triID = tri;
   });
 
   CalculateVertNormals();
@@ -475,6 +473,16 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
 
   halfedge_.clear(true);
   halfedge_.resize_nofill(numHalfedge);
+  // With an odd number of halfedges (e.g. after degenerate triangles were
+  // dropped from the input) the pairing below leaves the last sorted one
+  // unset. Give it no pair, so IsManifold() rejects the mesh instead of
+  // following an uninitialized pair index.
+  if (numHalfedge % 2 != 0) {
+    const int leftover = ids[numHalfedge - 1];
+    halfedge_.SetStart(leftover, halfedge[leftover].startVert);
+    halfedge_.SetProp(leftover, halfedge[leftover].propVert);
+    halfedge_.SetPair(leftover, -1);
+  }
   for_each_n(policy, countAt(0), numEdge,
              [this, &halfedge, &ids, &removed, numEdge](int i) {
                const int pair0 = ids[i];
@@ -533,7 +541,6 @@ void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
     MakeEmpty(Error::NonFiniteVertex);
     return;
   }
-  SetEpsilon();
   SortGeometry();
   SetFaceAndVertNormals();
   meshRelation_.originalID = -1;
@@ -553,8 +560,6 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
     return result;
   }
   result.meshRelation_ = meshRelation_;
-  result.epsilon_ = epsilon_;
-  result.tolerance_ = tolerance_;
   result.numProp_ = numProp_;
   result.properties_ = properties_;
   result.bBox_ = bBox_;
@@ -598,10 +603,6 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   }
 
   result.CalculateBBox();
-  // Scale epsilon by the norm of the 3x3 portion of the transform.
-  result.epsilon_ *= SpectralNorm(mat3(transform_));
-  // Maximum of inherited epsilon loss and translational epsilon loss.
-  result.SetEpsilon(result.epsilon_);
 
   if (!result.IsEmpty()) {
     if (Collider::IsAxisAligned(transform_)) {
@@ -616,19 +617,6 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
     }
   }
   return result;
-}
-
-/**
- * Sets epsilon based on the bounding box, and limits its minimum value
- * by the optional input.
- */
-void Manifold::Impl::SetEpsilon(double minEpsilon, bool useSingle) {
-  epsilon_ = MaxEpsilon(minEpsilon, bBox_);
-  double minTol = epsilon_;
-  if (useSingle)
-    minTol =
-        std::max(minTol, std::numeric_limits<float>::epsilon() * bBox_.Scale());
-  tolerance_ = std::max(tolerance_, minTol);
 }
 
 /**
@@ -702,8 +690,11 @@ void Manifold::Impl::IncrementMeshIDs() {
 
   int nextMeshID = ReserveIDs(numMeshIDs);
   for (const auto& pair : oldTransforms) {
-    const int thisID = pair.first == 0 ? 0 : nextMeshID++;
-    if (pair.first == 0) continue;
+    if (pair.first == 0) {
+      meshRelation_.meshIDtransform[0] = pair.second;
+      continue;
+    }
+    const int thisID = nextMeshID++;
     meshIDold2new.D().Insert(pair.first, thisID);
     meshRelation_.meshIDtransform[thisID] = pair.second;
   }
@@ -845,7 +836,6 @@ Manifold Manifold::ReadOBJ(std::istream& stream) {
   if (!stream.good()) return Invalid();
   auto [mesh, epsilon] = ReadOBJWithEpsilon(stream);
   auto impl = std::make_shared<Impl>(mesh);
-  if (epsilon) impl->SetEpsilon(epsilon.value());
   return Manifold(impl);
 }
 
