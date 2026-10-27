@@ -904,6 +904,25 @@ TEST(CrossSectionComplex, OutEdgesToPolygonsSplitsExactRepeatedVertex) {
   EXPECT_NEAR(TotalSignedArea(polys), 1.0, 1e-12);
 }
 
+TEST(CrossSectionComplex,
+     OutEdgesToPolygonsPreservesSplitOrderAndResetsPositions) {
+  // Two pinches on one walk, followed by a separate walk sharing vertex 1.
+  // Splitting must keep both the emission order and the surviving vertex order,
+  // and clear the position table before processing the final walk.
+  const std::vector<vec2> verts = {{0, 0},  {1, 0},  {1, -1}, {2, -1}, {2, 0},
+                                   {2, -1}, {3, -1}, {3, 1},  {1, 1},  {0, 1}};
+  const std::vector<OutEdge> edges = {{0, 1}, {1, 2}, {2, 3}, {3, 1}, {1, 4},
+                                      {4, 5}, {5, 6}, {6, 4}, {4, 7}, {7, 0},
+                                      {1, 8}, {8, 9}, {9, 1}};
+  const Polygons expected = {
+      {verts[1], verts[2], verts[3]},
+      {verts[4], verts[5], verts[6]},
+      {verts[0], verts[1], verts[4], verts[7]},
+      {verts[1], verts[8], verts[9]},
+  };
+  EXPECT_EQ(OutEdgesToPolygons(verts, edges), expected);
+}
+
 TEST(CrossSectionComplex, OutEdgesToPolygonsKeepsNearDistinctVertex) {
   constexpr double kDelta = 1e-12;
   const std::vector<vec2> verts = {{0, 0},  {1, 0}, {1, -1},

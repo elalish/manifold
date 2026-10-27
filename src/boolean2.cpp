@@ -90,21 +90,28 @@ void PushLoopIfNondegenerate(const std::vector<vec2>& verts,
 }
 
 void PushSimpleLoops(const std::vector<vec2>& verts, std::vector<int> loopVerts,
-                     Polygons& polys) {
-  for (;;) {
-    bool split = false;
-    for (size_t i = 1; i < loopVerts.size() && !split; ++i) {
-      for (size_t j = 0; j < i; ++j) {
-        if (loopVerts[i] != loopVerts[j]) continue;
-        std::vector<int> simple(loopVerts.begin() + j, loopVerts.begin() + i);
-        PushLoopIfNondegenerate(verts, simple, polys);
-        loopVerts.erase(loopVerts.begin() + j + 1, loopVerts.begin() + i + 1);
-        split = true;
-        break;
-      }
+                     Polygons& polys, std::vector<int>& positions) {
+  // positions is a shared scratch buffer mapping vertex IDs to active-path
+  // indices, or -1 if absent.
+  // Each input occurrence enters and leaves the active path at most once.
+  size_t size = 0;
+  for (size_t read = 0; read < loopVerts.size(); ++read) {
+    const int vertex = loopVerts[read];
+    const int previous = positions[vertex];
+    if (previous < 0) {
+      positions[vertex] = static_cast<int>(size);
+      loopVerts[size++] = vertex;
+      continue;
     }
-    if (!split) break;
+    std::vector<int> simple(loopVerts.begin() + previous,
+                            loopVerts.begin() + size);
+    PushLoopIfNondegenerate(verts, simple, polys);
+    for (size_t i = previous + 1; i < size; ++i) positions[loopVerts[i]] = -1;
+    size = previous + 1;
   }
+  loopVerts.resize(size);
+  // Reset remaining entries to empty the shared table for the next contour.
+  for (int vertex : loopVerts) positions[vertex] = -1;
   PushLoopIfNondegenerate(verts, loopVerts, polys);
 }
 
@@ -163,6 +170,7 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
   std::vector<std::vector<int>> outgoing(verts.size());
   for (int i = 0; i < nE; ++i) outgoing[edges[i].v0].push_back(i);
   std::vector<bool> visited(nE, false);
+  std::vector<int> positions(verts.size(), -1);
   Polygons polys;
   for (int start = 0; start < nE; ++start) {
     if (visited[start]) continue;
@@ -209,7 +217,7 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
       continue;
     }
     if (loopVerts.size() >= 3) {
-      PushSimpleLoops(verts, std::move(loopVerts), polys);
+      PushSimpleLoops(verts, std::move(loopVerts), polys, positions);
     }
   }
   return polys;
