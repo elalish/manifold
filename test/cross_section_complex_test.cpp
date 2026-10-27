@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <limits>
 #include <map>
@@ -1190,4 +1191,299 @@ TEST(CrossSectionComplex, VisibleMissedCrossingLargeEps) {
     if (kv.second.first != kv.second.second) ++imbalanced;
   EXPECT_EQ(imbalanced, 0) << "retained edges must form closed walks (dropped "
                               "crossing -> open walk)";
+}
+
+TEST(CrossSectionComplex, SweepSharedStartPreservesSubdivisions) {
+  const Polygons input = {{{0, 0}, {4, 0}, {4, 4}},
+                          {{0, 0}, {6, 0}, {6, 3}},
+                          {{0, 0}, {4, 4}, {0, 4}}};
+  using Segment = std::pair<vec2, vec2>;
+  const std::vector<Segment> expected[] = {
+      {{{0, 4}, {0, 0}},
+       {{0, 0}, {4, 0}},
+       {{4, 4}, {0, 4}},
+       {{4, 0}, {6, 0}},
+       {{4, 2}, {4, 4}},
+       {{6, 3}, {4, 2}},
+       {{6, 0}, {6, 3}}},
+      {{{0, 0}, {4, 0}}, {{4, 2}, {0, 0}}, {{4, 0}, {4, 2}}},
+      {{{0, 4}, {0, 0}},
+       {{0, 0}, {4, 2}},
+       {{4, 4}, {0, 4}},
+       {{4, 2}, {4, 0}},
+       {{4, 0}, {6, 0}},
+       {{4, 2}, {4, 4}},
+       {{6, 3}, {4, 2}},
+       {{6, 0}, {6, 3}}}};
+  const WindRule rules[] = {WindRule::Add, WindRule::Intersect,
+                            WindRule::EvenOdd};
+  for (int r = 0; r < 3; ++r) {
+    SCOPED_TRACE(r);
+    auto [verts, edges] = PolygonsToInput(input);
+    const auto result = SweepWinding(edges, verts, rules[r]);
+    ASSERT_EQ(result.size(), expected[r].size());
+    for (size_t i = 0; i < result.size(); ++i) {
+      EXPECT_EQ(verts[result[i].v0], expected[r][i].first);
+      EXPECT_EQ(verts[result[i].v1], expected[r][i].second);
+      EXPECT_EQ(result[i].mult, 1);
+    }
+  }
+}
+
+TEST(CrossSectionComplex, SweepOppositeOverlappingRemainders) {
+  // The clockwise inner triangle shares part of the outer triangle's base.
+  // The rectangle introduces events and crossings along these opposite edges.
+  const Polygons input = {{{-2, 0}, {2, 0}, {0, 2}},
+                          {{-1, 0}, {0, 1}, {2, 0}},
+                          {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}};
+  const std::vector<std::pair<vec2, vec2>> expected = {
+      {{-2, 0}, {-1, 0}},  {{-1, 1}, {-2, 0}}, {{-1, 0}, {-1, -1}},
+      {{-1, -1}, {1, -1}}, {{0, 2}, {-1, 1}},  {{1, 1}, {0, 2}},
+      {{1, -1}, {1, 0.5}}, {{1, 0.5}, {2, 0}}, {{2, 0}, {1, 1}}};
+  auto [verts, edges] = PolygonsToInput(input);
+  const auto result = SweepWinding(edges, verts, WindRule::Add);
+  ASSERT_EQ(result.size(), expected.size());
+  for (size_t i = 0; i < result.size(); ++i) {
+    EXPECT_EQ(verts[result[i].v0], expected[i].first);
+    EXPECT_EQ(verts[result[i].v1], expected[i].second);
+    EXPECT_EQ(result[i].mult, 1);
+  }
+}
+
+TEST(CrossSectionComplex, SweepPreservesExtremeScaleResults) {
+  // Exercise direct sweep inputs without public epsilon-based preprocessing.
+  for (int exponent : {-1070, -1020, -500, 0, 500, 900}) {
+    SCOPED_TRACE(exponent);
+    const double scale = std::ldexp(1.0, exponent);
+    for (WindRule rule :
+         {WindRule::Add, WindRule::Intersect, WindRule::EvenOdd}) {
+      auto verts =
+          std::vector<vec2>{{0, 0}, {4 * scale, 0}, {2 * scale, 4 * scale}};
+      const auto original = verts;
+      const std::vector<EdgeM> edges = {{0, 1, 2}, {1, 2, 2}, {2, 0, 2}};
+      const auto result = SweepWinding(edges, verts, rule);
+      if (exponent < -500 || rule == WindRule::EvenOdd) {
+        EXPECT_TRUE(result.empty());
+      } else {
+        ASSERT_EQ(result.size(), 3);
+        const int from[] = {2, 0, 1}, to[] = {0, 1, 2};
+        for (int i = 0; i < 3; ++i) {
+          EXPECT_EQ(result[i].v0, from[i]);
+          EXPECT_EQ(result[i].v1, to[i]);
+          EXPECT_EQ(result[i].mult, 1);
+        }
+      }
+      EXPECT_EQ(verts, original);
+    }
+  }
+}
+
+TEST(CrossSectionComplex, SweepHighDegreeSharedOriginExactEdges) {
+  constexpr int count = 64;
+  for (bool fanIn : {false, true}) {
+    SCOPED_TRACE(fanIn);
+    Polygons wedges;
+    for (int i = 0; i < count; ++i) {
+      if (fanIn)
+        wedges.push_back({{0, 0}, {-4, 2.0 * i + 1}, {-4, 2.0 * i}});
+      else
+        wedges.push_back({{0, 0}, {4, 2.0 * i}, {4, 2.0 * i + 1}});
+    }
+    for (WindRule rule :
+         {WindRule::Add, WindRule::Intersect, WindRule::EvenOdd}) {
+      SCOPED_TRACE(static_cast<int>(rule));
+      auto [verts, edges] = PolygonsToInput(wedges);
+      const auto result = SweepWinding(edges, verts, rule);
+      if (rule == WindRule::Intersect) {
+        EXPECT_TRUE(result.empty());
+        continue;
+      }
+      ASSERT_EQ(result.size(), 3 * count);
+      for (int i = 0; i < count; ++i) {
+        if (fanIn) {
+          EXPECT_EQ(result[3 * i].v0, 3 * i + 1);
+          EXPECT_EQ(result[3 * i].v1, 3 * i + 2);
+          EXPECT_EQ(result[3 * i + 1].v0, 3 * i + 2);
+          EXPECT_EQ(result[3 * i + 1].v1, 0);
+          EXPECT_EQ(result[3 * i + 2].v0, 0);
+          EXPECT_EQ(result[3 * i + 2].v1, 3 * i + 1);
+        } else {
+          EXPECT_EQ(result[2 * i].v0, 0);
+          EXPECT_EQ(result[2 * i].v1, 3 * i + 1);
+          EXPECT_EQ(result[2 * i + 1].v0, 3 * i + 2);
+          EXPECT_EQ(result[2 * i + 1].v1, 0);
+          EXPECT_EQ(result[2 * count + i].v0, 3 * i + 1);
+          EXPECT_EQ(result[2 * count + i].v1, 3 * i + 2);
+        }
+      }
+      for (const auto& edge : result) EXPECT_EQ(edge.mult, 1);
+    }
+  }
+}
+
+TEST(CrossSectionComplex, SweepThreeWayCrossingsExactEdges) {
+  Polygons bands;
+  for (int slope : {-1, 0, 1}) {
+    const double m = slope;
+    bands.push_back({{-1, -m}, {1, m}, {1, m + 12}, {-1, -m + 12}});
+  }
+  const std::vector<std::pair<vec2, vec2>> expected[] = {{{{-1, 0}, {-1, -1}},
+                                                          {{-1, -1}, {0, 0}},
+                                                          {{-1, 1}, {-1, 0}},
+                                                          {{-1, 11}, {-1, 1}},
+                                                          {{-1, 12}, {-1, 11}},
+                                                          {{-1, 13}, {-1, 12}},
+                                                          {{0, 12}, {-1, 13}},
+                                                          {{0, 0}, {1, -1}},
+                                                          {{1, 13}, {0, 12}},
+                                                          {{1, -1}, {1, 0}},
+                                                          {{1, 0}, {1, 1}},
+                                                          {{1, 1}, {1, 11}},
+                                                          {{1, 11}, {1, 12}},
+                                                          {{1, 12}, {1, 13}}},
+                                                         {{{-1, 1}, {-1, 0}},
+                                                          {{-1, 0}, {0, 0}},
+                                                          {{-1, 11}, {-1, 1}},
+                                                          {{-1, 12}, {-1, 11}},
+                                                          {{0, 12}, {-1, 12}},
+                                                          {{0, 0}, {1, 0}},
+                                                          {{1, 12}, {0, 12}},
+                                                          {{1, 0}, {1, 1}},
+                                                          {{1, 1}, {1, 11}},
+                                                          {{1, 11}, {1, 12}}},
+                                                         {{{-1, 0}, {-1, -1}},
+                                                          {{-1, -1}, {0, 0}},
+                                                          {{0, 0}, {-1, 0}},
+                                                          {{-1, 11}, {-1, 1}},
+                                                          {{-1, 1}, {0, 0}},
+                                                          {{0, 12}, {-1, 11}},
+                                                          {{-1, 13}, {-1, 12}},
+                                                          {{-1, 12}, {0, 12}},
+                                                          {{0, 12}, {-1, 13}},
+                                                          {{0, 0}, {1, -1}},
+                                                          {{1, 0}, {0, 0}},
+                                                          {{0, 0}, {1, 1}},
+                                                          {{1, 11}, {0, 12}},
+                                                          {{0, 12}, {1, 12}},
+                                                          {{1, 13}, {0, 12}},
+                                                          {{1, -1}, {1, 0}},
+                                                          {{1, 1}, {1, 11}},
+                                                          {{1, 12}, {1, 13}}}};
+  const WindRule rules[] = {WindRule::Add, WindRule::Intersect,
+                            WindRule::EvenOdd};
+  for (int r = 0; r < 3; ++r) {
+    SCOPED_TRACE(r);
+    auto [verts, edges] = PolygonsToInput(bands);
+    const auto result = SweepWinding(edges, verts, rules[r]);
+    ASSERT_EQ(result.size(), expected[r].size());
+    for (size_t i = 0; i < result.size(); ++i) {
+      EXPECT_EQ(verts[result[i].v0], expected[r][i].first);
+      EXPECT_EQ(verts[result[i].v1], expected[r][i].second);
+      EXPECT_EQ(result[i].mult, 1);
+    }
+  }
+}
+
+TEST(CrossSectionComplex, SweepPreservesSignedZeroRepresentative) {
+  // Preserve the first live map-key representative when +0 and -0 compare
+  // equal.
+  const Polygons input = {{{-0.0, -1}, {-0.0, 1}, {-2, -0.0}, {1, 0}},
+                          {{1, 1}, {-2, 2}, {2, -1}, {1, 2}, {-2, -2}}};
+  auto [verts, edges] = PolygonsToInput(input);
+  const auto result = OutEdgesToPolygons(
+      verts, SweepWinding(edges, verts, WindRule::Intersect));
+  const SimplePolygon expected = {
+      {-0x1.47ae147ae148p-4, 0x1.1eb851eb851ecp-1},
+      {-0.5, 0.0},
+      {0.0, 0.0},
+      {-0.0, 0.5},
+      {0x1.2492492492492p-2, 0x1.2492492492492p-2},
+      {1, 1},
+      {0x1.9999999999997p-2, 0x1.3333333333333p+0},
+      {0.0, 0x1.5555555555557p-1},
+      {-0.0, 1},
+      {-0x1.999999999999ap-2, 0x1.999999999999ap-1}};
+  ASSERT_EQ(result.size(), 1);
+  ASSERT_EQ(result[0].size(), expected.size());
+  for (size_t i = 0; i < expected.size(); ++i) {
+    EXPECT_EQ(result[0][i], expected[i]);
+    for (int axis = 0; axis < 2; ++axis)
+      EXPECT_EQ(std::signbit(result[0][i][axis]),
+                std::signbit(expected[i][axis]));
+  }
+}
+
+TEST(CrossSectionComplex, SignedZeroReducerPreservesPublicCoordinateBits) {
+  const Polygons input = {{{0, -2}, {1, -2}, {0, 2}},
+                          {{1, 2}, {-1, 1}, {-0.0, 0}},
+                          {{-1, -1}, {2, -2}, {-1, 1}}};
+  const Polygons actual = CrossSection(input).ToPolygons();
+  // Preserve raw order and double encodings, including +0 at (0, 1.5).
+  const SimplePolygon expected = {{-1, 1},
+                                  {-1, -1},
+                                  {0.0, -0x1.5555555555555p+0},
+                                  {0.0, -2},
+                                  {1, -2},
+                                  {0x1.d1745d1745d17p-1, -0x1.a2e8ba2e8ba2ep+0},
+                                  {2, -2},
+                                  {0x1.5555555555555p-1, -0x1.5555555555555p-1},
+                                  {0x1.5555555555555p-2, 0x1.5555555555555p-1},
+                                  {1, 2},
+                                  {0x1.c71c71c71c71cp-4, 0x1.8e38e38e38e39p+0},
+                                  {0.0, 2},
+                                  {0.0, 1.5}};
+  auto bits = [](double value) {
+    uint64_t result;
+    std::memcpy(&result, &value, sizeof(result));
+    return result;
+  };
+  ASSERT_EQ(actual.size(), 1);
+  ASSERT_EQ(actual[0].size(), expected.size());
+  for (size_t i = 0; i < expected.size(); ++i)
+    for (int axis = 0; axis < 2; ++axis)
+      EXPECT_EQ(bits(actual[0][i][axis]), bits(expected[i][axis]))
+          << "vertex " << i << " axis " << axis;
+}
+
+namespace {
+
+// Fixed repetitions provide a timing signal for the weekly benchmark suite.
+void ExpectRepeatedSweep(const Polygons& input, int repetitions,
+                         size_t expectedEdges, size_t expectedContours,
+                         double expectedArea) {
+  const auto [inputVerts, edges] = PolygonsToInput(input);
+  for (int i = 0; i < repetitions; ++i) {
+    auto verts = inputVerts;
+    const auto result = SweepWinding(edges, verts, WindRule::Add);
+    ASSERT_EQ(result.size(), expectedEdges);
+    if (i == 0) {
+      const auto polys = OutEdgesToPolygons(verts, result);
+      EXPECT_EQ(polys.size(), expectedContours);
+      EXPECT_NEAR(TotalSignedArea(polys), expectedArea, 1e-9);
+    }
+  }
+}
+
+}  // namespace
+
+TEST(CrossSectionComplex, SweepManySeparatedContours) {
+  Polygons rectangles;
+  for (int i = 0; i < 512; ++i) {
+    const double y = 4 * i;
+    rectangles.push_back({{0, y}, {100, y}, {100, y + 1}, {0, y + 1}});
+  }
+  ExpectRepeatedSweep(rectangles, 32, 4 * 512, 512, 100.0 * 512);
+}
+
+TEST(CrossSectionComplex, SweepCrossingContours) {
+  Polygons bands;
+  for (int i = 0; i < 32; ++i) {
+    const double y = 4 * i;
+    bands.push_back({{0, y}, {128, y + 128}, {128, y + 129}, {0, y + 1}});
+    bands.push_back({{0, y + 128}, {128, y}, {128, y + 1}, {0, y + 129}});
+  }
+  // Each of the 32x32 crossings contributes four corners and area 1/2;
+  // the connected union surrounds 31x31 holes.
+  ExpectRepeatedSweep(bands, 8, 4 * 64 + 4 * 32 * 32, 1 + 31 * 31,
+                      128.0 * 64 - 0.5 * 32 * 32);
 }
