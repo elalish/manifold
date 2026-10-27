@@ -25,7 +25,7 @@ jobs:
     runs-on: windows-2025
     steps:
     - uses: actions/checkout@v7
-    - uses: lukka/get-cmake@v4.4.2
+    - uses: lukka/get-cmake@v4.4.4
       with:
         cmakeVersion: 4.3.3
     - &clone-tbb
