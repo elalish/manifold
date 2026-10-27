@@ -286,6 +286,102 @@ TEST(CrossSection, EvenOddSelfIntersectingContour) {
   EXPECT_NEAR(evenOdd.Area(), silhouette - core, 1e-9);
 }
 
+TEST(CrossSection, NonZeroFillsBothSignsAndEvenWinding) {
+  const SimplePolygon clockwise = {{0, 0}, {0, 2}, {2, 2}, {2, 0}};
+  EXPECT_TRUE(CrossSection(clockwise).IsEmpty());
+  EXPECT_NEAR(CrossSection::NonZero(clockwise).Area(), 4., 1e-9);
+
+  const Polygons doubled = {clockwise, clockwise};
+  EXPECT_TRUE(CrossSection::EvenOdd(doubled).IsEmpty());
+  EXPECT_NEAR(CrossSection::NonZero(doubled).Area(), 4., 1e-9);
+  Polygons reversed = doubled;
+  for (auto& ring : reversed) std::reverse(ring.begin(), ring.end());
+  EXPECT_NEAR(CrossSection::NonZero(reversed).Area(), 4., 1e-9);
+}
+
+TEST(CrossSection, NonZeroSameDirectionNestingStaysFilled) {
+  Polygons nested = {
+      {{-3, -3}, {3, -3}, {3, 3}, {-3, 3}},
+      {{-2, -2}, {2, -2}, {2, 2}, {-2, 2}},
+      {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}},
+  };
+  for (int orientation = 0; orientation < 2; ++orientation) {
+    const CrossSection nonzero = CrossSection::NonZero(nested);
+    EXPECT_EQ(nonzero.NumContour(), 1u);
+    EXPECT_NEAR(nonzero.Area(), 36., 1e-9);
+    const CrossSection probe = CrossSection::Square({0.5, 0.5}, true);
+    for (double x : {0., 1.5, 2.5}) {
+      EXPECT_NEAR((nonzero ^ probe.Translate({x, 0})).Area(), 0.25, 1e-9);
+    }
+    for (auto& ring : nested) std::reverse(ring.begin(), ring.end());
+  }
+}
+
+TEST(CrossSection, NonZeroSelfIntersectingContour) {
+  SimplePolygon pentagram;
+  for (int i = 0; i < 5; ++i) {
+    const double theta = kPi / 2 + i * 4 * kPi / 5;
+    pentagram.push_back({std::cos(theta), std::sin(theta)});
+  }
+  const double r = std::cos(2 * kPi / 5) / std::cos(kPi / 5);
+  const double silhouette = 5 * r * std::sin(kPi / 5);
+  for (int orientation = 0; orientation < 2; ++orientation) {
+    const CrossSection nonzero = CrossSection::NonZero(pentagram);
+    EXPECT_EQ(nonzero.NumContour(), 1u);
+    EXPECT_NEAR(nonzero.Area(), silhouette, 1e-9);
+    std::reverse(pentagram.begin(), pentagram.end());
+  }
+}
+
+TEST(CrossSection, NonZeroCancelsOppositeCoincidentContours) {
+  const SimplePolygon ccw = {{0, 0}, {2, 0}, {2, 2}, {0, 2}};
+  const SimplePolygon cw(ccw.rbegin(), ccw.rend());
+  EXPECT_TRUE(CrossSection::NonZero(Polygons{ccw, cw}).IsEmpty());
+  // A residual winding of -1 must remain filled after cancellation.
+  EXPECT_NEAR(CrossSection::NonZero(Polygons{ccw, cw, cw}).Area(), 4., 1e-9);
+  EXPECT_TRUE(CrossSection::NonZero(Polygons{}).IsEmpty());
+}
+
+TEST(CrossSection, NonZeroOppositeOverlapsLeaveZeroWindingEmpty) {
+  const Polygons input = {{{0, 0}, {3, 0}, {3, 2}, {0, 2}},
+                          {{1, 0}, {1, 2}, {4, 2}, {4, 0}}};
+  const CrossSection nonzero = CrossSection::NonZero(input);
+  EXPECT_NEAR(nonzero.Area(), 4., 1e-9);
+  EXPECT_EQ(nonzero.NumContour(), 2);
+  EXPECT_NEAR(CrossSection(input).Area(), 2., 1e-9);
+  const CrossSection probe = CrossSection::Square({0.5, 0.5});
+  EXPECT_NEAR((nonzero ^ probe.Translate({0.25, 0.25})).Area(), 0.25, 1e-9);
+  EXPECT_TRUE((nonzero ^ probe.Translate({1.25, 0.25})).IsEmpty());
+  EXPECT_NEAR((nonzero ^ probe.Translate({3.25, 0.25})).Area(), 0.25, 1e-9);
+}
+
+TEST(CrossSection, NonZeroNormalizesHolesForLaterOperations) {
+  const Polygons input = {{{-2, -2}, {-2, 2}, {2, 2}, {2, -2}},
+                          {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}};
+  const CrossSection nonzero = CrossSection::NonZero(input);
+  EXPECT_EQ(nonzero.NumContour(), 2);
+  EXPECT_NEAR(nonzero.Area(), 12., 1e-9);
+  const CrossSection reread(nonzero.ToPolygons());
+  EXPECT_NEAR(reread.Area(), 12., 1e-9);
+  EXPECT_TRUE((reread - nonzero).IsEmpty());
+  EXPECT_TRUE((nonzero - reread).IsEmpty());
+  EXPECT_NEAR(Manifold::Extrude(nonzero.ToPolygons(), 3).Volume(), 36., 1e-9);
+  EXPECT_NEAR((CrossSection::Square({4, 4}, true) - nonzero).Area(), 4., 1e-9);
+}
+
+TEST(CrossSection, NonZeroSelfIntersectionsMatchPositiveReverseUnion) {
+  const Polygons input = {{{0, 0}, {2, 2}, {0, 2}, {2, 0}},
+                          {{10, 0}, {10, 2}, {12, 2}, {12, 0}}};
+  Polygons reversed = input;
+  for (auto& ring : reversed) std::reverse(ring.begin(), ring.end());
+  const CrossSection reference = CrossSection(input) + CrossSection(reversed);
+  const CrossSection nonzero = CrossSection::NonZero(input);
+  EXPECT_NEAR(nonzero.Area(), 6., 1e-9);
+  EXPECT_TRUE((nonzero - reference).IsEmpty());
+  EXPECT_TRUE((reference - nonzero).IsEmpty());
+  EXPECT_NEAR(CrossSection::NonZero(reversed).Area(), nonzero.Area(), 1e-9);
+}
+
 // The rule only decides how the input contours are read. What gets stored is
 // normal-oriented and positive either way, so re-reading the output with the
 // default rule changes nothing and later ops see an ordinary CrossSection.

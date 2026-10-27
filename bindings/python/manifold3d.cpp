@@ -812,6 +812,9 @@ NB_MODULE(manifold3d, m) {
       .def_static("even_odd",
                   nb::overload_cast<const Polygons&>(&CrossSection::EvenOdd),
                   nb::arg("contours"), cross_section__even_odd__contours)
+      .def_static("non_zero",
+                  nb::overload_cast<const Polygons&>(&CrossSection::NonZero),
+                  nb::arg("contours"), cross_section__non_zero__contours)
       .def("area", &CrossSection::Area, cross_section__area)
       .def("num_vert", &CrossSection::NumVert, cross_section__num_vert)
       .def("num_contour", &CrossSection::NumContour, cross_section__num_contour)

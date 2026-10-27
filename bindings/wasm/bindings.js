@@ -553,6 +553,13 @@ Module.setup = function() {
     return cs;
   };
 
+  Module.CrossSection.nonZero = function(polygons) {
+    const polygonsVec = polygons2vec(polygons);
+    const cs = Module._NonZero(polygonsVec);
+    polygonsVec.delete();
+    return cs;
+  };
+
   Module.CrossSection.square = function(...args) {
     let size = undefined;
     if (args.length == 0)

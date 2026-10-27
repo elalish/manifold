@@ -68,6 +68,8 @@ class CrossSection {
   CrossSection(const Rect& rect);
   static CrossSection EvenOdd(const SimplePolygon& contour);
   static CrossSection EvenOdd(const Polygons& contours);
+  static CrossSection NonZero(const SimplePolygon& contour);
+  static CrossSection NonZero(const Polygons& contours);
   Polygons ToPolygons() const;
   ///@}
 

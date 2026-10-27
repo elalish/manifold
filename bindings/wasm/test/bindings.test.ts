@@ -40,6 +40,24 @@ suite('CrossSection Bindings', () => {
     expect(evenOdd.area()).toBeCloseTo(12);
   });
 
+  test(
+      'nonZero fills both signs and even windings, and cancels opposites',
+      () => {
+        const clockwise: Polygons = [[[0, 0], [0, 2], [2, 2], [2, 0]]];
+        const reversed: Polygons = [clockwise[0].slice().reverse()];
+        const single = manifoldModule.CrossSection.nonZero(clockwise);
+        const doubled =
+            manifoldModule.CrossSection.nonZero([clockwise[0], clockwise[0]]);
+        const cancelled =
+            manifoldModule.CrossSection.nonZero([clockwise[0], reversed[0]]);
+        expect(single.area()).toBeCloseTo(4);
+        expect(doubled.area()).toBeCloseTo(4);
+        expect(cancelled.isEmpty()).toBe(true);
+        expect(
+            manifoldModule.CrossSection.ofPolygons(single.toPolygons()).area())
+            .toBeCloseTo(4);
+      });
+
   test('simplify argument is defaulted', () => {
     const cs = manifoldModule.CrossSection.circle(1).simplify();
     expect(cs.numContour()).toEqual(1);

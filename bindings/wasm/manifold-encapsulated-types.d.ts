@@ -395,6 +395,20 @@ export class CrossSection {
   static evenOdd(contours: Polygons): CrossSection;
 
   /**
+   * Create a 2d cross-section from a set of contours, reading them by the
+   * nonzero rule: a sub-region is filled when its signed winding number is
+   * not zero. Both clockwise and counter-clockwise contours can enclose solid
+   * regions; opposite windings cancel where their sum is zero. Unlike even-odd
+   * fill, a winding of two remains filled. The result is regularized like any
+   * other CrossSection, so every later operation behaves the same.
+   *
+   * @param contours A set of closed paths describing zero or more complex
+   * polygons.
+   * @group Input & Output
+   */
+  static nonZero(contours: Polygons): CrossSection;
+
+  /**
    * Return the contours of this CrossSection as a list of simple polygons.
    * @group Input & Output
    */

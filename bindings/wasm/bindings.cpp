@@ -146,6 +146,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
 
   // CrossSection Static Methods
   function("_EvenOdd", &cross_js::EvenOdd);
+  function("_NonZero", &cross_js::NonZero);
   function("_Square", &CrossSection::Square);
   function("_Circle", &CrossSection::Circle);
   function("_crossSectionUnionN", &cross_js::UnionN);
