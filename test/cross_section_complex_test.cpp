@@ -893,6 +893,59 @@ TEST(CrossSectionComplex, OutEdgesToPolygonsClosesSimpleRing) {
   EXPECT_EQ(polys[0].size(), 4u);
 }
 
+namespace {
+
+// Also timed by the weekly benchmark suite. Fixed repetitions make the
+// optimized path measurable without machine-dependent timing assertions.
+void ExpectLongLoopExtraction(int numVerts, int repetitions) {
+  std::vector<vec2> verts;
+  std::vector<OutEdge> edges;
+  verts.reserve(numVerts);
+  edges.reserve(numVerts);
+  for (int i = 0; i < numVerts; ++i) {
+    const double angle = 2 * kPi * i / numVerts;
+    const double radius = 10 + std::cos(5 * angle);
+    verts.push_back({radius * std::cos(angle), radius * std::sin(angle)});
+    edges.push_back({i, (i + 1) % numVerts});
+  }
+  const Polygons expected = {verts};
+  for (int i = 0; i < repetitions; ++i) {
+    ASSERT_EQ(OutEdgesToPolygons(verts, edges), expected);
+  }
+}
+
+}  // namespace
+
+TEST(CrossSectionComplex, OutEdgesToPolygonsLongLoop2048) {
+  ExpectLongLoopExtraction(2048, 256);
+}
+
+TEST(CrossSectionComplex, OutEdgesToPolygonsLongLoop8192) {
+  ExpectLongLoopExtraction(8192, 64);
+}
+
+TEST(CrossSectionComplex, OutEdgesToPolygonsManySmallContours) {
+  std::vector<vec2> verts;
+  std::vector<OutEdge> edges;
+  Polygons expected;
+  for (int i = 0; i < 1024; ++i) {
+    const double x = 3 * (i % 32), y = 3 * (i / 32);
+    const SimplePolygon square = {
+        {x, y}, {x + 1, y}, {x + 1, y + 1}, {x, y + 1}};
+    const int base = static_cast<int>(verts.size());
+    verts.insert(verts.end(), square.begin(), square.end());
+    for (int j = 0; j < 4; ++j) {
+      edges.push_back({base + j, base + (j + 1) % 4});
+    }
+    expected.push_back(square);
+  }
+  // Keep this separate from the long-loop cases: per-contour initialization
+  // of a global-sized lookup table can regress inputs with many small loops.
+  for (int i = 0; i < 128; ++i) {
+    ASSERT_EQ(OutEdgesToPolygons(verts, edges), expected);
+  }
+}
+
 TEST(CrossSectionComplex, OutEdgesToPolygonsSplitsExactRepeatedVertex) {
   const std::vector<vec2> verts = {{0, 0}, {1, 0}, {1, -1}, {2, -1}, {1, 1}};
   const std::vector<OutEdge> edges = {{0, 1}, {1, 2}, {2, 3},
