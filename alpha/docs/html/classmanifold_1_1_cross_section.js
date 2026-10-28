@@ -8,6 +8,8 @@ var classmanifold_1_1_cross_section =
     [ "CrossSection", "classmanifold_1_1_cross_section.html#ad2f60f6e1e3d45e773a595a1be246cf2", null ],
     [ "EvenOdd", "classmanifold_1_1_cross_section.html#a8d48930c2ec556f849d6928de3230ed5", null ],
     [ "EvenOdd", "classmanifold_1_1_cross_section.html#aa79faa30389f6e084f1ee72a1a464c72", null ],
+    [ "NonZero", "classmanifold_1_1_cross_section.html#ad21052ac7d3a5be98b390d9272c7260d", null ],
+    [ "NonZero", "classmanifold_1_1_cross_section.html#a0b9def787f533eeefd35c84564012204", null ],
     [ "ToPolygons", "classmanifold_1_1_cross_section.html#a209a83b1c39a84e094da9e854a7b8bc2", null ],
     [ "Decompose", "classmanifold_1_1_cross_section.html#a48f77ce6390caee13a94f681893fb65c", null ],
     [ "Square", "classmanifold_1_1_cross_section.html#a43e92332e827adee0914baf746fa677b", null ],

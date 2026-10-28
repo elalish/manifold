@@ -120,6 +120,8 @@ Input &amp; Output</h2></td></tr>
 <tr class="memitem:a209a83b1c39a84e094da9e854a7b8bc2" id="r_a209a83b1c39a84e094da9e854a7b8bc2"><td class="memItemLeft"><a class="el" href="group___structs.html#ga60a66d8ddacc086bb45d8afc37f646d1">Polygons</a>&#160;</td><td class="memItemRight"><a class="el" href="#a209a83b1c39a84e094da9e854a7b8bc2">ToPolygons</a> () const</td></tr>
 <tr class="memitem:a8d48930c2ec556f849d6928de3230ed5" id="r_a8d48930c2ec556f849d6928de3230ed5"><td class="memItemLeft">static <a class="el" href="#acbed403d82ee8d55f3be2c9a5f963ec0">CrossSection</a>&#160;</td><td class="memItemRight"><a class="el" href="#a8d48930c2ec556f849d6928de3230ed5">EvenOdd</a> (const <a class="el" href="group___structs.html#gac63dd7235f7caf5698ab44acb83ba362">SimplePolygon</a> &amp;contour)</td></tr>
 <tr class="memitem:aa79faa30389f6e084f1ee72a1a464c72" id="r_aa79faa30389f6e084f1ee72a1a464c72"><td class="memItemLeft">static <a class="el" href="#acbed403d82ee8d55f3be2c9a5f963ec0">CrossSection</a>&#160;</td><td class="memItemRight"><a class="el" href="#aa79faa30389f6e084f1ee72a1a464c72">EvenOdd</a> (const <a class="el" href="group___structs.html#ga60a66d8ddacc086bb45d8afc37f646d1">Polygons</a> &amp;contours)</td></tr>
+<tr class="memitem:ad21052ac7d3a5be98b390d9272c7260d" id="r_ad21052ac7d3a5be98b390d9272c7260d"><td class="memItemLeft">static <a class="el" href="#acbed403d82ee8d55f3be2c9a5f963ec0">CrossSection</a>&#160;</td><td class="memItemRight"><a class="el" href="#ad21052ac7d3a5be98b390d9272c7260d">NonZero</a> (const <a class="el" href="group___structs.html#gac63dd7235f7caf5698ab44acb83ba362">SimplePolygon</a> &amp;contour)</td></tr>
+<tr class="memitem:a0b9def787f533eeefd35c84564012204" id="r_a0b9def787f533eeefd35c84564012204"><td class="memItemLeft">static <a class="el" href="#acbed403d82ee8d55f3be2c9a5f963ec0">CrossSection</a>&#160;</td><td class="memItemRight"><a class="el" href="#a0b9def787f533eeefd35c84564012204">NonZero</a> (const <a class="el" href="group___structs.html#ga60a66d8ddacc086bb45d8afc37f646d1">Polygons</a> &amp;contours)</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-member-group" class="groupheader"><a id="member-group" name="member-group"></a>
 Constructors</h2></td></tr>
@@ -355,6 +357,71 @@ Convex Hull</h2></td></tr>
 </div><div class="memdoc">
 <p>Create a 2d cross-section from a set of contours, reading them by the even-odd rule: a sub-region is filled when its winding number is odd, so overlapping an odd number of contours fills and overlapping an even number leaves a hole. The constructors instead use the positive rule (filled where the winding number is greater than zero), which ignores contour count and only cares about direction. Use this to take input authored for an even-odd tool such as OpenSCAD.</p>
 <p>The rule only decides how these contours are read. The result is regularized and normal-oriented like any other <a class="el" href="classmanifold_1_1_cross_section.html" title="Two-dimensional cross sections guaranteed to be without self-intersections, or overlaps between polyg...">CrossSection</a>, so every later operation behaves the same. Note that <a class="el" href="classmanifold_1_1_manifold.html#a37da082109050d748421069e22eff876">Manifold::Extrude</a> and <a class="el" href="classmanifold_1_1_manifold.html#a8c454a293abbf86f520e10266087f5a6">Manifold::Revolve</a> take raw contours straight to the triangulator without applying any fill rule, so even-odd input has to be regularized here first, by passing EvenOdd(contours).<a class="el" href="#a209a83b1c39a84e094da9e854a7b8bc2">ToPolygons()</a> to them.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">contours</td><td>A set of closed paths describing zero or more complex polygons. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="ad21052ac7d3a5be98b390d9272c7260d" name="ad21052ac7d3a5be98b390d9272c7260d"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad21052ac7d3a5be98b390d9272c7260d">&#9670;&#160;</a></span>NonZero() <span class="overload">[1/2]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="#acbed403d82ee8d55f3be2c9a5f963ec0">CrossSection</a> NonZero </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="group___structs.html#gac63dd7235f7caf5698ab44acb83ba362">SimplePolygon</a> &amp;</td>          <td class="paramname"><span class="paramname"><em>contour</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Create a 2d cross-section from a single contour using the nonzero winding rule. See <a class="el" href="#a0b9def787f533eeefd35c84564012204">CrossSection::NonZero(const Polygons&amp;)</a>.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">contour</td><td>A closed path outlining the desired cross-section. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="a0b9def787f533eeefd35c84564012204" name="a0b9def787f533eeefd35c84564012204"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a0b9def787f533eeefd35c84564012204">&#9670;&#160;</a></span>NonZero() <span class="overload">[2/2]</span></h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="#acbed403d82ee8d55f3be2c9a5f963ec0">CrossSection</a> NonZero </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="group___structs.html#ga60a66d8ddacc086bb45d8afc37f646d1">Polygons</a> &amp;</td>          <td class="paramname"><span class="paramname"><em>contours</em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Create a 2d cross-section from a set of contours using the nonzero winding rule: a sub-region is filled whenever its signed winding number is not zero. Both clockwise and counter-clockwise contours can enclose solid regions; oppositely wound overlapping contours cancel where their windings sum to zero. Unlike even-odd fill, a winding of two is still filled.</p>
+<p>The rule only controls how the input contours are read. The result has normal-oriented boundaries like any other <a class="el" href="classmanifold_1_1_cross_section.html" title="Two-dimensional cross sections guaranteed to be without self-intersections, or overlaps between polyg...">CrossSection</a>, so later operations retain their usual behavior. <a class="el" href="classmanifold_1_1_manifold.html#a37da082109050d748421069e22eff876">Manifold::Extrude</a> and <a class="el" href="classmanifold_1_1_manifold.html#a8c454a293abbf86f520e10266087f5a6">Manifold::Revolve</a> take raw contours without applying a fill rule; regularize nonzero input here first and pass NonZero(contours).<a class="el" href="#a209a83b1c39a84e094da9e854a7b8bc2">ToPolygons()</a> to them.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">contours</td><td>A set of closed paths describing zero or more complex polygons. </td></tr>
