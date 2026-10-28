@@ -576,25 +576,26 @@ TEST(CrossSectionComplex, CleanupPassMatchesValidAddSinglePass) {
   EXPECT_NEAR(TotalSignedArea(pass1Polys), TotalSignedArea(pass2Polys), 1e-12);
 }
 
-// EvenOdd only changes which sub-edges the winding pass retains: `rule` is
-// read in SweepMode::Winding and nowhere in the arrangement. So on the same
-// self-intersecting input it must produce a graph the independent oracle still
-// accepts, over the same vertex merge Add gets.
-TEST(CrossSectionComplex, EvenOddRetainedGraphMatchesAddArrangement) {
+// Alternate fill rules only change which sub-edges the winding pass retains:
+// `rule` is read in SweepMode::Winding and nowhere in the arrangement. So on
+// the same self-intersecting input it must produce a graph the independent
+// oracle still accepts, over the same vertex merge Add gets.
+TEST(CrossSectionComplex, FillRulesRetainedGraphMatchAddArrangement) {
   Polygons polys{RandomTopologicalRing(8, 15)};
   const double eps = InferEps(polys, {});
   const auto [verts, edges] = PolygonsToInput(polys);
 
   const auto add =
       RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::Add);
-  const auto evenOdd =
-      RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::EvenOdd);
-
-  EXPECT_TRUE(CheckRetainedGraphValidity(
-      evenOdd, edges, evenOdd.inputVert2Merged, evenOdd.numMergedVerts, eps));
-  EXPECT_EQ(evenOdd.numMergedVerts, add.numMergedVerts);
-  EXPECT_EQ(evenOdd.inputVert2Merged, add.inputVert2Merged);
-  EXPECT_FALSE(OutEdgesToPolygons(evenOdd.verts, evenOdd.edges).empty());
+  for (WindRule rule : {WindRule::EvenOdd, WindRule::NonZero}) {
+    const auto filled =
+        RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, rule);
+    EXPECT_TRUE(CheckRetainedGraphValidity(
+        filled, edges, filled.inputVert2Merged, filled.numMergedVerts, eps));
+    EXPECT_EQ(filled.numMergedVerts, add.numMergedVerts);
+    EXPECT_EQ(filled.inputVert2Merged, add.inputVert2Merged);
+    EXPECT_FALSE(OutEdgesToPolygons(filled.verts, filled.edges).empty());
+  }
 }
 
 TEST(CrossSectionComplex, OffsetRoundUsesRequestedSegments) {

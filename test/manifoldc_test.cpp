@@ -764,6 +764,30 @@ TEST(CBIND, run_flag_accessors) {
   free(cube);
 }
 
+TEST(CBIND, cross_section_non_zero) {
+  // Doubled clockwise input distinguishes NonZero from Positive and EvenOdd.
+  ManifoldVec2 pts[] = {{0, 0}, {0, 2}, {2, 2}, {2, 0}};
+  ManifoldSimplePolygon* ring =
+      manifold_simple_polygon(alloc_simple_polygon_buffer(), pts, 4);
+  ManifoldSimplePolygon* rings[] = {ring, ring};
+  ManifoldPolygons* polygons =
+      manifold_polygons(alloc_polygons_buffer(), rings, 2);
+  ManifoldCrossSection* single = manifold_cross_section_non_zero_simple_polygon(
+      malloc(manifold_cross_section_size()), ring);
+  ManifoldCrossSection* multiple = manifold_cross_section_non_zero_polygons(
+      malloc(manifold_cross_section_size()), polygons);
+  EXPECT_NEAR(manifold_cross_section_area(single), 4., 1e-9);
+  EXPECT_NEAR(manifold_cross_section_area(multiple), 4., 1e-9);
+  manifold_destruct_cross_section(single);
+  manifold_destruct_cross_section(multiple);
+  manifold_destruct_polygons(polygons);
+  manifold_destruct_simple_polygon(ring);
+  free(single);
+  free(multiple);
+  free(polygons);
+  free(ring);
+}
+
 TEST(CBIND, cross_section_even_odd) {
   // Two same-direction squares, one nested in the other: positive fill leaves
   // the pair solid, even-odd cuts the inner square out.

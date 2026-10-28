@@ -299,6 +299,38 @@ CrossSection CrossSection::EvenOdd(const Polygons& contours) {
 }
 
 /**
+ * Create a 2d cross-section from a single contour using the nonzero winding
+ * rule. See CrossSection::NonZero(const Polygons&).
+ *
+ * @param contour A closed path outlining the desired cross-section.
+ */
+CrossSection CrossSection::NonZero(const SimplePolygon& contour) {
+  return NonZero(Polygons{contour});
+}
+
+/**
+ * Create a 2d cross-section from a set of contours using the nonzero winding
+ * rule: a sub-region is filled whenever its signed winding number is not zero.
+ * Both clockwise and counter-clockwise contours can enclose solid regions;
+ * oppositely wound overlapping contours cancel where their windings sum to
+ * zero. Unlike even-odd fill, a winding of two is still filled.
+ *
+ * The rule only controls how the input contours are read. The result has
+ * normal-oriented boundaries like any other CrossSection, so later operations
+ * retain their usual behavior. Manifold::Extrude and Manifold::Revolve take raw
+ * contours without applying a fill rule; regularize nonzero input here first
+ * and pass NonZero(contours).ToPolygons() to them.
+ *
+ * @param contours A set of closed paths describing zero or more complex
+ * polygons.
+ */
+CrossSection CrossSection::NonZero(const Polygons& contours) {
+  const double eps = InferEps(contours, {});
+  return CrossSection(
+      shared_paths(ApplyFillRule(contours, eps, WindRule::NonZero)));
+}
+
+/**
  * Create a 2d cross-section from an axis-aligned rectangle (bounding box).
  *
  * @param rect An axis-aligned rectangular bounding box.
