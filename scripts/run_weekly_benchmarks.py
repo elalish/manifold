@@ -24,6 +24,7 @@ DEFAULT_GTEST_FILTER = ":".join(
         "CrossSectionComplex.OutEdgesToPolygonsManySmallContours",
         "CrossSectionComplex.SweepManySeparatedContours",
         "CrossSectionComplex.SweepCrossingContours",
+        "CrossSectionComplex.OffsetRoundMergingContours",
         "Polygon.Sponge4",
         "Polygon.Zebra1",
         "Polygon.Zebra3",
