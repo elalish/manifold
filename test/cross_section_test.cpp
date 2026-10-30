@@ -2995,3 +2995,59 @@ TEST(CrossSection, NegativeOffset) {
       plusSign.Offset(-10, CrossSection::JoinType::Round, 2.0, 1024);
   EXPECT_NEAR(dilated.Area(), 30 * 30 - 10 * 10 * kPi, 0.01);
 }
+
+TEST(CrossSection, ResolvedWindingInputsWithVerticalTJunctions) {
+  std::vector<CrossSection> sections;
+  sections.push_back(CrossSection::Square({100.0, 100.0}, true));
+  for (int ix = -3; ix <= 3; ++ix) {
+    for (int iy = -3; iy <= 3; ++iy) {
+      sections.push_back(
+          CrossSection::Circle(4.0, 32).Translate({ix * 12.0, iy * 12.0}));
+    }
+  }
+  const CrossSection diff =
+      CrossSection::BatchBoolean(sections, OpType::Subtract);
+  const double expectedArea =
+      100.0 * 100.0 - 49.0 * CrossSection::Circle(4.0, 32).Area();
+  EXPECT_NEAR(diff.Area(), expectedArea, 1e-6);
+  EXPECT_EQ(diff.NumContour(), 50);
+  EXPECT_EQ(diff.NumVert(), 4 + 49 * 32);
+
+  // Shared vertical edge with T-junction breakpoints and opposing orientation.
+  const SimplePolygon left = {{0, 0},  {10, 0},  {10, 4},
+                              {10, 8}, {10, 10}, {0, 10}};
+  const SimplePolygon right = {{10, 2}, {20, 2}, {20, 8}, {10, 8}};
+  const CrossSection merged(Polygons{left, right});
+  EXPECT_NEAR(merged.Area(), 100.0 + 60.0, 1e-9);
+  EXPECT_EQ(merged.NumContour(), 1);
+
+  const CrossSection evenOdd =
+      CrossSection::EvenOdd(Polygons{{{0, 0}, {20, 0}, {20, 20}, {0, 20}},
+                                     {{4, 4}, {16, 4}, {16, 16}, {4, 16}}});
+  EXPECT_NEAR(evenOdd.Area(), 400.0 - 144.0, 1e-9);
+  EXPECT_EQ(evenOdd.NumContour(), 2);
+}
+
+TEST(CrossSection, WindingSweepCrossingsAndRoundOffsets) {
+  // Self-intersecting bowtie crossed by a vertical bar.
+  const SimplePolygon bowtie = {{0, 0}, {20, 20}, {20, 0}, {0, 20}};
+  const SimplePolygon bar = {{8, -5}, {12, -5}, {12, 25}, {8, 25}};
+  const CrossSection u(Polygons{bowtie, bar});
+  EXPECT_GT(u.Area(), 120.0);
+  const CrossSection reingested(u.ToPolygons());
+  EXPECT_NEAR(reingested.Area(), u.Area(), 1e-9);
+  EXPECT_EQ(reingested.NumContour(), u.NumContour());
+
+  // Negative round offset of a rectangle with seven rectangular holes.
+  CrossSection comb = CrossSection::Square({40.0, 20.0}, true);
+  for (int i = -3; i <= 3; ++i) {
+    comb -= CrossSection::Square({2.5, 14.0}, true).Translate({i * 5.0, 0.0});
+  }
+  const CrossSection eroded =
+      comb.Offset(-0.625, CrossSection::JoinType::Round, 2.0, 16);
+  EXPECT_GT(eroded.Area(), 0.0);
+  EXPECT_EQ(eroded.NumContour(), 8);
+  const Manifold mesh = Manifold::Extrude(eroded.ToPolygons(), 2.0);
+  EXPECT_EQ(mesh.Status(), Manifold::Error::NoError);
+  EXPECT_NEAR(mesh.Volume(), eroded.Area() * 2.0, 1e-5);
+}
