@@ -1487,3 +1487,43 @@ TEST(CrossSectionComplex, SweepCrossingContours) {
   ExpectRepeatedSweep(bands, 8, 4 * 64 + 4 * 32 * 32, 1 + 31 * 31,
                       128.0 * 64 - 0.5 * 32 * 32);
 }
+
+TEST(CrossSectionComplex, OffsetRoundMergingContours) {
+  constexpr int side = 8;
+  constexpr int segments = 32;
+  constexpr double delta = 1.25;
+  Polygons squares;
+  for (int y = 0; y < side; ++y) {
+    for (int x = 0; x < side; ++x) {
+      const double a = 3 * x;
+      const double b = 3 * y;
+      squares.push_back({{a, b}, {a + 1, b}, {a + 1, b + 1}, {a, b + 1}});
+    }
+  }
+  const CrossSection input(squares);
+  // Adjacent round offsets overlap, but diagonal pairs do not, leaving 49
+  // holes.
+  const double squareArea = 1 + 4 * delta + kPi * delta * delta;
+  const double overlapArea = 2 * delta - 2 +
+                             2 * delta * delta * std::acos(1 / delta) -
+                             2 * std::sqrt(delta * delta - 1);
+  const double roundArea =
+      side * side * squareArea - 2 * side * (side - 1) * overlapArea;
+  // Bound the inscribed arcs' area loss by one disk's faceting error per
+  // square.
+  const double facetLoss =
+      delta * delta * (kPi - segments * std::sin(2 * kPi / segments) / 2);
+  for (int i = 0; i < 16; ++i) {
+    const auto result =
+        input.Offset(delta, CrossSection::JoinType::Round, 2.0, segments);
+    ASSERT_EQ(result.NumContour(), 1 + (side - 1) * (side - 1));
+    ASSERT_EQ(result.NumVert(), 736);
+    if (i == 0) {
+      EXPECT_GE(result.Area(), roundArea - side * side * facetLoss - 1e-6);
+      EXPECT_LE(result.Area(), roundArea + 1e-6);
+      const auto bounds = result.Bounds();
+      EXPECT_EQ(bounds.min, vec2(-delta));
+      EXPECT_EQ(bounds.max, vec2(3 * (side - 1) + 1 + delta));
+    }
+  }
+}
