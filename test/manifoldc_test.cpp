@@ -430,15 +430,13 @@ TEST(CBIND, triangulation) {
   manifold_delete_polygons(ps);
 
   size_t num_tri = manifold_triangulation_num_tri(triangulation);
-  int* tri_verts = (int*)manifold_triangulation_tri_verts(
-      reinterpret_cast<int*>(malloc(num_tri * 3 * sizeof(int))), triangulation);
+  const int* tri_verts = manifold_triangulation_tri_verts(triangulation);
 
   EXPECT_EQ(num_tri, 1);
   EXPECT_EQ(tri_verts[0], 0);
   EXPECT_EQ(tri_verts[1], 1);
   EXPECT_EQ(tri_verts[2], 2);
   manifold_delete_triangulation(triangulation);
-  free(tri_verts);
 }
 
 TEST(CBIND, meshgl_merge_returns_mem) {
@@ -547,7 +545,7 @@ TEST(CBIND, meshgl_run_accessors) {
             manifold_meshgl_num_run(mesh));
 
   size_t flags_len = manifold_meshgl_run_flags_length(mesh);
-  uint8_t* flags = manifold_meshgl_run_flags(mesh);
+  const uint8_t* flags = manifold_meshgl_run_flags(mesh);
   // Just verify we got data without crashing.
   EXPECT_NE(flags, (uint8_t*)NULL);
 
@@ -559,7 +557,7 @@ TEST(CBIND, meshgl_run_accessors) {
             manifold_meshgl64_num_run(mesh64));
 
   size_t flags64_len = manifold_meshgl64_run_flags_length(mesh64);
-  uint8_t* flags64 = manifold_meshgl64_run_flags(mesh64);
+  const uint8_t* flags64 = manifold_meshgl64_run_flags(mesh64);
   EXPECT_NE(flags64, (uint8_t*)NULL);
 
   manifold_delete_meshgl(mesh);
