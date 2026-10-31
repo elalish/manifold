@@ -25,7 +25,7 @@ extern "C" {
 // In general, if the function return type is `T*`,
 // you have to cleanup the result by calling `maninfold_delete_*`.
 // If the function return type is `const T*`,
-// the result is borrowed from input arguments. 
+// the result is borrowed from input arguments.
 
 // Polygons
 
@@ -289,8 +289,10 @@ ManifoldCrossSection* manifold_cross_section_even_odd_simple_polygon(
     const ManifoldSimplePolygon* p);
 ManifoldCrossSection* manifold_cross_section_even_odd_polygons(
     const ManifoldPolygons* p);
-ManifoldCrossSection* manifold_cross_section_non_zero_simple_polygon(const ManifoldSimplePolygon* p);
-ManifoldCrossSection* manifold_cross_section_non_zero_polygons(const ManifoldPolygons* p);
+ManifoldCrossSection* manifold_cross_section_non_zero_simple_polygon(
+    const ManifoldSimplePolygon* p);
+ManifoldCrossSection* manifold_cross_section_non_zero_polygons(
+    const ManifoldPolygons* p);
 ManifoldCrossSection* manifold_cross_section_square(double x, double y,
                                                     int center);
 ManifoldCrossSection* manifold_cross_section_circle(double radius,

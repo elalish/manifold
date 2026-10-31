@@ -609,12 +609,13 @@ TEST(CBIND, run_flag_accessors) {
 TEST(CBIND, cross_section_non_zero) {
   // Doubled clockwise input distinguishes NonZero from Positive and EvenOdd.
   ManifoldVec2 pts[] = {{0, 0}, {0, 2}, {2, 2}, {2, 0}};
-  ManifoldSimplePolygon* ring =
-      manifold_simple_polygon(pts, 4);
+  ManifoldSimplePolygon* ring = manifold_simple_polygon(pts, 4);
   ManifoldSimplePolygon* rings[] = {ring, ring};
   ManifoldPolygons* polygons = manifold_polygons(rings, 2);
-  ManifoldCrossSection* single = manifold_cross_section_non_zero_simple_polygon(ring);
-  ManifoldCrossSection* multiple = manifold_cross_section_non_zero_polygons(polygons);
+  ManifoldCrossSection* single =
+      manifold_cross_section_non_zero_simple_polygon(ring);
+  ManifoldCrossSection* multiple =
+      manifold_cross_section_non_zero_polygons(polygons);
   EXPECT_NEAR(manifold_cross_section_area(single), 4., 1e-9);
   EXPECT_NEAR(manifold_cross_section_area(multiple), 4., 1e-9);
   manifold_delete_cross_section(single);
