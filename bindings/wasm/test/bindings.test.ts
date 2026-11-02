@@ -63,6 +63,15 @@ suite('CrossSection Bindings', () => {
     expect(cs.numContour()).toEqual(1);
     expect(cs.area()).to.be.greaterThan(0);
   });
+
+  test('extrude scales X and Y by a single scaleTop (issue #1780)', () => {
+    const square = manifoldModule.CrossSection.square(10);
+    expect(square.extrude(10, 0, 0, 1).volume()).toBeCloseTo(1000);
+    expect(square.extrude(10, 0, 0, 0.5).volume())
+        .toBeCloseTo(square.extrude(10, 0, 0, [0.5, 0.5]).volume());
+    expect(manifoldModule.Manifold.extrude(square, 10, 0, 0, 1).volume())
+        .toBeCloseTo(1000);
+  });
 });
 
 suite('Manifold Bindings', () => {

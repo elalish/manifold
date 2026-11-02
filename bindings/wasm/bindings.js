@@ -166,6 +166,10 @@ Module.setup = function() {
   Module.CrossSection.prototype.extrude = function(
       height, nDivisions = 0, twistDegrees = 0.0, scaleTop = [1.0, 1.0],
       center = false) {
+    // if only one factor provided, scale both x and y with it
+    if (typeof scaleTop == 'number') {
+      scaleTop = [scaleTop, scaleTop];
+    }
     scaleTop = vararg2vec2([scaleTop]);
     const polygonsVec = this._ToPolygons();
     const man = Module._Extrude(
