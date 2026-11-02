@@ -113,9 +113,9 @@ export declare class CrossSection {
      * avoid interpolation artifacts. Default is none.
      * @param twistDegrees Amount to twist the top crossSection relative to the
      * bottom, interpolated linearly for the divisions in between.
-     * @param scaleTop Amount to scale the top (independently in X and Y). If the
-     * scale is {0, 0}, a pure cone is formed with only a single vertex at the
-     * top. Default {1, 1}.
+     * @param scaleTop Amount to scale the top (independently in X and Y). A
+     * single number scales X and Y equally. If the scale is {0, 0}, a pure cone
+     * is formed with only a single vertex at the top. Default {1, 1}.
      * @param center If true, the extrusion is centered on the z-axis through the
      *     origin
      * as opposed to resting on the XY plane as is default.
@@ -826,9 +826,9 @@ export declare class Manifold {
      * avoid interpolation artifacts. Default is none.
      * @param twistDegrees Amount to twist the top crossSection relative to the
      * bottom, interpolated linearly for the divisions in between.
-     * @param scaleTop Amount to scale the top (independently in X and Y). If the
-     * scale is {0, 0}, a pure cone is formed with only a single vertex at the
-     * top. Default {1, 1}.
+     * @param scaleTop Amount to scale the top (independently in X and Y). A
+     * single number scales X and Y equally. If the scale is {0, 0}, a pure cone
+     * is formed with only a single vertex at the top. Default {1, 1}.
      * @param center If true, the extrusion is centered on the z-axis through the
      *     origin
      * as opposed to resting on the XY plane as is default.
