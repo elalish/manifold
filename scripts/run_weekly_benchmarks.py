@@ -17,6 +17,8 @@ DEFAULT_GTEST_FILTER = ":".join(
         "Manifold.DeepChainDoesNotOverflowNumLeaves",
         "Boolean.BatchBoolean",
         "CrossSection.BatchBoolean",
+        "CrossSectionComplex.MergeVertsSharedColumns",
+        "CrossSectionComplex.MergeVertsGrid",
         "CrossSectionComplex.OutEdgesToPolygonsLongLoop2048",
         "CrossSectionComplex.OutEdgesToPolygonsLongLoop8192",
         "CrossSectionComplex.OutEdgesToPolygonsManySmallContours",
