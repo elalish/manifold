@@ -14,6 +14,7 @@
 
 import {expect, suite, test} from 'vitest';
 
+import {bundleCode} from './bundler.ts';
 import * as worker from './worker.ts';
 
 suite('Bundler', () => {
@@ -41,5 +42,14 @@ suite('Bundler', () => {
         `};` +
         `export default check;`;
     await expect(worker.evaluate(script)).to.resolves.not.toBeNull();
+  });
+
+  test('Bundles files whose path has backslashes (issue #1915)', async () => {
+    // `\u`, `\x` and `\2` used to end up as escape sequences in the
+    // generated `import.meta.url` string, which made the bundle invalid.
+    const path = 'C:\\units\\xparts\\2026\\model.js';
+    const files = {[path]: 'export const url = import.meta.url;'};
+    const code = `import {url} from ${JSON.stringify(path)}; export {url};`;
+    await expect(bundleCode(code, {files})).resolves.toBeTypeOf('string');
   });
 });
