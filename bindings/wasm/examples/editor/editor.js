@@ -1271,7 +1271,9 @@ function createWorker() {
       output.threeMFURL = null;
       threemfButton.disabled = true;
 
-      // Start all over again.
+      // Start all over again.  Stop the old worker first, or it stays alive
+      // with its wasm memory after every error.
+      manifoldWorker.terminate();
       createWorker();
 
     } else if (message?.type === 'log') {
