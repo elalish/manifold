@@ -33,6 +33,39 @@ namespace manifold {
 
 namespace {
 
+// Items grouped by bucket in flat storage, keeping the order they were emitted
+// in within each bucket. The constructor calls forEach(emit) twice, first to
+// count and then to fill; forEach must call emit(bucket, item) for every entry
+// the same way both times.
+class BucketIndex {
+ public:
+  struct Range {
+    const int* first;
+    const int* last;
+    const int* begin() const { return first; }
+    const int* end() const { return last; }
+    bool empty() const { return first == last; }
+  };
+
+  BucketIndex() = default;
+  template <typename F>
+  BucketIndex(int numBuckets, F&& forEach) : start_(numBuckets + 1, 0) {
+    forEach([&](int bucket, int) { ++start_[bucket + 1]; });
+    for (int b = 0; b < numBuckets; ++b) start_[b + 1] += start_[b];
+    items_.resize(start_[numBuckets]);
+    std::vector<int> next(start_.begin(), start_.end() - 1);
+    forEach([&](int bucket, int item) { items_[next[bucket]++] = item; });
+  }
+
+  Range Bucket(int b) const {
+    return {items_.data() + start_[b], items_.data() + start_[b + 1]};
+  }
+
+ private:
+  std::vector<int> start_;
+  std::vector<int> items_;
+};
+
 bool AllFinite(const Polygons& polys) {
   for (const auto& loop : polys) {
     for (const vec2& v : loop) {
@@ -78,19 +111,20 @@ bool CcwTurnLess(vec2 ref, vec2 a, int edgeA, vec2 b, int edgeB) {
   return edgeA < edgeB;
 }
 
-void PushLoopIfNondegenerate(const std::vector<vec2>& verts,
-                             const std::vector<int>& loopVerts,
-                             Polygons& polys) {
-  if (loopVerts.size() >= 3) {
+void PushLoopIfNondegenerate(const std::vector<vec2>& verts, const int* begin,
+                             const int* end, Polygons& polys) {
+  if (end - begin >= 3) {
     SimplePolygon loop;
-    loop.reserve(loopVerts.size());
-    for (int v : loopVerts) loop.push_back(verts[v]);
+    loop.reserve(end - begin);
+    for (const int* v = begin; v != end; ++v) loop.push_back(verts[*v]);
     polys.push_back(std::move(loop));
   }
 }
 
-void PushSimpleLoops(const std::vector<vec2>& verts, std::vector<int> loopVerts,
-                     Polygons& polys, std::vector<int>& positions) {
+// loopVerts is a scratch buffer, consumed.
+void PushSimpleLoops(const std::vector<vec2>& verts,
+                     std::vector<int>& loopVerts, Polygons& polys,
+                     std::vector<int>& positions) {
   // positions is a shared scratch buffer mapping vertex IDs to active-path
   // indices, or -1 if absent.
   // Each input occurrence enters and leaves the active path at most once.
@@ -103,16 +137,16 @@ void PushSimpleLoops(const std::vector<vec2>& verts, std::vector<int> loopVerts,
       loopVerts[size++] = vertex;
       continue;
     }
-    std::vector<int> simple(loopVerts.begin() + previous,
-                            loopVerts.begin() + size);
-    PushLoopIfNondegenerate(verts, simple, polys);
+    PushLoopIfNondegenerate(verts, loopVerts.data() + previous,
+                            loopVerts.data() + size, polys);
     for (size_t i = previous + 1; i < size; ++i) positions[loopVerts[i]] = -1;
     size = previous + 1;
   }
   loopVerts.resize(size);
   // Reset remaining entries to empty the shared table for the next contour.
   for (int vertex : loopVerts) positions[vertex] = -1;
-  PushLoopIfNondegenerate(verts, loopVerts, polys);
+  PushLoopIfNondegenerate(verts, loopVerts.data(),
+                          loopVerts.data() + loopVerts.size(), polys);
 }
 
 void AppendInput(const Polygons& polys, int mult, std::vector<vec2>& verts,
@@ -165,17 +199,20 @@ std::pair<std::vector<vec2>, std::vector<EdgeM>> PolygonsToInput(
 Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
                             const std::vector<OutEdge>& edges) {
   const int nE = static_cast<int>(edges.size());
-  // Per-vertex outgoing edges; the next-pointer loop scans each list with
-  // deterministic cross/dot comparisons.
-  std::vector<std::vector<int>> outgoing(verts.size());
-  for (int i = 0; i < nE; ++i) outgoing[edges[i].v0].push_back(i);
+  const int nV = static_cast<int>(verts.size());
+  // Per-vertex outgoing edges in increasing edge index; the next-pointer loop
+  // scans each list with deterministic cross/dot comparisons.
+  const BucketIndex outgoing(nV, [&](auto&& emit) {
+    for (int i = 0; i < nE; ++i) emit(edges[i].v0, i);
+  });
   std::vector<bool> visited(nE, false);
   std::vector<int> positions(verts.size(), -1);
   Polygons polys;
+  std::vector<int> loopVerts;
   for (int start = 0; start < nE; ++start) {
     if (visited[start]) continue;
     const int startV = edges[start].v0;
-    std::vector<int> loopVerts;
+    loopVerts.clear();
     int cur = start;
     bool closed = false;
     while (cur >= 0 && !visited[cur]) {
@@ -189,8 +226,7 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
         closed = true;
         break;
       }
-      if (destV < 0 || destV >= static_cast<int>(outgoing.size()) ||
-          outgoing[destV].empty()) {
+      if (destV < 0 || destV >= nV || outgoing.Bucket(destV).empty()) {
         cur = -1;
         break;
       }
@@ -198,10 +234,9 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
       // edge, the next edge along the boundary loop.
       const vec2 vp = verts[destV];
       const vec2 ref = verts[edges[cur].v0] - vp;
-      const auto& lst = outgoing[destV];
       int next = -1;
       vec2 bestDir(0, 0);
-      for (int e : lst) {
+      for (const int e : outgoing.Bucket(destV)) {
         if (visited[e]) continue;
         const vec2 d = verts[edges[e].v1] - vp;
         if (next < 0 || CcwTurnLess(ref, d, e, bestDir, next)) {
@@ -217,7 +252,7 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
       continue;
     }
     if (loopVerts.size() >= 3) {
-      PushSimpleLoops(verts, std::move(loopVerts), polys, positions);
+      PushSimpleLoops(verts, loopVerts, polys, positions);
     }
   }
   return polys;
@@ -253,82 +288,11 @@ Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op,
   return ApplyFillRule(a, b, bSign, rule, eps);
 }
 
-// ===== BVH =====
-// BVH helpers for eps-padded 2D box queries.
-
-namespace {
-
-constexpr int kRadixTreeBuildGrainSize = 10000;
-
-}  // namespace
-
-Box2 BoxOf2DEdge(vec2 p0, vec2 p1, double eps) {
-  const vec2 pad(eps, eps);
-  Box2 b(p0, p1);
-  return Box2(b.min - pad, b.max + pad);
-}
-
-uint32_t MortonCode2(vec2 position, Box2 bBox) {
-  const vec2 size = bBox.max - bBox.min;
-  const double xNorm = size.x > 0 ? (position.x - bBox.min.x) / size.x : 0.5;
-  const double yNorm = size.y > 0 ? (position.y - bBox.min.y) / size.y : 0.5;
-  const double xClamped = std::min(1023.0, std::max(0.0, 1024.0 * xNorm));
-  const double yClamped = std::min(1023.0, std::max(0.0, 1024.0 * yNorm));
-  const uint32_t x =
-      collider_internal::SpreadBits3(static_cast<uint32_t>(xClamped));
-  const uint32_t y =
-      collider_internal::SpreadBits3(static_cast<uint32_t>(yClamped));
-  return x * 2 + y;
-}
-
-BVH BVHBuildFromBoxes(const std::vector<Box2>& boxes) {
-  const int n = static_cast<int>(boxes.size());
-  BVH out;
-  out.leafToOrig.resize(n);
-  for (int i = 0; i < n; ++i) out.leafToOrig[i] = i;
-  if (n == 0) return out;
-  Box2 bbox = boxes[0];
-  for (const auto& b : boxes) bbox = bbox.Union(b);
-  std::vector<uint32_t> morton(n);
-  for (int i = 0; i < n; ++i) morton[i] = MortonCode2(boxes[i].Center(), bbox);
-  manifold::stable_sort(out.leafToOrig.begin(), out.leafToOrig.end(),
-                        [&](int a, int b) { return morton[a] < morton[b]; });
-  std::vector<uint32_t> sortedMorton(n);
-  for (int i = 0; i < n; ++i) {
-    sortedMorton[i] = morton[out.leafToOrig[i]];
-  }
-  const int numNodes = 2 * n - 1;
-  out.nodeBBox.resize(numNodes);
-  std::vector<int> nodeParent(numNodes, -1);
-  out.internalChildren.resize(n - 1, std::make_pair(-1, -1));
-  // Radix-tree node creation does little work per index, so use a coarser
-  // grain than BVH query traversal/narrow predicates to avoid scheduling
-  // overhead dominating construction.
-  manifold::for_each_n(
-      autoPolicy(n - 1, kRadixTreeBuildGrainSize), countAt(0), n - 1,
-      collider_internal::CreateRadixTree(
-          {VecView<int>(nodeParent.data(), nodeParent.size()),
-           VecView<std::pair<int, int>>(out.internalChildren.data(),
-                                        out.internalChildren.size()),
-           VecView<const uint32_t>(sortedMorton)}));
-  for (int i = 0; i < n; ++i)
-    out.nodeBBox[collider_internal::Leaf2Node(i)] = boxes[out.leafToOrig[i]];
-  auto buildNode = [&](auto&& self, int node) -> Box2 {
-    if (collider_internal::IsLeaf(node)) return out.nodeBBox[node];
-    const auto [left, right] =
-        out.internalChildren[collider_internal::Node2Internal(node)];
-    out.nodeBBox[node] = self(self, left).Union(self(self, right));
-    return out.nodeBBox[node];
-  };
-  if (n > 1) buildNode(buildNode, collider_internal::kRoot);
-  return out;
-}
-
 // ===== Vertex merge =====
 // Vertex-merge and edge-collapse passes. MergeVerts buckets verts within eps
 // of each other onto an existing representative vertex; RemapAndCollapse drops
 // any input edge whose endpoints merged to the same vert. Both run before the
-// edge-pair broad phase.
+// incidence lists are built.
 
 VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
   const int n = static_cast<int>(in.size());
@@ -512,16 +476,15 @@ std::vector<EdgeM> RemapAndCollapse(const std::vector<EdgeM>& edges,
   return out;
 }
 
-// ===== Edge-vertex lists =====
-// Edge-vertex list construction: for each input edge, the sorted-by-parameter
-// list of vertices that lie within eps of the edge interior. Candidates come
-// from the edge-pair broad phase below.
+// ===== Incidence lists =====
+// For each edge, the sorted-by-parameter list of vertices lying within eps of
+// its interior. Each vertex queries a uniform grid of eps-padded edge boxes.
 
 namespace {
 
-// Pair-count threshold above which the combined helper uses TBB. Smaller
+// Vertex-count threshold above which the incidence queries use TBB. Smaller
 // inputs stay serial to avoid setup overhead.
-constexpr size_t kFusedNarrowParallelMin = 1024;
+constexpr int kIncidenceParallelMin = 1024;
 
 struct EdgeGeom {
   vec2 a, ab;
@@ -564,22 +527,6 @@ void RecordEdgeVertHit(const std::vector<EdgeM>& edges,
   hits.push_back({e, dotAB / g.abLen2, v});
 }
 
-void ProcessEdgePair(const std::vector<EdgeM>& edges,
-                     const std::vector<vec2>& verts,
-                     const std::vector<EdgeGeom>& edgeG, double eps,
-                     const std::pair<int, int>& pr,
-                     std::vector<EdgeVertHit>& hits) {
-  const int i = pr.first;
-  const int j = pr.second;
-  const auto& ei = edges[i];
-  const auto& ej = edges[j];
-  const double eps2 = eps * eps;
-  RecordEdgeVertHit(edges, verts, edgeG, eps2, ei.v0, j, hits);
-  RecordEdgeVertHit(edges, verts, edgeG, eps2, ei.v1, j, hits);
-  RecordEdgeVertHit(edges, verts, edgeG, eps2, ej.v0, i, hits);
-  RecordEdgeVertHit(edges, verts, edgeG, eps2, ej.v1, i, hits);
-}
-
 void MaterializeEdgeVertLists(int nE, std::vector<EdgeVertHit>& flatHits,
                               std::vector<std::vector<int>>& lists) {
   lists.assign(nE, {});
@@ -605,88 +552,8 @@ void MaterializeEdgeVertLists(int nE, std::vector<EdgeVertHit>& flatHits,
   }
 }
 
-// Narrow phase: test each candidate pair's endpoints against the other edge.
-std::vector<std::vector<int>> IncidenceListsFromPairs(
-    const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
-    const std::vector<std::pair<int, int>>& pairs) {
-  const int nE = static_cast<int>(edges.size());
-  std::vector<std::vector<int>> lists;
-
-  // Per-calling-thread scratch; workers read these only through const refs.
-  thread_local static std::vector<EdgeGeom> edgeG;
-  BuildEdgeGeometry(edges, verts, edgeG);
-  const auto& edgeGRef = edgeG;
-
-  std::vector<EdgeVertHit> flatHits;
-
-#if (MANIFOLD_PAR == 1)
-  if (pairs.size() >= kFusedNarrowParallelMin) {
-    tbb::combinable<std::vector<EdgeVertHit>> tls;
-    manifold::for_each_n(autoPolicy(pairs.size(), kFineParallelGrainSize),
-                         countAt(size_t{0}), pairs.size(), [&](size_t idx) {
-                           ProcessEdgePair(edges, verts, edgeGRef, eps,
-                                           pairs[idx], tls.local());
-                         });
-    tls.combine_each([&](const std::vector<EdgeVertHit>& l) {
-      flatHits.insert(flatHits.end(), l.begin(), l.end());
-    });
-  } else
-#endif
-  {
-    for (const auto& pr : pairs) {
-      ProcessEdgePair(edges, verts, edgeGRef, eps, pr, flatHits);
-    }
-  }
-  MaterializeEdgeVertLists(nE, flatHits, lists);
-  return lists;
-}
-
-// ===== Broad phase =====
-// Edge-pair broad phase: collect the candidate edge pairs whose eps-padded
-// boxes overlap. The pairs drive the incidence narrow phase (vertex-on-edge
-// split lists); the sweep does its own crossing discovery.
-
-// Encode (first, second) as uint64 and run manifold::stable_sort, which
-// dispatches to the LSB-radix specialization for integral types - much
-// faster than the comparator path for pair<int,int>. Casts through
-// uint32_t preserve non-negative edge indices and put `first` in the
-// high bits so int64 order matches lexicographic pair order.
-void RadixSortPairs(std::vector<std::pair<int, int>>& pairs) {
-  const size_t n = pairs.size();
-  if (n < 2) return;
-  thread_local static std::vector<uint64_t> encoded;
-  encoded.resize(n);
-  for (size_t i = 0; i < n; ++i) {
-    const auto& pr = pairs[i];
-    encoded[i] =
-        (static_cast<uint64_t>(static_cast<uint32_t>(pr.first)) << 32) |
-        static_cast<uint32_t>(pr.second);
-  }
-  manifold::stable_sort(encoded.begin(), encoded.end());
-  for (size_t i = 0; i < n; ++i) {
-    pairs[i] = {static_cast<int>(encoded[i] >> 32),
-                static_cast<int>(encoded[i] & 0xFFFFFFFFu)};
-  }
-}
-
-void SortSmallInts(std::vector<int>& values) {
-  if (values.size() < 32) {
-    for (size_t i = 1; i < values.size(); ++i) {
-      const int x = values[i];
-      size_t j = i;
-      while (j > 0 && x < values[j - 1]) {
-        values[j] = values[j - 1];
-        --j;
-      }
-      values[j] = x;
-    }
-  } else {
-    manifold::stable_sort(values.begin(), values.end());
-  }
-}
-
-// Drop shared-endpoint pairs when both non-shared endpoints are more than eps
-// from the opposite edge line; then no near-line sliver split is possible.
+// Edge pairs sharing an endpoint whose non-shared endpoints are both more than
+// eps from the other edge's line; no near-line sliver split is possible.
 bool SharedEndpointSafelySkippable(const EdgeM& a, const EdgeM& b,
                                    const std::vector<vec2>& verts, double eps) {
   int vS, wA, wB;
@@ -725,102 +592,137 @@ bool SharedEndpointSafelySkippable(const EdgeM& a, const EdgeM& b,
   return cross2 > eps2 * std::max(lenA2, lenB2);
 }
 
-// Broad phase: find overlapping edge AABBs, drop safe shared-endpoint pairs,
-// and return lex-sorted pairs for deterministic insertion.
-#if (MANIFOLD_PAR == 1)
-struct PairsRecorder {
-  using Local = std::vector<std::pair<int, int>>;
-  const std::vector<int>& leafToOrig;
-  const std::vector<EdgeM>& edges;
-  const std::vector<vec2>& verts;
-  double eps;
-  tbb::combinable<Local> tls;
-  inline void record(int queryIdx, int leafIdx, Local& local) const {
-    const int li = leafToOrig[leafIdx];
-    if (queryIdx >= li) return;
-    if (SharedEndpointSafelySkippable(edges[queryIdx], edges[li], verts, eps))
-      return;
-    local.emplace_back(queryIdx, li);
-  }
-  Local& local() { return tls.local(); }
-};
-#endif
-
-std::vector<std::pair<int, int>> CollectIntersectionPairs(
-    const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
-    const std::vector<Box2>& edgeBoxes) {
-  const int nE = static_cast<int>(edges.size());
-  std::vector<std::pair<int, int>> pairs;
-  if (nE < kEdgePairBvhThreshold) {
-    thread_local static std::vector<int> order;
-    thread_local static std::vector<std::vector<int>> byFirst;
-    order.resize(nE);
-    for (int i = 0; i < nE; ++i) order[i] = i;
-    manifold::stable_sort(order.begin(), order.end(), [&](int a, int b) {
-      if (edgeBoxes[a].min.x != edgeBoxes[b].min.x)
-        return edgeBoxes[a].min.x < edgeBoxes[b].min.x;
-      return a < b;
-    });
-    if (static_cast<int>(byFirst.size()) < nE) byFirst.resize(nE);
-    for (int i = 0; i < nE; ++i) byFirst[i].clear();
-    int numPairs = 0;
-    for (int oi = 0; oi < nE; ++oi) {
-      const int i = order[oi];
-      const Box2& bi = edgeBoxes[i];
-      for (int oj = oi + 1; oj < nE; ++oj) {
-        const int j = order[oj];
-        const Box2& bj = edgeBoxes[j];
-        if (bj.min.x > bi.max.x) break;
-        if (bi.min.y <= bj.max.y && bi.max.y >= bj.min.y) {
-          if (SharedEndpointSafelySkippable(edges[i], edges[j], verts, eps))
-            continue;
-          const int first = std::min(i, j);
-          const int second = std::max(i, j);
-          byFirst[first].push_back(second);
-          ++numPairs;
-        }
-      }
-    }
-    pairs.reserve(numPairs);
-    for (int first = 0; first < nE; ++first) {
-      auto& seconds = byFirst[first];
-      if (seconds.empty()) continue;
-      SortSmallInts(seconds);
-      for (int second : seconds) pairs.emplace_back(first, second);
-    }
-    return pairs;
-  }
-  const BVH bvh = BVHBuildFromBoxes(edgeBoxes);
-#if (MANIFOLD_PAR == 1)
-  PairsRecorder rec{bvh.leafToOrig, edges, verts, eps, {}};
-  auto qf = [&](int i) { return edgeBoxes[i]; };
-  BVHCollisions(bvh, rec, qf, nE, /*parallel=*/true);
-  rec.tls.combine_each([&](const auto& localPairs) {
-    pairs.insert(pairs.end(), localPairs.begin(), localPairs.end());
-  });
-  RadixSortPairs(pairs);
-#else
-  CollidePairs(bvh, edgeBoxes, [&](int qi, int li) {
-    if (qi >= li) return;
-    if (SharedEndpointSafelySkippable(edges[qi], edges[li], verts, eps)) return;
-    pairs.emplace_back(qi, li);
-  });
-  RadixSortPairs(pairs);
-#endif
-  return pairs;
+Box2 BoxOf2DEdge(vec2 p0, vec2 p1, double eps) {
+  const vec2 pad(eps, eps);
+  Box2 b(p0, p1);
+  return Box2(b.min - pad, b.max + pad);
 }
+
+// Uniform grid over a set of boxes, sized to about one box per cell. Each box
+// is binned into every cell it touches.
+class BoxGrid {
+ public:
+  explicit BoxGrid(const std::vector<Box2>& boxes) : boxes_(boxes) {
+    const int n = static_cast<int>(boxes.size());
+    if (n == 0) return;
+    for (const auto& b : boxes) bounds_ = bounds_.Union(b);
+    const vec2 size = bounds_.max - bounds_.min;
+    // The second term keeps a long, thin layout from getting more than O(n)
+    // cells.
+    const double cell = std::max(std::sqrt(size.x * size.y / n),
+                                 std::max(size.x, size.y) / (2.0 * n + 1));
+    nx_ = std::max(1, std::min(n, static_cast<int>(size.x / cell) + 1));
+    ny_ = std::max(1, std::min(n, static_cast<int>(size.y / cell) + 1));
+    scale_ = vec2(nx_ / std::max(size.x, kTiny), ny_ / std::max(size.y, kTiny));
+    cells_ = BucketIndex(nx_ * ny_, [&](auto&& emit) {
+      for (int i = 0; i < n; ++i) {
+        const Box2& b = boxes[i];
+        for (int y = CellY(b.min.y); y <= CellY(b.max.y); ++y)
+          for (int x = CellX(b.min.x); x <= CellX(b.max.x); ++x)
+            emit(y * nx_ + x, i);
+      }
+    });
+  }
+
+  // Calls f(i) once for each box i overlapping `query`. A box spanning several
+  // of the query's cells is reported only from the cell holding the lower-left
+  // corner of the two boxes' intersection.
+  template <typename F>
+  void ForEachOverlap(const Box2& query, F&& f) const {
+    if (boxes_.empty() || !query.DoesOverlap(bounds_)) return;
+    for (int y = CellY(query.min.y); y <= CellY(query.max.y); ++y)
+      for (int x = CellX(query.min.x); x <= CellX(query.max.x); ++x)
+        for (const int i : cells_.Bucket(y * nx_ + x)) {
+          const Box2& b = boxes_[i];
+          if (query.DoesOverlap(b) &&
+              CellX(std::max(query.min.x, b.min.x)) == x &&
+              CellY(std::max(query.min.y, b.min.y)) == y)
+            f(i);
+        }
+  }
+
+ private:
+  static constexpr double kTiny = 1e-300;
+  int CellX(double x) const {
+    return std::clamp(static_cast<int>((x - bounds_.min.x) * scale_.x), 0,
+                      nx_ - 1);
+  }
+  int CellY(double y) const {
+    return std::clamp(static_cast<int>((y - bounds_.min.y) * scale_.y), 0,
+                      ny_ - 1);
+  }
+
+  const std::vector<Box2>& boxes_;
+  Box2 bounds_;
+  int nx_ = 1, ny_ = 1;
+  vec2 scale_;
+  BucketIndex cells_;
+};
 
 }  // namespace
 
+// Vertex v goes on edge e's list iff RecordEdgeVertHit accepts (v, e) and some
+// other edge i at v makes a qualifying pair with e: their padded boxes overlap
+// and SharedEndpointSafelySkippable does not exempt them. For a hit, the pair
+// condition can fail only through rounding; applying it settles those
+// borderline cases the same way as testing the endpoints of every overlapping
+// edge pair. A hit puts v within about eps of e, so a query box around v padded
+// by eps plus a rounding margin finds every candidate e.
 std::vector<std::vector<int>> BuildIncidenceLists(
     const std::vector<EdgeM>& edges, const std::vector<vec2>& verts,
     double eps) {
-  std::vector<Box2> edgeBoxes(edges.size());
-  for (size_t e = 0; e < edges.size(); ++e)
+  const int nE = static_cast<int>(edges.size());
+  const int nV = static_cast<int>(verts.size());
+  std::vector<Box2> edgeBoxes(nE);
+  for (int e = 0; e < nE; ++e)
     edgeBoxes[e] = BoxOf2DEdge(verts[edges[e].v0], verts[edges[e].v1], eps);
-  return IncidenceListsFromPairs(
-      edges, verts, eps,
-      CollectIntersectionPairs(edges, verts, eps, edgeBoxes));
+  const BoxGrid grid(edgeBoxes);
+  const BucketIndex incident(nV, [&](auto&& emit) {
+    for (int e = 0; e < nE; ++e) {
+      emit(edges[e].v0, e);
+      emit(edges[e].v1, e);
+    }
+  });
+  std::vector<EdgeGeom> edgeG;
+  BuildEdgeGeometry(edges, verts, edgeG);
+  const double eps2 = eps * eps;
+
+  auto queryVert = [&](int v, std::vector<EdgeVertHit>& hits) {
+    if (incident.Bucket(v).empty()) return;
+    const double pad =
+        eps + 1e-9 * (std::abs(verts[v].x) + std::abs(verts[v].y) + eps);
+    const Box2 query(verts[v] - vec2(pad), verts[v] + vec2(pad));
+    grid.ForEachOverlap(query, [&](int e) {
+      const size_t before = hits.size();
+      RecordEdgeVertHit(edges, verts, edgeG, eps2, v, e, hits);
+      if (hits.size() == before) return;
+      for (const int i : incident.Bucket(v)) {
+        if (i != e && edgeBoxes[i].DoesOverlap(edgeBoxes[e]) &&
+            !SharedEndpointSafelySkippable(edges[i], edges[e], verts, eps))
+          return;
+      }
+      hits.pop_back();
+    });
+  };
+
+  std::vector<EdgeVertHit> hits;
+#if (MANIFOLD_PAR == 1)
+  if (nV >= kIncidenceParallelMin) {
+    tbb::combinable<std::vector<EdgeVertHit>> tls;
+    manifold::for_each_n(autoPolicy(nV, kFineParallelGrainSize), countAt(0), nV,
+                         [&](int v) { queryVert(v, tls.local()); });
+    tls.combine_each([&](const std::vector<EdgeVertHit>& l) {
+      hits.insert(hits.end(), l.begin(), l.end());
+    });
+  } else
+#endif
+  {
+    for (int v = 0; v < nV; ++v) queryVert(v, hits);
+  }
+  // Sorting makes the result independent of the order hits were found in.
+  std::vector<std::vector<int>> lists;
+  MaterializeEdgeVertLists(nE, hits, lists);
+  return lists;
 }
 
 // ===== Driver =====
