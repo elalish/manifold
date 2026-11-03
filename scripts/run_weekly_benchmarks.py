@@ -19,6 +19,7 @@ DEFAULT_GTEST_FILTER = ":".join(
         "CrossSection.BatchBoolean",
         "CrossSectionComplex.MergeVertsSharedColumns",
         "CrossSectionComplex.MergeVertsGrid",
+        "CrossSectionComplex.IncidenceBrickWall",
         "CrossSectionComplex.OutEdgesToPolygonsLongLoop2048",
         "CrossSectionComplex.OutEdgesToPolygonsLongLoop8192",
         "CrossSectionComplex.OutEdgesToPolygonsManySmallContours",

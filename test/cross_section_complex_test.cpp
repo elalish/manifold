@@ -569,6 +569,50 @@ TEST(CrossSectionComplex, MergeVertsGrid) {
   ExpectPairsMerge(verts, eps, 8);
 }
 
+TEST(CrossSectionComplex, IncidenceListsAlongLongEdge) {
+  // Triangle apexes sit on one long edge, just above or below it within eps,
+  // or clearly off it; only the first three kinds belong on its list, in
+  // order along the edge.
+  const double eps = 1e-6;
+  std::vector<vec2> verts = {{0, 0}, {1000, 0}, {1000, -1}, {0, -1}};
+  std::vector<EdgeM> edges = {{0, 1, 1}, {1, 2, 1}, {2, 3, 1}, {3, 0, 1}};
+  std::vector<int> expected;
+  const double offsets[] = {0.0, 0.5 * eps, -0.5 * eps, 3 * eps};
+  for (int i = 0; i < 396; ++i) {
+    const double x = 2.5 * i + 5;
+    const int apex = static_cast<int>(verts.size());
+    verts.push_back({x, offsets[i % 4]});
+    verts.push_back({x + 1, 1});
+    verts.push_back({x - 1, 1});
+    edges.push_back({apex, apex + 1, 1});
+    edges.push_back({apex + 1, apex + 2, 1});
+    edges.push_back({apex + 2, apex, 1});
+    if (i % 4 != 3) expected.push_back(apex);
+  }
+  const auto lists = BuildIncidenceLists(edges, verts, eps);
+  EXPECT_EQ(lists[0], expected);
+  for (size_t e = 1; e < lists.size(); ++e) EXPECT_TRUE(lists[e].empty());
+}
+
+TEST(CrossSectionComplex, IncidenceBrickWall) {
+  // Timed: staggered rows of bricks, where every brick corner lands on an
+  // edge of a brick in the next row. The gaps between bricks become holes,
+  // except in the first and last rows.
+  constexpr int kRows = 64, kCols = 48;
+  Polygons bricks;
+  for (int r = 0; r < kRows; ++r) {
+    for (int c = 0; c < kCols; ++c) {
+      const double x = 3.0 * c + (r % 2 ? 1.5 : 0.0), y = r;
+      bricks.push_back({{x, y}, {x + 2, y}, {x + 2, y + 1}, {x, y + 1}});
+    }
+  }
+  for (int i = 0; i < 16; ++i) {
+    const CrossSection wall(bricks);
+    ASSERT_EQ(wall.NumContour(), 1 + (kRows - 2) * (kCols - 1));
+    ASSERT_NEAR(wall.Area(), 2.0 * kRows * kCols, 1e-9);
+  }
+}
+
 TEST(CrossSectionComplex, ValidatorRejectsRetainedVertsWithinEps) {
   const std::vector<vec2> verts = {{0.0, 0.0}, {10.0, 0.0}, {0.0, 10.0},
                                    {0.5, 0.5}, {20.0, 0.0}, {20.0, 10.0}};

@@ -150,18 +150,12 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps);
 std::vector<EdgeM> RemapAndCollapse(const std::vector<EdgeM>& edges,
                                     const std::vector<int>& inputVert2Merged);
 
-// Incidence narrow phase over broad-phase edge pairs: for each edge, the sorted
-// list of other-edge endpoints lying within eps of its interior. Splitting each
-// edge at these vertices yields the two-vertex sub-edges the sweep operates on.
+// For each edge, the sorted list of other edges' endpoints lying within eps of
+// its interior. Splitting each edge at these vertices yields the two-vertex
+// sub-edges the sweep operates on.
 std::vector<std::vector<int>> BuildIncidenceLists(
-    const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
-    const std::vector<std::pair<int, int>>& pairs);
-
-void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
-                              const std::vector<vec2>& verts, double eps,
-                              const std::vector<Box2>& edgeBoxes,
-                              const BVH& bvh,
-                              std::vector<std::pair<int, int>>& pairs);
+    const std::vector<EdgeM>& edges, const std::vector<vec2>& verts,
+    double eps);
 
 struct Trace;
 

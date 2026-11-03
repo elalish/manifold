@@ -514,8 +514,8 @@ std::vector<EdgeM> RemapAndCollapse(const std::vector<EdgeM>& edges,
 
 // ===== Edge-vertex lists =====
 // Edge-vertex list construction: for each input edge, the sorted-by-parameter
-// list of vertices that lie within eps of the edge interior. Candidates are
-// derived from the same edge-pair broad phase used for intersections.
+// list of vertices that lie within eps of the edge interior. Candidates come
+// from the edge-pair broad phase below.
 
 namespace {
 
@@ -605,9 +605,8 @@ void MaterializeEdgeVertLists(int nE, std::vector<EdgeVertHit>& flatHits,
   }
 }
 
-}  // namespace
-
-std::vector<std::vector<int>> BuildIncidenceLists(
+// Narrow phase: test each candidate pair's endpoints against the other edge.
+std::vector<std::vector<int>> IncidenceListsFromPairs(
     const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
     const std::vector<std::pair<int, int>>& pairs) {
   const int nE = static_cast<int>(edges.size());
@@ -646,8 +645,6 @@ std::vector<std::vector<int>> BuildIncidenceLists(
 // Edge-pair broad phase: collect the candidate edge pairs whose eps-padded
 // boxes overlap. The pairs drive the incidence narrow phase (vertex-on-edge
 // split lists); the sweep does its own crossing discovery.
-
-namespace {
 
 // Encode (first, second) as uint64 and run manifold::stable_sort, which
 // dispatches to the LSB-radix specialization for integral types - much
@@ -749,16 +746,12 @@ struct PairsRecorder {
 };
 #endif
 
-}  // namespace
-
-void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
-                              const std::vector<vec2>& verts, double eps,
-                              const std::vector<Box2>& edgeBoxes,
-                              const BVH& bvh,
-                              std::vector<std::pair<int, int>>& pairs) {
+std::vector<std::pair<int, int>> CollectIntersectionPairs(
+    const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
+    const std::vector<Box2>& edgeBoxes) {
   const int nE = static_cast<int>(edges.size());
-  pairs.clear();
-  if (bvh.leafToOrig.empty()) {
+  std::vector<std::pair<int, int>> pairs;
+  if (nE < kEdgePairBvhThreshold) {
     thread_local static std::vector<int> order;
     thread_local static std::vector<std::vector<int>> byFirst;
     order.resize(nE);
@@ -795,8 +788,9 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
       SortSmallInts(seconds);
       for (int second : seconds) pairs.emplace_back(first, second);
     }
-    return;
+    return pairs;
   }
+  const BVH bvh = BVHBuildFromBoxes(edgeBoxes);
 #if (MANIFOLD_PAR == 1)
   PairsRecorder rec{bvh.leafToOrig, edges, verts, eps, {}};
   auto qf = [&](int i) { return edgeBoxes[i]; };
@@ -813,6 +807,20 @@ void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
   });
   RadixSortPairs(pairs);
 #endif
+  return pairs;
+}
+
+}  // namespace
+
+std::vector<std::vector<int>> BuildIncidenceLists(
+    const std::vector<EdgeM>& edges, const std::vector<vec2>& verts,
+    double eps) {
+  std::vector<Box2> edgeBoxes(edges.size());
+  for (size_t e = 0; e < edges.size(); ++e)
+    edgeBoxes[e] = BoxOf2DEdge(verts[edges[e].v0], verts[edges[e].v1], eps);
+  return IncidenceListsFromPairs(
+      edges, verts, eps,
+      CollectIntersectionPairs(edges, verts, eps, edgeBoxes));
 }
 
 // ===== Driver =====
@@ -845,33 +853,13 @@ OverlapResult RemoveOverlaps2D(const std::vector<vec2>& vertsIn,
     edges = RemapAndCollapse(edgesIn, merge.inputVert2Merged);
   }
   traceRecorder.RecordCollapsedEdges(merge.verts, edges);
-  // Broad phase: candidate edge pairs whose eps-padded boxes overlap.
-  thread_local static std::vector<Box2> edgeBoxes;
-  edgeBoxes.resize(edges.size());
-  for (size_t e = 0; e < edges.size(); ++e) {
-    edgeBoxes[e] =
-        BoxOf2DEdge(merge.verts[edges[e].v0], merge.verts[edges[e].v1], eps);
-  }
-  BVH bvh;
-  {
-    ScopedTiming timing(P.bvhBuildNs);
-    if (edges.size() >= kEdgePairBvhThreshold)
-      bvh = BVHBuildFromBoxes(edgeBoxes);
-  }
-  thread_local static std::vector<std::pair<int, int>> intersectionPairs;
-  {
-    ScopedTiming timing(P.broadPairWorkNs);
-    CollectIntersectionPairs(edges, merge.verts, eps, edgeBoxes, bvh,
-                             intersectionPairs);
-  }
   // Incidence pre-split: split each edge at the input vertices lying within eps
   // of its interior. The sweep's own crossing tests are exact, so this
   // eps-scale vertex-on-edge quantization is what the sweep cannot reproduce.
   std::vector<std::vector<int>> incidenceLists;
   {
-    ScopedTiming timing(P.narrowPhaseNs);
-    incidenceLists =
-        BuildIncidenceLists(edges, merge.verts, eps, intersectionPairs);
+    ScopedTiming timing(P.incidenceNs);
+    incidenceLists = BuildIncidenceLists(edges, merge.verts, eps);
   }
   {
     std::vector<EdgeM> subEdges;

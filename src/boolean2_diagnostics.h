@@ -40,9 +40,7 @@ struct PhaseAcc {
   std::atomic<int64_t> filterWindingNs{0};
   std::atomic<int64_t> totalNs{0};
   std::atomic<int64_t> cases{0};
-  std::atomic<int64_t> bvhBuildNs{0};
-  std::atomic<int64_t> broadPairWorkNs{0};
-  std::atomic<int64_t> narrowPhaseNs{0};
+  std::atomic<int64_t> incidenceNs{0};
 
   void Reset() {
     mergeNs = 0;
@@ -50,9 +48,7 @@ struct PhaseAcc {
     filterWindingNs = 0;
     totalNs = 0;
     cases = 0;
-    bvhBuildNs = 0;
-    broadPairWorkNs = 0;
-    narrowPhaseNs = 0;
+    incidenceNs = 0;
   }
 };
 
