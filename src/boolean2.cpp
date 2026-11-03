@@ -352,61 +352,76 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
       }
     }
   } else {
-    // Sort by x and scan forward until x-distance exceeds 2*eps. Pairs are
-    // sorted at the end so the unite step below stays deterministic.
-    thread_local static std::vector<int> idx;
-    idx.resize(n);
-    std::iota(idx.begin(), idx.end(), 0);
-    manifold::stable_sort(idx.begin(), idx.end(),
+    // Sort by x and cut into slabs: each slab holds the verts within 2*eps in
+    // x of its first vert, sorted by y. Any candidate pair lies in one slab or
+    // two adjacent ones, so each vert scans a y-window of its own slab and the
+    // next. Pairs are sorted at the end so the unite step stays deterministic.
+    std::vector<int> order(n);
+    std::iota(order.begin(), order.end(), 0);
+    manifold::stable_sort(order.begin(), order.end(),
                           [&](int a, int b) { return in[a].x < in[b].x; });
+    // in[order[i]], gathered so the scans read linearly.
+    std::vector<vec2> pos(n);
+    for (int i = 0; i < n; ++i) pos[i] = in[order[i]];
     const double thresh = 2 * eps;
-    // Each i iteration writes only to its local pair buffer, so large inputs
-    // can collect candidates in parallel.
+    std::vector<int> start;
+    for (int i = 0; i < n; ++i) {
+      if (start.empty() || !(pos[i].x - pos[start.back()].x <= thresh))
+        start.push_back(i);
+    }
+    start.push_back(n);
+    const int numSlabs = static_cast<int>(start.size()) - 1;
+    for (int s = 0; s < numSlabs; ++s) {
+      const int lo = start[s], hi = start[s + 1];
+      if (hi - lo < 2) continue;
+      // Mirror-symmetric outlines make many two-vert slabs.
+      if (hi - lo == 2) {
+        if (pos[lo + 1].y < pos[lo].y) {
+          std::swap(order[lo], order[lo + 1]);
+          std::swap(pos[lo], pos[lo + 1]);
+        }
+        continue;
+      }
+      manifold::stable_sort(order.begin() + lo, order.begin() + hi,
+                            [&](int a, int b) { return in[a].y < in[b].y; });
+      for (int i = lo; i < hi; ++i) pos[i] = in[order[i]];
+    }
+    // Slabs only read shared state, so large inputs can collect candidates in
+    // parallel.
+    auto visitSlab = [&](int s, std::vector<std::pair<int, int>>& out) {
+      const int end = start[s + 1];
+      const int nextEnd = s + 1 < numSlabs ? start[s + 2] : end;
+      int next = end;
+      for (int i = start[s]; i < end; ++i) {
+        const vec2 a = pos[i];
+        auto test = [&](int j) {
+          if (std::fabs(pos[j].x - a.x) > thresh) return;
+          if (std::fabs(pos[j].y - a.y) > thresh) return;
+          out.emplace_back(std::min(order[i], order[j]),
+                           std::max(order[i], order[j]));
+        };
+        for (int j = i + 1; j < end && pos[j].y - a.y <= thresh; ++j) test(j);
+        // a.y only grows with i, so the next slab's window start only moves
+        // forward.
+        while (next < nextEnd && a.y - pos[next].y > thresh) ++next;
+        for (int j = next; j < nextEnd && pos[j].y - a.y <= thresh; ++j)
+          test(j);
+      }
+    };
     constexpr int kParallelMergeMin = 1024;
 #if (MANIFOLD_PAR == 1)
     if (n >= kParallelMergeMin) {
-      // Bind before worker dispatch; direct `idx` access would resolve to each
-      // worker's thread-local copy.
-      auto& idxRef = idx;
       tbb::combinable<std::vector<std::pair<int, int>>> tls;
-      manifold::for_each_n(autoPolicy(n, kFineParallelGrainSize), countAt(0), n,
-                           [&](int i) {
-                             const int ai = idxRef[i];
-                             const double ax = in[ai].x;
-                             const double ay = in[ai].y;
-                             auto& local = tls.local();
-                             for (int j = i + 1; j < n; ++j) {
-                               const int bi = idxRef[j];
-                               const double dx = in[bi].x - ax;
-                               if (dx > thresh) break;
-                               if (std::fabs(in[bi].y - ay) > thresh) continue;
-                               if (ai < bi)
-                                 local.emplace_back(ai, bi);
-                               else
-                                 local.emplace_back(bi, ai);
-                             }
-                           });
+      manifold::for_each_n(autoPolicy(numSlabs, kFineParallelGrainSize),
+                           countAt(0), numSlabs,
+                           [&](int s) { visitSlab(s, tls.local()); });
       tls.combine_each([&](const std::vector<std::pair<int, int>>& l) {
         pairs.insert(pairs.end(), l.begin(), l.end());
       });
     } else
 #endif
     {
-      for (int i = 0; i < n; ++i) {
-        const int ai = idx[i];
-        const double ax = in[ai].x;
-        const double ay = in[ai].y;
-        for (int j = i + 1; j < n; ++j) {
-          const int bi = idx[j];
-          const double dx = in[bi].x - ax;
-          if (dx > thresh) break;
-          if (std::fabs(in[bi].y - ay) > thresh) continue;
-          if (ai < bi)
-            pairs.emplace_back(ai, bi);
-          else
-            pairs.emplace_back(bi, ai);
-        }
-      }
+      for (int s = 0; s < numSlabs; ++s) visitSlab(s, pairs);
     }
     manifold::stable_sort(pairs.begin(), pairs.end());
   }

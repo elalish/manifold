@@ -513,6 +513,61 @@ TEST(CrossSectionComplex, VertexMergeIdempotenceTightCluster) {
       << ", eps=" << eps << ")";
 }
 
+namespace {
+// Timed: many verts sharing an x, like the ends of stacked horizontal edges.
+void ExpectPairsMerge(const std::vector<vec2>& verts, double eps,
+                      int repetitions) {
+  for (int i = 0; i < repetitions; ++i) {
+    const VertexMerge merged = MergeVerts(verts, eps);
+    ASSERT_EQ(merged.verts.size(), verts.size() / 2);
+    for (size_t v = 0; v < verts.size(); v += 2) {
+      ASSERT_EQ(merged.inputVert2Merged[v], merged.inputVert2Merged[v + 1]);
+    }
+  }
+}
+}  // namespace
+
+TEST(CrossSectionComplex, MergeVertsChainAcrossSlabs) {
+  // Steps of 0.875 eps put neighbors in different 2*eps slabs, so each chain
+  // only connects through pairs that straddle a slab boundary.
+  const double eps = 1.0;
+  std::vector<vec2> verts;
+  for (const double y : {0.0, 10.0}) {
+    for (int i = 0; i < 64; ++i) verts.push_back({0.875 * i, y});
+  }
+  const VertexMerge merged = MergeVerts(verts, eps);
+  ASSERT_EQ(merged.verts.size(), 2);
+  for (int i = 0; i < 64; ++i) {
+    EXPECT_EQ(merged.inputVert2Merged[i], merged.inputVert2Merged[0]);
+    EXPECT_EQ(merged.inputVert2Merged[64 + i], merged.inputVert2Merged[64]);
+  }
+  EXPECT_NE(merged.inputVert2Merged[0], merged.inputVert2Merged[64]);
+}
+
+TEST(CrossSectionComplex, MergeVertsSharedColumns) {
+  const double eps = 1e-6;
+  std::vector<vec2> verts;
+  for (int i = 0; i < 4096; ++i) {
+    for (const double x : {0.0, 100.0}) {
+      verts.push_back({x, 4.0 * i});
+      verts.push_back({x, 4.0 * i + 0.25 * eps});
+    }
+  }
+  ExpectPairsMerge(verts, eps, 16);
+}
+
+TEST(CrossSectionComplex, MergeVertsGrid) {
+  const double eps = 1e-6;
+  std::vector<vec2> verts;
+  for (int i = 0; i < 256; ++i) {
+    for (int j = 0; j < 256; ++j) {
+      verts.push_back({double(i), double(j)});
+      verts.push_back({i + 0.25 * eps, j + 0.25 * eps});
+    }
+  }
+  ExpectPairsMerge(verts, eps, 8);
+}
+
 TEST(CrossSectionComplex, ValidatorRejectsRetainedVertsWithinEps) {
   const std::vector<vec2> verts = {{0.0, 0.0}, {10.0, 0.0}, {0.0, 10.0},
                                    {0.5, 0.5}, {20.0, 0.0}, {20.0, 10.0}};
