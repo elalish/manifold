@@ -23,6 +23,7 @@ DEFAULT_GTEST_FILTER = ":".join(
         "CrossSectionComplex.OutEdgesToPolygonsLongLoop8192",
         "CrossSectionComplex.OutEdgesToPolygonsManySmallContours",
         "CrossSectionComplex.SweepManySeparatedContours",
+        "CrossSectionComplex.SweepManySeparatedContoursRotated90",
         "CrossSectionComplex.SweepCrossingContours",
         "CrossSectionComplex.OffsetRoundMergingContours",
         "Polygon.Sponge4",

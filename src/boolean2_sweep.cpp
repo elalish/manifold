@@ -46,24 +46,6 @@ struct LexLess {
 };
 constexpr LexLess kLexLess{};
 
-// Table 7.1 (p.107): y-value of a non-vertical segment at abscissa xP, via the
-// shared interpolation kernel (shared.h; lambda measured from the nearer
-// endpoint, 8.5).
-double YAtX(const vec2& l, const vec2& r, double xP) {
-  return Interpolate(vec3(l, 0.0), vec3(r, 0.0), xP).x;
-}
-
-// Table 7.2 (p.108): the crossing point on the common x-range, via the shared
-// intersection kernel (shared.h). Contract: A=(xL,yAL)->(xR,yAR),
-// B=(xL,yBL)->(xR,yBR) with yAL <= yBL and yBR <= yAR, at least one strict; the
-// result lies in both bounding boxes (8.5 eqs 8.18/8.19).
-vec2 Interpolate2(double xL, double yAL, double yBL, double xR, double yAR,
-                  double yBR) {
-  const vec4 q = Intersect(vec3(xL, yAL, 0.0), vec3(xR, yAR, 0.0),
-                           vec3(xL, yBL, 0.0), vec3(xR, yBR, 0.0));
-  return {q.x, q.y};
-}
-
 // Enclose Interpolate's rounded y result, including its fallback to l.y.
 // For clamped x, finite lambda lies in [0, 1] from l or [-1, 0] from r.
 // Rounded multiply/add are monotonic, so values at 0 and +/-1 bound both forms.
@@ -82,6 +64,30 @@ std::pair<double, double> InterpolatedYBounds(vec2 l, vec2 r) {
                   std::max(l.y + std::max(0.0, dy), r.y + std::max(0.0, -dy)));
   }
   return {lo, hi};
+}
+
+// Table 7.1 (p.107): y-value of a non-vertical segment at abscissa xP, via the
+// shared interpolation kernel (shared.h; lambda measured from the nearer
+// endpoint, 8.5).
+double YAtX(const vec2& l, const vec2& r, double xP) {
+  const double y = Interpolate(vec3(l, 0.0), vec3(r, 0.0), xP).x;
+#if defined(MANIFOLD_ASSERT) && defined(MANIFOLD_DEBUG)
+  const auto [ymin, ymax] = InterpolatedYBounds(l, r);
+  DEBUG_ASSERT(ymin <= y && y <= ymax, logicErr,
+               "Interpolated y is outside its conservative bounds");
+#endif
+  return y;
+}
+
+// Table 7.2 (p.108): the crossing point on the common x-range, via the shared
+// intersection kernel (shared.h). Contract: A=(xL,yAL)->(xR,yAR),
+// B=(xL,yBL)->(xR,yBR) with yAL <= yBL and yBR <= yAR, at least one strict; the
+// result lies in both bounding boxes (8.5 eqs 8.18/8.19).
+vec2 Interpolate2(double xL, double yAL, double yBL, double xR, double yAR,
+                  double yBR) {
+  const vec4 q = Intersect(vec3(xL, yAL, 0.0), vec3(xR, yAR, 0.0),
+                           vec3(xL, yBL, 0.0), vec3(xR, yBR, 0.0));
+  return {q.x, q.y};
 }
 
 // 6.5 vertex-on-edge-interior test, exact equality only.
@@ -285,12 +291,9 @@ class SweepPass {
       return Side::ON;
     }
     const bool lFirst = e.l.x < e.r.x;
-    const vec2& lo = lFirst ? e.l : e.r;
-    const vec2& hi = lFirst ? e.r : e.l;
+    const vec2 lo = lFirst ? e.l : e.r;
+    const vec2 hi = lFirst ? e.r : e.l;
     if (p.x < lo.x || p.x > hi.x) return p.x < lo.x ? Side::OVER : Side::ON;
-    const double ylo = e.ymin, yhi = e.ymax;
-    if (p.y > yhi) return Side::UNDER;
-    if (p.y < ylo) return Side::OVER;
     const double ys = YAtX(lo, hi, p.x);
     if (ys < p.y) return Side::UNDER;
     if (ys > p.y) return Side::OVER;
@@ -340,33 +343,28 @@ class SweepPass {
     int64_t wSum;
   };
 
-  void RebuildBlock(size_t b) {
+  StatusBlock BuildBlock(size_t b) const {
     const size_t start = b << kBlockShift;
     const size_t end = std::min(start + kBlockSize, status_.size());
     const SweepEdge& e0 = status_[start];
-    double maxLx = e0.l.x;
-    double minRx = e0.r.x;
-    double maxY = e0.ymax;
-    double minY = e0.ymin;
-    int64_t wSum = mode_ == SweepMode::Winding ? LexMultiplicity(e0) : 0;
+    StatusBlock block{e0.l.x, e0.r.x, e0.ymax, e0.ymin,
+                      mode_ == SweepMode::Winding ? LexMultiplicity(e0) : 0};
     for (size_t i = start + 1; i < end; ++i) {
       const SweepEdge& e = status_[i];
-      if (e.l.x > maxLx) maxLx = e.l.x;
-      if (e.r.x < minRx) minRx = e.r.x;
-      const double eyMax = e.ymax;
-      const double eyMin = e.ymin;
-      if (eyMax > maxY) maxY = eyMax;
-      if (eyMin < minY) minY = eyMin;
-      if (mode_ == SweepMode::Winding) wSum += LexMultiplicity(e);
+      block.maxLx = std::max(block.maxLx, e.l.x);
+      block.minRx = std::min(block.minRx, e.r.x);
+      block.maxY = std::max(block.maxY, e.ymax);
+      block.minY = std::min(block.minY, e.ymin);
+      if (mode_ == SweepMode::Winding) block.wSum += LexMultiplicity(e);
     }
-    blocks_[b] = {maxLx, minRx, maxY, minY, wSum};
+    return block;
   }
 
   void RebuildBlocksFrom(size_t startIdx) {
     const size_t numBlocks = (status_.size() + kBlockSize - 1) >> kBlockShift;
     blocks_.resize(numBlocks);
     for (size_t b = startIdx >> kBlockShift; b < numBlocks; ++b) {
-      RebuildBlock(b);
+      blocks_[b] = BuildBlock(b);
     }
   }
 
@@ -556,7 +554,7 @@ class SweepPass {
     } else if (dirtyLo_ < dirtyHi_) {
       const size_t bFirst = dirtyLo_ >> kBlockShift;
       const size_t bLast = (dirtyHi_ - 1) >> kBlockShift;
-      for (size_t b = bFirst; b <= bLast; ++b) RebuildBlock(b);
+      for (size_t b = bFirst; b <= bLast; ++b) blocks_[b] = BuildBlock(b);
     }
   }
 

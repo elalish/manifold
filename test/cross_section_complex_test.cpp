@@ -1530,6 +1530,15 @@ TEST(CrossSectionComplex, SweepManySeparatedContours) {
   ExpectRepeatedSweep(rectangles, 32, 4 * 512, 512, 100.0 * 512);
 }
 
+TEST(CrossSectionComplex, SweepManySeparatedContoursRotated90) {
+  Polygons rectangles;
+  for (int i = 0; i < 512; ++i) {
+    const double y = 4 * i;
+    rectangles.push_back({{-y, 0}, {-y, 100}, {-y - 1, 100}, {-y - 1, 0}});
+  }
+  ExpectRepeatedSweep(rectangles, 32, 4 * 512, 512, 100.0 * 512);
+}
+
 TEST(CrossSectionComplex, SweepCrossingContours) {
   Polygons bands;
   for (int i = 0; i < 32; ++i) {
