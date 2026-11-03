@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {exec as execSync} from 'child_process';
+import {execFile as execFileSync} from 'child_process';
 import {glob} from 'glob';
 import * as fs from 'node:fs/promises';
 import * as path from 'path';
 import {promisify} from 'util';
 import {beforeAll, expect, suite, test} from 'vitest';
 
-const exec = promisify(execSync);
+const execFile = promisify(execFileSync);
 
 const resultPath = path.resolve(import.meta.dirname, './results/cli/')
 
@@ -29,10 +29,9 @@ beforeAll(async () => {
 
 const execCLI =
     async (infile: string, outfile: string = `${resultPath}/${infile}.glb`) => {
-  const cmd = [
-    '../bin/manifold-cad', `"./fixtures/${infile}"`, `"${outfile}"`
-  ].join(' ');
-  return await exec(cmd, {cwd: import.meta.dirname});
+  // Run the script with node directly; Windows can't run a shebang script.
+  const args = ['../bin/manifold-cad', `./fixtures/${infile}`, outfile];
+  return await execFile(process.execPath, args, {cwd: import.meta.dirname});
 };
 
 suite('When executed, the CLI will', () => {
@@ -41,6 +40,7 @@ suite('When executed, the CLI will', () => {
   });
 
   test('Fail to build a known-bad model', async () => {
-    await expect(execCLI('unitSphereNoManifoldImport.mjs')).rejects.toThrow();
+    await expect(execCLI('unitSphereNoManifoldImport.mjs'))
+        .rejects.toThrow('Manifold is not defined');
   });
 });
