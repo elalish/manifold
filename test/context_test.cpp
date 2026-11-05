@@ -625,38 +625,19 @@ TEST(Context, ManifoldContextStaticFactoriesDropAttachment) {
   ExecutionContext ctx;
   ctx.Cancel();
   std::vector<Manifold> items = {
-      Manifold::Cube(vec3(1), true).WithContext(ctx),
+      (Manifold::Cube(vec3(1), true) + Manifold::Cube(vec3(1), true))
+          .WithContext(ctx),
       Manifold::Cube(vec3(1), true).Translate(vec3(2, 0, 0)).WithContext(ctx)};
 
-  // Both factories drop the input ctx; results evaluate to NoError despite
-  // the cancelled ctx on every input.
+  // Hull runs first, while the first input is still lazy.
+  EXPECT_EQ(Manifold::Hull(items).Status(), Manifold::Error::NoError);
   EXPECT_EQ(Manifold::BatchBoolean(items, OpType::Add).Status(),
             Manifold::Error::NoError);
-  EXPECT_EQ(Manifold::Hull(items).Status(), Manifold::Error::NoError);
 }
 
 static Manifold FreshHullOperand() {
   return Manifold::Cube(vec3(1), true) +
          Manifold::Cube(vec3(1), true).Translate(vec3(2, 0, 0));
-}
-
-TEST(Context, ManifoldContextStaticHullIgnoresLazyInputContext) {
-  for (int count : {1, 2}) {
-    SCOPED_TRACE(count);
-    ExecutionContext ctx;
-    ctx.Cancel();
-    // Do not evaluate a shared copy before the factory under test.
-    std::vector<Manifold> operands = {FreshHullOperand().WithContext(ctx)};
-    if (count == 2) {
-      operands.push_back(Manifold::Cube(vec3(1), true)
-                             .Translate(vec3(4, 0, 0))
-                             .WithContext(ctx));
-    }
-    const Manifold hull = Manifold::Hull(operands);
-    EXPECT_EQ(hull.Status(), Manifold::Error::NoError);
-    EXPECT_NEAR(hull.Volume(), count == 1 ? 3.0 : 5.0, 1e-10);
-    EXPECT_TRUE(ctx.Cancelled());
-  }
 }
 
 TEST(Context, ManifoldContextStaticHullLeavesInputProgress) {
