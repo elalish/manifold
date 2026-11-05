@@ -252,6 +252,24 @@ class SweepPass {
     if (mergeVerticalOutput) MergeVerticals1D(out_);
   }
 
+  void RunStatic(const PolySet2& arr) {
+    std::vector<vec2> events;
+    events.reserve(2 * arr.size());
+    for (const auto& kv : arr) {
+      events.push_back(kv.first.first);
+      events.push_back(kv.first.second);
+    }
+    manifold::stable_sort(events.begin(), events.end(), kLexLess);
+    events.erase(std::unique(events.begin(), events.end(),
+                             [](const vec2& a, const vec2& b) {
+                               return !kLexLess(a, b);
+                             }),
+                 events.end());
+    static_ = &arr;
+    staticNext_ = arr.begin();
+    for (const vec2& p : events) ProcessEvent(p);
+  }
+
   PolySet2& Out() { return out_; }
 
  private:
@@ -523,8 +541,13 @@ class SweepPass {
       }
     }
     const bool removedAny = hi > lo;
-    auto pit = pending_.find(p);
-    if (pit != pending_.end()) {
+    if (static_) {
+      for (; staticNext_ != static_->end() &&
+             !kLexLess(p, staticNext_->first.first);
+           ++staticNext_)
+        reinsert_.push_back(MakeSweepEdge(p, staticNext_->first.second,
+                                          staticNext_->second, seqCounter_++));
+    } else if (auto pit = pending_.find(p); pit != pending_.end()) {
       for (const auto& kv : pit->second)
         reinsert_.push_back(
             MakeSweepEdge(p, kv.first, kv.second, seqCounter_++));
@@ -566,6 +589,8 @@ class SweepPass {
   std::vector<StatusBlock> blocks_;
   std::vector<SweepEdge> reinsert_;
   PolySet2 out_;
+  const PolySet2* static_ = nullptr;
+  PolySet2::const_iterator staticNext_;
   uint64_t seqCounter_ = 0;
   size_t dirtyLo_ = 0;
   size_t dirtyHi_ = 0;
@@ -588,8 +613,7 @@ PolySet2 CollectArrangement(PolySet2 arr, WindRule rule) {
 PolySet2 CollectThenMeasure(PolySet2 arr, WindRule rule) {
   PolySet2 clean = CollectArrangement(std::move(arr), rule);
   SweepPass measure(rule, SweepMode::Winding);
-  measure.SeedFromPolySet(clean);
-  measure.Run(/*mergeVerticalOutput=*/false);  // preserve T-junction verts
+  measure.RunStatic(clean);
   return std::move(measure.Out());
 }
 
