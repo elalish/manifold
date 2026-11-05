@@ -1101,7 +1101,8 @@ Manifold Manifold::Hull() const {
  */
 Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
   for (const auto& man : manifolds) {
-    auto status = man.Status();
+    // Static factories ignore contexts attached to their inputs.
+    auto status = man.GetCsgLeafNode().GetImpl()->status_;
     if (status != Error::NoError) return PropagateStatus(status);
   }
   std::vector<vec3> vertPos;

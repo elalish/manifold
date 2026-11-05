@@ -625,14 +625,53 @@ TEST(Context, ManifoldContextStaticFactoriesDropAttachment) {
   ExecutionContext ctx;
   ctx.Cancel();
   std::vector<Manifold> items = {
-      Manifold::Cube(vec3(1), true).WithContext(ctx),
+      (Manifold::Cube(vec3(1), true) + Manifold::Cube(vec3(1), true))
+          .WithContext(ctx),
       Manifold::Cube(vec3(1), true).Translate(vec3(2, 0, 0)).WithContext(ctx)};
 
-  // Both factories drop the input ctx; results evaluate to NoError despite
-  // the cancelled ctx on every input.
+  // Hull runs first, while the first input is still lazy.
+  EXPECT_EQ(Manifold::Hull(items).Status(), Manifold::Error::NoError);
   EXPECT_EQ(Manifold::BatchBoolean(items, OpType::Add).Status(),
             Manifold::Error::NoError);
-  EXPECT_EQ(Manifold::Hull(items).Status(), Manifold::Error::NoError);
+}
+
+static Manifold FreshHullOperand() {
+  return Manifold::Cube(vec3(1), true) +
+         Manifold::Cube(vec3(1), true).Translate(vec3(2, 0, 0));
+}
+
+TEST(Context, ManifoldContextStaticHullLeavesInputProgress) {
+  for (bool lazy : {false, true}) {
+    SCOPED_TRACE(lazy);
+    ExecutionContext ctx;
+    ctx.impl_->totalBooleans.store(7);
+    ctx.impl_->doneBooleans.store(3);
+    ctx.impl_->totalPhases.store(37);
+    ctx.impl_->donePhases.store(11);
+    const Manifold source =
+        lazy ? FreshHullOperand() : Manifold::Cube(vec3(1), true);
+    const Manifold hull =
+        Manifold::Hull(std::vector<Manifold>{source.WithContext(ctx)});
+    EXPECT_EQ(hull.Status(), Manifold::Error::NoError);
+    EXPECT_NEAR(hull.Volume(), lazy ? 3.0 : 1.0, 1e-10);
+    EXPECT_EQ(ctx.impl_->totalBooleans.load(), 7);
+    EXPECT_EQ(ctx.impl_->doneBooleans.load(), 3);
+    EXPECT_EQ(ctx.impl_->totalPhases.load(), 37);
+    EXPECT_EQ(ctx.impl_->donePhases.load(), 11);
+    EXPECT_DOUBLE_EQ(ctx.Progress(), 11.0 / 37.0);
+  }
+}
+
+TEST(Context, ManifoldContextStaticHullPreservesCachedErrors) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  const Manifold errored = FreshHullOperand().WithContext(ctx);
+  ASSERT_EQ(errored.Status(), Manifold::Error::Cancelled);
+  // Once materialized, cancellation is an actual operand error, not merely
+  // an attached context the static factory must ignore.
+  const Manifold hull = Manifold::Hull(std::vector<Manifold>{errored});
+  EXPECT_EQ(hull.Status(), Manifold::Error::Cancelled);
+  EXPECT_TRUE(hull.IsEmpty());
 }
 
 // no-arg Status() on a ctx-attached Manifold observes the attached ctx:
