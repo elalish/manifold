@@ -32,7 +32,6 @@
  */
 
 import * as GLTFTransform from '@gltf-transform/core';
-
 import type {Manifold, Mesh, Vec3} from 'manifold-3d';
 
 import {ImportError, UnsupportedFormatError} from './error.ts';

@@ -36,7 +36,6 @@
  */
 
 import type * as GLTFTransform from '@gltf-transform/core';
-
 import type {CrossSection, Manifold, Vec3} from 'manifold-3d';
 
 import {getManifoldModuleSync} from './wasm.ts';

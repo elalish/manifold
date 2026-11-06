@@ -25,7 +25,6 @@
 
 import {Document, Extension, Material, Node, PropertyType} from '@gltf-transform/core';
 import {copyToDocument, dedup, unpartition} from '@gltf-transform/functions';
-
 import type {CrossSection, Manifold, Vec2, Vec3} from 'manifold-3d';
 
 import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimationInDoc, getMorph, morphEnd, morphStart, setMorph} from './animation.ts';

@@ -21,7 +21,6 @@
  */
 
 import {Document} from '@gltf-transform/core';
-
 import type {Manifold, Mesh} from 'manifold-3d';
 
 import type {Properties} from './gltf-io.ts';

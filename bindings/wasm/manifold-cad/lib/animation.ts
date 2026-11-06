@@ -20,7 +20,6 @@
  */
 
 import {Accessor, Animation, AnimationSampler, Document, Mesh as GLTFMesh, Node} from '@gltf-transform/core';
-
 import type {Manifold, Mesh, Vec3} from 'manifold-3d';
 
 import {BaseGLTFNode} from './gltf-node.ts';
