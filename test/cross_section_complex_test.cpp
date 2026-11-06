@@ -21,6 +21,7 @@
 #include <iostream>
 #include <limits>
 #include <map>
+#include <numeric>
 #include <random>
 #include <sstream>
 #include <string>
@@ -569,10 +570,12 @@ TEST(CrossSectionComplex, MergeVertsGrid) {
   ExpectPairsMerge(verts, eps, 8);
 }
 
-TEST(CrossSectionComplex, IncidenceListsAlongLongEdge) {
-  // Triangle apexes sit on one long edge, just above or below it within eps,
-  // or clearly off it; only the first three kinds belong on its list, in
-  // order along the edge.
+namespace {
+// Triangle apexes sit on one long edge, just above or below it within eps,
+// or clearly off it; only the first three kinds belong on its list, in order
+// along the edge. With `farSquare`, a small square far away puts nearly every
+// edge in one grid cell, so the lists come from the tree fallback instead.
+void ExpectIncidenceAlongLongEdge(bool farSquare) {
   const double eps = 1e-6;
   std::vector<vec2> verts = {{0, 0}, {1000, 0}, {1000, -1}, {0, -1}};
   std::vector<EdgeM> edges = {{0, 1, 1}, {1, 2, 1}, {2, 3, 1}, {3, 0, 1}};
@@ -589,9 +592,95 @@ TEST(CrossSectionComplex, IncidenceListsAlongLongEdge) {
     edges.push_back({apex + 2, apex, 1});
     if (i % 4 != 3) expected.push_back(apex);
   }
+  if (farSquare) {
+    const int s = static_cast<int>(verts.size());
+    for (const vec2 p : {vec2(1e5, 1e5), vec2(1e5 + 10, 1e5),
+                         vec2(1e5 + 10, 1e5 + 10), vec2(1e5, 1e5 + 10)})
+      verts.push_back(p);
+    for (int k = 0; k < 4; ++k) edges.push_back({s + k, s + (k + 1) % 4, 1});
+  }
   const auto lists = BuildIncidenceLists(edges, verts, eps);
   EXPECT_EQ(lists[0], expected);
   for (size_t e = 1; e < lists.size(); ++e) EXPECT_TRUE(lists[e].empty());
+}
+}  // namespace
+
+TEST(CrossSectionComplex, IncidenceListsAlongLongEdge) {
+  ExpectIncidenceAlongLongEdge(false);
+}
+
+TEST(CrossSectionComplex, IncidenceListsAlongLongEdgeUnevenLayout) {
+  ExpectIncidenceAlongLongEdge(true);
+}
+
+TEST(CrossSectionComplex, IncidenceClusterInRandomOrder) {
+  // Timed: a dense lattice of tiny squares, listed in shuffled order, next to
+  // one far square. Both the grid and coordinate-based Morton codes see the
+  // whole lattice as one cell, so a tree splitting it by input order can't
+  // prune.
+  constexpr int kSide = 80;
+  constexpr double kSize = 1e-4;
+  std::vector<int> order(kSide * kSide);
+  std::iota(order.begin(), order.end(), 0);
+  std::mt19937 rng(1922);
+  for (int i = static_cast<int>(order.size()) - 1; i > 0; --i)
+    std::swap(order[i], order[rng() % (i + 1)]);
+  Polygons input;
+  for (const int k : order) {
+    const vec2 c(k % kSide / double(kSide), k / kSide / double(kSide));
+    input.push_back(
+        {c, c + vec2(kSize, 0), c + vec2(kSize, kSize), c + vec2(0, kSize)});
+  }
+  input.push_back(
+      {{1e4, 1e4}, {1e4 + 1, 1e4}, {1e4 + 1, 1e4 + 1}, {1e4, 1e4 + 1}});
+  for (int i = 0; i < 4; ++i) {
+    const CrossSection result(input);
+    ASSERT_EQ(result.NumContour(), kSide * kSide + 1);
+    ASSERT_NEAR(result.Area(), 1 + kSide * kSide * kSize * kSize, 1e-9);
+  }
+}
+
+TEST(CrossSectionComplex, IncidenceParallelDiagonalSlivers) {
+  // Timed: parallel slivers at 45 degrees, so every edge's box covers many
+  // vertices. Each box also spans many grid cells, too many to bin.
+  constexpr int kSlivers = 2000;
+  constexpr double kWidth = 1e-4;
+  Polygons input;
+  for (int i = 0; i < kSlivers; ++i) {
+    const double x = 100.0 * i / kSlivers;
+    input.push_back(
+        {{x, 0}, {x + kWidth, 0}, {x + 100 + kWidth, 100}, {x + 100, 100}});
+  }
+  for (int i = 0; i < 2; ++i) {
+    const CrossSection result(input);
+    ASSERT_EQ(result.NumContour(), kSlivers);
+    ASSERT_NEAR(result.Area(), kSlivers * kWidth * 100, 1e-9);
+  }
+}
+
+TEST(CrossSectionComplex, IncidenceUnevenLayout) {
+  // Timed: detailed shapes plus one far-away square, so a grid sized from the
+  // overall bounds would put almost every edge in one cell.
+  auto circle = [](vec2 c, int n) {
+    SimplePolygon p;
+    for (int k = 0; k < n; ++k) {
+      const double a = 2 * kPi * k / n;
+      p.push_back(c + vec2(std::cos(a), std::sin(a)));
+    }
+    return p;
+  };
+  const Polygons input = {circle({0, 0}, 20000),
+                          circle({0.5, 0}, 20000),
+                          {{1e4, 1e4}, {2e4, 1e4}, {2e4, 2e4}, {1e4, 2e4}}};
+  // Two unit circles 0.5 apart overlap in a lens of area
+  // 2 acos(1/4) - (1/4) sqrt(15/4).
+  const double circles =
+      2 * kPi - (2 * std::acos(0.25) - 0.25 * std::sqrt(3.75));
+  for (int i = 0; i < 4; ++i) {
+    const CrossSection result(input);
+    ASSERT_EQ(result.NumContour(), 2);
+    ASSERT_NEAR(result.Area(), 1e8 + circles, 1e-5);
+  }
 }
 
 TEST(CrossSectionComplex, IncidenceBrickWall) {

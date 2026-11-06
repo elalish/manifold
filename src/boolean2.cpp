@@ -20,14 +20,17 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <numeric>
 #include <utility>
 #include <vector>
 
 #include "boolean2_diagnostics.h"
+#include "collider.h"
 #include "disjoint_sets.h"
 #include "manifold/optional_assert.h"
 #include "parallel.h"
+#include "vec.h"
 
 namespace manifold {
 
@@ -602,7 +605,9 @@ Box2 BoxOf2DEdge(vec2 p0, vec2 p1, double eps) {
 // is binned into every cell it touches.
 class BoxGrid {
  public:
-  explicit BoxGrid(const std::vector<Box2>& boxes) : boxes_(boxes) {
+  // Leaves the grid unbuilt (Built() false) if binning would take more than
+  // maxEntries cell entries, as when many long boxes each touch many cells.
+  BoxGrid(const std::vector<Box2>& boxes, size_t maxEntries) : boxes_(boxes) {
     const int n = static_cast<int>(boxes.size());
     if (n == 0) return;
     for (const auto& b : boxes) bounds_ = bounds_.Union(b);
@@ -614,6 +619,12 @@ class BoxGrid {
     nx_ = std::max(1, std::min(n, static_cast<int>(size.x / cell) + 1));
     ny_ = std::max(1, std::min(n, static_cast<int>(size.y / cell) + 1));
     scale_ = vec2(nx_ / std::max(size.x, kTiny), ny_ / std::max(size.y, kTiny));
+    size_t entries = 0;
+    for (const auto& b : boxes)
+      entries += static_cast<size_t>(CellX(b.max.x) - CellX(b.min.x) + 1) *
+                 (CellY(b.max.y) - CellY(b.min.y) + 1);
+    if (entries > maxEntries) return;
+    built_ = true;
     cells_ = BucketIndex(nx_ * ny_, [&](auto&& emit) {
       for (int i = 0; i < n; ++i) {
         const Box2& b = boxes[i];
@@ -622,6 +633,15 @@ class BoxGrid {
             emit(y * nx_ + x, i);
       }
     });
+  }
+
+  bool Built() const { return built_; }
+
+  // The number of boxes binned in p's cell: what a query at p scans.
+  size_t Load(vec2 p) const {
+    if (boxes_.empty() || !Box2(p, p).DoesOverlap(bounds_)) return 0;
+    const auto bucket = cells_.Bucket(CellY(p.y) * nx_ + CellX(p.x));
+    return bucket.end() - bucket.begin();
   }
 
   // Calls f(i) once for each box i overlapping `query`. A box spanning several
@@ -656,8 +676,73 @@ class BoxGrid {
   Box2 bounds_;
   int nx_ = 1, ny_ = 1;
   vec2 scale_;
+  bool built_ = false;
   BucketIndex cells_;
 };
+
+// The boxes in Manifold's (3D) Collider at z = 0: slower per query than the
+// grid, but its pruning doesn't depend on how evenly the boxes are spread.
+class BoxTree {
+ public:
+  explicit BoxTree(const std::vector<Box2>& boxes) : boxes_(boxes) {
+    const int n = static_cast<int>(boxes.size());
+    if (n == 0) return;
+    // Code each box center's x and y ranks, not its coordinates, so the tree
+    // follows the boxes' density: a dense cluster next to a far outlier would
+    // otherwise share one Morton code and be split only by input order.
+    std::vector<vec2> rank(n);
+    std::vector<int> byAxis(n);
+    for (const int axis : {0, 1}) {
+      std::iota(byAxis.begin(), byAxis.end(), 0);
+      auto center = [&](int i) {
+        return boxes[i].min[axis] + boxes[i].max[axis];
+      };
+      std::stable_sort(byAxis.begin(), byAxis.end(),
+                       [&](int a, int b) { return center(a) < center(b); });
+      for (int k = 0; k < n; ++k) rank[byAxis[k]][axis] = k;
+    }
+    const Box space(vec3(0.0), vec3(n, n, 1));
+    std::vector<uint32_t> morton(n);
+    for (int i = 0; i < n; ++i)
+      morton[i] = Collider::MortonCode(vec3(rank[i], 0.5), space);
+    order_.resize(n);
+    std::iota(order_.begin(), order_.end(), 0);
+    std::stable_sort(order_.begin(), order_.end(),
+                     [&](int a, int b) { return morton[a] < morton[b]; });
+    Vec<Box> leaves(n);
+    Vec<uint32_t> codes(n);
+    for (int k = 0; k < n; ++k) {
+      const Box2& b = boxes[order_[k]];
+      leaves[k] = Box(vec3(b.min, 0), vec3(b.max, 0));
+      codes[k] = morton[order_[k]];
+    }
+    collider_ = Collider(leaves, codes);
+  }
+
+  template <typename F>
+  void ForEachOverlap(const Box2& query, F&& f) const {
+    if (boxes_.empty()) return;
+    const Box q(vec3(query.min, 0), vec3(query.max, 0));
+    auto record = [&](int, int leaf) { f(order_[leaf]); };
+    auto recorder = MakeSimpleRecorder(record);
+    collider_.Collisions(recorder, [&](int) { return q; }, 1, false);
+  }
+
+ private:
+  const std::vector<Box2>& boxes_;
+  std::vector<int> order_;
+  Collider collider_;
+};
+
+// The grid is used only while its work stays linear; otherwise a BoxTree is.
+// A grid query scans one cell's boxes, so the vertices may scan at most this
+// many per vertex on average. Past that, the boxes are too unevenly spread for
+// the grid's bounds-sized cells.
+constexpr size_t kMaxGridLoadPerQuery = 128;
+// Nor is the grid built if binning the boxes would take more than this many
+// cell entries per box, as when many long diagonal edges each cover a large
+// area of cells.
+constexpr size_t kMaxGridEntriesPerBox = 64;
 
 }  // namespace
 
@@ -676,13 +761,23 @@ std::vector<std::vector<int>> BuildIncidenceLists(
   std::vector<Box2> edgeBoxes(nE);
   for (int e = 0; e < nE; ++e)
     edgeBoxes[e] = BoxOf2DEdge(verts[edges[e].v0], verts[edges[e].v1], eps);
-  const BoxGrid grid(edgeBoxes);
   const BucketIndex incident(nV, [&](auto&& emit) {
     for (int e = 0; e < nE; ++e) {
       emit(edges[e].v0, e);
       emit(edges[e].v1, e);
     }
   });
+  const BoxGrid grid(edgeBoxes,
+                     kMaxGridEntriesPerBox * static_cast<size_t>(nE));
+  bool useTree = !grid.Built();
+  if (!useTree) {
+    size_t gridLoad = 0;
+    for (int v = 0; v < nV; ++v)
+      if (!incident.Bucket(v).empty()) gridLoad += grid.Load(verts[v]);
+    useTree = gridLoad > kMaxGridLoadPerQuery * static_cast<size_t>(nV);
+  }
+  std::unique_ptr<BoxTree> tree;
+  if (useTree) tree = std::make_unique<BoxTree>(edgeBoxes);
   double scale = 0;
   for (const vec2& p : verts)
     scale = std::max({scale, std::abs(p.x), std::abs(p.y)});
@@ -694,7 +789,7 @@ std::vector<std::vector<int>> BuildIncidenceLists(
   auto queryVert = [&](int v, std::vector<EdgeVertHit>& hits) {
     if (incident.Bucket(v).empty()) return;
     const Box2 query(verts[v] - vec2(margin), verts[v] + vec2(margin));
-    grid.ForEachOverlap(query, [&](int e) {
+    auto record = [&](int e) {
       const size_t before = hits.size();
       RecordEdgeVertHit(edges, verts, edgeG, eps2, v, e, hits);
       if (hits.size() == before) return;
@@ -704,7 +799,11 @@ std::vector<std::vector<int>> BuildIncidenceLists(
           return;
       }
       hits.pop_back();
-    });
+    };
+    if (tree)
+      tree->ForEachOverlap(query, record);
+    else
+      grid.ForEachOverlap(query, record);
   };
 
   std::vector<EdgeVertHit> hits;

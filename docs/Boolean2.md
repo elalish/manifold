@@ -25,7 +25,8 @@ winding:
 
 1. Merge vertices within the operation epsilon.
 2. Collapse edges whose endpoints merge together.
-3. Bin the eps-padded edge boxes into a uniform grid.
+3. Bin the eps-padded edge boxes into a uniform grid, or a `Collider` tree if
+   the edges are too unevenly spread for one.
 4. Incidence pre-split: each vertex queries the grid to find the edges whose
    interior it lies within eps of, and every edge is split at those vertices
    into two-vertex sub-edges. This is the one eps-scale quantization the
