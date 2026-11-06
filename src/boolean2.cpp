@@ -666,8 +666,8 @@ class BoxGrid {
 // and SharedEndpointSafelySkippable does not exempt them. For a hit, the pair
 // condition can fail only through rounding; applying it settles those
 // borderline cases the same way as testing the endpoints of every overlapping
-// edge pair. A hit puts v within about eps of e, so a query box around v padded
-// by eps plus a rounding margin finds every candidate e.
+// edge pair. A hit puts v within eps of e, so inside e's eps-padded box; the
+// query box around v needs only a margin for rounding.
 std::vector<std::vector<int>> BuildIncidenceLists(
     const std::vector<EdgeM>& edges, const std::vector<vec2>& verts,
     double eps) {
@@ -683,15 +683,17 @@ std::vector<std::vector<int>> BuildIncidenceLists(
       emit(edges[e].v1, e);
     }
   });
+  double scale = 0;
+  for (const vec2& p : verts)
+    scale = std::max({scale, std::abs(p.x), std::abs(p.y)});
+  const double margin = 64 * kU * scale;
   std::vector<EdgeGeom> edgeG;
   BuildEdgeGeometry(edges, verts, edgeG);
   const double eps2 = eps * eps;
 
   auto queryVert = [&](int v, std::vector<EdgeVertHit>& hits) {
     if (incident.Bucket(v).empty()) return;
-    const double pad =
-        eps + 1e-9 * (std::abs(verts[v].x) + std::abs(verts[v].y) + eps);
-    const Box2 query(verts[v] - vec2(pad), verts[v] + vec2(pad));
+    const Box2 query(verts[v] - vec2(margin), verts[v] + vec2(margin));
     grid.ForEachOverlap(query, [&](int e) {
       const size_t before = hits.size();
       RecordEdgeVertHit(edges, verts, edgeG, eps2, v, e, hits);
