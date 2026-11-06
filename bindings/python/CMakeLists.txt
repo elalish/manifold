@@ -46,6 +46,16 @@ target_compile_options(
 )
 set_target_properties(manifold3d PROPERTIES OUTPUT_NAME "manifold3d")
 
+# Keep the statically linked manifold and TBB out of the module's dynamic
+# symbol table: otherwise, in a host that already loaded a shared libmanifold
+# or libtbb (e.g. a distro Blender), the dynamic linker binds the module's
+# calls to the host's copies and objects get freed by the wrong version.
+include(CheckLinkerFlag)
+check_linker_flag(CXX "LINKER:--exclude-libs,ALL" MANIFOLD_HAS_EXCLUDE_LIBS)
+if(MANIFOLD_HAS_EXCLUDE_LIBS)
+  target_link_options(manifold3d PRIVATE "LINKER:--exclude-libs,ALL")
+endif()
+
 # ideally we should generate a dependency file from python...
 set(
   DOCSTRING_DEPS
