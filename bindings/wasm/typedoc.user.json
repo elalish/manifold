@@ -4,7 +4,7 @@
   "name": "ManifoldCAD User Guide",
   "customCss": "./documents/user-guide.css",
   "out": "docs/jsuser",
-  "entryPoints": [ "./types/manifoldCADUserGuide.d.ts" ],
+  "entryPoints": [ "./manifold-cad/types/manifoldCADUserGuide.d.ts" ],
   "alwaysCreateEntryPointModule": false,
   "excludeInternal": true,
   "readme": "none",

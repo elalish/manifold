@@ -35,7 +35,7 @@
  * @module manifoldCAD
  */
 
-import type {ManifoldToplevel} from '../manifold.d.ts';
+import type {ManifoldToplevel} from 'manifold-3d';
 
 import * as debug from './debug.ts';
 import {garbageCollectFunction, garbageCollectManifold} from './garbage-collector.ts';

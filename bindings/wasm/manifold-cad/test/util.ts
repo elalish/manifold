@@ -15,7 +15,7 @@
 import {expect} from 'vitest';
 
 import {distanceVec3} from '../lib/math.ts';
-import type {Mesh, Vec3} from '../manifold.d.ts';
+import type {Mesh, Vec3} from 'manifold-3d';
 
 export function inVec3Array(
     haystack: Array<Vec3>, needle: Vec3, margin: number = 1.0e-6): boolean {

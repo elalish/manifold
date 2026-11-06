@@ -20,8 +20,8 @@
  * @category Core
  */
 
-import type {ManifoldToplevel} from '../manifold.d.ts';
-import Module from '../manifold.js';
+import type {ManifoldToplevel} from 'manifold-3d';
+import Module from 'manifold-3d';
 
 // Instantiate Manifold WASM
 let manifoldwasm: ManifoldToplevel|null = null;

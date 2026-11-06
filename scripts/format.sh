@@ -11,11 +11,14 @@ $CLANG_FORMAT -i test/*.{h,cpp} &
 $CLANG_FORMAT -i bindings/*/*.cpp &
 $CLANG_FORMAT -i bindings/c/include/manifold/*.h &
 $CLANG_FORMAT -i bindings/wasm/*.{js,ts} &
-$CLANG_FORMAT -i bindings/wasm/lib/*.ts &
 $CLANG_FORMAT -i bindings/wasm/examples/*/*.{js,ts,html} &
 $CLANG_FORMAT -i bindings/wasm/test/*.ts &
-$CLANG_FORMAT -i bindings/wasm/test/fixtures/*.{ts,mjs} &
-$CLANG_FORMAT -i bindings/wasm/types/*.ts &
+$CLANG_FORMAT -i bindings/wasm/test/fixtures/*.mjs &
+$CLANG_FORMAT -i bindings/wasm/manifold-cad/*.js &
+$CLANG_FORMAT -i bindings/wasm/manifold-cad/lib/*.ts &
+$CLANG_FORMAT -i bindings/wasm/manifold-cad/test/*.ts &
+$CLANG_FORMAT -i bindings/wasm/manifold-cad/test/fixtures/*.{ts,mjs} &
+$CLANG_FORMAT -i bindings/wasm/manifold-cad/types/*.ts &
 $CLANG_FORMAT -i src/*.{h,cpp} &
 $CLANG_FORMAT -i include/manifold/*.h &
 

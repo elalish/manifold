@@ -19,7 +19,7 @@ import {resolve} from 'path';
 import {afterEach, expect, suite, test} from 'vitest';
 
 // @ts-ignore
-import {Mesh} from '../manifold';
+import {Mesh} from 'manifold-3d';
 
 import {gltfDocToManifold, importModel} from './import-model.ts';
 import {cleanup, evaluate, exportBlobURL} from './worker.ts';

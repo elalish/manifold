@@ -24,7 +24,7 @@ import * as GLTFTransform from '@gltf-transform/core';
 import {KHRMaterialsUnlit} from '@gltf-transform/extensions';
 import {copyToDocument} from '@gltf-transform/functions';
 
-import type {Manifold} from '../manifold.d.ts';
+import type {Manifold} from 'manifold-3d';
 
 import {getPropertyResolver} from './export-model.ts';
 import type {GLTFMaterial} from './gltf-node.ts';

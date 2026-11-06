@@ -28,7 +28,7 @@ import {fileForContentTypes, FileForRelThumbnail, to3dmodel} from '@jscadui/3mf-
 import type {Zippable} from 'fflate';
 import {strToU8, zipSync} from 'fflate';
 
-import type {Mat4} from '../manifold-global-types.d.ts';
+import type {Mat4} from 'manifold-3d/manifold-global-types.d.ts';
 
 import type {ExportOptions} from './export-model.ts';
 import {ManifoldPrimitive} from './manifold-gltf.ts';

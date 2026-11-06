@@ -14,7 +14,7 @@
 
 import {afterEach, beforeAll, describe, expect, suite, test} from 'vitest';
 
-import type {Vec3} from '../manifold.d.ts';
+import type {Vec3} from 'manifold-3d';
 import {equalsVec3Array, meshToVec3Array} from '../test/util.ts';
 
 import {toArrayBuffer} from './export-model.ts';

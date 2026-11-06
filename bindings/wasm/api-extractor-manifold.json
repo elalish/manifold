@@ -1,5 +1,6 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/api-extractor/v7/api-extractor.schema.json",
+  "projectFolder": ".",
   "mainEntryPointFilePath": "./manifold-root.d.ts",
   "compiler": {
     "overrideTsconfig": {
