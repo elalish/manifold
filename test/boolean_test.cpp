@@ -344,6 +344,37 @@ TEST(Boolean, DegenerateSplitQuadSharedEdge) {
 
 #endif
 
+// Regression test (#1888): SplitQuad gave its new triangles the normal of a
+// degenerate triangle from another face, so a later colinear collapse moved a
+// vert across a crease and silently lost volume. Checking Status() after each
+// union evaluates them in order.
+TEST(Boolean, DegenerateSplitQuadNormal) {
+  const vec3 box[5][2] = {
+      {{0x1.221316fef9f3dp-39, 0x1.ef4c7fd7b0a8cp+1, -0x1.adc3adc62749fp-39},
+       {0x1.4a32ffe520f54p+0, 0x1.4a32ffe521441p+2, 0x1.4a32ffe5217c6p+0}},
+      {{0x1.ef4c7fd7b2e94p+1, 0x1.4a32ffe520be5p+0, 0x1.4a32ffe52091ap+1},
+       {0x1.4a32ffe52129fp+2, 0x1.4a32ffe522beep+1, 0x1.ef4c7fd7b1676p+1}},
+      {{0x1.ef4c7fd7b1355p+1, 0x1.d135653670f1bp-39, 0x1.ef4c7fd7b1c8fp+1},
+       {0x1.4a32ffe521557p+2, 0x1.4a32ffe51f24p+0, 0x1.4a32ffe522335p+2}},
+      {{0x1.ef4c7fd7b275p+1, -0x1.1c7eeb46978ccp-39, 0x1.4a32ffe51fc5p+1},
+       {0x1.4a32ffe520d5cp+2, 0x1.4a32ffe52316ep+0, 0x1.ef4c7fd7b2a3dp+1}},
+      {{0x1.ef4c7fd7b1cep+1, 0x1.4a32ffe52103fp+1, 0x1.4a32ffe51e564p+0},
+       {0x1.4a32ffe5218c8p+2, 0x1.ef4c7fd7b01f7p+1, 0x1.4a32ffe520692p+1}}};
+  Manifold result;
+  double volume = 0;
+  for (const auto& b : box) {
+    Manifold m = Manifold::Cube(b[1] - b[0])
+                     .Translate(b[0])
+                     .Rotate(0x1.5d0d5d1c7af0fp+7, 0x1.5f161b5de68e7p+5,
+                             0x1.db765cb1701dp+7);
+    m = Manifold(m.GetMeshGL64());
+    volume += m.Volume();
+    result = result + m;
+    EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  }
+  EXPECT_NEAR(result.Volume(), volume, 1e-6);
+}
+
 TEST(Boolean, NoRetainedVerts) {
   Manifold cube = Manifold::Cube(vec3(1), true);
   Manifold oct = Manifold::Sphere(1, 4);
