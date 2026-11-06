@@ -1321,15 +1321,13 @@ TEST(CrossSection, CollinearSegmentOverlap) {
   EXPECT_NEAR(cs.Area(), 14.0, 1e-9);
 }
 
-// Audit target: collinearity gate in CollectIntersectionPairs. N polygon
+// Audit target: shared-endpoint gate in BuildIncidenceLists. N polygon
 // wedges all share the origin as a vertex; every pair shares that
-// endpoint. The gate must drop pairs that fan out at the center (no
-// T-junction possible) while letting through pairs that need their
-// non-shared endpoints checked. Result must be the inscribed regular
-// N-gon: one contour, area = N/2 * sin(2pi/N). If the gate over-drops
-// (filters something needed), interior wedge boundaries leak through;
-// if it under-drops (filters nothing), the test still passes but the
-// pre-1a057638 perf gain is gone.
+// endpoint. The gate must exempt pairs that fan out at the center (no
+// T-junction possible) while keeping pairs whose non-shared endpoints
+// need checking. Result must be the inscribed regular N-gon: one
+// contour, area = N/2 * sin(2pi/N). If the gate exempts something
+// needed, interior wedge boundaries leak through.
 TEST(CrossSection, ManyPolygonsShareCenterVertex) {
   constexpr int N = 8;
   Polygons polys;
