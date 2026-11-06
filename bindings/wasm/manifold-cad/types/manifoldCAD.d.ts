@@ -41,11 +41,11 @@
  */
 
 /**
- * {@include ../README.md#IncludeInUserGuide}
+ * {@include ../../README.md#IncludeInUserGuide}
  *
- * {@include ../documents/using-manifoldcad.md}
+ * {@include ../../documents/using-manifoldcad.md}
  *
- * {@include ../documents/tips.md}
+ * {@include ../../documents/tips.md}
  *
  * @packageDocumentation
  * @module manifoldCAD
@@ -71,9 +71,9 @@ export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from
 /** @group Material */
 export {setMaterial} from '../lib/material';
 /** @group Basics */
-export {CrossSection, Manifold} from '../manifold';
+export {CrossSection, Manifold} from 'manifold-3d';
 /** @group Polygons */
-export {triangulate} from '../manifold';
+export {triangulate} from 'manifold-3d';
 // clang-format on
 
 /**
@@ -90,14 +90,14 @@ export type {
   Polygons, SimplePolygon, JoinType,
   Box, Rect, RayHit, ExecutionContext,
   ErrorStatus
-} from '../manifold';
+} from 'manifold-3d';
 
 /* See the Developer Guide for more detail on these: */
 /** @internal */
-export type {SealedFloat32Array, SealedUint32Array} from '../manifold';
+export type {SealedFloat32Array, SealedUint32Array} from 'manifold-3d';
 /** @internal */
 export type {ImportOptions} from '../lib/import-model';
 /** @internal */
-export type {MeshOptions} from '../manifold';
+export type {MeshOptions} from 'manifold-3d';
 /** @internal */
-export {Mesh} from '../manifold';
+export {Mesh} from 'manifold-3d';

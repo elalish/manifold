@@ -22,8 +22,8 @@
  * @category Core
  */
 
-import type {CrossSection, Manifold} from '../manifold-encapsulated-types.d.ts';
-import type {ManifoldToplevel} from '../manifold.d.ts';
+import type {ManifoldToplevel} from 'manifold-3d';
+import type {CrossSection, Manifold} from 'manifold-3d/manifold-encapsulated-types.d.ts';
 
 const memoryRegistry = Array<Manifold|CrossSection>();
 

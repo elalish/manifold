@@ -1,0 +1,116 @@
+{
+  "name": "manifold-cad",
+  "version": "3.5.1",
+  "description": "ManifoldCAD: scripted CAD and a command line tool built on manifold-3d",
+  "bin": {
+    "manifold-cad": "bin/manifold-cad"
+  },
+  "scripts": {
+    "build": "tsc && node ./esbuild.mjs",
+    "postbuild": "api-extractor run -c api-extractor-manifoldCAD.json && api-extractor run -c api-extractor-manifoldCADGlobals.json",
+    "test": "vitest run",
+    "test:ui": "vitest --coverage --ui",
+    "test:dev": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "clean": "tsc --build --clean && rm -fr ./dist/ ./coverage",
+    "prepack": "npm run build"
+  },
+  "files": [
+    "bin/manifold-cad",
+    "lib/*.d.ts",
+    "lib/*.js",
+    "types/manifoldCAD.d.ts",
+    "types/manifoldCADGlobals.d.ts",
+    "dist/manifoldCAD.d.ts",
+    "dist/manifoldCADGlobals.d.ts",
+    "dist/worker.bundled.js"
+  ],
+  "exports": {
+    "./manifoldCAD.d.ts": "./dist/manifoldCAD.d.ts",
+    "./manifoldCAD.js": "./lib/manifoldCAD.js",
+    "./manifoldCAD": {
+      "import": {
+        "types": "./dist/manifoldCAD.d.ts",
+        "default": "./lib/manifoldCAD.js"
+      }
+    },
+    "./manifold-gltf": {
+      "import": {
+        "types": "./lib/manifold-gltf.d.ts",
+        "default": "./lib/manifold-gltf.js"
+      }
+    },
+    "./lib/worker.bundled.js": {
+      "import": {
+        "types": "./lib/worker.d.ts",
+        "default": "./dist/worker.bundled.js"
+      }
+    },
+    "./lib/*.js": "./lib/*.js",
+    "./lib/*.d.ts": "./lib/*.d.ts",
+    "./lib/*": {
+      "import": {
+        "types": "./lib/*.d.ts",
+        "default": "./lib/*.js"
+      }
+    }
+  },
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/elalish/manifold.git",
+    "directory": "bindings/wasm/manifold-cad"
+  },
+  "keywords": [
+    "3D",
+    "mesh",
+    "manifold",
+    "geometry",
+    "solid",
+    "CAD",
+    "triangle",
+    "SDF"
+  ],
+  "contributors": [
+    "Emmett Lalish <elalish>",
+    "Chun Kit LAM <pca006132>"
+  ],
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/elalish/manifold/issues"
+  },
+  "homepage": "https://github.com/elalish/manifold#readme",
+  "peerDependencies": {
+    "@gltf-transform/core": "^4.2.0",
+    "@gltf-transform/extensions": "^4.2.0",
+    "@gltf-transform/functions": "^4.2.0",
+    "esbuild-wasm": "^0.27.3"
+  },
+  "devDependencies": {
+    "@chialab/esbuild-plugin-meta-url": "^0.19.0",
+    "@microsoft/api-extractor": "^7.57.7",
+    "@types/convert-source-map": "^2.0.3",
+    "@types/node": "^25.0.9",
+    "@vitest/coverage-v8": "^4.0.17",
+    "@vitest/ui": "^4.0.17",
+    "glob": "^13.0.0",
+    "gltf-validator": "^2.0.0-dev.3.10",
+    "stacktrace-parser": "^0.1.11",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.17"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^4.2.0",
+    "@gltf-transform/extensions": "^4.2.0",
+    "@gltf-transform/functions": "^4.2.0",
+    "@jridgewell/resolve-uri": "^3.1.2",
+    "@jridgewell/trace-mapping": "^0.3.31",
+    "@jscadui/3mf-export": "^0.5.0",
+    "commander": "^13.1.0",
+    "convert-source-map": "^2.0.0",
+    "fast-xml-parser": "^5.4.2",
+    "fflate": "^0.8.0",
+    "magic-string": "^0.30.21",
+    "manifold-3d": "3.5.1"
+  }
+}

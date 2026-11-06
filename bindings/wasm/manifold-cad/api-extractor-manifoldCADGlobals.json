@@ -1,6 +1,7 @@
 {
   "$schema": "https://developer.microsoft.com/json-schemas/api-extractor/v7/api-extractor.schema.json",
-  "mainEntryPointFilePath": "./types/manifoldCAD.d.ts",
+  "mainEntryPointFilePath": "./types/manifoldCADGlobals.d.ts",
+  "bundledPackages": ["manifold-3d"],
   "apiReport": {
     "enabled": false
   },
@@ -9,7 +10,7 @@
   },
   "dtsRollup": {
     "enabled": true,
-    "untrimmedFilePath": "./dist/manifoldCAD.d.ts"
+    "untrimmedFilePath": "./dist/manifoldCADGlobals.d.ts"
   },
   "tsdocMetadata": {
     "enabled": false

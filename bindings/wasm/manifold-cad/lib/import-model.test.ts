@@ -13,10 +13,10 @@
 // limitations under the License.
 
 import * as validator from 'gltf-validator';
+import type {Vec3} from 'manifold-3d';
 import * as fs from 'node:fs/promises';
 import {afterEach, beforeAll, expect, suite, test} from 'vitest';
 
-import type {Vec3} from '../manifold.d.ts';
 import {equalsVec3Array, meshToVec3Array} from '../test/util.ts';
 
 import {toArrayBuffer} from './export-model.ts';

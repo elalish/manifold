@@ -17,7 +17,7 @@
  * @packageDocumentation
  */
 
-import type {Vec3} from '../manifold.d.ts';
+import type {Vec3} from 'manifold-3d';
 
 const {cos, sin, sqrt, PI} = Math;
 
