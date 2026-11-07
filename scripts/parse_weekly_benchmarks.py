@@ -212,7 +212,11 @@ def parse_gtest_run(run_path: Path, run_index: int) -> dict:
     tests = []
     for testsuite in report.get("testsuites", []):
         for test in testsuite.get("testsuite", []):
-            if "failures" in test:
+            if (
+                "failures" in test
+                or test.get("status") == "NOTRUN"
+                or test.get("result") in {"SKIPPED", "SUPPRESSED"}
+            ):
                 continue
             name = f"{test['classname']}.{test['name']}"
             time_ms = float(test["time"].rstrip("s")) * 1000.0
@@ -234,9 +238,18 @@ def parse_gtest_suite(suite_dir: Path) -> dict:
     ]
     test_order = [item["name"] for item in runs[0]["tests"]]
 
+    samples_by_name = {name: [] for name in test_order}
+    for run in runs:
+        timings = {test["name"]: test["time_ms"] for test in run["tests"]}
+        if len(timings) != len(run["tests"]):
+            raise ValueError(f"Duplicate Google Test result in {run['path']}")
+        if timings.keys() != samples_by_name.keys():
+            raise ValueError(f"Google Test names differ in {run['path']}")
+        for name, elapsed in timings.items():
+            samples_by_name[name].append(elapsed)
+
     tests = []
-    for position, name in enumerate(test_order):
-        samples = [run["tests"][position]["time_ms"] for run in runs]
+    for name, samples in samples_by_name.items():
         tests.append({"name": name, "time_ms": summarize(samples, "_ms")})
 
     return {
@@ -438,3 +451,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+

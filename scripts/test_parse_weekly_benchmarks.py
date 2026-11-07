@@ -1,3 +1,4 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -28,3 +29,23 @@ class EmberCaseAlignmentTests(unittest.TestCase):
                 self.parse([[(0, 10), (1, 20)], cases])
         with self.assertRaisesRegex(ValueError, "Unknown Ember case index"):
             self.parse([[(2, 1)]])
+
+
+
+class GoogleTestAlignmentTests(unittest.TestCase):
+    def test_reordered_and_skipped_tests(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for i, names in enumerate([["A", "B"], ["B", "A"]], 1):
+                results = [
+                    {"classname": "Suite", "name": name, "time": "1s" if name == "A" else "2s"}
+                    for name in names
+                ]
+                results.extend([
+                    {"classname": "Suite", "name": "Disabled", "status": "NOTRUN"},
+                    {"classname": "Suite", "name": "Skipped", "result": "SKIPPED"},
+                ])
+                (root / f"run{i}.json").write_text(json.dumps({"testsuites": [{"testsuite": results}]}))
+            report = parser.parse_gtest_suite(root)
+            self.assertEqual(report["test_order"], ["Suite.A", "Suite.B"])
+            self.assertEqual(report["tests"][0]["time_ms"]["samples_ms"], [1000.0, 1000.0])
