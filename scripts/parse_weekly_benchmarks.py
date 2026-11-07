@@ -106,15 +106,29 @@ def parse_ember_suite(suite_dir: Path, source_dir: Path) -> dict:
     ember_specs = load_ember_specs(source_dir)
     case_order = [case["case_index"] for case in runs[0]["cases"]]
 
+    phases_by_run = []
+    expected = set(case_order)
+    for run in runs:
+        by_index = {case["case_index"]: case["phases_ms"] for case in run["cases"]}
+        if len(by_index) != len(run["cases"]):
+            raise ValueError(f"Duplicate Ember case in {run['path']}")
+        if by_index.keys() != expected:
+            missing = sorted(expected - by_index.keys())
+            unexpected = sorted(by_index.keys() - expected)
+            raise ValueError(f"Ember cases differ in {run['path']}: missing={missing}, unexpected={unexpected}")
+        phases_by_run.append(by_index)
+
     cases = []
-    for position, case_index in enumerate(case_order):
+    for case_index in case_order:
+        if case_index >= len(ember_specs):
+            raise ValueError(f"Unknown Ember case index {case_index} in {runs[0]['path']}")
         spec = ember_specs[case_index]
         phase_samples = {phase: [] for phase in INDEPENDENT_PHASES}
         full_phase_samples = []
         intersect12_share_samples = []
 
-        for run in runs:
-            phases = run["cases"][position]["phases_ms"]
+        for by_index in phases_by_run:
+            phases = by_index[case_index]
             full_phase_sum = sum(phases[phase] for phase in INDEPENDENT_PHASES)
             full_phase_samples.append(full_phase_sum)
             intersect12_sum = phases["Intersect12 P->Q"] + phases["Intersect12 Q->P"]
