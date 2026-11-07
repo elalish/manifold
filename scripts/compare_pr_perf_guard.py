@@ -9,10 +9,10 @@ from pathlib import Path
 from system_metadata import resolve_metadata
 
 # fallback: extract only time value when nTri label is not present
-TIME_PATTERN = re.compile(r"time\s*=\s*([0-9]*\.?[0-9]+)\s*sec")
+TIME_PATTERN = re.compile(r"time\s*=\s*([0-9]*\.?[0-9]+(?:[eE][+-]?[0-9]+)?)\s*sec")
 # primary: extract both nTri bucket and timing from perfTest output
 TRI_TIME_PATTERN = re.compile(
-    r"nTri\s*=\s*([0-9]+)\s*,\s*time\s*=\s*([0-9]*\.?[0-9]+)\s*sec"
+    r"nTri\s*=\s*([0-9]+)\s*,\s*time\s*=\s*([0-9]*\.?[0-9]+(?:[eE][+-]?[0-9]+)?)\s*sec"
 )
 PEAK_RSS_PATTERN = re.compile(
     r"PEAK_RSS\s+nTri=([^\s]+)\s+size_index=([0-9]+)\s+"
@@ -64,8 +64,10 @@ def parse_run(run_path: Path, run_index: int) -> dict:
         if peak_rss_match:
             ntri, size_index, peak_rss_mb, _peak_rss_bytes = peak_rss_match.groups()
             benchmark_key = (
-                f"nTri={ntri}" if ntri != "unknown" else f"size_index={size_index}"
+                f"nTri={ntri}" if ntri != "unknown" else f"benchmark_{int(size_index) + 1}"
             )
+            if benchmark_key in peak_rss_by_benchmark:
+                raise RuntimeError(f"Duplicate peak RSS for {benchmark_key} in {run_path}")
             peak_rss_by_benchmark[benchmark_key] = {
                 "peak_rss_mb": float(peak_rss_mb),
             }
@@ -91,7 +93,10 @@ def parse_run(run_path: Path, run_index: int) -> dict:
 
 def parse_suite(suite_dir: Path) -> dict:
     # parse all run*.txt and build per-benchmark aggregates across repeats
-    run_files = sorted(suite_dir.glob("run*.txt"))
+    run_files = sorted(
+        (p for p in suite_dir.glob("run*.txt") if p.stem[3:].isdigit()),
+        key=lambda p: int(p.stem[3:]),
+    )
     if not run_files:
         raise RuntimeError(f"No run*.txt files found in {suite_dir}")
 
@@ -114,9 +119,9 @@ def parse_suite(suite_dir: Path) -> dict:
                 peak_rss_samples[entry["benchmark"]].append(entry["peak_rss_mb"])
 
     for benchmark in benchmark_order:
-        if not peak_rss_samples[benchmark]:
+        if len(peak_rss_samples[benchmark]) != len(runs):
             raise RuntimeError(
-                f"No peak RSS samples for benchmark {benchmark!r} in {suite_dir}"
+                f"Missing peak RSS samples for benchmark {benchmark!r} in {suite_dir}"
             )
 
     benchmarks = {
