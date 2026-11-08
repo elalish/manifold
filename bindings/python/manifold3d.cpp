@@ -67,14 +67,17 @@ struct nb::detail::type_caster<la::vec<T, N>> {
   NB_TYPE_CASTER(la_type, const_name(la_name<la_type>::name));
 
   bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept {
-    int size = PyObject_Size(src.ptr());  // negative on failure
-    if (size != N) return false;
+    size_t size;
+    PyObject* temp;
+    PyObject** o = seq_get(src.ptr(), &size, &temp);
+    bool success = o != nullptr && size == N;
     make_caster<T> t_cast;
-    for (int i = 0; i < size; i++) {
-      if (!t_cast.from_python(src[i], flags, cleanup)) return false;
-      value[i] = t_cast.value;
+    for (size_t i = 0; success && i < size; i++) {
+      success = t_cast.from_python(o[i], flags, cleanup);
+      if (success) value[i] = t_cast.value;
     }
-    return true;
+    Py_XDECREF(temp);
+    return success;
   }
   static handle from_cpp(la_type vec, rv_policy policy,
                          cleanup_list* cleanup) noexcept {
@@ -92,19 +95,24 @@ struct nb::detail::type_caster<la::mat<T, R, C>> {
   NB_TYPE_CASTER(la_type, const_name(la_name<la_type>::name));
 
   bool from_python(handle src, uint8_t flags, cleanup_list* cleanup) noexcept {
-    int rows = PyObject_Size(src.ptr());  // negative on failure
-    if (rows != R) return false;
-    for (int i = 0; i < R; i++) {
-      const nb::object& slice = src[i];
-      int cols = PyObject_Size(slice.ptr());  // negative on failure
-      if (cols != C) return false;
-      for (int j = 0; j < C; j++) {
-        make_caster<T> t_cast;
-        if (!t_cast.from_python(slice[j], flags, cleanup)) return false;
-        value[j][i] = t_cast.value;
+    size_t rows;
+    PyObject* temp;
+    PyObject** o = seq_get(src.ptr(), &rows, &temp);
+    bool success = o != nullptr && rows == R;
+    for (size_t i = 0; success && i < R; i++) {
+      size_t cols;
+      PyObject* row_temp;
+      PyObject** row = seq_get(o[i], &cols, &row_temp);
+      success = row != nullptr && cols == C;
+      make_caster<T> t_cast;
+      for (size_t j = 0; success && j < C; j++) {
+        success = t_cast.from_python(row[j], flags, cleanup);
+        if (success) value[j][i] = t_cast.value;
       }
+      Py_XDECREF(row_temp);
     }
-    return true;
+    Py_XDECREF(temp);
+    return success;
   }
   static handle from_cpp(la_type mat, rv_policy policy,
                          cleanup_list* cleanup) noexcept {
@@ -140,14 +148,18 @@ struct nb::detail::type_caster<std::vector<la::vec<T, N>>> {
         }
       }
     } else {
-      size_t num_vec = PyObject_Size(src.ptr());  // negative on failure
-      if (num_vec == static_cast<size_t>(-1)) return false;
-      value.resize(num_vec);
-      for (size_t i = 0; i < num_vec; i++) {
+      size_t num_vec;
+      PyObject* temp;
+      PyObject** o = seq_get(src.ptr(), &num_vec, &temp);
+      bool success = o != nullptr;
+      if (success) value.resize(num_vec);
+      for (size_t i = 0; success && i < num_vec; i++) {
         make_caster<la_type> vec_cast;
-        if (!vec_cast.from_python(src[i], flags, cleanup)) return false;
-        value[i] = vec_cast.value;
+        success = vec_cast.from_python(o[i], flags, cleanup);
+        if (success) value[i] = vec_cast.value;
       }
+      Py_XDECREF(temp);
+      return success;
     }
     return true;
   }
@@ -254,7 +266,7 @@ NB_MODULE(manifold3d, m) {
       .def("scale", &Manifold::Scale, nb::arg("v"), manifold__scale__v)
       .def(
           "scale",
-          [](const Manifold& self, double s) { self.Scale({s, s, s}); },
+          [](const Manifold& self, double s) { return self.Scale({s, s, s}); },
           nb::arg("s"),
           "Scale this Manifold in space. This operation can be chained. "
           "Transforms are combined and applied lazily.\n\n"
@@ -835,7 +847,7 @@ NB_MODULE(manifold3d, m) {
            cross_section__scale__scale)
       .def(
           "scale",
-          [](const CrossSection& self, double s) { self.Scale({s, s}); },
+          [](const CrossSection& self, double s) { return self.Scale({s, s}); },
           nb::arg("s"),
           "Scale this CrossSection in space. This operation can be chained. "
           "Transforms are combined and applied lazily."
