@@ -578,12 +578,18 @@ std::vector<FilletGeometry> BuildFilletGeometries(const FilletInput& input,
   vec2 center;
   double firstT = 0;
   double secondT = 0;
+  // The tangent points are the center's projections onto the edges. For
+  // nearly parallel lines the solver's own parameters are ill-conditioned
+  // (and meaningless for collinear edges, which can never share a ball), but
+  // projecting the center is well-conditioned.
   if (IntersectLines(firstOffset, firstVec, secondOffset, secondVec, center,
-                     firstT, secondT) &&
-      firstT >= 0 && firstT <= 1 && secondT >= 0 && secondT <= 1 &&
-      FinishFilletGeometry(input, firstEdge, secondEdge, firstT, secondT, false,
-                           false, center, geometry)) {
-    geometries.push_back(geometry);
+                     firstT, secondT)) {
+    firstT = dot(center - firstStart, firstVec) / dot(firstVec, firstVec);
+    secondT = dot(center - secondStart, secondVec) / dot(secondVec, secondVec);
+    if (firstT >= 0 && firstT <= 1 && secondT >= 0 && secondT <= 1 &&
+        FinishFilletGeometry(input, firstEdge, secondEdge, firstT, secondT,
+                             false, false, center, geometry))
+      geometries.push_back(geometry);
   }
 
   // A vertex on the line of the other edge can only be touched at the tangent
@@ -1233,7 +1239,11 @@ std::vector<CrossSection> TraceFillets(
 
   if (resultLoops.empty()) return {};
 
-  return CrossSection(resultLoops).Decompose();
+  // Decompose returns the section itself when it has fewer than two contours,
+  // including when it is empty.
+  const CrossSection result(resultLoops);
+  if (result.IsEmpty()) return {};
+  return result.Decompose();
 }
 
 // Turns towards the material side must come from discretized arcs, so be no
