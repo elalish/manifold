@@ -85,6 +85,8 @@ struct FilletGeometry {
 struct IntersectResult {
   int count = 0;
   std::array<vec2, 2> points{vec2(), vec2()};
+  // For IntersectSegmentArc, the parameter of each point along the segment.
+  std::array<double, 2> params{0, 0};
   // The two solutions coincide: the ball fits exactly through a neck and
   // carries an arc on each side of it.
   bool tangent = false;
@@ -240,18 +242,22 @@ IntersectResult IntersectSegmentArc(vec2 p, vec2 q, vec2 center, double radius,
   const double tOffset = offset / std::sqrt(lenSq);
   const std::array<double, 2> values{projectionT - tOffset,
                                      projectionT + tOffset};
+  // Coincident when they round to the same parameter, even if tOffset is not
+  // exactly zero.
+  const int numValues = values[0] == values[1] ? 1 : 2;
 
   IntersectResult result;
-  for (const double t : values) {
-    if (result.count == 1 && t == values[0]) continue;
+  for (int i = 0; i < numValues; ++i) {
+    const double t = values[i];
     if (!(t >= 0 && t <= 1)) continue;
 
     const vec2 point = p + edge * t;
     if (IsVectorInSector(point - center, arcStart, arcEnd, arcCCW)) {
+      result.params[result.count] = t;
       result.points[result.count++] = point;
     }
   }
-  result.tangent = result.count == 1 && values[0] == values[1];
+  result.tangent = numValues == 1 && result.count == 1;
 
   return result;
 }
@@ -273,14 +279,15 @@ IntersectResult IntersectArcArc(vec2 c1, vec2 arc1Start, vec2 arc1End,
 
   IntersectResult result;
   const std::array<vec2, 2> points{midpoint + offset, midpoint - offset};
-  for (const vec2 point : points) {
-    if (result.count == 1 && SamePoint(point, result.points[0])) continue;
+  const int numPoints = SamePoint(points[0], points[1]) ? 1 : 2;
+  for (int i = 0; i < numPoints; ++i) {
+    const vec2 point = points[i];
     if (IsVectorInSector(point - c1, arc1Start, arc1End, arc1CCW) &&
         IsVectorInSector(point - c2, arc2Start, arc2End, arc2CCW)) {
       result.points[result.count++] = point;
     }
   }
-  result.tangent = result.count == 1 && SamePoint(points[0], points[1]);
+  result.tangent = numPoints == 1 && result.count == 1;
 
   return result;
 }
@@ -463,6 +470,14 @@ double PivotKey(const FilletInput& input, int edge, double t, vec2 center) {
   return NormalizeAngle(input.invert ? to - from : from - to);
 }
 
+// The point at parameter t along edge e, exactly its start or end vertex at
+// t = 0 or 1.
+vec2 PointOnEdge(const FilletInput& input, int e, double t) {
+  if (t == 0) return EdgeStart(input, e);
+  if (t == 1) return EdgeEnd(input, e);
+  return EdgeStart(input, e) + t * (EdgeEnd(input, e) - EdgeStart(input, e));
+}
+
 bool FinishFilletGeometry(const FilletInput& input, int firstEdge,
                           int secondEdge, double firstT, double secondT,
                           bool firstIsVertex, bool secondIsVertex, vec2 center,
@@ -478,25 +493,16 @@ bool FinishFilletGeometry(const FilletInput& input, int firstEdge,
                           : Contact{secondEdge, false};
   double fromT = firstT;
   double toT = secondT;
-  vec2 fromPoint =
-      EdgeStart(input, firstEdge) +
-      firstT * (EdgeEnd(input, firstEdge) - EdgeStart(input, firstEdge));
-  vec2 toPoint =
-      EdgeStart(input, secondEdge) +
-      secondT * (EdgeEnd(input, secondEdge) - EdgeStart(input, secondEdge));
+  vec2 fromPoint = PointOnEdge(input, firstEdge, firstT);
+  vec2 toPoint = PointOnEdge(input, secondEdge, secondT);
   vec2 fromRadius = fromPoint - center;
   vec2 toRadius = toPoint - center;
 
+  // Arcs run CCW around the ball (CW with invert). `reverse` asks for the
+  // other arc of a ball through a neck (see IntersectResult::tangent).
   const double radiusCross = la::cross(fromRadius, toRadius);
-  if ((!input.invert && radiusCross < 0) || (input.invert && radiusCross > 0)) {
-    std::swap(fromEdge, toEdge);
-    std::swap(fromContact, toContact);
-    std::swap(fromT, toT);
-    std::swap(fromPoint, toPoint);
-    std::swap(fromRadius, toRadius);
-  }
-  // The other arc of a ball through a neck (see IntersectResult::tangent).
-  if (reverse) {
+  const bool backwards = input.invert ? radiusCross > 0 : radiusCross < 0;
+  if (backwards != reverse) {
     std::swap(fromEdge, toEdge);
     std::swap(fromContact, toContact);
     std::swap(fromT, toT);
@@ -545,7 +551,6 @@ std::vector<FilletGeometry> BuildFilletGeometries(const FilletInput& input,
                                                   int firstEdge, int secondEdge,
                                                   double radius) {
   std::vector<FilletGeometry> geometries;
-  if (firstEdge == secondEdge) return geometries;
 
   const vec2 firstStart = EdgeStart(input, firstEdge);
   const vec2 firstEnd = EdgeEnd(input, firstEdge);
@@ -555,8 +560,6 @@ std::vector<FilletGeometry> BuildFilletGeometries(const FilletInput& input,
   const vec2 secondNextEnd = EdgeEnd(input, NextEdge(input, secondEdge));
   const vec2 firstVec = firstEnd - firstStart;
   const vec2 secondVec = secondEnd - secondStart;
-
-  if (length2(firstVec) == 0 || length2(secondVec) == 0) return geometries;
 
   const vec2 firstNormal = EdgeNormal(firstVec, input.invert);
   const vec2 secondNormal = EdgeNormal(secondVec, input.invert);
@@ -583,39 +586,38 @@ std::vector<FilletGeometry> BuildFilletGeometries(const FilletInput& input,
     geometries.push_back(geometry);
   }
 
-  if (!secondConvex) {
+  // A vertex on the line of the other edge can only be touched at the tangent
+  // point itself, a zero-length arc; skip vertex-line pairs where the vertex
+  // is an endpoint of that edge.
+  auto onEdge = [&](vec2 v, vec2 a, vec2 b) {
+    return SamePoint(v, a) || SamePoint(v, b);
+  };
+
+  if (!secondConvex && !onEdge(secondEnd, firstStart, firstEnd)) {
     const IntersectResult ev = IntersectSegmentArc(
         firstOffset, firstOffset + firstVec, secondEnd, radius, secondNormal,
         secondNextNormal, input.invert);
 
     for (int i = 0; i < ev.count; ++i) {
-      const vec2 candidate = ev.points[i];
-      const double t =
-          dot(candidate - firstOffset, firstVec) / dot(firstVec, firstVec);
-      if (!(t >= 0 && t <= 1)) continue;
       for (const bool reverse : {false, true}) {
         if (reverse && !ev.tangent) break;
-        if (FinishFilletGeometry(input, firstEdge, secondEdge, t, 1, false,
-                                 true, candidate, geometry, reverse))
+        if (FinishFilletGeometry(input, firstEdge, secondEdge, ev.params[i], 1,
+                                 false, true, ev.points[i], geometry, reverse))
           geometries.push_back(geometry);
       }
     }
   }
 
-  if (!firstConvex) {
+  if (!firstConvex && !onEdge(firstEnd, secondStart, secondEnd)) {
     const IntersectResult ve =
         IntersectSegmentArc(secondOffset, secondOffset + secondVec, firstEnd,
                             radius, firstNormal, firstNextNormal, input.invert);
 
     for (int i = 0; i < ve.count; ++i) {
-      const vec2 candidate = ve.points[i];
-      const double t =
-          dot(candidate - secondOffset, secondVec) / dot(secondVec, secondVec);
-      if (!(t >= 0 && t <= 1)) continue;
       for (const bool reverse : {false, true}) {
         if (reverse && !ve.tangent) break;
-        if (FinishFilletGeometry(input, firstEdge, secondEdge, 1, t, true,
-                                 false, candidate, geometry, reverse))
+        if (FinishFilletGeometry(input, firstEdge, secondEdge, 1, ve.params[i],
+                                 true, false, ve.points[i], geometry, reverse))
           geometries.push_back(geometry);
       }
     }
