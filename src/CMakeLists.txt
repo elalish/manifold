@@ -23,6 +23,7 @@ set(
   boolean_result.cpp
   constructors.cpp
   cross_section.cpp
+  cross_section/fillet2d.cpp
   csg_tree.cpp
   edge_op.cpp
   execution_impl.cpp

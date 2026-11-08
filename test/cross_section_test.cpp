@@ -3051,3 +3051,148 @@ TEST(CrossSection, WindingSweepCrossingsAndRoundOffsets) {
   EXPECT_EQ(mesh.Status(), Manifold::Error::NoError);
   EXPECT_NEAR(mesh.Volume(), eroded.Area() * 2.0, 1e-5);
 }
+
+namespace {
+
+double NormalizeAngle(double angle) {
+  while (angle < 0) angle += 2.0 * kPi;
+  while (angle >= 2.0 * kPi) angle -= 2.0 * kPi;
+  return angle;
+}
+
+void ExpectFilletAngles(const CrossSection& crossSection,
+                        int circularSegments) {
+  const double dPhi = 2.0 * kPi / circularSegments;
+  for (const SimplePolygon& loop : crossSection.ToPolygons()) {
+    ASSERT_GE(loop.size(), 3);
+    for (size_t i = 0; i < loop.size(); ++i) {
+      const vec2 p1 = loop[i];
+      const vec2 p2 = loop[(i + 1) % loop.size()];
+      const vec2 p3 = loop[(i + 2) % loop.size()];
+      const vec2 e1 = p2 - p1;
+      const vec2 e2 = p3 - p2;
+
+      EXPECT_TRUE(std::isfinite(p1.x));
+      EXPECT_TRUE(std::isfinite(p1.y));
+      EXPECT_GT(length2(e1), 0);
+      EXPECT_GT(length2(e2), 0);
+
+      const double angle =
+          NormalizeAngle(std::atan2(e2.y, e2.x) - std::atan2(e1.y, e1.x));
+      EXPECT_TRUE(angle > kPi || angle < dPhi + dPhi * 0.1);
+    }
+  }
+}
+
+void ExpectValidLoops(const CrossSection& crossSection) {
+  for (const SimplePolygon& loop : crossSection.ToPolygons()) {
+    ASSERT_GE(loop.size(), 3);
+    for (size_t i = 0; i < loop.size(); ++i) {
+      const vec2 p1 = loop[i];
+      const vec2 p2 = loop[(i + 1) % loop.size()];
+
+      EXPECT_TRUE(std::isfinite(p1.x));
+      EXPECT_TRUE(std::isfinite(p1.y));
+      EXPECT_GT(length2(p2 - p1), 0);
+    }
+  }
+}
+
+CrossSection ExpectFilletResult(const CrossSection& input, double radius,
+                                int circularSegments) {
+  const std::vector<CrossSection> pieces =
+      input.Fillet(radius, circularSegments);
+  const CrossSection composed = CrossSection::BatchBoolean(pieces, OpType::Add);
+
+  EXPECT_FALSE(pieces.empty());
+  EXPECT_FALSE(composed.IsEmpty());
+  if (radius < 0) {
+    EXPECT_GT(composed.Area(), input.Area());
+  } else {
+    EXPECT_LT(composed.Area(), input.Area());
+  }
+  EXPECT_GT(std::abs(composed.Area() - input.Area()), 1e-9);
+
+  for (const CrossSection& piece : pieces) {
+    ExpectValidLoops(piece);
+    if (radius > 0) ExpectFilletAngles(piece, circularSegments);
+  }
+  ExpectValidLoops(composed);
+  if (radius > 0) ExpectFilletAngles(composed, circularSegments);
+  return composed;
+}
+
+}  // namespace
+
+TEST(CrossSection, FilletPositiveEESquareProducesGeometry) {
+  CrossSection input = CrossSection::Square({10, 10});
+  CrossSection filleted = ExpectFilletResult(input, 1, 16);
+
+  EXPECT_GT(filleted.NumVert(), input.NumVert());
+}
+
+TEST(CrossSection, FilletPositiveEVAndVEConcaveL) {
+  CrossSection input =
+      CrossSection(Polygons{{{0, 0}, {6, 0}, {6, 2}, {2, 2}, {2, 6}, {0, 6}}});
+  CrossSection filleted = ExpectFilletResult(input, 1, 20);
+
+  EXPECT_GT(filleted.NumVert(), input.NumVert());
+}
+
+TEST(CrossSection, FilletPositiveVVStar) {
+  CrossSection input = CrossSection(Polygons{{{3.18993, 0},
+                                              {0.549068, 0.951013},
+                                              {-1.47393, 2.55292},
+                                              {-1.1997, 0},
+                                              {-2.47915, -4.29402},
+                                              {0.942809, -1.63299}}});
+  CrossSection filleted = ExpectFilletResult(input, 1.2, 20);
+
+  EXPECT_GT(filleted.NumVert(), input.NumVert());
+}
+
+TEST(CrossSection, FilletNegativeRadiusRoundsConcaveCorners) {
+  CrossSection input = CrossSection(Polygons{
+      {{0, 0}, {6, 0}, {6, 6}, {4, 6}, {4, 2}, {2, 2}, {2, 6}, {0, 6}}});
+  CrossSection filleted = ExpectFilletResult(input, -1, 20);
+
+  EXPECT_GT(filleted.NumVert(), input.NumVert());
+}
+
+TEST(CrossSection, FilletTooFlatForSegmentCount) {
+  CrossSection input = CrossSection::Square({10, 10});
+  std::vector<CrossSection> filleted = input.Fillet(1, 3);
+
+  EXPECT_TRUE(filleted.empty());
+}
+
+TEST(CrossSection, FilletDeterministic) {
+  CrossSection input = CrossSection::Square({10, 10});
+  CrossSection a = CrossSection::BatchBoolean(input.Fillet(1, 16), OpType::Add);
+  CrossSection b = CrossSection::BatchBoolean(input.Fillet(1, 16), OpType::Add);
+
+  EXPECT_EQ(a.NumContour(), b.NumContour());
+  EXPECT_EQ(a.NumVert(), b.NumVert());
+  EXPECT_DOUBLE_EQ(a.Area(), b.Area());
+}
+
+TEST(CrossSection, FilletRadiusFitRejectsOversizedTriangle) {
+  CrossSection input = CrossSection({{0, 0}, {10, 0}, {0, 10}});
+  std::vector<CrossSection> filleted = input.Fillet(4, 16);
+
+  EXPECT_TRUE(filleted.empty());
+}
+
+TEST(CrossSection, FilletNearColinearRejected) {
+  CrossSection input = CrossSection({{0, 0}, {10, 0}, {20, 1e-9}});
+  std::vector<CrossSection> filleted = input.Fillet(0.1, 16);
+
+  EXPECT_TRUE(filleted.empty());
+}
+
+TEST(CrossSection, FilletNegativeRadiusStrictlyRejectedOnConvexSquare) {
+  CrossSection input = CrossSection::Square({10, 10});
+  std::vector<CrossSection> filleted = input.Fillet(-1, 16);
+
+  EXPECT_TRUE(filleted.empty());
+}

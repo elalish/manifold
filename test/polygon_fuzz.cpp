@@ -106,7 +106,7 @@ std::vector<TestCase> SeedProvider() {
   std::string dir = file.substr(0, file.rfind('/'));
   auto f = std::ifstream(dir + "/polygons/" + "polygon_corpus.txt");
   // for each test:
-  //   test name, expectedNumTri, precision, num polygons
+  //   test name, expectedNumTri, precision, num polygons, max circle radius
   //   for each polygon:
   //     num points
   //     for each vertex:
@@ -115,14 +115,15 @@ std::vector<TestCase> SeedProvider() {
   // note that we should not have commas in the file
 
   std::string name;
-  double precision, x, y;
+  double precision, x, y, maxCircleRadius;
   int expectedNumTri, numPolys, numPoints;
 
   std::vector<TestCase> TestCases;
   while (1) {
     f >> name;
     if (f.eof()) break;
-    f >> expectedNumTri >> precision >> numPolys;
+    f >> expectedNumTri >> precision >> numPolys >> maxCircleRadius;
+    (void)maxCircleRadius;
     Polygons polys;
     for (int i = 0; i < numPolys; i++) {
       polys.emplace_back();
