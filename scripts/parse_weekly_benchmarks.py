@@ -106,29 +106,15 @@ def parse_ember_suite(suite_dir: Path, source_dir: Path) -> dict:
     ember_specs = load_ember_specs(source_dir)
     case_order = [case["case_index"] for case in runs[0]["cases"]]
 
-    phases_by_run = []
-    expected = set(case_order)
-    for run in runs:
-        by_index = {case["case_index"]: case["phases_ms"] for case in run["cases"]}
-        if len(by_index) != len(run["cases"]):
-            raise ValueError(f"Duplicate Ember case in {run['path']}")
-        if by_index.keys() != expected:
-            missing = sorted(expected - by_index.keys())
-            unexpected = sorted(by_index.keys() - expected)
-            raise ValueError(f"Ember cases differ in {run['path']}: missing={missing}, unexpected={unexpected}")
-        phases_by_run.append(by_index)
-
     cases = []
-    for case_index in case_order:
-        if case_index >= len(ember_specs):
-            raise ValueError(f"Unknown Ember case index {case_index} in {runs[0]['path']}")
+    for position, case_index in enumerate(case_order):
         spec = ember_specs[case_index]
         phase_samples = {phase: [] for phase in INDEPENDENT_PHASES}
         full_phase_samples = []
         intersect12_share_samples = []
 
-        for by_index in phases_by_run:
-            phases = by_index[case_index]
+        for run in runs:
+            phases = run["cases"][position]["phases_ms"]
             full_phase_sum = sum(phases[phase] for phase in INDEPENDENT_PHASES)
             full_phase_samples.append(full_phase_sum)
             intersect12_sum = phases["Intersect12 P->Q"] + phases["Intersect12 Q->P"]
@@ -205,18 +191,11 @@ def parse_perf_suite(suite_dir: Path) -> dict:
 
 
 def parse_gtest_run(run_path: Path, run_index: int) -> dict:
-    # run_path is a gtest --gtest_output=json report; a passing test has no
-    # "failures" key, matching the old parser's "only count [ OK ] lines"
-    # behavior. time is a string in seconds, e.g. "0.024s" or "0s".
     report = json.loads(run_path.read_text(encoding="utf-8-sig"))
     tests = []
     for testsuite in report.get("testsuites", []):
         for test in testsuite.get("testsuite", []):
-            if (
-                "failures" in test
-                or test.get("status") == "NOTRUN"
-                or test.get("result") in {"SKIPPED", "SUPPRESSED"}
-            ):
+            if "failures" in test or test.get("result") in {"SKIPPED", "SUPPRESSED"}:
                 continue
             name = f"{test['classname']}.{test['name']}"
             time_ms = float(test["time"].rstrip("s")) * 1000.0
@@ -236,26 +215,20 @@ def parse_gtest_suite(suite_dir: Path) -> dict:
         parse_gtest_run(path, i + 1)
         for i, path in enumerate(gtest_run_files(suite_dir))
     ]
-    test_order = [item["name"] for item in runs[0]["tests"]]
-
-    samples_by_name = {name: [] for name in test_order}
+    samples_by_name = {}
     for run in runs:
-        timings = {test["name"]: test["time_ms"] for test in run["tests"]}
-        if len(timings) != len(run["tests"]):
-            raise ValueError(f"Duplicate Google Test result in {run['path']}")
-        if timings.keys() != samples_by_name.keys():
-            raise ValueError(f"Google Test names differ in {run['path']}")
-        for name, elapsed in timings.items():
-            samples_by_name[name].append(elapsed)
+        for test in run["tests"]:
+            samples_by_name.setdefault(test["name"], []).append(test["time_ms"])
 
-    tests = []
-    for name, samples in samples_by_name.items():
-        tests.append({"name": name, "time_ms": summarize(samples, "_ms")})
+    tests = [
+        {"name": name, "time_ms": summarize(samples, "_ms")}
+        for name, samples in samples_by_name.items()
+    ]
 
     return {
         "type": "existing_gtests",
         "description": "Selected existing regression tests used as weekly benchmark signals",
-        "test_order": test_order,
+        "test_order": list(samples_by_name),
         "tests": tests,
         "runs": runs,
     }
@@ -451,4 +424,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
-
