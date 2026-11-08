@@ -317,10 +317,11 @@ def build_gtest_summary(suite: dict) -> list[str]:
     lines = []
     lines.append("#### Existing Regression Tests")
     lines.append("")
+    if not suite["tests"]:
+        lines.extend(["No completed test timings.", ""])
+        return lines
     lines.append("| Test | Mean (ms) | Median (ms) | Min (ms) | Max (ms) | Runs |")
     lines.append("|---|---:|---:|---:|---:|---:|")
-    if not suite["tests"]:
-        lines.append("| No tests selected | 0 | 0 | 0 | 0 | 0 |")
     for test in suite["tests"]:
         timing = test["time_ms"]
         lines.append(
