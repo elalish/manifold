@@ -908,8 +908,9 @@ bool TouchesContact(const FilletInput& input, const FilletGeometry& fillet,
 std::vector<FilletGeometry> FindFilletPairs(
     const FilletInput& input, const EdgeIndex& index,
     const std::vector<std::pair<int, int>>& broadPairs, double radius) {
+  // No reserve: at large radii there can be ~1e9 broad pairs, of which only a
+  // small fraction become candidates.
   std::vector<FilletGeometry> candidates;
-  candidates.reserve(broadPairs.size());
   for (const auto& pair : broadPairs) {
     for (const FilletGeometry& geometry :
          BuildFilletGeometries(input, pair.first, pair.second, radius)) {
