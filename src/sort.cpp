@@ -79,14 +79,26 @@ template <typename Precision, typename I>
 bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
   ZoneScoped;
 
-  std::vector<int> merge(mesh.NumVert());
+  if (mesh.numProp < 3 ||
+      mesh.mergeFromVert.size() != mesh.mergeToVert.size()) {
+    return false;
+  }
+  const auto numVert = mesh.NumVert();
+  const auto numTri = mesh.NumTri();
+  const auto inRange = [numVert](I v) { return v < numVert; };
+  if (!std::all_of(mesh.mergeFromVert.begin(), mesh.mergeFromVert.end(),
+                   inRange) ||
+      !std::all_of(mesh.mergeToVert.begin(), mesh.mergeToVert.end(), inRange) ||
+      !std::all_of(mesh.triVerts.begin(), mesh.triVerts.end(), inRange)) {
+    return false;
+  }
+
+  std::vector<int> merge(numVert);
   std::iota(merge.begin(), merge.end(), 0);
   for (size_t i = 0; i < mesh.mergeFromVert.size(); ++i) {
     merge[mesh.mergeFromVert[i]] = mesh.mergeToVert[i];
   }
 
-  const auto numVert = mesh.NumVert();
-  const auto numTri = mesh.NumTri();
   Vec<uint64_t> edges(3 * numTri);
   const int next[3] = {1, 2, 0};
   for_each_n(autoPolicy(numTri, 1e5), countAt(0_uz), numTri,
@@ -605,11 +617,12 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
 
 /**
  * Updates the mergeFromVert and mergeToVert vectors in order to create a
- * manifold solid. If the MeshGL is already manifold, no change will occur and
- * the function will return false. Otherwise, this will merge verts along open
- * edges within tolerance (the maximum of the MeshGL tolerance and the
- * baseline bounding-box tolerance), keeping any from the existing merge
- * vectors, and return true.
+ * manifold solid. If the MeshGL is already manifold, or is invalid (fewer than
+ * 3 properties, merge vectors of different lengths, or out-of-range indices),
+ * no change will occur and the function will return false. Otherwise, this
+ * will merge verts along open edges within tolerance (the maximum of the MeshGL
+ * tolerance and the baseline bounding-box tolerance), keeping any from the
+ * existing merge vectors, and return true.
  *
  * There is no guarantee the result will be manifold - this is a best-effort
  * helper function designed primarily to aid in the case where a manifold
