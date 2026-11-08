@@ -27,11 +27,11 @@
 #include <type_traits>
 #include <vector>
 
-#include "../collider.h"
-#include "../parallel.h"
-#include "../vec.h"
+#include "collider.h"
 #include "manifold/cross_section.h"
 #include "manifold/manifold.h"
+#include "parallel.h"
+#include "vec.h"
 
 using namespace manifold;
 
