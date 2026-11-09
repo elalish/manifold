@@ -18,6 +18,13 @@ cmake -DMANIFOLD_DEBUG=ON -DMANIFOLD_ASSERT=ON -DMANIFOLD_PAR=ON -DMANIFOLD_USE_
 
 TODO:
 
+Dig into the CrossSection (boolean2) implementation: Polygon.Fillet.Looping1/2
+are skipped because CrossSection(polys) of those inputs is empty. One vertex
+at ~1.4e38 makes boolean2's scale-derived tolerance ~1e26, so the
+ordinary-sized loops merge away and the huge sliver has no area at that
+scale. Check whether that is intended, and what the expected max circle
+radius (1.399 / 0.0863) should mean for such input.
+
 Fix Hole6 extra circle centers
 Fix radius test
 Fix tracing non-stop looping
