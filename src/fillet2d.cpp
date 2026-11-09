@@ -18,20 +18,25 @@
 #include <cmath>
 #include <cstdint>
 #include <exception>
-#include <fstream>
-#include <iomanip>
-#include <iostream>
 #include <limits>
-#include <string>
 #include <tuple>
 #include <type_traits>
 #include <vector>
 
 #include "collider.h"
 #include "manifold/cross_section.h"
-#include "manifold/manifold.h"
 #include "parallel.h"
 #include "vec.h"
+
+// Debug output only; MANIFOLD_DEBUG is incompatible with MANIFOLD_NO_IOSTREAM.
+#ifdef MANIFOLD_DEBUG
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+#include <string>
+
+#include "manifold/manifold.h"
+#endif
 
 using namespace manifold;
 
