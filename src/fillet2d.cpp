@@ -62,19 +62,18 @@ struct FilletInput {
   double minArcAngle;
 };
 
-// What a fillet ball touches: the interior of an edge (its line), or a reflex
-// vertex, referenced as the start of the edge that follows it.
-struct Contact {
-  int edge;
-  bool isVertex;
-};
+// A feature of the input boundary a fillet ball can touch, as one id: 2e is
+// the interior (line) of edge e, 2e + 1 the vertex at the start of edge e.
+int LineFeature(int e) { return 2 * e; }
+int VertexFeature(int e) { return 2 * e + 1; }
+bool IsVertex(int feature) { return feature & 1; }
+int FeatureEdge(int feature) { return feature >> 1; }
 
-// One end of a fillet arc, as generated: the ball touches the line of `edge` at
-// parameter t, or, if isVertex, the reflex vertex at the end of `edge` (t = 1).
+// One end of a fillet arc: the feature the ball touches, and the parameter
+// along FeatureEdge(feature) - where a line is touched, 0 for a vertex.
 struct FilletEnd {
-  int edge;
+  int feature;
   double t;
-  bool isVertex;
 };
 
 struct FilletGeometry {
@@ -492,19 +491,13 @@ struct BoundaryPos {
 };
 
 BoundaryPos Position(const FilletInput& input, const FilletEnd& end) {
-  if (end.t == 1) return {NextEdge(input, end.edge), 0};
-  return {end.edge, end.t};
+  const int edge = FeatureEdge(end.feature);
+  if (end.t == 1) return {NextEdge(input, edge), 0};
+  return {edge, end.t};
 }
 
 vec2 EndPoint(const FilletInput& input, const FilletEnd& end) {
-  return PointOnEdge(input, end.edge, end.t);
-}
-
-// The feature an end touches: a vertex is referenced as the start of the edge
-// after it.
-Contact ContactOf(const FilletInput& input, const FilletEnd& end) {
-  if (end.isVertex) return {NextEdge(input, end.edge), true};
-  return {end.edge, false};
+  return PointOnEdge(input, FeatureEdge(end.feature), end.t);
 }
 
 double EndAngle(const FilletInput& input, const FilletEnd& end, vec2 center) {
@@ -515,8 +508,14 @@ bool FinishFilletGeometry(const FilletInput& input, int firstEdge,
                           int secondEdge, double firstT, double secondT,
                           bool firstIsVertex, bool secondIsVertex, vec2 center,
                           FilletGeometry& geometry, bool reverse = false) {
-  FilletEnd from{firstEdge, firstT, firstIsVertex};
-  FilletEnd to{secondEdge, secondT, secondIsVertex};
+  // A vertex contact is the end vertex of the given edge, i.e. the start of
+  // the next one.
+  auto end = [&](int edge, double t, bool isVertex) {
+    return isVertex ? FilletEnd{VertexFeature(NextEdge(input, edge)), 0}
+                    : FilletEnd{LineFeature(edge), t};
+  };
+  FilletEnd from = end(firstEdge, firstT, firstIsVertex);
+  FilletEnd to = end(secondEdge, secondT, secondIsVertex);
 
   // Arcs run CCW around the ball (CW with invert). `reverse` asks for the
   // other arc of a ball through a neck (see IntersectResult::tangent).
@@ -650,13 +649,10 @@ vec2 LineNormal(const FilletInput& input, int e) {
   return EdgeNormal(EdgeEnd(input, e) - EdgeStart(input, e), input.invert);
 }
 
-bool SameContact(const Contact& a, const Contact& b) {
-  return a.edge == b.edge && a.isVertex == b.isVertex;
-}
-
-bool ContactLess(const Contact& a, const Contact& b) {
-  return std::make_pair(a.isVertex, a.edge) <
-         std::make_pair(b.isVertex, b.edge);
+// Lines before vertices, then by edge.
+bool FeatureLess(int a, int b) {
+  return std::make_pair(IsVertex(a), FeatureEdge(a)) <
+         std::make_pair(IsVertex(b), FeatureEdge(b));
 }
 
 // Solves r0 . x = rhs.x, r1 . x = rhs.y.
@@ -705,17 +701,17 @@ int BisectorCircles(vec2 m, vec2 dir, double a, double b, vec2 p,
 // (n . x - c = r) and passing through each vertex (|x - P| = r). The contacts
 // are sorted first and each case uses a fixed sequence of operations, so every
 // fillet of the triple gets bit-identical circles. Returns how many (<= 2).
-int TouchingCircles(const FilletInput& input, std::array<Contact, 3> f,
+int TouchingCircles(const FilletInput& input, std::array<int, 3> f,
                     std::array<vec2, 2>& centers,
                     std::array<double, 2>& radii) {
-  std::sort(f.begin(), f.end(), ContactLess);
-  const int lines = !f[0].isVertex + !f[1].isVertex + !f[2].isVertex;
+  std::sort(f.begin(), f.end(), FeatureLess);
+  const int lines = !IsVertex(f[0]) + !IsVertex(f[1]) + !IsVertex(f[2]);
   std::array<vec2, 3> n, p;
   std::array<double, 3> c;
   for (int i = 0; i < 3; ++i) {
-    p[i] = EdgeStart(input, f[i].edge);
-    if (!f[i].isVertex) {
-      n[i] = LineNormal(input, f[i].edge);
+    p[i] = EdgeStart(input, FeatureEdge(f[i]));
+    if (!IsVertex(f[i])) {
+      n[i] = LineNormal(input, FeatureEdge(f[i]));
       c[i] = dot(n[i], p[i]);
     }
   }
@@ -768,14 +764,14 @@ int TouchingCircles(const FilletInput& input, std::array<Contact, 3> f,
 // Velocity of the center of the ball touching contacts g and h as its radius
 // grows, at center x and radius r: a line gives n . v = 1, a vertex P gives
 // (x - P) . v = r.
-bool CenterVelocity(const FilletInput& input, const Contact& g,
-                    const Contact& h, vec2 x, double r, vec2& v) {
-  auto row = [&](const Contact& f, vec2& n, double& rhs) {
-    if (f.isVertex) {
-      n = x - EdgeStart(input, f.edge);
+bool CenterVelocity(const FilletInput& input, int g, int h, vec2 x, double r,
+                    vec2& v) {
+  auto row = [&](int f, vec2& n, double& rhs) {
+    if (IsVertex(f)) {
+      n = x - EdgeStart(input, FeatureEdge(f));
       rhs = r;
     } else {
-      n = LineNormal(input, f.edge);
+      n = LineNormal(input, FeatureEdge(f));
       rhs = 1;
     }
   };
@@ -788,19 +784,18 @@ bool CenterVelocity(const FilletInput& input, const Contact& g,
 
 // Balls touching a vertex and a line, or two vertices, come in two branches at
 // any radius. Whether centers a and b are on the same one.
-bool SameBranch(const FilletInput& input, const Contact& g, const Contact& h,
-                vec2 a, vec2 b) {
-  if (!g.isVertex && !h.isVertex) return true;
+bool SameBranch(const FilletInput& input, int g, int h, vec2 a, vec2 b) {
+  if (!IsVertex(g) && !IsVertex(h)) return true;
   double sa, sb;
-  if (g.isVertex && h.isVertex) {
-    const vec2 p = EdgeStart(input, g.edge);
-    const vec2 q = EdgeStart(input, h.edge);
+  if (IsVertex(g) && IsVertex(h)) {
+    const vec2 p = EdgeStart(input, FeatureEdge(g));
+    const vec2 q = EdgeStart(input, FeatureEdge(h));
     sa = la::cross(q - p, a - p);
     sb = la::cross(q - p, b - p);
   } else {
-    const Contact& line = g.isVertex ? h : g;
-    const vec2 p = EdgeStart(input, (g.isVertex ? g : h).edge);
-    const vec2 dir = EdgeEnd(input, line.edge) - EdgeStart(input, line.edge);
+    const int line = FeatureEdge(IsVertex(g) ? h : g);
+    const vec2 p = EdgeStart(input, FeatureEdge(IsVertex(g) ? g : h));
+    const vec2 dir = EdgeEnd(input, line) - EdgeStart(input, line);
     sa = dot(a - p, dir);
     sb = dot(b - p, dir);
   }
@@ -809,10 +804,9 @@ bool SameBranch(const FilletInput& input, const Contact& g, const Contact& h,
 
 // The circle of the triple {g, h, f} relevant to the ball of fillet (g, h):
 // among touching circles on the fillet's branch, the one nearest in radius.
-bool TripleCircle(const FilletInput& input, const Contact& g, const Contact& h,
-                  const Contact& f, vec2 ballCenter, double radius,
-                  vec2& center, double& rho) {
-  if (SameContact(f, g) || SameContact(f, h) || SameContact(g, h)) return false;
+bool TripleCircle(const FilletInput& input, int g, int h, int f,
+                  vec2 ballCenter, double radius, vec2& center, double& rho) {
+  if (f == g || f == h || g == h) return false;
   std::array<vec2, 2> centers;
   std::array<double, 2> radii;
   const int count = TouchingCircles(input, {g, h, f}, centers, radii);
@@ -841,20 +835,19 @@ constexpr double kNearTie = 1e-9;
 // around it must agree: all fit or none do. Then decide by that circle's
 // radius rho and the slope there, which depend only on the set of contacts.
 bool ContactBlocks(const FilletInput& input, const FilletGeometry& fillet,
-                   const Contact& f, double distance, double radius) {
+                   int f, double distance, double radius) {
   const double scale =
       radius + std::max(std::abs(fillet.center.x), std::abs(fillet.center.y));
   if (std::abs(distance - radius) > kNearTie * scale) return distance < radius;
   vec2 x, v;
   double rho;
-  const Contact fromContact = ContactOf(input, fillet.from);
-  const Contact toContact = ContactOf(input, fillet.to);
-  if (!TripleCircle(input, fromContact, toContact, f, fillet.center, radius, x,
-                    rho) ||
-      !CenterVelocity(input, fromContact, toContact, x, rho, v))
+  const int g = fillet.from.feature;
+  const int h = fillet.to.feature;
+  if (!TripleCircle(input, g, h, f, fillet.center, radius, x, rho) ||
+      !CenterVelocity(input, g, h, x, rho, v))
     return distance < radius;
-  const vec2 toward = f.isVertex ? (x - EdgeStart(input, f.edge)) / rho
-                                 : LineNormal(input, f.edge);
+  const vec2 toward = IsVertex(f) ? (x - EdgeStart(input, FeatureEdge(f))) / rho
+                                  : LineNormal(input, FeatureEdge(f));
   const double k = dot(toward, v) - 1;
   if (k == 0) return distance < radius;
   return k * (radius - rho) < 0;
@@ -875,17 +868,16 @@ bool Blocks(const FilletInput& input, const FilletGeometry& fillet, int c,
     const double s = dot(EdgeNormal(d, input.invert), fillet.center - p0);
     // A ball behind the edge cannot touch it from the ball side.
     if (!(s > 0)) return -s < radius;
-    return ContactBlocks(input, fillet, Contact{c, false}, s, radius);
+    return ContactBlocks(input, fillet, LineFeature(c), s, radius);
   }
-  const Contact vertex =
-      t <= 0 ? Contact{c, true} : Contact{input.nextEdges[c], true};
+  const int vertex =
+      t <= 0 ? VertexFeature(c) : VertexFeature(input.nextEdges[c]);
   // A vertex on a line the ball is tangent to is never closer than radius.
   const vec2 point = t <= 0 ? p0 : p1;
-  for (const Contact& contact :
-       {ContactOf(input, fillet.from), ContactOf(input, fillet.to)}) {
-    if (!contact.isVertex &&
-        (SamePoint(point, EdgeStart(input, contact.edge)) ||
-         SamePoint(point, EdgeEnd(input, contact.edge))))
+  for (const int feature : {fillet.from.feature, fillet.to.feature}) {
+    if (!IsVertex(feature) &&
+        (SamePoint(point, EdgeStart(input, FeatureEdge(feature))) ||
+         SamePoint(point, EdgeEnd(input, FeatureEdge(feature)))))
       return false;
   }
   return ContactBlocks(input, fillet, vertex,
@@ -898,8 +890,7 @@ bool Blocks(const FilletInput& input, const FilletGeometry& fillet, int c,
 bool TouchesContact(const FilletInput& input, const FilletGeometry& fillet,
                     int c) {
   for (const FilletEnd& end : {fillet.from, fillet.to}) {
-    const Contact contact = ContactOf(input, end);
-    if (!contact.isVertex && contact.edge == c) return true;
+    if (end.feature == LineFeature(c)) return true;
   }
   for (const FilletEnd& end : {fillet.from, fillet.to}) {
     const BoundaryPos pos = Position(input, end);
