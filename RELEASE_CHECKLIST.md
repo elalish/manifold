@@ -3,11 +3,12 @@
 1. Verify our three.js [example](https://manifoldcad.org/three) is functional.
 1. Verify our model-viewer [example](https://manifoldcad.org/model-viewer) is functional - select Union and Intersection.
 1. Verify [make-manifold](https://manifoldcad.org/make-manifold) is functional. Try dropping [DragonAttenuation.glb](https://github.com/KhronosGroup/glTF-Sample-Assets/blob/main/Models/DragonAttenuation/glTF-Binary/DragonAttenuation.glb) in and verify you can select "View Manifold GLB" and that the dragon is still present while the backdrop is removed. Download the GLB.
-1. Run the Prepare release workflow from the Actions tab with the new version number. It sets the version in CMakeLists.txt, pyproject.toml, flake.nix, package.json and test-cmake.sh, refreshes the package-lock files, and opens a PR.
+1. Run the Prepare release workflow from the Actions tab with the new version number. It sets the version in CMakeLists.txt, pyproject.toml, flake.nix, both package.json files (manifold-3d and manifold-cad, including manifold-cad's exact manifold-3d dependency) and test-cmake.sh, refreshes the package-lock files, and opens a PR.
 1. Verify tests pass on that PR, manually trigger build_wheels CI, merge.
 1. On Github, draft a new release, make a new tag with the version number, add release notes, and publish.
-1. Check the Actions and verify that both PyPI and npm publishing actions ran successfully.
-1. Verify the npm [package](https://www.npmjs.com/package/manifold-3d?activeTab=code) looks good - unpacked size should be close to 1MB.
+1. Check the Actions and verify that both PyPI and npm publishing actions ran successfully. The npm action publishes `manifold-3d` first, then `manifold-cad`; if it fails part way, re-run it, since versions already on npm are skipped.
+1. Verify the npm [manifold-3d](https://www.npmjs.com/package/manifold-3d?activeTab=code) package looks good - unpacked size should be under 1MB, with no dependencies.
+1. Verify the npm [manifold-cad](https://www.npmjs.com/package/manifold-cad?activeTab=code) package looks good - unpacked size should be around 2MB, and it should depend on exactly the `manifold-3d` version just released.
 1. Verify PyPI [package](https://pypi.org/project/manifold3d/#files) looks good - a bunch of built distributions ranging from ~600kB to ~1.1MB.
 1. If there's a problem with release deployment, the release workflows can be triggered separately, manually for any branch, under the Actions tab. See [Deploying manually](#deploying-manually) for the site deploy in particular.
 
