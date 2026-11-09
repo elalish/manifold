@@ -69,22 +69,22 @@ struct Contact {
   bool isVertex;
 };
 
+// One end of a fillet arc, as generated: the ball touches the line of `edge` at
+// parameter t, or, if isVertex, the reflex vertex at the end of `edge` (t = 1).
+struct FilletEnd {
+  int edge;
+  double t;
+  bool isVertex;
+};
+
 struct FilletGeometry {
-  int fromEdge;
-  int toEdge;
-  double fromT;
-  double toT;
-  vec2 fromPoint;
-  vec2 toPoint;
+  FilletEnd from;
+  FilletEnd to;
   vec2 center;
-  double startRad;
-  double endRad;
-  // Order of tangent points at the start vertex of their edge (t == 0); see
-  // PivotKey.
+  // Order of the ends at the start vertex of their edge (see Position and
+  // PivotKey), cached for sorting.
   double fromKey;
   double toKey;
-  Contact fromContact;
-  Contact toContact;
 };
 
 struct IntersectResult {
@@ -483,75 +483,69 @@ vec2 PointOnEdge(const FilletInput& input, int e, double t) {
   return EdgeStart(input, e) + t * (EdgeEnd(input, e) - EdgeStart(input, e));
 }
 
+// Where an end sits on the boundary for tracing: a point on a vertex is always
+// referenced as the start of the following edge, so arrivals and departures
+// there compare correctly.
+struct BoundaryPos {
+  int edge;
+  double t;
+};
+
+BoundaryPos Position(const FilletInput& input, const FilletEnd& end) {
+  if (end.t == 1) return {NextEdge(input, end.edge), 0};
+  return {end.edge, end.t};
+}
+
+vec2 EndPoint(const FilletInput& input, const FilletEnd& end) {
+  return PointOnEdge(input, end.edge, end.t);
+}
+
+// The feature an end touches: a vertex is referenced as the start of the edge
+// after it.
+Contact ContactOf(const FilletInput& input, const FilletEnd& end) {
+  if (end.isVertex) return {NextEdge(input, end.edge), true};
+  return {end.edge, false};
+}
+
+double EndAngle(const FilletInput& input, const FilletEnd& end, vec2 center) {
+  return NormalizeAngle(ToRad(EndPoint(input, end) - center));
+}
+
 bool FinishFilletGeometry(const FilletInput& input, int firstEdge,
                           int secondEdge, double firstT, double secondT,
                           bool firstIsVertex, bool secondIsVertex, vec2 center,
                           FilletGeometry& geometry, bool reverse = false) {
-  int fromEdge = firstEdge;
-  int toEdge = secondEdge;
-  // A vertex contact is always the end vertex of the given edge.
-  Contact fromContact = firstIsVertex
-                            ? Contact{NextEdge(input, firstEdge), true}
-                            : Contact{firstEdge, false};
-  Contact toContact = secondIsVertex
-                          ? Contact{NextEdge(input, secondEdge), true}
-                          : Contact{secondEdge, false};
-  double fromT = firstT;
-  double toT = secondT;
-  vec2 fromPoint = PointOnEdge(input, firstEdge, firstT);
-  vec2 toPoint = PointOnEdge(input, secondEdge, secondT);
-  vec2 fromRadius = fromPoint - center;
-  vec2 toRadius = toPoint - center;
+  FilletEnd from{firstEdge, firstT, firstIsVertex};
+  FilletEnd to{secondEdge, secondT, secondIsVertex};
 
   // Arcs run CCW around the ball (CW with invert). `reverse` asks for the
   // other arc of a ball through a neck (see IntersectResult::tangent).
-  const double radiusCross = la::cross(fromRadius, toRadius);
+  const double radiusCross =
+      la::cross(EndPoint(input, from) - center, EndPoint(input, to) - center);
   const bool backwards = input.invert ? radiusCross > 0 : radiusCross < 0;
-  if (backwards != reverse) {
-    std::swap(fromEdge, toEdge);
-    std::swap(fromContact, toContact);
-    std::swap(fromT, toT);
-    std::swap(fromPoint, toPoint);
-    std::swap(fromRadius, toRadius);
-  }
-
-  const double startRad = NormalizeAngle(ToRad(fromRadius));
-  const double endRad = NormalizeAngle(ToRad(toRadius));
-  // A tangent point on a vertex is always referenced as the start of the
-  // following edge, so arrivals and departures there match during tracing.
-  if (fromT == 1) {
-    fromEdge = NextEdge(input, fromEdge);
-    fromT = 0;
-  }
-  if (toT == 1) {
-    toEdge = NextEdge(input, toEdge);
-    toT = 0;
-  }
+  if (backwards != reverse) std::swap(from, to);
 
   // An arc too flat to discretize may be skipped only at a plain corner: both
   // tangent points inside two adjacent edges, so the arc angle equals the
   // corner's turn and tracing still reaches the next edge via the vertex. Any
   // other arc spans more of the boundary and must be kept.
-  const bool corner = fromT > 0 && toEdge == NextEdge(input, fromEdge);
+  const BoundaryPos fromPos = Position(input, from);
+  const BoundaryPos toPos = Position(input, to);
+  const bool corner =
+      fromPos.t > 0 && toPos.edge == NextEdge(input, fromPos.edge);
   const double minArc = corner ? input.minArcAngle : 0;
-  if (!(ArcAngle(startRad, endRad, input.invert) > minArc)) return false;
+  if (!(ArcAngle(EndAngle(input, from, center), EndAngle(input, to, center),
+                 input.invert) > minArc))
+    return false;
 
-  geometry = FilletGeometry{fromEdge,
-                            toEdge,
-                            fromT,
-                            toT,
-                            fromPoint,
-                            toPoint,
-                            center,
-                            startRad,
-                            endRad,
-                            PivotKey(input, fromEdge, fromT, center),
-                            PivotKey(input, toEdge, toT, center),
-                            fromContact,
-                            toContact};
+  geometry = FilletGeometry{from, to, center,
+                            PivotKey(input, fromPos.edge, fromPos.t, center),
+                            PivotKey(input, toPos.edge, toPos.t, center)};
   return true;
 }
 
+// Local collision: use fillet arc touching geometry convex or reflex to
+// determine collision
 std::vector<FilletGeometry> BuildFilletGeometries(const FilletInput& input,
                                                   int firstEdge, int secondEdge,
                                                   double radius) {
@@ -853,9 +847,11 @@ bool ContactBlocks(const FilletInput& input, const FilletGeometry& fillet,
   if (std::abs(distance - radius) > kNearTie * scale) return distance < radius;
   vec2 x, v;
   double rho;
-  if (!TripleCircle(input, fillet.fromContact, fillet.toContact, f,
-                    fillet.center, radius, x, rho) ||
-      !CenterVelocity(input, fillet.fromContact, fillet.toContact, x, rho, v))
+  const Contact fromContact = ContactOf(input, fillet.from);
+  const Contact toContact = ContactOf(input, fillet.to);
+  if (!TripleCircle(input, fromContact, toContact, f, fillet.center, radius, x,
+                    rho) ||
+      !CenterVelocity(input, fromContact, toContact, x, rho, v))
     return distance < radius;
   const vec2 toward = f.isVertex ? (x - EdgeStart(input, f.edge)) / rho
                                  : LineNormal(input, f.edge);
@@ -885,7 +881,8 @@ bool Blocks(const FilletInput& input, const FilletGeometry& fillet, int c,
       t <= 0 ? Contact{c, true} : Contact{input.nextEdges[c], true};
   // A vertex on a line the ball is tangent to is never closer than radius.
   const vec2 point = t <= 0 ? p0 : p1;
-  for (const Contact& contact : {fillet.fromContact, fillet.toContact}) {
+  for (const Contact& contact :
+       {ContactOf(input, fillet.from), ContactOf(input, fillet.to)}) {
     if (!contact.isVertex &&
         (SamePoint(point, EdgeStart(input, contact.edge)) ||
          SamePoint(point, EdgeEnd(input, contact.edge))))
@@ -900,13 +897,14 @@ bool Blocks(const FilletInput& input, const FilletGeometry& fillet, int c,
 // touches, and every edge ending at a vertex it touches.
 bool TouchesContact(const FilletInput& input, const FilletGeometry& fillet,
                     int c) {
-  for (const Contact& contact : {fillet.fromContact, fillet.toContact}) {
+  for (const FilletEnd& end : {fillet.from, fillet.to}) {
+    const Contact contact = ContactOf(input, end);
     if (!contact.isVertex && contact.edge == c) return true;
   }
-  for (const auto& [edge, t] : {std::make_pair(fillet.fromEdge, fillet.fromT),
-                                std::make_pair(fillet.toEdge, fillet.toT)}) {
-    if (t != 0) continue;
-    const vec2 vertex = EdgeStart(input, edge);
+  for (const FilletEnd& end : {fillet.from, fillet.to}) {
+    const BoundaryPos pos = Position(input, end);
+    if (pos.t != 0) continue;
+    const vec2 vertex = EdgeStart(input, pos.edge);
     if (SamePoint(EdgeStart(input, c), vertex) ||
         SamePoint(EdgeEnd(input, c), vertex))
       return true;
@@ -959,12 +957,16 @@ std::vector<FilletGeometry> FindFilletPairs(
   return fillets;
 }
 
-std::vector<vec2> discreteArcToPoint(const FilletGeometry& arc, double radius,
-                                     int circularSegments, bool invert) {
+std::vector<vec2> discreteArcToPoint(const FilletInput& input,
+                                     const FilletGeometry& arc, double radius,
+                                     int circularSegments) {
+  const bool invert = input.invert;
   std::vector<vec2> points;
-  points.push_back(arc.fromPoint);
+  points.push_back(EndPoint(input, arc.from));
 
-  const double totalRad = ArcAngle(arc.startRad, arc.endRad, invert);
+  const double startRad = EndAngle(input, arc.from, arc.center);
+  const double totalRad =
+      ArcAngle(startRad, EndAngle(input, arc.to, arc.center), invert);
   // Spread the points evenly: fixed dPhi steps leave a sliver segment at the
   // end when totalRad is just over a multiple of dPhi, whose direction is
   // meaningless after rounding.
@@ -974,19 +976,20 @@ std::vector<vec2> discreteArcToPoint(const FilletGeometry& arc, double radius,
   const double step = (invert ? -totalRad : totalRad) / segments;
 
   for (int i = 1; i < segments; ++i) {
-    const double current = arc.startRad + step * i;
+    const double current = startRad + step * i;
     points.push_back({arc.center.x + radius * cos(current),
                       arc.center.y + radius * sin(current)});
   }
 
-  points.push_back(arc.toPoint);
+  points.push_back(EndPoint(input, arc.to));
   return points;
 }
 
-void AppendArcPoints(SimplePolygon& loop, const FilletGeometry& arc,
-                     double radius, int circularSegments, bool invert) {
+void AppendArcPoints(const FilletInput& input, SimplePolygon& loop,
+                     const FilletGeometry& arc, double radius,
+                     int circularSegments) {
   const std::vector<vec2> points =
-      discreteArcToPoint(arc, radius, circularSegments, invert);
+      discreteArcToPoint(input, arc, radius, circularSegments);
   const double pointTolerance = std::max(radius * 1e-8, 1e-12);
   for (size_t i = 1; i < points.size(); ++i) {
     AppendPoint(loop, points[i], pointTolerance);
@@ -1001,22 +1004,27 @@ void RemoveUnreachedFillets(const FilletInput& input,
                             std::vector<uint8_t>& removed) {
   std::vector<std::vector<size_t>> starts(input.edges.size());
   for (size_t i = 0; i < geometries.size(); ++i) {
-    if (!removed[i]) starts[geometries[i].fromEdge].push_back(i);
+    if (!removed[i])
+      starts[Position(input, geometries[i].from).edge].push_back(i);
   }
   for (auto& edgeStarts : starts) {
     std::sort(edgeStarts.begin(), edgeStarts.end(), [&](size_t a, size_t b) {
-      return std::make_pair(geometries[a].fromT, geometries[a].fromKey) <
-             std::make_pair(geometries[b].fromT, geometries[b].fromKey);
+      return std::make_pair(Position(input, geometries[a].from).t,
+                            geometries[a].fromKey) <
+             std::make_pair(Position(input, geometries[b].from).t,
+                            geometries[b].fromKey);
     });
   }
   auto findNext = [&](size_t i) -> int {
-    int edge = geometries[i].toEdge;
-    double t = geometries[i].toT;
+    const BoundaryPos arrival = Position(input, geometries[i].to);
+    int edge = arrival.edge;
+    double t = arrival.t;
     double key = geometries[i].toKey;
     for (size_t walk = 0; walk <= input.edges.size(); ++walk) {
       for (size_t f : starts[edge]) {
         const FilletGeometry& g = geometries[f];
-        if (removed[f] || g.fromT < t || (g.fromT == t && g.fromKey < key))
+        const double fromT = Position(input, g.from).t;
+        if (removed[f] || fromT < t || (fromT == t && g.fromKey < key))
           continue;
         return static_cast<int>(f);
       }
@@ -1109,10 +1117,12 @@ std::vector<CrossSection> TraceFillets(
     for (size_t i = 0; i < geometries.size(); ++i) {
       if (removed[i]) continue;
       const FilletGeometry& g = geometries[i];
-      arrivals[cycleOf[g.toEdge]].push_back(
-          BoundaryEvent{i, posOf[g.toEdge], g.toT, g.toKey});
-      departures[cycleOf[g.fromEdge]].push_back(
-          BoundaryEvent{i, posOf[g.fromEdge], g.fromT, g.fromKey});
+      const BoundaryPos to = Position(input, g.to);
+      const BoundaryPos from = Position(input, g.from);
+      arrivals[cycleOf[to.edge]].push_back(
+          BoundaryEvent{i, posOf[to.edge], to.t, g.toKey});
+      departures[cycleOf[from.edge]].push_back(
+          BoundaryEvent{i, posOf[from.edge], from.t, g.fromKey});
     }
   };
   auto balanced = [&]() {
@@ -1194,32 +1204,35 @@ std::vector<CrossSection> TraceFillets(
       used[current] = 1;
 
       const FilletGeometry& fillet = geometries[current];
-      AppendPoint(loop, fillet.fromPoint, pointTolerance);
-      AppendArcPoints(loop, fillet, radius, circularSegments, input.invert);
-      touchedLoop[input.edges[fillet.fromEdge].loop] = 1;
-      touchedLoop[input.edges[fillet.toEdge].loop] = 1;
+      const BoundaryPos departure = Position(input, fillet.from);
+      const BoundaryPos arrival = Position(input, fillet.to);
+      AppendPoint(loop, EndPoint(input, fillet.from), pointTolerance);
+      AppendArcPoints(input, loop, fillet, radius, circularSegments);
+      touchedLoop[input.edges[departure.edge].loop] = 1;
+      touchedLoop[input.edges[arrival.edge].loop] = 1;
 
       if (next[current] < 0) return {};
       const FilletGeometry& nextFillet = geometries[next[current]];
+      const BoundaryPos nextDeparture = Position(input, nextFillet.from);
       // Walk the input boundary to the paired departure. Without wrapping, a
       // departure not after the arrival is a tie: the stretch is empty.
-      const BoundaryEvent from{current, posOf[fillet.toEdge], fillet.toT,
+      const BoundaryEvent from{current, posOf[arrival.edge], arrival.t,
                                fillet.toKey};
       const BoundaryEvent to{static_cast<size_t>(next[current]),
-                             posOf[nextFillet.fromEdge], nextFillet.fromT,
+                             posOf[nextDeparture.edge], nextDeparture.t,
                              nextFillet.fromKey};
       const bool wrap = wraps[current];
       if (wrap || PositionLess(from, to)) {
-        int edge = fillet.toEdge;
+        int edge = arrival.edge;
         bool first = true;
-        while (edge != nextFillet.fromEdge || (first && wrap)) {
+        while (edge != nextDeparture.edge || (first && wrap)) {
           AppendPoint(loop, EdgeEnd(input, edge), pointTolerance);
           touchedLoop[input.edges[edge].loop] = 1;
           edge = NextEdge(input, edge);
           first = false;
         }
       }
-      AppendPoint(loop, nextFillet.fromPoint, pointTolerance);
+      AppendPoint(loop, EndPoint(input, nextFillet.from), pointTolerance);
       current = static_cast<size_t>(next[current]);
     } while (current != startFillet);
 
@@ -1391,9 +1404,10 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
     prevEdges[e] =
         static_cast<int>(loopOffsets[ref.loop] + (ref.edge + n - 1) % n);
   }
-  const FilletInput input{
-      polygons, loopOffsets,          edges, nextEdges, prevEdges,
-      invert,   2.0 * M_PI / segments};
+  const FilletInput input{polygons, loopOffsets, edges, nextEdges, prevEdges,
+
+                          // FIXME: why minimal radius?
+                          invert, 2.0 * M_PI / segments};
 
 #ifdef MANIFOLD_DEBUG
   if (caseIndex == 0) SavePolygons("Testing/Fillet/input.txt", polygons);
