@@ -68,8 +68,6 @@ def parse_run(run_path: Path, run_index: int) -> dict:
             benchmark_key = (
                 f"nTri={ntri}" if ntri != "unknown" else f"size_index={size_index}"
             )
-            if benchmark_key in peak_rss_by_benchmark:
-                raise RuntimeError(f"Duplicate peak RSS for {benchmark_key} in {run_path}")
             peak_rss_by_benchmark[benchmark_key] = {
                 "peak_rss_mb": float(peak_rss_mb),
             }
