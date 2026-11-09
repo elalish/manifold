@@ -20,7 +20,6 @@
 #include <exception>
 #include <limits>
 #include <tuple>
-#include <type_traits>
 #include <vector>
 
 #include "collider.h"
@@ -58,6 +57,7 @@ struct FilletInput {
   const std::vector<EdgeRef>& edges;
   const std::vector<int>& nextEdges;
   const std::vector<int>& prevEdges;
+  const std::vector<int>& startPoints;
   bool invert;
   double minArcAngle;
 };
@@ -190,6 +190,16 @@ int NextEdge(const FilletInput& input, int edge) {
   return input.nextEdges[edge];
 }
 
+// Point ids: vertices with exactly the same coordinates share one, so a pinch
+// or two loops touching at a vertex is a single point.
+int StartPoint(const FilletInput& input, int edge) {
+  return input.startPoints[edge];
+}
+
+int EndPoint(const FilletInput& input, int edge) {
+  return input.startPoints[NextEdge(input, edge)];
+}
+
 vec2 EdgeNormal(const vec2& edge, bool invert) {
   return normalize(!invert ? vec2(-edge.y, edge.x) : vec2(edge.y, -edge.x));
 }
@@ -316,10 +326,11 @@ std::vector<EdgeRef> BuildEdges(const Polygons& polygons,
 // the first outgoing edge clockwise from the reversed incoming edge, so the
 // material (on the left) stays on the left. With invert the traced region is
 // the complement, so the first counter-clockwise edge is taken instead.
+// Also assigns each edge the point id of its start vertex.
 std::vector<int> BuildNextEdges(const Polygons& polygons,
                                 const std::vector<size_t>& loopOffsets,
-                                const std::vector<EdgeRef>& edges,
-                                bool invert) {
+                                const std::vector<EdgeRef>& edges, bool invert,
+                                std::vector<int>& startPoints) {
   auto start = [&](int e) { return polygons[edges[e].loop][edges[e].edge]; };
   auto end = [&](int e) {
     const SimplePolygon& loop = polygons[edges[e].loop];
@@ -334,27 +345,31 @@ std::vector<int> BuildNextEdges(const Polygons& polygons,
   std::sort(byStart.begin(), byStart.end(),
             [&](int a, int b) { return pointLess(start(a), start(b)); });
 
+  // pointBegin[p] is where the edges starting at point p begin in byStart.
+  startPoints.assign(edges.size(), 0);
+  std::vector<size_t> pointBegin;
+  for (size_t i = 0; i < byStart.size(); ++i) {
+    if (i == 0 || pointLess(start(byStart[i - 1]), start(byStart[i])))
+      pointBegin.push_back(i);
+    startPoints[byStart[i]] = static_cast<int>(pointBegin.size()) - 1;
+  }
+  pointBegin.push_back(byStart.size());
+
   std::vector<int> nextEdges(edges.size());
   for (size_t e = 0; e < edges.size(); ++e) {
     const EdgeRef ref = edges[e];
     nextEdges[e] = static_cast<int>(loopOffsets[ref.loop] +
                                     (ref.edge + 1) % polygons[ref.loop].size());
 
-    const vec2 vertex = end(e);
-    auto range = std::equal_range(
-        byStart.begin(), byStart.end(), vertex,
-        [&](const auto& a, const auto& b) {
-          if constexpr (std::is_same_v<std::decay_t<decltype(a)>, vec2>) {
-            return pointLess(a, start(b));
-          } else {
-            return pointLess(start(a), b);
-          }
-        });
-    if (range.second - range.first < 2) continue;
+    const int point = startPoints[nextEdges[e]];
+    const auto first = byStart.begin() + pointBegin[point];
+    const auto last = byStart.begin() + pointBegin[point + 1];
+    if (last - first < 2) continue;
 
+    const vec2 vertex = end(e);
     const double back = ToRad(start(e) - vertex);
     double best = std::numeric_limits<double>::infinity();
-    for (auto it = range.first; it != range.second; ++it) {
+    for (auto it = first; it != last; ++it) {
       const double out = ToRad(end(*it) - vertex);
       double turn = NormalizeAngle(invert ? out - back : back - out);
       if (turn == 0) turn = 2 * M_PI;
@@ -593,11 +608,12 @@ std::vector<FilletGeometry> BuildFilletGeometries(const FilletInput& input,
   // A vertex on the line of the other edge can only be touched at the tangent
   // point itself, a zero-length arc; skip vertex-line pairs where the vertex
   // is an endpoint of that edge.
-  auto onEdge = [&](vec2 v, vec2 a, vec2 b) {
-    return SamePoint(v, a) || SamePoint(v, b);
+  auto endOnEdge = [&](int vertexEdge, int edge) {
+    const int v = EndPoint(input, vertexEdge);
+    return v == StartPoint(input, edge) || v == EndPoint(input, edge);
   };
 
-  if (!secondConvex && !onEdge(secondEnd, firstStart, firstEnd)) {
+  if (!secondConvex && !endOnEdge(secondEdge, firstEdge)) {
     const IntersectResult ev = IntersectSegmentArc(
         firstOffset, firstOffset + firstVec, secondEnd, radius, secondNormal,
         secondNextNormal, input.invert);
@@ -612,7 +628,7 @@ std::vector<FilletGeometry> BuildFilletGeometries(const FilletInput& input,
     }
   }
 
-  if (!firstConvex && !onEdge(firstEnd, secondStart, secondEnd)) {
+  if (!firstConvex && !endOnEdge(firstEdge, secondEdge)) {
     const IntersectResult ve =
         IntersectSegmentArc(secondOffset, secondOffset + secondVec, firstEnd,
                             radius, firstNormal, firstNextNormal, input.invert);
@@ -873,11 +889,11 @@ bool Blocks(const FilletInput& input, const FilletGeometry& fillet, int c,
   const int vertex =
       t <= 0 ? VertexFeature(c) : VertexFeature(input.nextEdges[c]);
   // A vertex on a line the ball is tangent to is never closer than radius.
-  const vec2 point = t <= 0 ? p0 : p1;
+  const int point = t <= 0 ? StartPoint(input, c) : EndPoint(input, c);
   for (const int feature : {fillet.from.feature, fillet.to.feature}) {
     if (!IsVertex(feature) &&
-        (SamePoint(point, EdgeStart(input, FeatureEdge(feature))) ||
-         SamePoint(point, EdgeEnd(input, FeatureEdge(feature)))))
+        (point == StartPoint(input, FeatureEdge(feature)) ||
+         point == EndPoint(input, FeatureEdge(feature))))
       return false;
   }
   return ContactBlocks(input, fillet, vertex,
@@ -895,9 +911,8 @@ bool TouchesContact(const FilletInput& input, const FilletGeometry& fillet,
   for (const FilletEnd& end : {fillet.from, fillet.to}) {
     const BoundaryPos pos = Position(input, end);
     if (pos.t != 0) continue;
-    const vec2 vertex = EdgeStart(input, pos.edge);
-    if (SamePoint(EdgeStart(input, c), vertex) ||
-        SamePoint(EdgeEnd(input, c), vertex))
+    const int vertex = StartPoint(input, pos.edge);
+    if (StartPoint(input, c) == vertex || EndPoint(input, c) == vertex)
       return true;
   }
   return false;
@@ -1384,8 +1399,9 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
 
   const std::vector<size_t> loopOffsets = BuildLoopOffsets(polygons);
   const std::vector<EdgeRef> edges = BuildEdges(polygons, loopOffsets);
+  std::vector<int> startPoints;
   const std::vector<int> nextEdges =
-      BuildNextEdges(polygons, loopOffsets, edges, invert);
+      BuildNextEdges(polygons, loopOffsets, edges, invert, startPoints);
   std::vector<int> prevEdges(edges.size(), -1);
   for (size_t e = 0; e < edges.size(); ++e) prevEdges[nextEdges[e]] = e;
   for (size_t e = 0; e < edges.size(); ++e) {
@@ -1396,6 +1412,7 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
         static_cast<int>(loopOffsets[ref.loop] + (ref.edge + n - 1) % n);
   }
   const FilletInput input{polygons, loopOffsets, edges, nextEdges, prevEdges,
+                          startPoints,
 
                           // FIXME: why minimal radius?
                           invert, 2.0 * M_PI / segments};
