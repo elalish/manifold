@@ -7,7 +7,7 @@
 // manifold objects. When exporting to glTF, CrossSections will be visible, but
 // will not have `EXT_mesh_manifold` applied.
 
-import {CrossSection, CrossSectionGLTFNode, GLTFNode, Manifold, Polygons, Vec3} from 'manifold-3d/manifoldCAD';
+import {CrossSection, CrossSectionGLTFNode, GLTFNode, Manifold, Polygons, Vec3} from 'manifold-cad/manifoldCAD';
 import {pointsOnPath} from 'points-on-path';
 import {Font, getGlyphPath, pathToSVG} from 'text-shaper';
 

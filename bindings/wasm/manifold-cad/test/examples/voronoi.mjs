@@ -1,6 +1,6 @@
 // Generate an organic looking Voronoi pattern.
 
-import {CrossSection} from 'manifold-3d/manifoldCAD';
+import {CrossSection} from 'manifold-cad/manifoldCAD';
 
 // When run through manifoldcad.org or the `manifold-cad` CLI,
 // imported npm packages will automatically be retrieved from

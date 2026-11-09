@@ -2,7 +2,7 @@
 // This example recreates the Gear Bearing by Emmett Lalish:
 // https://www.thingiverse.com/thing:53451
 
-import {getGLTFNodes, GLTFNode, Manifold} from 'manifold-3d/manifoldCAD';
+import {getGLTFNodes, GLTFNode, Manifold} from 'manifold-cad/manifoldCAD';
 
 import {spurGear} from './involute-gear-library';
 

@@ -1,7 +1,7 @@
 // A smoothed manifold demonstrating manual smoothing by assigning tangents to
 // halfedges. Use refine() before export to see the curvature.
 
-import {GLTFNode, Manifold, Mesh} from 'manifold-3d/manifoldCAD';
+import {GLTFNode, Manifold, Mesh} from 'manifold-cad/manifoldCAD';
 
 const height = 10;
 const radius = 30;

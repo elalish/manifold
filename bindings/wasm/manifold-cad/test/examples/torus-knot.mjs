@@ -4,7 +4,7 @@
 // an example of using the warp() method, thus avoiding any direct
 // handling of triangles.
 
-import {CrossSection, getCircularSegments, Manifold} from 'manifold-3d/manifoldCAD';
+import {CrossSection, getCircularSegments, Manifold} from 'manifold-cad/manifoldCAD';
 
 // The number of times the thread passes through the donut hole.
 const p = 1;

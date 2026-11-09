@@ -1,7 +1,7 @@
 // This example demonstrates how symbolic perturbation correctly creates
 // holes even though the subtracted objects are exactly coplanar.
 
-import {GLTFNode, Manifold} from 'manifold-3d/manifoldCAD';
+import {GLTFNode, Manifold} from 'manifold-cad/manifoldCAD';
 
 function fractal(holes, hole, w, position, depth, maxDepth) {
   w /= 3;

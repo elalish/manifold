@@ -5,7 +5,7 @@
 // can also be used bare. Use console.log() to print output (lower-right).
 // This editor defines Z as up and units of mm.
 
-import {Manifold} from 'manifold-3d/manifoldCAD';
+import {Manifold} from 'manifold-cad/manifoldCAD';
 const {cube, sphere} = Manifold;
 
 const box = cube([100, 100, 100], true);

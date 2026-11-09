@@ -8,7 +8,7 @@
 // the source model into a fully manifold object that can be manipulated
 // or combined like any other manifoldCAD object.
 
-import {importManifold, Manifold} from 'manifold-3d/manifoldCAD';
+import {importManifold, Manifold} from 'manifold-cad/manifoldCAD';
 const {union} = Manifold;
 
 const csg = async () => {

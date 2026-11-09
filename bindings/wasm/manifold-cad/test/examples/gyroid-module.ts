@@ -3,7 +3,7 @@
 // use of a Signed Distance Function (SDF) to create smooth, complex
 // manifolds.
 
-import {Box, getGLTFNodes, GLTFNode, Manifold} from 'manifold-3d/manifoldCAD';
+import {Box, getGLTFNodes, GLTFNode, Manifold} from 'manifold-cad/manifoldCAD';
 
 // number of modules along pyramid edge (use 1 for print orientation)
 const m = 4;

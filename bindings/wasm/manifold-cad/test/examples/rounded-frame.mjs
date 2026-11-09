@@ -2,7 +2,7 @@
 // facets match up perfectly, for any choice of global resolution
 // parameters.
 
-import {getGLTFNodes, GLTFNode, Manifold} from 'manifold-3d/manifoldCAD';
+import {getGLTFNodes, GLTFNode, Manifold} from 'manifold-cad/manifoldCAD';
 
 const {sphere, cylinder, union, cube} = Manifold;
 

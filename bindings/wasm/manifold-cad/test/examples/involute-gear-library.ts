@@ -3,7 +3,7 @@
 // This example is based on the involute gear modules from the Gear Bearing by
 // Emmett Lalish: https://www.thingiverse.com/thing:53451
 
-import {CrossSection, getCircularSegments, Vec2} from 'manifold-3d/manifoldCAD';
+import {CrossSection, getCircularSegments, Vec2} from 'manifold-cad/manifoldCAD';
 
 const {sin, cos, tan, atan2, sqrt, pow, max, PI} = Math;
 

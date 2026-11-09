@@ -1,7 +1,7 @@
 // This example shows `importModel()`, which imports a model for display only.
 // Unlike `importManifold()`, the result cannot be used in CSG operations.
 
-import {importModel, Manifold} from 'manifold-3d/manifoldCAD';
+import {importModel, Manifold} from 'manifold-cad/manifoldCAD';
 
 const csg = async () => {
   // `new URL(..., import.meta.url)` resolves this file relative to the script.

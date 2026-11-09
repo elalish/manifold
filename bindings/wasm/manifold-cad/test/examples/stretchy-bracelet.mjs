@@ -1,7 +1,7 @@
 // Recreates Stretchy Bracelet by Emmett Lalish:
 // https://www.thingiverse.com/thing:13505
 
-import {Manifold} from 'manifold-3d/manifoldCAD';
+import {Manifold} from 'manifold-cad/manifoldCAD';
 
 function rotate2D(point, angleRad) {
   const cosA = Math.cos(angleRad);
