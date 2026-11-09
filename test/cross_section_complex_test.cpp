@@ -658,6 +658,32 @@ TEST(CrossSectionComplex, IncidenceParallelDiagonalSlivers) {
   }
 }
 
+TEST(CrossSectionComplex, IncidenceExtremeExtents) {
+  // At these magnitudes the grid's cell size or scale underflows or overflows.
+  const auto square = [](double side) {
+    return Polygons{{{0, 0}, {side, 0}, {side, side}, {0, side}}};
+  };
+  EXPECT_EQ(CrossSection(square(1e-310)).NumVert(), 4);
+  EXPECT_EQ(CrossSection(square(1e-320)).NumVert(), 4);
+  EXPECT_EQ(CrossSection(square(1e308)).NumVert(), 4);
+
+  // A contour on a vertical line: eps underflows to 0, so the extent in x is 0.
+  EXPECT_EQ(
+      CrossSection(Polygons{{{0, 0}, {0, 1e-320}, {0, 2e-320}}}).NumVert(), 0);
+
+  // Many edges in a subnormal box, so the cell size itself underflows.
+  constexpr int kSide = 64;
+  const double step = 1e-320 / kSide;
+  Polygons triangles;
+  for (int i = 0; i < kSide; ++i) {
+    for (int j = 0; j < kSide; ++j) {
+      const vec2 c(i * step, j * step);
+      triangles.push_back({c, c + vec2(step / 2, 0), c + vec2(0, step / 2)});
+    }
+  }
+  EXPECT_EQ(CrossSection(triangles).NumContour(), kSide * kSide);
+}
+
 TEST(CrossSectionComplex, IncidenceUnevenLayout) {
   // Timed: detailed shapes plus one far-away square, so a grid sized from the
   // overall bounds would put almost every edge in one cell.

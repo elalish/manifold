@@ -605,8 +605,9 @@ Box2 BoxOf2DEdge(vec2 p0, vec2 p1, double eps) {
 // is binned into every cell it touches.
 class BoxGrid {
  public:
-  // Leaves the grid unbuilt (Built() false) if binning would take more than
-  // maxEntries cell entries, as when many long boxes each touch many cells.
+  // Leaves the grid unbuilt (Built() false) if it can't be sized, or if binning
+  // would take more than maxEntries cell entries, as when many long boxes each
+  // touch many cells.
   BoxGrid(const std::vector<Box2>& boxes, size_t maxEntries) : boxes_(boxes) {
     const int n = static_cast<int>(boxes.size());
     if (n == 0) return;
@@ -616,9 +617,13 @@ class BoxGrid {
     // cells.
     const double cell = std::max(std::sqrt(size.x * size.y / n),
                                  std::max(size.x, size.y) / (2.0 * n + 1));
+    // At the extremes of the double range, the sizing can underflow or
+    // overflow; such inputs are left to the tree.
+    if (!(cell > 0) || !std::isfinite(cell)) return;
     nx_ = std::max(1, std::min(n, static_cast<int>(size.x / cell) + 1));
     ny_ = std::max(1, std::min(n, static_cast<int>(size.y / cell) + 1));
-    scale_ = vec2(nx_ / std::max(size.x, kTiny), ny_ / std::max(size.y, kTiny));
+    scale_ = vec2(nx_ / size.x, ny_ / size.y);
+    if (!std::isfinite(scale_.x) || !std::isfinite(scale_.y)) return;
     size_t entries = 0;
     for (const auto& b : boxes)
       entries += static_cast<size_t>(CellX(b.max.x) - CellX(b.min.x) + 1) *
@@ -662,7 +667,6 @@ class BoxGrid {
   }
 
  private:
-  static constexpr double kTiny = 1e-300;
   int CellX(double x) const {
     return std::clamp(static_cast<int>((x - bounds_.min.x) * scale_.x), 0,
                       nx_ - 1);
