@@ -19,8 +19,8 @@ import 'monaco-editor/esm/vs/editor/browser/widget/codeEditor/editor.css';
 import 'monaco-editor/esm/vs/editor/standalone/browser/standalone-tokens.css';
 
 import esbuildWasmUrl from 'esbuild-wasm/esbuild.wasm?url';
-import ManifoldWorker from 'manifold-cad/lib/worker.bundled.js?worker';
 import manifoldWasmUrl from 'manifold-3d/manifold.wasm?url';
+import ManifoldWorker from 'manifold-cad/lib/worker.bundled.js?worker';
 import {Box3, BufferGeometry, CanvasTexture, Float32BufferAttribute, Group, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, PlaneGeometry, SkinnedMesh,} from 'three';
 
 const CODE_START = '<code>';
