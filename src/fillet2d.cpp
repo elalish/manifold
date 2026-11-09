@@ -240,20 +240,25 @@ bool IsVectorInSector(vec2 v, vec2 start, vec2 end, bool ccw) {
   return crossStartV > 0 || crossVEnd > 0;
 }
 
-IntersectResult IntersectSegmentArc(vec2 p, vec2 q, vec2 center, double radius,
-                                    vec2 arcStart, vec2 arcEnd, bool arcCCW) {
-  const vec2 edge = q - p;
+// Centers of balls tangent to the line of an edge, on its normal side, that
+// touch the vertex `center`. Measured from the vertex's signed distance s to
+// the edge's own line: r^2 - (r - s)^2 = s (2r - s) stays accurate for a
+// vertex lying nearly on the line, where comparing r^2 with the squared
+// distance to the offset line would round s away below ulp(r).
+IntersectResult IntersectSegmentArc(vec2 start, vec2 edge, vec2 normal,
+                                    vec2 center, double radius, vec2 arcStart,
+                                    vec2 arcEnd, bool arcCCW) {
   const double lenSq = dot(edge, edge);
   if (lenSq == 0) return {};
 
-  const double projectionT = dot(center - p, edge) / lenSq;
-  const vec2 projection = p + edge * projectionT;
-  const double distSq = length2(center - projection);
-  const double radiusSq = radius * radius;
-  if (distSq > radiusSq) return {};
+  const vec2 w = center - start;
+  const double s = dot(w, normal);
+  const double discriminant = s * (2 * radius - s);
+  if (!(discriminant >= 0)) return {};
 
-  const double offset = std::sqrt(radiusSq - distSq);
-  const double tOffset = offset / std::sqrt(lenSq);
+  const vec2 p = start + normal * radius;
+  const double projectionT = dot(w, edge) / lenSq;
+  const double tOffset = std::sqrt(discriminant / lenSq);
   const std::array<double, 2> values{projectionT - tOffset,
                                      projectionT + tOffset};
   // Coincident when they round to the same parameter, even if tOffset is not
@@ -615,7 +620,7 @@ std::vector<FilletGeometry> BuildFilletGeometries(const FilletInput& input,
 
   if (!secondConvex && !endOnEdge(secondEdge, firstEdge)) {
     const IntersectResult ev = IntersectSegmentArc(
-        firstOffset, firstOffset + firstVec, secondEnd, radius, secondNormal,
+        firstStart, firstVec, firstNormal, secondEnd, radius, secondNormal,
         secondNextNormal, input.invert);
 
     for (int i = 0; i < ev.count; ++i) {
@@ -630,7 +635,7 @@ std::vector<FilletGeometry> BuildFilletGeometries(const FilletInput& input,
 
   if (!firstConvex && !endOnEdge(firstEdge, secondEdge)) {
     const IntersectResult ve =
-        IntersectSegmentArc(secondOffset, secondOffset + secondVec, firstEnd,
+        IntersectSegmentArc(secondStart, secondVec, secondNormal, firstEnd,
                             radius, firstNormal, firstNextNormal, input.invert);
 
     for (int i = 0; i < ve.count; ++i) {
