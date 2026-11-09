@@ -26,6 +26,8 @@ If you like OpenSCAD / JSCAD, you might also like ManifoldCAD - our own solid mo
 
 manifoldCAD = manifold + [TypeScript](https://www.typescriptlang.org/) + [glTF](https://www.khronos.org/gltf/)
 
+The ManifoldCAD runtime, its command line tool and its glTF and 3MF import and export are published as a separate npm package, [manifold-cad](https://www.npmjs.com/package/manifold-cad). `manifold-3d` holds only the geometry library and has no dependencies.
+
 <div style="clear:both"></div>
 
 <!-- #endregion IncludeInUserGuide -->

@@ -45,7 +45,7 @@
  * fact manifold, and adds a small amount of extra data to losslessly recover
  * this manifold mesh by leveraging sparse accessors.
  *
- * It can be imported as `manifold-3d/manifold-gltf`.
+ * It can be imported as `manifold-cad/manifold-gltf`.
  *
  * @packageDocumentation
  * @group glTF Extension
