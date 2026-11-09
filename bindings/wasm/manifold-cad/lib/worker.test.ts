@@ -14,7 +14,6 @@
 
 import {strict as assert} from 'assert';
 import {glob} from 'glob';
-// @ts-ignore
 import {Mesh} from 'manifold-3d';
 import * as fs from 'node:fs/promises';
 import {resolve} from 'path';
