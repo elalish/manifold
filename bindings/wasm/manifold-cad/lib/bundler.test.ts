@@ -44,6 +44,22 @@ suite('Bundler', () => {
     await expect(worker.evaluate(script)).to.resolves.not.toBeNull();
   });
 
+  test('Accepts manifold-cad/manifoldCAD as the import name', async () => {
+    const script = `import {Manifold} from 'manifold-cad/manifoldCAD';` +
+        `export default Manifold.sphere(1);`;
+    await expect(worker.evaluate(script)).to.resolves.not.toBeNull();
+  });
+
+  test('Accepts manifold-cad/manifoldCAD in a library', async () => {
+    const files = {
+      'lib.js': `import {Manifold} from 'manifold-cad/manifoldCAD';` +
+          `export const ball = () => Manifold.sphere(1);`
+    };
+    const script = `import {ball} from 'lib.js';` +
+        `export default ball();`;
+    await expect(worker.evaluate(script, {files})).to.resolves.not.toBeNull();
+  });
+
   test('Bundles files whose path has backslashes (issue #1915)', async () => {
     // `\u`, `\x` and `\2` used to end up as escape sequences in the
     // generated `import.meta.url` string, which made the bundle invalid.

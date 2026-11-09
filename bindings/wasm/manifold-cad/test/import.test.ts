@@ -88,7 +88,7 @@ suite('From a string, the worker will', () => {
     const code = await readFile(filename, 'utf-8');
     const ev = async () => await worker.evaluate(code, {filename});
     await expect(ev()).rejects.toThrowError(
-        /Import it by adding.*manifold-3d\/manifoldCAD/);
+        /Import it by adding.*manifold-cad\/manifoldCAD/);
   });
 
   test('Have a specific error when missing gl-matrix', async () => {
@@ -172,7 +172,7 @@ suite('From the filesystem, the worker will', () => {
     const bundle = await bundleFile(filename);
     const ev = async () => await worker.evaluate(bundle, {doNotBundle: true});
     await expect(ev()).rejects.toThrowError(
-        /Import it by adding.*manifold-3d\/manifoldCAD/);
+        /Import it by adding.*manifold-cad\/manifoldCAD/);
   });
 
   test('Bundle npm imports from a CDN', async () => {

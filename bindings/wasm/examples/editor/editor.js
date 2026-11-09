@@ -623,15 +623,19 @@ async function createEditor() {
     allowNonTsExtensions: true,
   });
 
-  // Make sure `manifold-3d/manifoldCAD` types are available for import.
+  // Make sure `manifold-cad/manifoldCAD` types are available for import, and
+  // `manifold-3d/manifoldCAD` for older models.
   const manifoldCADTypesUrl =
       new URL('./manifoldCAD.d.ts', window.location.href);
   const manifoldCADGlobalsTypesUrl =
       new URL('./manifoldCADGlobals.d.ts', window.location.href);
 
-  monaco.languages.typescript.typescriptDefaults.addExtraLib(
-      await (await fetch(manifoldCADTypesUrl)).text(),
-      'inmemory://model/node_modules/manifold-3d/manifoldCAD.d.ts');
+  const manifoldCADTypes = await (await fetch(manifoldCADTypesUrl)).text();
+  for (const packageName of ['manifold-cad', 'manifold-3d']) {
+    monaco.languages.typescript.typescriptDefaults.addExtraLib(
+        manifoldCADTypes,
+        `inmemory://model/node_modules/${packageName}/manifoldCAD.d.ts`);
+  }
 
   // Types in the global namespace for top-level scripts.
   // This could be improved in the future.  API-Extractor intentionally doesn't
@@ -780,14 +784,14 @@ async function initializeAutoTypings(showTypeIndicator) {
       await import('monaco-editor-auto-typings');
   self.window.typecache = new LocalStorageCache();
 
-  // We inject manifold-3d typings locally above, and text-shaper publishes
+  // We inject manifoldCAD typings locally above, and text-shaper publishes
   // broken declaration re-exports to non-existent source files. Avoid CDN
   // probes for those packages to keep refreshes quiet.
   // This skip list only affects Monaco auto-typing CDN lookups, not runtime
   // imports.
   const jsDelivrResolver = new JsDelivrSourceResolver();
   const skippedTypingPackages =
-      new Set(['manifold-3d', 'text-shaper', '@types/require']);
+      new Set(['manifold-3d', 'manifold-cad', 'text-shaper', '@types/require']);
   const shouldSkipTypingPackage = packageName => {
     return skippedTypingPackages.has(packageName);
   };

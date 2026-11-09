@@ -83,19 +83,23 @@ const insertMetaData =
  *   * It fetches imports from http/https urls.
  *   * It provides evaluation context to npm packages.
  *
- * ManifoldCAD libraries can include `manifold-3d/manifoldCAD` to get access to
- * the evaluator context.  Outside of the evaluator, this involves importing a
- * module.  Inside the evaluator, imports are in the global namespace.  The
- * imported module will not be able to see the actual evaluator context.  Here,
- * we will swap it out for an object we will inject at evaluation time.
+ * ManifoldCAD libraries can include `manifold-cad/manifoldCAD` (or the older
+ * `manifold-3d/manifoldCAD`) to get access to the evaluator context.  Outside
+ * of the evaluator, this involves importing a module.  Inside the evaluator,
+ * imports are in the global namespace.  The imported module will not be able to
+ * see the actual evaluator context.  Here, we will swap it out for an object we
+ * will inject at evaluation time.
  */
 export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
                                          esbuild.Plugin => ({
   name: 'esbuild-manifold-plugin',
   async setup(build) {
     let manifoldCADExportPath: string|null = null;
-    const manifoldCADExportURLMatch = /manifold-3d(@[0-9.]+)?\/manifoldCAD/
-    const ManifoldCADExportMatch = /^manifold-3d\/manifoldCAD(.ts|.js)?$/
+    // `manifold-cad` is the package name since v4; `manifold-3d` keeps older
+    // models working.
+    const manifoldCADExportURLMatch =
+        /manifold-(3d|cad)(@[0-9.]+)?\/manifoldCAD/
+    const ManifoldCADExportMatch = /^manifold-(3d|cad)\/manifoldCAD(.ts|.js)?$/
     const manifoldCADExportNames = [
       // Manifold classes.
       'Mesh', 'Manifold', 'CrossSection',
@@ -128,7 +132,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       // We only need to check against the local manifoldCAD context on disk if
       // we happen to be running in node.  Truthfully, this is really only
       // necessary in development.  End users will almost always import
-      // `manifold-3d/manifoldCAD` instead of `some/path/to/manifoldCAD`.
+      // `manifold-cad/manifoldCAD` instead of `some/path/to/manifoldCAD`.
       (async () => {
         const {resolve, dirname} = await import('node:path');
         const {fileURLToPath} = await import('node:url');
@@ -233,7 +237,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
         const path = new URL(args.path, args.importer).toString();
 
         // Is this a manifoldCAD context import from a remote package?
-        // e.g.: `/npm/manifold-3d/manifoldCAD/+esm`
+        // e.g.: `/npm/manifold-cad/manifoldCAD/+esm`
         if (path.match(manifoldCADExportURLMatch)) {
           const response = {
             path,

@@ -204,7 +204,7 @@ export async function evaluate(
     log(`Bundling code took ${((t1 - t0) / 1000).toFixed(2)} seconds`);
   }
 
-  // Customize `manifold-3d/manifoldCAD`.
+  // Customize `manifold-cad/manifoldCAD`.
   // Let models know that they are running inside this worker.
   const manifoldCAD = await import('./manifoldCAD.ts');
   const manifoldImport = {
@@ -279,7 +279,7 @@ export async function evaluate(
       newError = new RuntimeError(
           error,
           error.message + '.  Import it by adding \`' +
-              `import {${missing}} from 'manifold-3d/manifoldCAD';` +
+              `import {${missing}} from 'manifold-cad/manifoldCAD';` +
               '\` to the top of your model.');
     } else if (
         error.name === 'ReferenceError' && error.message.match(/glMatrix/)) {
