@@ -65,6 +65,9 @@ struct FilletInput {
   std::vector<int8_t> endKinds;
   // The unit normal of each edge, towards the ball.
   std::vector<vec2> normals;
+  // For each edge, a box around the centers of the balls that touch its line
+  // or pivot around its end vertex (see BuildCollider).
+  std::vector<Box> pieces;
   // The endpoints of each edge, copied out of loops for fast access.
   std::vector<vec2> starts;
   std::vector<vec2> ends;
@@ -212,10 +215,6 @@ double SignedArea(const SimplePolygon& loop) {
   for (size_t i = 0; i < loop.size(); ++i)
     area += la::cross(loop[i], loop[(i + 1) % loop.size()]);
   return area * 0.5;
-}
-
-bool IsConvexTurn(const vec2& a, const vec2& b, const vec2& c) {
-  return la::cross(b - a, c - b) > 0;
 }
 
 bool IntersectLines(vec2 p, vec2 d, vec2 q, vec2 e, vec2& point, double& t,
@@ -424,22 +423,18 @@ std::vector<size_t> BuildLoopOffsets(const Polygons& polygons) {
   return loopOffsets;
 }
 
-EdgeIndex BuildEdgeIndex(const Polygons& polygons) {
+// Index over one box per edge, in edge order.
+EdgeIndex BuildBoxIndex(const std::vector<Box>& edgeBoxesIn) {
   Box bounds;
-  for (const SimplePolygon& loop : polygons)
-    for (const vec2& v : loop) bounds.Union(ToVec3(v));
+  for (const Box& box : edgeBoxesIn) bounds = bounds.Union(box);
 
   std::vector<EdgeBox> edgeBoxes;
-  int globalEdge = 0;
-  for (const SimplePolygon& loop : polygons) {
-    for (size_t edgeIdx = 0; edgeIdx < loop.size(); ++edgeIdx, ++globalEdge) {
-      const vec2 p0 = loop[edgeIdx];
-      const vec2 p1 = loop[(edgeIdx + 1) % loop.size()];
-      const Box edgeBox(ToVec3(p0), ToVec3(p1));
-      edgeBoxes.push_back(
-          EdgeBox{edgeBox, Collider::MortonCode(ToVec3((p0 + p1) / 2), bounds),
-                  globalEdge});
-    }
+  edgeBoxes.reserve(edgeBoxesIn.size());
+  for (size_t e = 0; e < edgeBoxesIn.size(); ++e) {
+    const Box& box = edgeBoxesIn[e];
+    edgeBoxes.push_back(
+        EdgeBox{box, Collider::MortonCode((box.min + box.max) / 2.0, bounds),
+                static_cast<int>(e)});
   }
 
   std::stable_sort(edgeBoxes.begin(), edgeBoxes.end(), EdgeBoxMortonLess());
@@ -457,48 +452,67 @@ EdgeIndex BuildEdgeIndex(const Polygons& polygons) {
   return index;
 }
 
-std::vector<std::pair<int, int>> BuildCollider(const FilletInput& input,
-                                               const EdgeIndex& index,
+EdgeIndex BuildEdgeIndex(const FilletInput& input) {
+  std::vector<Box> boxes(input.edges.size());
+  for (size_t e = 0; e < boxes.size(); ++e)
+    boxes[e] = Box(ToVec3(input.starts[e]), ToVec3(input.ends[e]));
+  return BuildBoxIndex(boxes);
+}
+
+// Pairs of edges that may share a fillet ball. The centers of the balls
+// touching an edge lie on its offset by the radius, and for a vertex the ball
+// can pivot around, on the arc around it between the two edges' normals. Two
+// edges share a ball only where these pieces meet, so only pairs whose pieces'
+// bounding boxes overlap are kept. Far fewer than the edges within reach of
+// each other's balls: for short edges and a large radius those are most of
+// the neighbourhood.
+std::vector<std::pair<int, int>> BuildCollider(FilletInput& input,
                                                double radius) {
-  const Polygons& polygons = input.loops;
-  const bool invert = input.invert;
-  Vec<Box> filletBoxes;
-  Vec<int> filletBoxEdges;
+  const size_t numEdges = input.edges.size();
+  std::vector<Box>& pieces = input.pieces;
+  pieces.resize(numEdges);
+  Vec<Box> queries(numEdges);
+  for (size_t e = 0; e < numEdges; ++e) {
+    const vec2 normal = input.normals[e];
+    const vec2 start = input.starts[e] + normal * radius;
+    const vec2 end = input.ends[e] + normal * radius;
+    Box box(ToVec3(start), ToVec3(end));
 
-  int globalEdge = 0;
-  for (const SimplePolygon& loop : polygons) {
-    for (size_t edgeIdx = 0; edgeIdx < loop.size(); ++edgeIdx, ++globalEdge) {
-      const vec2 p0 = loop[edgeIdx];
-      const vec2 p1 = loop[(edgeIdx + 1) % loop.size()];
-      const vec2 p2 = EdgeEnd(input, NextEdge(input, globalEdge));
-      const vec2 edge = p1 - p0;
-
-      const vec2 normal = EdgeNormal(edge, invert);
-
-      // Every ball tangent to this edge has its center on the edge offset by
-      // radius, and touches other edges within radius of that center.
-      const vec2 r(radius, radius);
-      Box filletBox(ToVec3(p0 + normal * radius), ToVec3(p1 + normal * radius));
-      filletBox.min -= ToVec3(r);
-      filletBox.max += ToVec3(r);
-
-      // At a reflex end vertex balls also pivot around it, centers within
-      // radius of the vertex.
-      if (IsConvexTurn(p0, p1, p2) == invert) {
-        filletBox.Union(ToVec3(p1 - 2.0 * r));
-        filletBox.Union(ToVec3(p1 + 2.0 * r));
+    if (input.endKinds[e] == kTouchable) {
+      const vec2 vertex = input.ends[e];
+      const vec2 nextNormal = input.normals[input.nextEdges[e]];
+      const double cosine = dot(normal, nextNormal);
+      if (cosine > 0) {
+        // The arc bulges past the box of its ends by at most its sagitta.
+        const vec2 arcEnd = vertex + nextNormal * radius;
+        const double sagitta = radius * (1 - std::sqrt((1 + cosine) / 2));
+        const vec2 bulge(sagitta, sagitta);
+        Box arc(ToVec3(end), ToVec3(arcEnd));
+        arc.min -= ToVec3(bulge);
+        arc.max += ToVec3(bulge);
+        box = box.Union(arc);
+      } else {
+        const vec2 r(radius, radius);
+        box.Union(ToVec3(vertex - r));
+        box.Union(ToVec3(vertex + r));
       }
-
-      filletBoxes.push_back(filletBox);
-      filletBoxEdges.push_back(globalEdge);
     }
+
+    // The corners are rounded sums; widen by more than that rounding so that
+    // pieces meeting exactly at a shared end are never separated by it.
+    const vec3 size = max(abs(box.min), abs(box.max));
+    const double pad = 8 * std::numeric_limits<double>::epsilon() *
+                       (std::max(size.x, size.y) + radius);
+    box.min -= vec3(pad, pad, 0);
+    box.max += vec3(pad, pad, 0);
+    pieces[e] = box;
+    queries[e] = box;
   }
 
-  // A ball touching edges a and b lies in both of their fillet boxes, so each
-  // unordered pair is found from both sides; keep only one direction.
+  // Each unordered pair is found from both sides; keep one direction.
+  const EdgeIndex index = BuildBoxIndex(pieces);
   std::vector<std::pair<int, int>> pairs;
-  for (auto [query, b] : index.Query(filletBoxes)) {
-    const int a = filletBoxEdges[query];
+  for (auto [a, b] : index.Query(queries)) {
     if (a < b) pairs.push_back({a, b});
   }
   return pairs;
@@ -1240,12 +1254,17 @@ std::vector<FilletGeometry> FindFilletPairs(
   Vec<Box> circleBoxes;
   circleBoxes.reserve(candidates.size());
   for (const FilletGeometry& geometry : candidates) {
-    // Twice the radius: a blocker exactly tangent to the ball must still be
-    // offered, or one fillet of a near-tie can miss it while the others don't.
-    // A larger box only adds edges to test; it never changes a decision.
-    const vec2 r(2 * radius, 2 * radius);
-    circleBoxes.push_back(
-        Box(ToVec3(geometry.center - r), ToVec3(geometry.center + r)));
+    // The ball's center lies where the pieces of its two contacts meet, so
+    // only an edge reaching within the radius of both pieces' boxes can cut
+    // it. The computed center is not used here: between nearly parallel
+    // edges it can be far from where the decisions place the ball.
+    auto piece = [&](const FilletEnd& end) {
+      const int edge = FeatureEdge(end.feature);
+      return input.pieces[IsVertex(end.feature) ? input.prevEdges[edge] : edge];
+    };
+    const Box a = piece(geometry.from), b = piece(geometry.to);
+    const vec3 r(radius, radius, 0);
+    circleBoxes.push_back(Box(max(a.min, b.min) - r, min(a.max, b.max) + r));
   }
 
   std::vector<uint8_t> fits(candidates.size(), 1);
@@ -1606,7 +1625,7 @@ bool HasValidFilletGeometry(const CrossSection& crossSection) {
 }
 
 bool IsValidFilletResult(const std::vector<CrossSection>& result,
-                         const CrossSection& original, int circularSegments,
+                         double originalArea, int circularSegments,
                          bool invert) {
   if (result.empty()) return false;
   for (const CrossSection& crossSection : result) {
@@ -1617,7 +1636,7 @@ bool IsValidFilletResult(const std::vector<CrossSection>& result,
   // Decomposed pieces are disjoint, so their areas add up.
   double area = 0;
   for (const CrossSection& crossSection : result) area += crossSection.Area();
-  return invert ? area > original.Area() : area < original.Area();
+  return invert ? area > originalArea : area < originalArea;
 }
 
 #ifdef MANIFOLD_DEBUG
@@ -1673,7 +1692,8 @@ void SaveCrossSection(std::ofstream& outFile,
 }
 #endif
 
-std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
+std::vector<CrossSection> FilletImpl(const Polygons& polygons,
+                                     double originalArea, double radius,
                                      int circularSegments) {
   if (polygons.empty() || radius == 0) return {};
 
@@ -1723,6 +1743,7 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
                     {},
                     {},
                     {},
+                    {},
                     {}};
   input.starts.resize(edges.size());
   input.ends.resize(edges.size());
@@ -1757,15 +1778,15 @@ std::vector<CrossSection> FilletImpl(const Polygons& polygons, double radius,
   }
 #endif
 
-  const EdgeIndex index = BuildEdgeIndex(polygons);
+  const EdgeIndex index = BuildEdgeIndex(input);
   const std::vector<std::pair<int, int>> broadPairs =
-      BuildCollider(input, index, radius);
+      BuildCollider(input, radius);
   const std::vector<FilletGeometry> geometries =
       FindFilletPairs(input, index, broadPairs, radius);
 
-  const CrossSection original(polygons);
   auto result = TraceFillets(input, geometries, radius, segments);
-  if (!IsValidFilletResult(result, original, segments, invert)) result.clear();
+  if (!IsValidFilletResult(result, originalArea, segments, invert))
+    result.clear();
 
 #ifdef MANIFOLD_DEBUG
   if (resultOutputFile.is_open()) {
@@ -1784,7 +1805,7 @@ namespace manifold {
 std::vector<CrossSection> CrossSection::Fillet(double radius,
                                                int circularSegments) const {
   try {
-    return FilletImpl(ToPolygons(), radius, circularSegments);
+    return FilletImpl(ToPolygons(), Area(), radius, circularSegments);
   } catch (const std::exception&) {
     return {};
   }
