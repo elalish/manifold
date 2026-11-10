@@ -112,7 +112,7 @@ struct FilletGeometry {
 struct IntersectResult {
   int count = 0;
   std::array<vec2, 2> points{vec2(), vec2()};
-  // For IntersectSegmentArc, the parameter of each point along the segment.
+  // For a line and a vertex, the parameter of each point along the edge.
   std::array<double, 2> params{0, 0};
   // The two solutions coincide: the ball fits exactly through a neck and
   // carries an arc on each side of it.
@@ -286,55 +286,6 @@ int AlongLine(const FilletInput& input, int line, vec2 v, vec2 p) {
 bool LinesMeet(const FilletInput& input, int a, int b) {
   return input.startPoints[input.nextEdges[input.runLast[a]]] ==
          input.startPoints[input.runFirst[b]];
-}
-
-// How many balls tangent to the line of an edge (from start along `edge`), on
-// its normal side, touch the vertex `center`: with s the vertex's signed
-// distance to the line, none unless 0 <= s <= 2 r, and a double one (the ball
-// fits exactly through the neck) at s == 2 r. A vertex computed to be on the
-// line itself counts as on the ball side: it is then usually a distinct
-// vertex a rounding error away from the edge's own end, which the ball does
-// get to pivot around.
-int CountSegmentArc(vec2 start, vec2 edge, bool invert, vec2 center,
-                    double radius) {
-  const vec2 end = start + edge;
-  const int sigma = invert ? -1 : 1;
-  if (sigma * CrossSign(end, start, center, start) < 0) return 0;
-  // sign(2 r - s) = sign(2 r |d| - sigma cross(d, w)).
-  const vec2 w = center - start;
-  const double f =
-      2 * radius * length(edge) - sigma * (edge.x * w.y - edge.y * w.x);
-  return f < 0 ? 0 : f == 0 ? 1 : 2;
-}
-
-// Centers of the `count` balls of CountSegmentArc, in order along the edge.
-// Measured from the vertex's signed distance s to the edge's own line:
-// r^2 - (r - s)^2 = s (2r - s) stays accurate for a vertex lying nearly on the
-// line, where comparing r^2 with the squared distance to the offset line
-// would round s away below ulp(r).
-// All roots, whether or not they lie on the edge or in the vertex's sector:
-// those limits are decided by the caller (Passes).
-IntersectResult IntersectSegmentArc(vec2 start, vec2 edge, vec2 normal,
-                                    vec2 center, double radius, int count) {
-  IntersectResult result;
-  const double lenSq = dot(edge, edge);
-  if (lenSq == 0 || count == 0) return result;
-
-  const vec2 w = center - start;
-  const double s = dot(w, normal);
-  const double discriminant = std::max(0.0, s * (2 * radius - s));
-
-  const vec2 p = start + normal * radius;
-  const double projectionT = dot(w, edge) / lenSq;
-  const double tOffset = count == 1 ? 0 : std::sqrt(discriminant / lenSq);
-  const std::array<double, 2> values{projectionT - tOffset,
-                                     projectionT + tOffset};
-  for (int i = 0; i < count; ++i) {
-    result.params[result.count] = values[i];
-    result.points[result.count++] = p + edge * values[i];
-  }
-  result.tangent = count == 1;
-  return result;
 }
 
 // How many balls pass through two vertices: two closer than 2 r, a double one
@@ -719,20 +670,43 @@ double FacingBeyond(const FilletInput& input, int line, int m, vec2 v,
          FacingGap(input, line, m, radius);
 }
 
+// The signed distance s of a point from the line of an edge, on its ball
+// side. One expression for every use: how many balls the line shares with a
+// vertex there, where they are, and which side of an end of the edge each is
+// on all depend on it. Measured from the nearer end of the line: a vertex
+// that all but coincides with that end - another loop touching there - is
+// then placed as accurately as the two points are apart, not as the line is
+// long.
+double HeightOverLine(const FilletInput& input, int line, vec2 p) {
+  const vec2 start = LineStart(input, line), end = LineEnd(input, line);
+  const vec2 fromStart = p - start, fromEnd = p - end;
+  return dot(
+      dot(fromEnd, fromEnd) < dot(fromStart, fromStart) ? fromEnd : fromStart,
+      LineNormal(input, line));
+}
+
 // How many balls the line of an edge shares with the vertex at the end of
-// edge `vertexEdge` (see CountSegmentArc). Decided once per line and vertex:
-// candidate generation and the vertex's sector both read it, so a ball is
-// never left to an edge that has none.
+// edge `vertexEdge`: none unless 0 <= s <= 2 r, and a double one (the ball
+// fits exactly through the neck) at s == 2 r. A vertex computed to be on the
+// line itself counts as on the ball side: it is then usually a distinct
+// vertex a rounding error away from the edge's own end, which the ball does
+// get to pivot around. Decided once per line and vertex: candidate
+// generation and the vertex's sector both read it, so a ball is never left
+// to an edge that has none.
 // Where one of the vertex's own edges faces the line, the two can form a
 // channel just as wide as the ball, and whether the vertex is within the
 // ball's width of the line is then the same question as whether the ball
-// tangent to that edge at the vertex is cut by the line (FacingBeyond): with
-// s the vertex's distance, s - 2 r = that ball's distance beyond r, less
-// r (1 + n . n_M). It is taken from there, so the two cannot disagree.
+// tangent to that edge at the vertex is cut by the line (FacingBeyond):
+// s - 2 r = that ball's distance beyond r, less r (1 + n . n_M). It is taken
+// from there, so the two cannot disagree.
+// `within`, if asked for, is 2 r - s as it was decided: the centers are
+// placed from it (LineVertexCenters), so that two balls counted as distinct
+// are distinct, on either side of the vertex's foot.
 int LineVertexBalls(const FilletInput& input, int line, int vertexEdge,
-                    double radius) {
+                    double radius, double* within = nullptr) {
   const vec2 vertex = EdgeEnd(input, vertexEdge);
-  const vec2 start = LineStart(input, line);
+  const double s = HeightOverLine(input, line, vertex);
+  if (s < 0) return 0;
   const vec2 nM = LineNormal(input, line);
   const int next = NextEdge(input, vertexEdge);
   const int facing =
@@ -740,32 +714,49 @@ int LineVertexBalls(const FilletInput& input, int line, int vertexEdge,
           ? vertexEdge
           : next;
   const vec2 nJ = LineNormal(input, facing);
-  if (!(dot(nM, nJ) < 0))
-    return CountSegmentArc(start, LineEnd(input, line) - start, input.invert,
-                           vertex, radius);
-  const int sigma = input.invert ? -1 : 1;
-  if (sigma * CrossSign(LineEnd(input, line), start, vertex, start) < 0)
-    return 0;
   const vec2 sum = nM + nJ;
-  const double within = 0.5 * radius * dot(sum, sum) -
-                        FacingBeyond(input, facing, line, vertex, radius);
-  return within < 0 ? 0 : within == 0 ? 1 : 2;
+  const double margin =
+      dot(nM, nJ) < 0 ? 0.5 * radius * dot(sum, sum) -
+                            FacingBeyond(input, facing, line, vertex, radius)
+                      : 2 * radius - s;
+  if (within) *within = margin;
+  return margin < 0 ? 0 : margin == 0 ? 1 : 2;
 }
 
 // Those balls, with their parameters along the edge itself.
 IntersectResult LineVertexCenters(const FilletInput& input, int line,
                                   int vertexEdge, double radius) {
+  IntersectResult result;
+  double within = 0;
+  const int count = LineVertexBalls(input, line, vertexEdge, radius, &within);
+  if (count == 0) return result;
   const vec2 vertex = EdgeEnd(input, vertexEdge);
   const vec2 start = LineStart(input, line);
-  IntersectResult result = IntersectSegmentArc(
-      start, LineEnd(input, line) - start, LineNormal(input, line), vertex,
-      radius, LineVertexBalls(input, line, vertexEdge, radius));
+  const vec2 edge = LineEnd(input, line) - start;
+  const vec2 normal = LineNormal(input, line);
+  // The centers are r^2 - (r - s)^2 = s (2 r - s) along the line from the
+  // vertex's foot, squared: accurate also for a vertex nearly on the line,
+  // where comparing r^2 with the squared distance to the offset line would
+  // round s away.
+  const double lenSq = dot(edge, edge);
+  // s itself where it may be small; with a facing edge it is close to 2 r,
+  // and what is left of 2 r is what was decided.
+  const double s = HeightOverLine(input, line, vertex);
+  const double discriminant = std::max(
+      0.0, s <= radius ? s * (2 * radius - s) : (2 * radius - within) * within);
+  const double projection = dot(vertex - start, edge) / lenSq;
+  const double reach = count == 1 ? 0 : std::sqrt(discriminant / lenSq);
   const vec2 pieceStart = EdgeStart(input, line);
   const vec2 piece = EdgeEnd(input, line) - pieceStart;
-  const vec2 offset = pieceStart + LineNormal(input, line) * radius;
-  for (int i = 0; i < result.count; ++i)
+  const vec2 offset = pieceStart + normal * radius;
+  for (int i = 0; i < count; ++i) {
+    const double t = i == 0 ? projection - reach : projection + reach;
+    result.points[i] = start + normal * radius + edge * t;
     result.params[i] =
         dot(result.points[i] - offset, piece) / dot(piece, piece);
+  }
+  result.count = count;
+  result.tangent = count == 1;
   return result;
 }
 
@@ -1096,9 +1087,9 @@ bool SegmentLimit(const FilletInput& input, int g, int line, bool atEnd,
   }
   const vec2 p = EdgeStart(input, FeatureEdge(g));
   const vec2 w = v - p;
-  // |dL| (|S - P|^2 - r^2) = |w|^2 |dL| + 2 r sigma cross(dL, w).
+  // |S - P|^2 - r^2 = |w|^2 - 2 r s, as v is on the line.
   const bool inside =
-      dot(w, w) * lenL + 2 * radius * sigma * la::cross(dL, w) < 0;
+      dot(w, w) - 2 * radius * HeightOverLine(input, line, p) < 0;
   if (inside && roots == 2) return root == (atEnd ? 0 : 1);
   const int foot = -AlongLine(input, line, v, p);
   return atEnd ? foot <= 0 : foot >= 0;
