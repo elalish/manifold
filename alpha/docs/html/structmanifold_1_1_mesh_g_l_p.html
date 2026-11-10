@@ -161,7 +161,7 @@ template&lt;typename Precision, typename I&gt; </div>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Updates the mergeFromVert and mergeToVert vectors in order to create a manifold solid. If the MeshGL is already manifold, no change will occur and the function will return false. Otherwise, this will merge verts along open edges within tolerance (the maximum of the MeshGL tolerance and the baseline bounding-box tolerance), keeping any from the existing merge vectors, and return true.</p>
+<p>Updates the mergeFromVert and mergeToVert vectors in order to create a manifold solid. If the MeshGL is already manifold, or is invalid (fewer than 3 properties, merge vectors of different lengths, or out-of-range indices), no change will occur and the function will return false. Otherwise, this will merge verts along open edges within tolerance (the maximum of the MeshGL tolerance and the baseline bounding-box tolerance), keeping any from the existing merge vectors, and return true.</p>
 <p>There is no guarantee the result will be manifold - this is a best-effort helper function designed primarily to aid in the case where a manifold multi-material MeshGL was produced, but its merge vectors were lost due to a round-trip through a file format. Constructing a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> from the result will report an error status if it is not manifold. </p>
 
 </div>
