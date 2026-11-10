@@ -27,6 +27,7 @@ set(
   edge_op.cpp
   execution_impl.cpp
   face_op.cpp
+  fillet2d.cpp
   impl.cpp
   manifold.cpp
   minkowski.cpp
