@@ -217,6 +217,41 @@ TEST(Manifold, InvalidInput7) {
   EXPECT_EQ(tet.Status(), Manifold::Error::RunIndexWrongLength);
 }
 
+TEST(Manifold, InvalidInputRunIndexPastEnd) {
+  MeshGL tetGL = TetGL();
+  tetGL.runIndex = {0, 3000};
+  tetGL.runOriginalID = {1};
+  Manifold tet(tetGL);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::RunIndexWrongLength);
+}
+
+TEST(Manifold, InvalidInputRunIndexDecreasing) {
+  MeshGL tetGL = TetGL();
+  tetGL.runIndex = {0, 9, 6, static_cast<uint32_t>(tetGL.triVerts.size())};
+  tetGL.runOriginalID = {1, 2, 3};
+  Manifold tet(tetGL);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::RunIndexWrongLength);
+}
+
+TEST(Manifold, InvalidInputShortTangents) {
+  MeshGL tetGL = TetGL();
+  tetGL.halfedgeTangent = {1, 1, 1, 1};
+  Manifold tet(tetGL);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::InvalidConstruction);
+}
+
+TEST(Manifold, InvalidInputNoProperties) {
+  MeshGL in;
+  in.numProp = 0;
+  in.vertProperties.resize(15);
+  Manifold tet(in);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::MissingPositionProperties);
+}
+
 TEST(Manifold, ErrorPropagationDecompose) {
   MeshGL in = TetGL();
   in.vertProperties[2 * 3 + 1] = NAN;
@@ -816,6 +851,12 @@ TEST(Manifold, Extrude) {
   EXPECT_EQ(donut.Genus(), 1);
   EXPECT_FLOAT_EQ(donut.Volume(), 12.0);
   EXPECT_FLOAT_EQ(donut.SurfaceArea(), 48.0);
+}
+
+TEST(Manifold, ExtrudeNegativeDivisions) {
+  Manifold extrusion =
+      Manifold::Extrude({{{0, 0}, {1, 0}, {1, 1}, {0, 1}}}, 1, -5);
+  EXPECT_EQ(extrusion.Status(), Manifold::Error::InvalidConstruction);
 }
 
 TEST(Manifold, ExtrudeSquare) {

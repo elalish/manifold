@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #pragma once
+#include <algorithm>
 #include <map>
 
 #include "collider.h"
@@ -308,6 +309,11 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
     return;
   }
 
+  if (meshGL.numProp < 3) {
+    MakeEmpty(Error::MissingPositionProperties);
+    return;
+  }
+
   const uint32_t numVert = meshGL.NumVert();
   const uint32_t numTri = meshGL.NumTri();
 
@@ -318,11 +324,6 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
 
   if (numVert < 4 || numTri < 4) {
     MakeEmpty(Error::NotManifold);
-    return;
-  }
-
-  if (meshGL.numProp < 3) {
-    MakeEmpty(Error::MissingPositionProperties);
     return;
   }
 
@@ -346,6 +347,12 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
 
   if (!meshGL.faceID.empty() && meshGL.faceID.size() != meshGL.NumTri()) {
     MakeEmpty(Error::FaceIDWrongLength);
+    return;
+  }
+
+  if (!meshGL.halfedgeTangent.empty() &&
+      meshGL.halfedgeTangent.size() != 4 * meshGL.triVerts.size()) {
+    MakeEmpty(Error::InvalidConstruction);
     return;
   }
 
@@ -421,6 +428,14 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   auto runOriginalID = meshGL.runOriginalID;
   if (runOriginalID.empty()) {
     runOriginalID.push_back(0);  // untracked
+  }
+
+  if (runIndex.size() < runOriginalID.size() + 1 || runIndex[0] != 0 ||
+      runIndex[runOriginalID.size()] != runEnd ||
+      !std::is_sorted(runIndex.begin(),
+                      runIndex.begin() + runOriginalID.size() + 1)) {
+    MakeEmpty(Error::RunIndexWrongLength);
+    return;
   }
   for (size_t i = 0; i < runOriginalID.size(); ++i) {
     const int originalID = runOriginalID[i];

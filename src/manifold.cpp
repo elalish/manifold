@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <limits>
 
 #include "atomic_compat.h"
 #include "boolean3.h"
@@ -37,6 +38,12 @@ Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
   double yDeg = degrees(-math::asin(normal.z));
   double zDeg = degrees(math::atan2(normal.y, normal.x));
   return cutter.Rotate(0.0, yDeg, zDeg);
+}
+
+// Property arrays are indexed with int, so their size must fit in one.
+bool PropertiesTooLarge(int64_t numProp, size_t numPropVert) {
+  return numProp * static_cast<int64_t>(numPropVert) >
+         std::numeric_limits<int>::max();
 }
 }  // namespace
 
@@ -662,6 +669,9 @@ Manifold Manifold::SetProperties(
   auto leafImpl = GetCsgLeafNode().GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
+  if (numProp < 0) return Invalid();
+  if (PropertiesTooLarge(numProp, leafImpl->NumPropVert()))
+    return PropagateStatus(Error::ResultTooLarge);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   const int oldNumProp = NumProp();
   const Vec<double> oldProperties = pImpl->properties_;
@@ -714,6 +724,9 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
+  if (PropertiesTooLarge(std::max(gaussianIdx, meanIdx) + int64_t(1),
+                         leafImpl->NumPropVert()))
+    return PropagateStatus(Error::ResultTooLarge);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   pImpl->CalculateCurvature(gaussianIdx, meanIdx);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
@@ -742,6 +755,8 @@ Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
+  if (PropertiesTooLarge(normalIdx + int64_t(3), leafImpl->NumPropVert()))
+    return PropagateStatus(Error::ResultTooLarge);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   pImpl->SetNormals(normalIdx, minSharpAngle);
   // Mark per-meshID hasNormals so GetMeshGL(-1) can auto-substitute slot 0 on
@@ -775,6 +790,9 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
     return PropagateStatus(leafImpl->status_);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (!IsEmpty()) {
+    if (normalIdx < 0 ||
+        normalIdx + int64_t(3) > static_cast<int64_t>(pImpl->NumProp()))
+      return Invalid();
     pImpl->CreateTangents(normalIdx);
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));

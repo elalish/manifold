@@ -226,7 +226,7 @@ Manifold Manifold::Sphere(double radius, int circularSegments) {
 Manifold Manifold::Extrude(const Polygons& crossSection, double height,
                            int nDivisions, double twistDegrees, vec2 scaleTop) {
   ZoneScoped;
-  if (crossSection.size() == 0 || height <= 0.0) {
+  if (crossSection.size() == 0 || height <= 0.0 || nDivisions < 0) {
     return Invalid();
   }
   return Manifold(

@@ -14,7 +14,9 @@
 
 #include "manifold/polygon.h"
 
+#include <algorithm>
 #include <cstddef>
+#include <iterator>
 #include <map>
 #include <memory>
 #if defined(__has_include)
@@ -959,6 +961,18 @@ template <typename GetTriangulator>
 HalfedgeTriangulation TriangulateIdxHalfedgesImpl(
     const PolygonsIdx& polys, double epsilon, bool allowConvex,
     GetTriangulator getTriangulator) {
+  // Contours with fewer than 3 verts have no area.
+  const auto isShort = [](const SimplePolygonIdx& poly) {
+    return poly.size() < 3;
+  };
+  if (std::any_of(polys.begin(), polys.end(), isShort)) {
+    PolygonsIdx filtered;
+    std::remove_copy_if(polys.begin(), polys.end(),
+                        std::back_inserter(filtered), isShort);
+    return TriangulateIdxHalfedgesImpl(filtered, epsilon, allowConvex,
+                                       getTriangulator);
+  }
+
   HalfedgeTriangulation result;
   double updatedEpsilon = epsilon;
 #ifdef MANIFOLD_DEBUG

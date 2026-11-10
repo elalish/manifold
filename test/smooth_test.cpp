@@ -356,6 +356,16 @@ TEST(Smooth, InvalidTangents) {
   EXPECT_EQ(smooth.Status(), Manifold::Error::InvalidTangents);
 }
 
+TEST(Smooth, NormalIdxOutOfRange) {
+  const Manifold cube = Manifold::Cube().CalculateNormals(0);
+  EXPECT_EQ(cube.SmoothByNormals(5).Status(),
+            Manifold::Error::InvalidConstruction);
+  EXPECT_EQ(cube.SmoothByNormals(-1).Status(),
+            Manifold::Error::InvalidConstruction);
+  EXPECT_EQ(Manifold::Cube().SmoothByNormals(0).Status(),
+            Manifold::Error::InvalidConstruction);
+}
+
 TEST(Smooth, Mirrored) {
   const auto tet = Manifold::Tetrahedron().Scale({1, 2, 3});
   Manifold smooth = tet.CalculateNormals().SmoothByNormals();
