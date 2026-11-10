@@ -56,6 +56,9 @@ TEST(SDF, InvalidGrid) {
   infBox.max.x = INFINITY;
   EXPECT_EQ(Manifold::LevelSet(sphere, infBox, 0.5).Status(),
             Manifold::Error::InvalidConstruction);
+  EXPECT_EQ(
+      Manifold::LevelSet(sphere, Box(vec3(0.0), vec3(3e9, 1, 1)), 1).Status(),
+      Manifold::Error::ResultTooLarge);
   EXPECT_EQ(Manifold::LevelSet(sphere, box, 1e-9).Status(),
             Manifold::Error::ResultTooLarge);
   EXPECT_EQ(Manifold::LevelSet(sphere, box, 1e-6).Status(),

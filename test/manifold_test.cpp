@@ -15,6 +15,7 @@
 #include "manifold/manifold.h"
 
 #include <algorithm>
+#include <limits>
 
 #include "../src/execution_impl.h"
 #include "gtest/gtest.h"
@@ -259,6 +260,12 @@ TEST(Manifold, InvalidInputShortTangents) {
   Manifold tet(tetGL);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::InvalidConstruction);
+}
+
+TEST(Manifold, LongTangents) {
+  MeshGL tetGL = TetGL();
+  tetGL.halfedgeTangent.resize(4 * tetGL.triVerts.size() + 4, 0);
+  EXPECT_EQ(Manifold(tetGL).Status(), Manifold::Error::NoError);
 }
 
 TEST(Manifold, InvalidInputNoProperties) {
@@ -897,6 +904,9 @@ TEST(Manifold, ExtrudeNegativeDivisions) {
   Manifold extrusion =
       Manifold::Extrude({{{0, 0}, {1, 0}, {1, 1}, {0, 1}}}, 1, -5);
   EXPECT_EQ(extrusion.Status(), Manifold::Error::InvalidConstruction);
+  extrusion = Manifold::Extrude({{{0, 0}, {1, 0}, {1, 1}, {0, 1}}}, 1,
+                                std::numeric_limits<int>::max());
+  EXPECT_EQ(extrusion.Status(), Manifold::Error::ResultTooLarge);
 }
 
 TEST(Manifold, ExtrudeSquare) {

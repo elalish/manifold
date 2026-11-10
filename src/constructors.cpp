@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <limits>
+
 #include "csg_tree.h"
 #include "disjoint_sets.h"
 #include "impl.h"
@@ -240,6 +242,12 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
     polygons.push_back(poly);
   }
   if (polygons.empty()) return Invalid();
+  // Vert indices are int.
+  int64_t numVert = 0;
+  for (const SimplePolygon& poly : polygons) numVert += poly.size();
+  if (numVert * (nDivisions + int64_t(2)) > std::numeric_limits<int>::max()) {
+    return PropagateStatus(Error::ResultTooLarge);
+  }
   return Manifold(
       ExtrudeImpl(polygons, height, nDivisions, twistDegrees, scaleTop));
 }
