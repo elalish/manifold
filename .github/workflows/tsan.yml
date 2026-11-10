@@ -9,9 +9,9 @@ name: TSAN
 
 on:
   push:
-    branches: [master]
+    branches: [master, 'v*-release']
   pull_request:
-    branches: [master]
+    branches: [master, 'v*-release']
   workflow_dispatch:
 
 concurrency:
