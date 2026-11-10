@@ -191,14 +191,11 @@ def parse_perf_suite(suite_dir: Path) -> dict:
 
 
 def parse_gtest_run(run_path: Path, run_index: int) -> dict:
-    # run_path is a gtest --gtest_output=json report; a passing test has no
-    # "failures" key, matching the old parser's "only count [ OK ] lines"
-    # behavior. time is a string in seconds, e.g. "0.024s" or "0s".
     report = json.loads(run_path.read_text(encoding="utf-8-sig"))
     tests = []
     for testsuite in report.get("testsuites", []):
         for test in testsuite.get("testsuite", []):
-            if "failures" in test:
+            if "failures" in test or test.get("result") in {"SKIPPED", "SUPPRESSED"}:
                 continue
             name = f"{test['classname']}.{test['name']}"
             time_ms = float(test["time"].rstrip("s")) * 1000.0
@@ -218,17 +215,20 @@ def parse_gtest_suite(suite_dir: Path) -> dict:
         parse_gtest_run(path, i + 1)
         for i, path in enumerate(gtest_run_files(suite_dir))
     ]
-    test_order = [item["name"] for item in runs[0]["tests"]]
+    samples_by_name = {}
+    for run in runs:
+        for test in run["tests"]:
+            samples_by_name.setdefault(test["name"], []).append(test["time_ms"])
 
-    tests = []
-    for position, name in enumerate(test_order):
-        samples = [run["tests"][position]["time_ms"] for run in runs]
-        tests.append({"name": name, "time_ms": summarize(samples, "_ms")})
+    tests = [
+        {"name": name, "time_ms": summarize(samples, "_ms")}
+        for name, samples in samples_by_name.items()
+    ]
 
     return {
         "type": "existing_gtests",
         "description": "Selected existing regression tests used as weekly benchmark signals",
-        "test_order": test_order,
+        "test_order": list(samples_by_name),
         "tests": tests,
         "runs": runs,
     }
@@ -317,10 +317,11 @@ def build_gtest_summary(suite: dict) -> list[str]:
     lines = []
     lines.append("#### Existing Regression Tests")
     lines.append("")
+    if not suite["tests"]:
+        lines.extend(["No completed test timings.", ""])
+        return lines
     lines.append("| Test | Mean (ms) | Median (ms) | Min (ms) | Max (ms) | Runs |")
     lines.append("|---|---:|---:|---:|---:|---:|")
-    if not suite["tests"]:
-        lines.append("| No tests selected | 0 | 0 | 0 | 0 | 0 |")
     for test in suite["tests"]:
         timing = test["time_ms"]
         lines.append(
