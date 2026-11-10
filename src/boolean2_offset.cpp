@@ -186,7 +186,9 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
       // Positive union resolves, keeping the correct corner fill (matching
       // Clipper2's offset cleanup). endPrev and startNext suffice; the original
       // vertex V is redundant - the union fills the same region with or without
-      // it, V only changes the corner's winding multiplicity.
+      // it, V only changes the corner's winding multiplicity. That holds only
+      // because Offset skips contours that collapse entirely (see
+      // CollapsesUnderOffset); Clipper2 emits V, which also removes those.
       out.push_back(endPrev);
       out.push_back(startNext);
       continue;
@@ -239,6 +241,30 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
   return out;
 }
 
+// True when the offset erases the region `contour` bounds (an outer under
+// inset or a hole under dilation): the region fits within the narrower side
+// of its bounding box, so |delta| of at least half that side leaves nothing.
+//
+// The fill rule cannot drop such a contour by itself. The offset edge normals
+// turn once around the ring, so once |delta| exceeds about the contour's
+// circumradius, the offset ring is a loop of radius ~|delta| with the original
+// orientation, and Positive fill keeps it as a phantom island or hole. Smaller
+// over-insets self-intersect and cancel, except on near-circles, whose
+// circumradius is their inradius. Since the circumradius is at least half the
+// narrower box side, this check fires first. Emitting the original vertex at
+// concave joins, as Clipper2 does, gives the same results but is slower.
+bool CollapsesUnderOffset(const SimplePolygon& contour, double delta) {
+  // The ring contracts when its orientation (CCW outer, CW hole) opposes the
+  // offset direction. A zero-area ring has no orientation; leave it to
+  // OffsetContour.
+  const double area = SignedArea(contour);
+  if (area == 0 || (area > 0) == (delta > 0)) return false;
+  Rect box;
+  for (const vec2& v : contour) box.Union(v);
+  const vec2 size = box.Size();
+  return 2 * std::fabs(delta) >= std::min(size.x, size.y);
+}
+
 }  // namespace
 
 // Public Offset API. `delta` is the offset distance (positive = inflate,
@@ -246,10 +272,10 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
 // is the chord count per 360 degrees of Round join; values < 3 use the Quality
 // default for radius |delta|.
 //
-// Each input contour produces one offset ring, then all rings are regularized
-// with Positive/Add filling. Collinear vertices are left in place for the
-// caller to `Simplify` if wanted, matching Manifold's tolerance model rather
-// than Clipper2's finishing behaviour.
+// Each input contour produces one offset ring, or none if the offset erases
+// it, then all rings are regularized with Positive/Add filling. Collinear
+// vertices are left in place for the caller to `Simplify` if wanted, matching
+// Manifold's tolerance model rather than Clipper2's finishing behaviour.
 Polygons Offset(const Polygons& in, double delta, JoinType jt,
                 double miterLimit, int circularSegments) {
   // Reject NaN/Inf delta and input coordinates.
@@ -270,6 +296,7 @@ Polygons Offset(const Polygons& in, double delta, JoinType jt,
   Polygons offsetRings;
   offsetRings.reserve(in.size());
   for (const auto& ring : in) {
+    if (ring.size() < 3 || CollapsesUnderOffset(ring, delta)) continue;
     auto off = OffsetContour(ring, delta, jt, miterLimit, segments);
     if (off.size() >= 3) offsetRings.push_back(std::move(off));
   }
@@ -278,7 +305,8 @@ Polygons Offset(const Polygons& in, double delta, JoinType jt,
   // Resolve self-intersecting offset rings (e.g. when delta exceeds a
   // thin feature's half-width and the offset pinches itself into multiple
   // loops). CrossSection storage is normal-oriented before reaching Offset,
-  // so Positive/Add cleanup keeps the filled side for both dilation and inset.
+  // so Positive/Add cleanup keeps the filled side for both dilation and inset
+  // once erased contours are skipped.
   // This is fill-rule application at machine eps, not tolerance decimation -
   // the caller can Simplify the result if it wants collinear verts removed.
   return ApplyFillRule(offsetRings, eps, WindRule::Add);
