@@ -357,13 +357,16 @@ TEST(Smooth, InvalidTangents) {
 }
 
 TEST(Smooth, NormalIdxOutOfRange) {
-  const Manifold cube = Manifold::Cube().CalculateNormals(0);
-  EXPECT_EQ(cube.SmoothByNormals(5).Status(),
-            Manifold::Error::InvalidConstruction);
+  const Manifold cube = Manifold::Cube();
   EXPECT_EQ(cube.SmoothByNormals(-1).Status(),
             Manifold::Error::InvalidConstruction);
-  EXPECT_EQ(Manifold::Cube().SmoothByNormals(0).Status(),
-            Manifold::Error::InvalidConstruction);
+  // Channels past NumProp count as missing normals, same as zero normals.
+  const double missing =
+      cube.SetProperties(3, nullptr).SmoothByNormals(0).Refine(4).Volume();
+  EXPECT_DOUBLE_EQ(cube.SmoothByNormals(0).Refine(4).Volume(), missing);
+  EXPECT_DOUBLE_EQ(
+      cube.SetProperties(3, nullptr).SmoothByNormals(5).Refine(4).Volume(),
+      missing);
 }
 
 TEST(Smooth, Mirrored) {

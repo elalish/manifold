@@ -778,9 +778,9 @@ Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
  * normals are considered missing and will defer to their neighboring normals
  * instead. If all normals are missing, the vertex pseudonormal will be used.
  *
- * @param normalIdx The first property channel of the normals. NumProp must be
- * at least normalIdx + 3. Any vertex where multiple normals exist and don't
- * agree will result in a sharp edge. Default is 0, the standard slot.
+ * @param normalIdx The first property channel of the normals. Channels past
+ * NumProp count as missing normals. Any vertex where multiple normals exist and
+ * don't agree will result in a sharp edge. Default is 0, the standard slot.
  * Non-zero values are retained for compatibility and will not be supported in
  * a future release.
  */
@@ -788,11 +788,9 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
+  if (normalIdx < 0) return Invalid();
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (!IsEmpty()) {
-    if (normalIdx < 0 ||
-        normalIdx + int64_t(3) > static_cast<int64_t>(pImpl->NumProp()))
-      return Invalid();
     pImpl->CreateTangents(normalIdx);
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));

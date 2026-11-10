@@ -493,7 +493,8 @@ void Manifold::Impl::CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
     return;
   }
 
-  if (!bounds.IsFinite() || !std::isfinite(edgeLength) || edgeLength <= 0) {
+  if (!bounds.IsFinite() || la::any(la::less(bounds.max, bounds.min)) ||
+      !std::isfinite(edgeLength) || edgeLength <= 0) {
     MakeEmpty(Error::InvalidConstruction);
     return;
   }

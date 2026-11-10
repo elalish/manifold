@@ -351,7 +351,7 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   }
 
   if (!meshGL.halfedgeTangent.empty() &&
-      meshGL.halfedgeTangent.size() != 4 * meshGL.triVerts.size()) {
+      meshGL.halfedgeTangent.size() < 4 * meshGL.triVerts.size()) {
     MakeEmpty(Error::InvalidConstruction);
     return;
   }

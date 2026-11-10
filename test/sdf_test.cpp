@@ -48,6 +48,10 @@ TEST(SDF, InvalidGrid) {
   nanBox.max.x = NAN;
   EXPECT_EQ(Manifold::LevelSet(sphere, nanBox, 0.5).Status(),
             Manifold::Error::InvalidConstruction);
+  Box invertedBox = box;
+  std::swap(invertedBox.min, invertedBox.max);
+  EXPECT_EQ(Manifold::LevelSet(sphere, invertedBox, 0.5).Status(),
+            Manifold::Error::InvalidConstruction);
   Box infBox = box;
   infBox.max.x = INFINITY;
   EXPECT_EQ(Manifold::LevelSet(sphere, infBox, 0.5).Status(),

@@ -235,6 +235,24 @@ TEST(Manifold, InvalidInputRunIndexDecreasing) {
   EXPECT_EQ(tet.Status(), Manifold::Error::RunIndexWrongLength);
 }
 
+TEST(Manifold, InvalidInputRunIndexStart) {
+  MeshGL tetGL = TetGL();
+  tetGL.runIndex = {6};
+  tetGL.runOriginalID = {1};
+  Manifold tet(tetGL);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::RunIndexWrongLength);
+}
+
+TEST(Manifold, InvalidInputRunIDsWithoutIndex) {
+  MeshGL tetGL = TetGL();
+  tetGL.runIndex.clear();
+  tetGL.runOriginalID = {1, 2};
+  Manifold tet(tetGL);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::RunIndexWrongLength);
+}
+
 TEST(Manifold, InvalidInputShortTangents) {
   MeshGL tetGL = TetGL();
   tetGL.halfedgeTangent = {1, 1, 1, 1};
@@ -851,6 +869,28 @@ TEST(Manifold, Extrude) {
   EXPECT_EQ(donut.Genus(), 1);
   EXPECT_FLOAT_EQ(donut.Volume(), 12.0);
   EXPECT_FLOAT_EQ(donut.SurfaceArea(), 48.0);
+}
+
+TEST(Manifold, ExtrudeInvalid) {
+  const Polygons square = {{{0, 0}, {1, 0}, {1, 1}, {0, 1}}};
+  EXPECT_EQ(Manifold::Extrude(square, 1, 4, NAN).Status(),
+            Manifold::Error::InvalidConstruction);
+  EXPECT_EQ(Manifold::Extrude(square, 1, 4, 0, vec2(INFINITY)).Status(),
+            Manifold::Error::InvalidConstruction);
+  EXPECT_EQ(Manifold::Extrude({{{0, 0}, {1, 0}, {NAN, 1}}}, 1).Status(),
+            Manifold::Error::InvalidConstruction);
+  EXPECT_EQ(Manifold::Extrude({{{0, 0}}}, 1).Status(),
+            Manifold::Error::InvalidConstruction);
+}
+
+TEST(Manifold, ShortContours) {
+  const SimplePolygon square = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+  EXPECT_DOUBLE_EQ(Manifold::Extrude({square, {{5, 5}}, {}}, 1).Volume(), 1);
+  const SimplePolygon offset = {{1, 0}, {2, 0}, {2, 1}, {1, 1}};
+  const Manifold revolved = Manifold::Revolve({offset}, 32);
+  EXPECT_DOUBLE_EQ(
+      Manifold::Revolve({offset, {{5, 5}}, {{1, 2}, {2, 2}}, {}}, 32).Volume(),
+      revolved.Volume());
 }
 
 TEST(Manifold, ExtrudeNegativeDivisions) {
