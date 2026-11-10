@@ -126,27 +126,17 @@ struct EdgeBoxMortonLess {
   }
 };
 
-struct PairRecorder {
-  const Vec<int>& leafEdge;
-  std::vector<std::pair<int, int>>& pairs;
-
-  void operator()(int query, int leaf) const {
-    pairs.push_back({query, leafEdge[leaf]});
-  }
-};
-
 struct EdgeIndex {
   Collider collider;
   Vec<int> leafEdge;
 
-  // Returns (query index, global edge) for every query box overlapping an edge
+  // Calls f(query index, global edge) for every query box overlapping an edge
   // box.
-  std::vector<std::pair<int, int>> Query(const Vec<Box>& queries) const {
-    std::vector<std::pair<int, int>> pairs;
-    PairRecorder record{leafEdge, pairs};
+  template <typename F>
+  void ForEach(const Vec<Box>& queries, F f) const {
+    auto record = [&](int query, int leaf) { f(query, leafEdge[leaf]); };
     auto recorder = MakeSimpleRecorder(record);
     collider.Collisions(recorder, queries.cview(), false);
-    return pairs;
   }
 };
 
@@ -506,15 +496,18 @@ std::vector<std::pair<int, int>> BuildCollider(FilletInput& input,
     box.min -= vec3(pad, pad, 0);
     box.max += vec3(pad, pad, 0);
     pieces[e] = box;
-    queries[e] = box;
   }
 
-  // Each unordered pair is found from both sides; keep one direction.
+  // Each unordered pair is found from both sides; keep one direction. The
+  // boxes are queried in the index's own order, which keeps neighbouring
+  // queries in neighbouring parts of it.
   const EdgeIndex index = BuildBoxIndex(pieces);
+  for (size_t i = 0; i < numEdges; ++i) queries[i] = pieces[index.leafEdge[i]];
   std::vector<std::pair<int, int>> pairs;
-  for (auto [a, b] : index.Query(queries)) {
+  index.ForEach(queries, [&](int query, int b) {
+    const int a = index.leafEdge[query];
     if (a < b) pairs.push_back({a, b});
-  }
+  });
   return pairs;
 }
 
@@ -595,16 +588,8 @@ bool FinishFilletGeometry(const FilletInput& input, int firstEdge,
   const bool backwards = input.invert ? turn > 0 : turn < 0;
   if (backwards != reverse) std::swap(from, to);
 
-  // An arc too flat to discretize may be skipped only at a plain corner: both
-  // tangent points inside two adjacent edges, so the arc angle equals the
-  // corner's turn and tracing still reaches the next edge via the vertex. Any
-  // other arc spans more of the boundary and must be kept.
-  const bool corner =
-      !IsVertex(from.feature) && !IsVertex(to.feature) &&
-      FeatureEdge(to.feature) == NextEdge(input, FeatureEdge(from.feature));
-  const double minArc = corner ? input.minArcAngle : 0;
   if (!(ArcAngle(EndAngle(input, from, center), EndAngle(input, to, center),
-                 input.invert) > minArc))
+                 input.invert) > 0))
     return false;
 
   geometry = FilletGeometry{from, to, center, PivotKey(input, from, center),
@@ -1177,7 +1162,7 @@ bool Blocks(const FilletInput& input, const FilletGeometry& fillet, int c,
   const double t = dot(fillet.center - p0, d) / dot(d, d);
 
   if (t > 0 && t < 1) {
-    const double s = dot(EdgeNormal(d, input.invert), fillet.center - p0);
+    const double s = dot(LineNormal(input, c), fillet.center - p0);
     // A ball behind the edge cannot touch it from the ball side.
     if (!(s > 0)) return -s < radius;
     // For a ball tangent to two lines, the cut by a third is one decision
@@ -1225,6 +1210,25 @@ bool TouchesContact(const FilletInput& input, const FilletGeometry& fillet,
   return false;
 }
 
+// An arc too flat to discretize may be skipped only at a plain corner: the
+// ball tangent to two adjacent edges, running from the first to the second,
+// so the arc angle equals the corner's turn and tracing still reaches the
+// next edge via the vertex. Any other arc spans more of the boundary and must
+// be kept. Decided from the edges' normals, before anything else is computed
+// for the pair: most pairs of short edges along a curve are such corners.
+bool FlatCorner(const FilletInput& input, int first, int second,
+                double cosMinArc) {
+  const int turn = CrossSign(EdgeEnd(input, first), EdgeStart(input, first),
+                             EdgeEnd(input, second), EdgeStart(input, second));
+  // The arc runs from `first` unless the edges turn the other way (see
+  // FinishFilletGeometry).
+  const bool backwards = input.invert ? turn > 0 : turn < 0;
+  const int from = backwards ? second : first;
+  const int to = backwards ? first : second;
+  if (NextEdge(input, from) != to) return false;
+  return dot(LineNormal(input, from), LineNormal(input, to)) >= cosMinArc;
+}
+
 // A fillet circle is part of the result only if the rolling ball fits there:
 // no edge other than the ones it touches may cut it.
 std::vector<FilletGeometry> FindFilletPairs(
@@ -1235,9 +1239,12 @@ std::vector<FilletGeometry> FindFilletPairs(
   // Each pair classifies its balls: edge or end vertex on each side. Where a
   // ball could be the neighbouring case, EdgeCaseAt decides for both.
   std::vector<FilletGeometry> candidates;
+  const double cosMinArc = std::cos(input.minArcAngle);
   for (const auto& [first, second] : broadPairs) {
     for (const int kind :
          {kLineLine, kLineVertex, kVertexLine, kVertexVertex}) {
+      if (kind == kLineLine && FlatCorner(input, first, second, cosMinArc))
+        continue;
       const RawCandidates raws =
           FindRawCandidates(input, first, second, kind, radius);
       for (size_t i = 0; i < raws.size(); ++i) {
@@ -1268,15 +1275,15 @@ std::vector<FilletGeometry> FindFilletPairs(
   }
 
   std::vector<uint8_t> fits(candidates.size(), 1);
-  for (auto [query, edge] : index.Query(circleBoxes)) {
-    if (!fits[query]) continue;
+  index.ForEach(circleBoxes, [&](int query, int edge) {
+    if (!fits[query]) return;
     const FilletGeometry& geometry = candidates[query];
 
     // Skip topology neighbour geometry because it must touch the arc.
-    if (TouchesContact(input, geometry, edge)) continue;
+    if (TouchesContact(input, geometry, edge)) return;
 
     if (Blocks(input, geometry, edge, radius)) fits[query] = 0;
-  }
+  });
 
   std::vector<FilletGeometry> fillets;
   fillets.reserve(candidates.size());
