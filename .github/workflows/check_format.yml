@@ -2,9 +2,9 @@ name: Check code formatting
 
 on:
   push:
-    branches: [ master ]
+    branches: [ master, 'v*-release' ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, 'v*-release' ]
 
 jobs:
   check_format:

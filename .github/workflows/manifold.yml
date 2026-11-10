@@ -3,12 +3,12 @@
 name: CI
 
 # Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the master branch
+# events for the master and release branches
 on:
   push:
-    branches: [ master ]
+    branches: [ master, 'v*-release' ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, 'v*-release' ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
