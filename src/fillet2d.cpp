@@ -179,15 +179,8 @@ bool SamePoint(const vec2& a, const vec2& b) {
   return a.x == b.x && a.y == b.y;
 }
 
-bool SamePointWithin(const vec2& a, const vec2& b, double tolerance) {
-  return tolerance > 0 && length2(a - b) <= tolerance * tolerance;
-}
-
-void AppendPoint(SimplePolygon& loop, const vec2& point, double tolerance = 0) {
-  if (loop.empty() || (!SamePoint(loop.back(), point) &&
-                       !SamePointWithin(loop.back(), point, tolerance))) {
-    loop.push_back(point);
-  }
+void AppendPoint(SimplePolygon& loop, const vec2& point) {
+  if (loop.empty() || !SamePoint(loop.back(), point)) loop.push_back(point);
 }
 
 vec2 EdgeStart(const FilletInput& input, int edge) {
@@ -1287,13 +1280,9 @@ std::vector<vec2> discreteArcToPoint(const FilletInput& input,
   // Spread the points evenly: fixed dPhi steps leave a sliver segment at the
   // end when totalRad is just over a multiple of dPhi, whose direction is
   // meaningless after rounding.
-  // An arc that is a whole number of steps up to rounding (a right angle at
-  // 20 segments, say) must not get an extra one, so the count is taken just
-  // short of the next whole number; the validity check on the result allows
-  // steps far more oversized than this.
   const int segments = std::max(
-      1, static_cast<int>(
-             std::ceil(totalRad * circularSegments / (2.0 * M_PI) - 1e-9)));
+      1,
+      static_cast<int>(std::ceil(totalRad * circularSegments / (2.0 * M_PI))));
   const double step = (invert ? -totalRad : totalRad) / segments;
 
   for (int i = 1; i < segments; ++i) {
@@ -1311,9 +1300,8 @@ void AppendArcPoints(const FilletInput& input, SimplePolygon& loop,
                      int circularSegments) {
   const std::vector<vec2> points =
       discreteArcToPoint(input, arc, radius, circularSegments);
-  const double pointTolerance = std::max(radius * 1e-8, 1e-12);
   for (size_t i = 1; i < points.size(); ++i) {
-    AppendPoint(loop, points[i], pointTolerance);
+    AppendPoint(loop, points[i]);
   }
 }
 
@@ -1512,7 +1500,6 @@ std::vector<CrossSection> TraceFillets(
 
   Polygons resultLoops;
   std::vector<uint8_t> touchedLoop(input.loops.size(), 0);
-  const double pointTolerance = std::max(radius * 1e-8, 1e-12);
   std::vector<uint8_t> used(geometries.size(), 0);
 
   for (size_t startFillet = 0; startFillet < geometries.size(); ++startFillet) {
@@ -1527,7 +1514,7 @@ std::vector<CrossSection> TraceFillets(
       const FilletGeometry& fillet = geometries[current];
       const BoundaryPos departure = Position(input, fillet.from);
       const BoundaryPos arrival = Position(input, fillet.to);
-      AppendPoint(loop, EndPoint(input, fillet.from), pointTolerance);
+      AppendPoint(loop, EndPoint(input, fillet.from));
       AppendArcPoints(input, loop, fillet, radius, circularSegments);
       touchedLoop[input.edges[departure.edge].loop] = 1;
       touchedLoop[input.edges[arrival.edge].loop] = 1;
@@ -1547,21 +1534,18 @@ std::vector<CrossSection> TraceFillets(
         int edge = arrival.edge;
         bool first = true;
         while (edge != nextDeparture.edge || (first && wrap)) {
-          AppendPoint(loop, EdgeEnd(input, edge), pointTolerance);
+          AppendPoint(loop, EdgeEnd(input, edge));
           touchedLoop[input.edges[edge].loop] = 1;
           edge = NextEdge(input, edge);
           first = false;
         }
       }
-      AppendPoint(loop, EndPoint(input, nextFillet.from), pointTolerance);
+      AppendPoint(loop, EndPoint(input, nextFillet.from));
       current = static_cast<size_t>(next[current]);
     } while (current != startFillet);
 
-    if (loop.size() > 1 &&
-        (SamePoint(loop.front(), loop.back()) ||
-         SamePointWithin(loop.front(), loop.back(), pointTolerance))) {
+    if (loop.size() > 1 && SamePoint(loop.front(), loop.back()))
       loop.pop_back();
-    }
     if (loop.size() < 3) return {};
     resultLoops.push_back(loop);
   }
