@@ -19,6 +19,13 @@ TEST(CBIND, version) {
   EXPECT_EQ(version[2], MANIFOLD_VERSION_PATCH);
 }
 
+TEST(CBIND, meshgl_no_props) {
+  const float vertProps[] = {0, 0, 0};
+  ManifoldMeshGL* mesh = manifold_meshgl(vertProps, 1, 0, NULL, 0);
+  EXPECT_EQ(manifold_meshgl_num_vert(mesh), 0);
+  manifold_delete_meshgl(mesh);
+}
+
 TEST(CBIND, sphere) {
   int n = 25;
   ManifoldManifold* sphere = manifold_sphere(1.0, 4 * n);
