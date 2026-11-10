@@ -680,24 +680,18 @@ Manifold Manifold::SetProperties(
     pImpl->properties_.clear();
   } else {
     pImpl->properties_ = Vec<double>(numProp * NumPropVert(), 0);
-    for_each_n(
-        propFunc == nullptr ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
-        countAt(0), NumTri(), [&](int tri) {
-          for (int i : {0, 1, 2}) {
-            const int edge = 3 * tri + i;
-            const int vert = pImpl->halfedge_.Start(edge);
-            const int propVert = pImpl->halfedge_.Prop(edge);
-            if (propFunc == nullptr) {
-              for (int p = 0; p < numProp; ++p) {
-                pImpl->properties_[numProp * propVert + p] = 0;
-              }
-            } else {
-              propFunc(&pImpl->properties_[numProp * propVert],
-                       pImpl->vertPos_[vert],
-                       oldProperties.data() + oldNumProp * propVert);
-            }
-          }
-        });
+    if (propFunc != nullptr) {
+      for_each_n(ExecutionPolicy::Seq, countAt(0), NumTri(), [&](int tri) {
+        for (int i : {0, 1, 2}) {
+          const int edge = 3 * tri + i;
+          const int vert = pImpl->halfedge_.Start(edge);
+          const int propVert = pImpl->halfedge_.Prop(edge);
+          propFunc(&pImpl->properties_[numProp * propVert],
+                   pImpl->vertPos_[vert],
+                   oldProperties.data() + oldNumProp * propVert);
+        }
+      });
+    }
   }
 
   pImpl->numProp_ = numProp;
