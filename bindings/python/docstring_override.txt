@@ -9,7 +9,8 @@ cross_section__warp_batch__warp_func:
   Same as CrossSection::warp but calls warpFunc with
   an ndarray[n, 2] instead of processing only one vertex at a time.
   :param warp_func: A function that takes multiple vertex positions as an
-  ndarray[n, 2] and returns the new vertex positions.
+  ndarray[n, 2] and returns the new vertex positions. The result should have the
+  same shape as the input.
 manifold__warp__warp_func:
   This function does not change the topology, but allows the vertices to be
   moved according to any arbitrary input function. It is easy to create a
