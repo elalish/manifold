@@ -1451,8 +1451,9 @@ bool InArcAround(const FilletInput& input, const FilletGeometry& fillet,
   std::vector<FilletGeometry> rivals;
   const RawCandidates raws =
       FindRawCandidates(input, first, second, kind, radius);
-  for (size_t i = 0; i < raws.size(); ++i)
+  for (size_t i = 0; i < raws.size(); ++i) {
     AppendFillets(input, first, second, kind, raws[i], rivals);
+  }
   if (rivals.size() != 2) return true;
   const FilletGeometry* leaves = nullptr;
   const FilletGeometry* arrives = nullptr;
@@ -1491,12 +1492,19 @@ bool BetweenOnLine(const FilletInput& input, int vertexEdge,
   return balls.params[0] < end.t && end.t < balls.params[1];
 }
 
+// An arc by the features it runs between, for looking up whether a given
+// one is among the candidates.
+uint64_t ArcKey(int from, int to) {
+  return (static_cast<uint64_t>(static_cast<uint32_t>(from)) << 32) |
+         static_cast<uint32_t>(to);
+}
+
 // Whether edge c cuts the fillet ball. Its nearest point to the center is
 // either inside the edge (its line) or one of its endpoints (a vertex).
 // Endpoints matter even when convex: across a narrow gap a spike tip can be
 // the nearest point with both of its edges nearest there too.
 bool Blocks(const FilletInput& input, const FilletGeometry& fillet, int c,
-            double radius) {
+            double radius, const std::vector<uint64_t>& arcs) {
   const vec2 p0 = EdgeStart(input, c);
   const vec2 p1 = EdgeEnd(input, c);
   // An edge on a line the ball is tangent to touches it at most.
@@ -1555,8 +1563,26 @@ bool Blocks(const FilletInput& input, const FilletGeometry& fillet, int c,
     return BetweenOnLine(input, into, fillet.from, radius) &&
            BetweenOnLine(input, into, fillet.to, radius);
   }
-  if (!(length(fillet.center - (t <= 0 ? p0 : p1)) < radius)) return false;
   const int y = VertexFeature(t <= 0 ? c : NextEdge(input, c));
+  // Two balls that reach one vertex from different contacts compete for it,
+  // and their order around that vertex alone says which of them the other's
+  // contact cuts: exactly one, where the distance of each from the other's
+  // contact could leave both.
+  bool decided = false, within = true;
+  // Only a vertex the ball can turn about has balls of its own.
+  const bool turns = TouchableEnd(input, t <= 0 ? input.prevEdges[c] : c);
+  for (const int pivot : {g, h}) {
+    if (!turns || !IsVertex(pivot)) continue;
+    // y's own ball at the same end of its arc: the one that competes with
+    // this one for the vertex, if the two keep it.
+    const uint64_t rival =
+        fillet.from.feature == pivot ? ArcKey(pivot, y) : ArcKey(y, pivot);
+    if (!std::binary_search(arcs.begin(), arcs.end(), rival)) continue;
+    decided = true;
+    within = within && InArcAround(input, fillet, pivot, y, radius);
+  }
+  if (decided) return within;
+  if (!(length(fillet.center - (t <= 0 ? p0 : p1)) < radius)) return false;
   return (!IsVertex(g) || InArcAround(input, fillet, g, y, radius)) &&
          (!IsVertex(h) || InArcAround(input, fillet, h, y, radius));
 }
@@ -1661,6 +1687,14 @@ std::vector<FilletGeometry> FindFilletPairs(
     circleBoxes.push_back(Box(max(a.min, b.min) - r, min(a.max, b.max) + r));
   }
 
+  // Every candidate arc, sorted, so that a ball can find the one competing
+  // with it for a vertex (Blocks).
+  std::vector<uint64_t> arcs;
+  arcs.reserve(candidates.size());
+  for (const FilletGeometry& geometry : candidates)
+    arcs.push_back(ArcKey(geometry.from.feature, geometry.to.feature));
+  std::sort(arcs.begin(), arcs.end());
+
   std::vector<uint8_t> fits(candidates.size(), 1);
   index.ForEach(circleBoxes, [&](int query, int edge) {
     if (!fits[query]) return;
@@ -1669,7 +1703,7 @@ std::vector<FilletGeometry> FindFilletPairs(
     // Skip topology neighbour geometry because it must touch the arc.
     if (TouchesContact(input, geometry, edge)) return;
 
-    if (Blocks(input, geometry, edge, radius)) fits[query] = 0;
+    if (Blocks(input, geometry, edge, radius, arcs)) fits[query] = 0;
   });
 
   std::vector<FilletGeometry> fillets;
