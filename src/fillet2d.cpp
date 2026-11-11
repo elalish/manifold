@@ -806,6 +806,36 @@ struct RawCandidates {
   const RawCandidate& operator[](size_t i) const { return balls[i]; }
 };
 
+int Slope(const FilletInput& input, int m, int line, double radius);
+
+// Whether every ball tangent to edge y within its ends touches the line of
+// edge x within x's limits - its ends, or the corner balls there: the balls
+// at the two ends of y do, and the rest lie between them.
+bool Covers(const FilletInput& input, int x, int y, double radius) {
+  const vec2 origin = LineStart(input, x);
+  const vec2 d = LineEnd(input, x) - origin;
+  const double dd = dot(d, d);
+  auto limit = [&](bool atEnd) {
+    const int before = atEnd ? x : input.prevEdges[x];
+    const int other = atEnd ? NextEdge(input, x) : before;
+    double at =
+        dot((atEnd ? EdgeEnd(input, x) : EdgeStart(input, x)) - origin, d) / dd;
+    if (input.endKinds[before] == kCorner) {
+      const vec2 n = LineNormal(input, x), no = LineNormal(input, other);
+      const double along = dot((n + no) * (radius / (1 + dot(n, no))), d) / dd;
+      if (std::isfinite(along)) at += along;
+    }
+    return at;
+  };
+  const double lo = limit(false), hi = limit(true);
+  const vec2 up = LineNormal(input, y) * radius;
+  for (const vec2 v : {EdgeStart(input, y), EdgeEnd(input, y)}) {
+    const double t = dot(v + up - origin, d) / dd;
+    if (!(lo < t && t < hi)) return false;
+  }
+  return true;
+}
+
 RawCandidates FindRawCandidates(const FilletInput& input, int first, int second,
                                 int kind, double radius) {
   const vec2 firstStart = EdgeStart(input, first);
@@ -865,8 +895,24 @@ RawCandidates FindRawCandidates(const FilletInput& input, int first, int second,
     firstT = dot(center - firstStart, firstVec) / firstLenSq;
     secondT = dot(center - secondStart, secondVec) / dot(secondVec, secondVec);
     // The contacts are at -r n, and the normals turn as the edges do.
-    raws.push_back(
-        {center, firstT, secondT, false, LineCross(input, first, second)});
+    // Which way round the ball the arc runs follows the sign of the cross
+    // product of the two directions. Between lines facing each other along
+    // a channel that is also which way the channel closes, and there the
+    // shorter one - the one whose balls all land within the other - has
+    // said so already, by the values at its two ends (Slope). The longer
+    // one could only repeat the question at its far ends, where the answer
+    // is the rounding of a distance that hardly changes over its length.
+    int turn = LineCross(input, first, second);
+    if (input.kindsReady && dot(firstNormal, secondNormal) < 0) {
+      const int sigma = input.invert ? -1 : 1;
+      int closes = 0;
+      if (Covers(input, first, second, radius))
+        closes = sigma * Slope(input, first, second, radius);
+      else if (Covers(input, second, first, radius))
+        closes = -sigma * Slope(input, second, first, radius);
+      if (closes != 0) turn = closes;
+    }
+    raws.push_back({center, firstT, secondT, false, turn});
   } else if (kind == kLineVertex) {
     if (!TouchableEnd(input, second) || endOnEdge(second, first)) return raws;
     const IntersectResult ev = LineVertexCenters(input, first, second, radius);
@@ -914,9 +960,15 @@ SectorTest TestSector(const FilletInput& input, int edge, vec2 center) {
   const vec2 normalOut = LineNormal(input, next);
   const bool ccw = input.invert;
   SectorTest test{};
-  // A sector wider than a half-turn has no single side test per normal.
+  // A sector of exactly a half-turn - the tip of a spike folded back on
+  // itself - has no single side test per normal. The boundary never turns
+  // by more than that, so a cross product of the wrong sign is rounding: of
+  // a half-turn where the normals point apart, and of hardly any turn at
+  // all where they point the same way. There the sector is as narrow as
+  // can be, not all the way round.
   test.narrow = (ccw ? la::cross(normalIn, normalOut)
-                     : la::cross(normalOut, normalIn)) >= 0;
+                     : la::cross(normalOut, normalIn)) >= 0 ||
+                dot(normalIn, normalOut) > 0;
   if (!test.narrow) {
     test.inside = IsVectorInSector(v, normalIn, normalOut, ccw);
     return test;
@@ -1057,10 +1109,17 @@ bool TripleCut(const FilletInput& input, int c, int a, int b, double radius) {
     // this ball touches that line.
     const int w = dot(nz, nx) <= dot(nz, ny) ? x : y;
     const vec2 nw = w == x ? nx : ny;
-    const double beyond =
+    double beyond =
         dot(nz, nw) < 0
             ? FacingBeyond(input, w, z, center - nw * radius, radius)
             : dot(nz, center - LineStart(input, z)) - radius;
+    // And from how far the vertex itself is within the ball's width of z,
+    // where that is known: the number the two edges read for their own
+    // balls at the vertex (EndValue), which this ball lies between.
+    double within = std::numeric_limits<double>::quiet_NaN();
+    LineVertexBalls(input, z, input.runLast[meet ? x : y], radius, &within);
+    if (!std::isnan(within))
+      beyond = radius * (1 + dot(nz, nx + ny) / (1 + dot(nx, ny))) - within;
     g = -LineCross(input, x, y) * beyond;
   } else {
     g = dot(nx, ny) < 0
@@ -1355,6 +1414,20 @@ int MeetingSide(const FilletInput& input, int g, vec2 v, int line) {
 // one of the edge case and the vertex case claims the ball.
 bool InVertexSector(const FilletInput& input, int edge, int g, vec2 center,
                     double radius, int side) {
+  // Against a line, the two edges at the vertex have each said whether the
+  // ball tangent to them there is cut by it (EndValue). Those two balls are
+  // the ends of the sector, and the line keeps the ball out of one arc
+  // around the vertex: clear at one end and cut at the other, the ball
+  // turning about the vertex meets the line exactly once in between - where
+  // it leaves for the line if it started clear, where it arrives from it if
+  // it ends clear. That ball is the vertex's, and the other one is not.
+  if (!IsVertex(g) && side != 0 && input.kindsReady) {
+    const int m = FeatureEdge(g);
+    const int in = EndValue(input, m, edge, true, radius);
+    const int out = EndValue(input, m, NextEdge(input, edge), false, radius);
+    if (in > 0 && out < 0) return side > 0;
+    if (in < 0 && out > 0) return side < 0;
+  }
   const SectorTest test = TestSector(input, edge, center);
   if (!test.narrow) return test.inside;
   const vec2 v = EdgeEnd(input, edge);
