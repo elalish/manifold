@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <limits>
 
 #include "boolean3.h"
 #include "csg_tree.h"
@@ -35,6 +36,12 @@ Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
   double yDeg = degrees(-math::asin(normal.z));
   double zDeg = degrees(math::atan2(normal.y, normal.x));
   return cutter.Rotate(0.0, yDeg, zDeg);
+}
+
+// Property arrays are indexed with int, so their size must fit in one.
+bool PropertiesTooLarge(int64_t numProp, size_t numPropVert) {
+  return numProp * static_cast<int64_t>(numPropVert) >
+         std::numeric_limits<int>::max();
 }
 }  // namespace
 
@@ -625,6 +632,9 @@ Manifold Manifold::SetProperties(
   auto leafImpl = GetCsgLeafNode().GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
+  if (numProp < 0) return Invalid();
+  if (PropertiesTooLarge(numProp, leafImpl->NumPropVert()))
+    return PropagateStatus(Error::ResultTooLarge);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   const int oldNumProp = NumProp();
   const Vec<double> oldProperties = pImpl->properties_;
@@ -633,24 +643,18 @@ Manifold Manifold::SetProperties(
     pImpl->properties_.clear();
   } else {
     pImpl->properties_ = Vec<double>(numProp * NumPropVert(), 0);
-    for_each_n(
-        propFunc == nullptr ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
-        countAt(0), NumTri(), [&](int tri) {
-          for (int i : {0, 1, 2}) {
-            const int edge = 3 * tri + i;
-            const int vert = pImpl->halfedge_.Start(edge);
-            const int propVert = pImpl->halfedge_.Prop(edge);
-            if (propFunc == nullptr) {
-              for (int p = 0; p < numProp; ++p) {
-                pImpl->properties_[numProp * propVert + p] = 0;
-              }
-            } else {
-              propFunc(&pImpl->properties_[numProp * propVert],
-                       pImpl->vertPos_[vert],
-                       oldProperties.data() + oldNumProp * propVert);
-            }
-          }
-        });
+    if (propFunc != nullptr) {
+      for_each_n(ExecutionPolicy::Seq, countAt(0), NumTri(), [&](int tri) {
+        for (int i : {0, 1, 2}) {
+          const int edge = 3 * tri + i;
+          const int vert = pImpl->halfedge_.Start(edge);
+          const int propVert = pImpl->halfedge_.Prop(edge);
+          propFunc(&pImpl->properties_[numProp * propVert],
+                   pImpl->vertPos_[vert],
+                   oldProperties.data() + oldNumProp * propVert);
+        }
+      });
+    }
   }
 
   pImpl->numProp_ = numProp;
@@ -677,6 +681,9 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
+  if (PropertiesTooLarge(std::max(gaussianIdx, meanIdx) + int64_t(1),
+                         leafImpl->NumPropVert()))
+    return PropagateStatus(Error::ResultTooLarge);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   pImpl->CalculateCurvature(gaussianIdx, meanIdx);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
@@ -705,6 +712,8 @@ Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
+  if (PropertiesTooLarge(normalIdx + int64_t(3), leafImpl->NumPropVert()))
+    return PropagateStatus(Error::ResultTooLarge);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   pImpl->SetNormals(normalIdx, minSharpAngle);
   // Mark per-meshID hasNormals so GetMeshGL(-1) can auto-substitute slot 0 on
@@ -726,9 +735,9 @@ Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
  * normals are considered missing and will defer to their neighboring normals
  * instead. If all normals are missing, the vertex pseudonormal will be used.
  *
- * @param normalIdx The first property channel of the normals. NumProp must be
- * at least normalIdx + 3. Any vertex where multiple normals exist and don't
- * agree will result in a sharp edge. Default is 0, the standard slot.
+ * @param normalIdx The first property channel of the normals. Channels past
+ * NumProp count as missing normals. Any vertex where multiple normals exist and
+ * don't agree will result in a sharp edge. Default is 0, the standard slot.
  * Non-zero values are retained for compatibility and will not be supported in
  * a future release.
  */
@@ -736,6 +745,7 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
+  if (normalIdx < 0) return Invalid();
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (!IsEmpty()) {
     pImpl->CreateTangents(normalIdx);

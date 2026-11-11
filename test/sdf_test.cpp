@@ -34,6 +34,36 @@ struct Layers {
   }
 };
 
+TEST(SDF, InvalidGrid) {
+  auto sphere = [](vec3 p) { return 1 - la::length(p); };
+  const Box box(vec3(-1), vec3(1));
+  EXPECT_EQ(Manifold::LevelSet(sphere, box, 0).Status(),
+            Manifold::Error::InvalidConstruction);
+  EXPECT_EQ(Manifold::LevelSet(sphere, box, -1).Status(),
+            Manifold::Error::InvalidConstruction);
+  EXPECT_EQ(Manifold::LevelSet(sphere, box, NAN).Status(),
+            Manifold::Error::InvalidConstruction);
+  Box nanBox = box;
+  nanBox.max.x = NAN;
+  EXPECT_EQ(Manifold::LevelSet(sphere, nanBox, 0.5).Status(),
+            Manifold::Error::InvalidConstruction);
+  Box invertedBox = box;
+  std::swap(invertedBox.min, invertedBox.max);
+  EXPECT_EQ(Manifold::LevelSet(sphere, invertedBox, 0.5).Status(),
+            Manifold::Error::InvalidConstruction);
+  Box infBox = box;
+  infBox.max.x = INFINITY;
+  EXPECT_EQ(Manifold::LevelSet(sphere, infBox, 0.5).Status(),
+            Manifold::Error::InvalidConstruction);
+  EXPECT_EQ(
+      Manifold::LevelSet(sphere, Box(vec3(0.0), vec3(3e9, 1, 1)), 1).Status(),
+      Manifold::Error::ResultTooLarge);
+  EXPECT_EQ(Manifold::LevelSet(sphere, box, 1e-9).Status(),
+            Manifold::Error::ResultTooLarge);
+  EXPECT_EQ(Manifold::LevelSet(sphere, box, 1e-6).Status(),
+            Manifold::Error::ResultTooLarge);
+}
+
 TEST(SDF, SphereShell) {
   Manifold sphere = Manifold::LevelSet(
       [](vec3 pos) {

@@ -123,6 +123,15 @@ void RegisterPolygonTestsFile(const std::string& filename) {
 #endif
 }  // namespace
 
+TEST(Triangulation, ShortContours) {
+  const SimplePolygon square = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+  EXPECT_TRUE(Triangulate({{}}).empty());
+  EXPECT_TRUE(Triangulate({{{0, 0}}}).empty());
+  EXPECT_TRUE(Triangulate({{{0, 0}, {1, 0}}}).empty());
+  EXPECT_EQ(Triangulate({{}, square}).size(), 2);
+  EXPECT_EQ(Triangulate({square, {{2, 2}}}).size(), 2);
+}
+
 #ifndef MANIFOLD_NO_IOSTREAM
 void RegisterPolygonTests() {
   std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <limits>
+
 #include "../src/utils.h"
 #include "manifold/manifold.h"
 #include "test.h"
@@ -164,6 +166,22 @@ TEST(Properties, CalculateNormals) {
     EXPECT_FLOAT_EQ(la::length(norm), 1.0);
     EXPECT_GT(dot(la::normalize(pos), norm), 0.99);
   }
+}
+
+TEST(Properties, PropertyIndexTooLarge) {
+  const Manifold cube = Manifold::Cube();
+  EXPECT_EQ(
+      cube.CalculateCurvature(std::numeric_limits<int>::max(), -1).Status(),
+      Manifold::Error::ResultTooLarge);
+  EXPECT_EQ(cube.CalculateNormals(1 << 30).Status(),
+            Manifold::Error::ResultTooLarge);
+  EXPECT_EQ(cube.SetProperties(1 << 30, nullptr).Status(),
+            Manifold::Error::ResultTooLarge);
+}
+
+TEST(Properties, SetPropertiesNegative) {
+  EXPECT_EQ(Manifold::Cube().SetProperties(-1, nullptr).Status(),
+            Manifold::Error::InvalidConstruction);
 }
 
 TEST(Properties, Coplanar) {

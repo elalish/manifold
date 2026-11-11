@@ -101,7 +101,9 @@ namespace manifold {
 template <typename Precision, typename I>
 struct MeshGLP {
   /// Number of property vertices
-  I NumVert() const { return vertProperties.size() / numProp; };
+  I NumVert() const {
+    return numProp == 0 ? 0 : vertProperties.size() / numProp;
+  };
   /// Number of triangles
   I NumTri() const { return triVerts.size() / 3; };
   /// Number of triangle runs

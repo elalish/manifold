@@ -14,6 +14,8 @@
 
 #include "manifold/polygon.h"
 
+#include <algorithm>
+#include <iterator>
 #include <map>
 #include <set>
 
@@ -931,6 +933,17 @@ namespace manifold {
 HalfedgeTriangulation TriangulateIdxHalfedges(const PolygonsIdx& polys,
                                               double epsilon,
                                               bool allowConvex) {
+  // Contours with fewer than 3 verts have no area.
+  const auto isShort = [](const SimplePolygonIdx& poly) {
+    return poly.size() < 3;
+  };
+  if (std::any_of(polys.begin(), polys.end(), isShort)) {
+    PolygonsIdx filtered;
+    std::remove_copy_if(polys.begin(), polys.end(),
+                        std::back_inserter(filtered), isShort);
+    return TriangulateIdxHalfedges(filtered, epsilon, allowConvex);
+  }
+
   HalfedgeTriangulation result;
   double updatedEpsilon = epsilon;
 #ifdef MANIFOLD_DEBUG

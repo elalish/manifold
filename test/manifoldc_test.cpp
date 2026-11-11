@@ -29,6 +29,14 @@ void* alloc_manifold_vec_buffer() {
   return malloc(manifold_manifold_vec_size());
 }
 
+TEST(CBIND, meshgl_no_props) {
+  float vertProps[] = {0, 0, 0};
+  ManifoldMeshGL* mesh =
+      manifold_meshgl(manifold_alloc_meshgl(), vertProps, 1, 0, NULL, 0);
+  EXPECT_EQ(manifold_meshgl_num_vert(mesh), 0);
+  manifold_delete_meshgl(mesh);
+}
+
 TEST(CBIND, sphere) {
   int n = 25;
   ManifoldManifold* sphere =

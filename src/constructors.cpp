@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <limits>
+
 #include "csg_tree.h"
 #include "disjoint_sets.h"
 #include "impl.h"
@@ -215,8 +217,25 @@ Manifold Manifold::Sphere(double radius, int circularSegments) {
 Manifold Manifold::Extrude(const Polygons& crossSection, double height,
                            int nDivisions, double twistDegrees, vec2 scaleTop) {
   ZoneScoped;
-  if (crossSection.size() == 0 || height <= 0.0) {
+  if (!(height > 0.0) || !std::isfinite(height) || nDivisions < 0 ||
+      !std::isfinite(twistDegrees) || !la::all(la::isfinite(scaleTop))) {
     return Invalid();
+  }
+  // Contours with fewer than 3 verts have no area.
+  Polygons polygons;
+  for (const SimplePolygon& poly : crossSection) {
+    if (poly.size() < 3) continue;
+    for (const vec2& v : poly) {
+      if (!la::all(la::isfinite(v))) return Invalid();
+    }
+    polygons.push_back(poly);
+  }
+  if (polygons.empty()) return Invalid();
+  // Vert indices are int.
+  int64_t numVert = 0;
+  for (const SimplePolygon& poly : polygons) numVert += poly.size();
+  if (numVert * (nDivisions + int64_t(2)) > std::numeric_limits<int>::max()) {
+    return PropagateStatus(Error::ResultTooLarge);
   }
 
   scaleTop.x = std::max(scaleTop.x, 0.0);
@@ -231,7 +250,7 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
   bool isCone = scaleTop.x == 0.0 && scaleTop.y == 0.0;
   size_t idx = 0;
   PolygonsIdx polygonsIndexed;
-  for (auto& poly : crossSection) {
+  for (auto& poly : polygons) {
     nCrossSection += poly.size();
     SimplePolygonIdx simpleIndexed;
     for (const vec2& polyVert : poly) {
@@ -248,7 +267,7 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
     mat2 transform = mat2({scale.x, 0.0}, {0.0, scale.y}) * rotation;
     size_t j = 0;
     size_t idx = 0;
-    for (const auto& poly : crossSection) {
+    for (const auto& poly : polygons) {
       for (size_t vert = 0; vert < poly.size(); ++vert) {
         size_t offset = idx + nCrossSection * i;
         size_t thisVert = vert + offset;
@@ -271,8 +290,7 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
     }
   }
   if (isCone)
-    for (size_t j = 0; j < crossSection.size();
-         ++j)  // Duplicate vertex for Genus
+    for (size_t j = 0; j < polygons.size(); ++j)  // Duplicate vertex for Genus
       vertPos.push_back({0.0, 0.0, height});
   std::vector<ivec3> top = TriangulateIdx(polygonsIndexed);
   for (const ivec3& tri : top) {
@@ -308,6 +326,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   Polygons polygons;
   double radius = 0;
   for (const SimplePolygon& poly : crossSection) {
+    if (poly.size() < 3) continue;
     size_t i = 0;
     while (i < poly.size() && poly[i].x < 0) {
       ++i;
