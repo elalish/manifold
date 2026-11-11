@@ -988,9 +988,10 @@ export declare class Manifold {
      * interpolate the surface. This version uses the supplied vertex normal
      * properties to define the tangent vectors.
      *
-     * @param normalIdx The first property channel of the normals. NumProp must be
-     * at least normalIdx + 3. Any vertex where multiple normals exist and don't
-     * agree will result in a sharp edge. Default is 0, the standard slot.
+     * @param normalIdx The first property channel of the normals. Channels past
+     * NumProp count as missing normals. Any vertex where multiple normals exist
+     * and don't agree will result in a sharp edge. Default is 0, the standard
+     * slot.
      * Non-zero values are retained for compatibility and will not be supported
      * in a future release.
      * @group Smoothing

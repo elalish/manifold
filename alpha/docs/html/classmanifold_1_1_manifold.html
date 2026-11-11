@@ -267,8 +267,8 @@ I/O</h2></td></tr>
 <div class="line">  }</div>
 <div class="line">  ifile.close();</div>
 <div class="line">}</div>
-<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:324</div></div>
-<div class="ttc" id="aclassmanifold_1_1_manifold_html_ad5f60691d05e3402630122740cdf3a0b"><div class="ttname"><a href="#ad5f60691d05e3402630122740cdf3a0b">manifold::Manifold::Manifold</a></div><div class="ttdeci">Manifold()</div><div class="ttdef"><b>Definition</b> manifold.cpp:145</div></div>
+<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:331</div></div>
+<div class="ttc" id="aclassmanifold_1_1_manifold_html_ad5f60691d05e3402630122740cdf3a0b"><div class="ttname"><a href="#ad5f60691d05e3402630122740cdf3a0b">manifold::Manifold::Manifold</a></div><div class="ttdeci">Manifold()</div><div class="ttdef"><b>Definition</b> manifold.cpp:152</div></div>
 </div><!-- fragment --><p>Writing: </p><div class="fragment"><div class="line">std::ofstream ofile;</div>
 <div class="line">ofile.open(filename);</div>
 <div class="line"><span class="keywordflow">if</span> (ofile.is_open()) {</div>
@@ -1889,7 +1889,7 @@ Testing Hooks</h2></td></tr>
 <p>Smooths out the <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> by filling in the halfedgeTangent vectors. The geometry will remain unchanged until Refine, RefineToLength, or RefineToTolerance is called to interpolate the surface. This version uses the supplied vertex normal properties to define the tangent vectors. Zero-length normals are considered missing and will defer to their neighboring normals instead. If all normals are missing, the vertex pseudonormal will be used.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">normalIdx</td><td>The first property channel of the normals. NumProp must be at least normalIdx + 3. Any vertex where multiple normals exist and don't agree will result in a sharp edge. Default is 0, the standard slot. Non-zero values are retained for compatibility and will not be supported in a future release. </td></tr>
+    <tr><td class="paramname">normalIdx</td><td>The first property channel of the normals. Channels past NumProp count as missing normals. Any vertex where multiple normals exist and don't agree will result in a sharp edge. Default is 0, the standard slot. Non-zero values are retained for compatibility and will not be supported in a future release. </td></tr>
   </table>
   </dd>
 </dl>
