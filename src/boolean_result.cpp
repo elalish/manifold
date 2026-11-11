@@ -930,7 +930,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   vP2R.clear();
   vQ2R.clear();
 
-  outR.CalculateBBox();
+  outR.epsilon_ = tol_;
 
   // Level 6
   outR.Face2Tri(faceEdge, faceHalfedges, halfedgeRef, /*allowConvex=*/false,
@@ -964,6 +964,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
                  "simplified mesh has degenerate triangles!");
   }
 
+  outR.CalculateBBox();
   outR.SortGeometry(ctx_);
   outR.IncrementMeshIDs();
   if (auto c = phase(__LINE__)) return *c;
