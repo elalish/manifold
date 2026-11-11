@@ -63,11 +63,18 @@ struct FilletInput {
   // For the vertex at the end of each edge, how the boundary turns there
   // (see EndKind), decided once.
   std::vector<int8_t> endKinds;
+  // Set once endKinds is complete.
+  bool kindsReady = false;
   // The unit normal of each edge, towards the ball. Edges of one straight
   // run share the normal of the run's line.
   std::vector<vec2> normals;
   // Edges that continue each other in a straight line - an edge split into
   // pieces - are one line: for each edge, the first and last edge of its run.
+  // The direction of each edge's line, as one angle: every sign of a cross
+  // product of two lines' directions is read from the order of their angles
+  // (LineCross), so those signs cannot contradict each other the way
+  // separately rounded cross products of nearly parallel lines can.
+  std::vector<double> angles;
   std::vector<int> runFirst;
   std::vector<int> runLast;
   // For each edge, a box around the centers of the balls that touch its line
@@ -107,6 +114,10 @@ struct FilletGeometry {
   // PivotKey), cached for sorting.
   double fromKey;
   double toKey;
+  // The center as first computed, on the circle of radius r around each
+  // vertex the ball touches: what the order of balls around a vertex is read
+  // from (ComesFirst).
+  vec2 pivotCenter;
 };
 
 struct IntersectResult {
@@ -255,20 +266,6 @@ int DotSign(vec2 a, vec2 b, vec2 c, vec2 d) {
   return sum > 0 ? 1 : sum < 0 ? -1 : 0;
 }
 
-// Whether the segments a0 a1 and b0 b1 run the same way to within the
-// rounding of their own coordinates: moving an end by less than the spacing
-// of representable numbers there would make them exactly parallel. The rule
-// for a straight vertex between two pieces of a split edge.
-bool SameDirection(vec2 a0, vec2 a1, vec2 b0, vec2 b1) {
-  const vec2 d1 = a1 - a0, d2 = b1 - b0;
-  const double size = std::max({std::abs(a0.x), std::abs(a0.y), std::abs(a1.x),
-                                std::abs(a1.y), std::abs(b0.x), std::abs(b0.y),
-                                std::abs(b1.x), std::abs(b1.y)});
-  const double grid =
-      std::numeric_limits<double>::epsilon() * size * (length(d1) + length(d2));
-  return std::abs(la::cross(d1, d2)) <= grid && dot(d1, d2) > 0;
-}
-
 // The line an edge lies on is that of its whole straight run: decisions
 // about lines are made from the run's two ends, so that all pieces of one
 // split edge are the same line in every one of them.
@@ -282,10 +279,19 @@ vec2 LineEnd(const FilletInput& input, int e) {
   return input.ends[input.runLast[e]];
 }
 
+// Sign of the turn from direction angle `from` to `to`: of the cross product
+// of the two directions. Zero for the same and for opposite angles.
+int TurnSign(double from, double to) {
+  double turn = to - from;
+  if (turn > M_PI) turn -= 2 * M_PI;
+  if (turn < -M_PI) turn += 2 * M_PI;
+  if (turn == M_PI || turn == -M_PI) return 0;
+  return turn > 0 ? 1 : turn < 0 ? -1 : 0;
+}
+
 // Sign of the cross product of the directions of two edges' lines.
 int LineCross(const FilletInput& input, int a, int b) {
-  return CrossSign(LineEnd(input, a), LineStart(input, a), LineEnd(input, b),
-                   LineStart(input, b));
+  return TurnSign(input.angles[a], input.angles[b]);
 }
 
 // Which way along the line of an edge the point v lies from the point p: the
@@ -650,6 +656,9 @@ bool LinesShareBall(const FilletInput& input, int a, int b, double radius) {
   if (LineCross(input, first, second) == 0) return false;
   const vec2 firstNormal = LineNormal(input, first);
   const vec2 secondNormal = LineNormal(input, second);
+  // Nor do lines whose normals are exactly parallel: every expression for
+  // their ball then vanishes identically, and nothing could cut it.
+  if (la::cross(firstNormal, secondNormal) == 0) return false;
   if (!(dot(firstNormal, secondNormal) > 0)) return true;
   const vec2 firstVec = firstEnd - firstStart;
   const double len = length(firstVec);
@@ -722,17 +731,22 @@ int LineVertexBalls(const FilletInput& input, int line, int vertexEdge,
   const double s = HeightOverLine(input, line, vertex);
   if (s < 0) return 0;
   const vec2 nM = LineNormal(input, line);
-  const int next = NextEdge(input, vertexEdge);
-  const int facing =
-      dot(nM, LineNormal(input, vertexEdge)) <= dot(nM, LineNormal(input, next))
-          ? vertexEdge
-          : next;
-  const vec2 nJ = LineNormal(input, facing);
-  const vec2 sum = nM + nJ;
-  const double margin =
-      dot(nM, nJ) < 0 ? 0.5 * radius * dot(sum, sum) -
-                            FacingBeyond(input, facing, line, vertex, radius)
-                      : 2 * radius - s;
+  // Either of the vertex's edges that faces the line: if the ball tangent
+  // to one of them at the vertex is found cut by the line, the vertex is
+  // within the ball's width of it, whatever the other one says - that edge
+  // then hands its ball over to the vertex, which must have one to take.
+  double margin = 0;
+  bool faces = false;
+  for (const int j : {vertexEdge, NextEdge(input, vertexEdge)}) {
+    const vec2 nJ = LineNormal(input, j);
+    if (!(dot(nM, nJ) < 0)) continue;
+    const vec2 sum = nM + nJ;
+    const double m = 0.5 * radius * dot(sum, sum) -
+                     FacingBeyond(input, j, line, vertex, radius);
+    if (!faces || m > margin) margin = m;
+    faces = true;
+  }
+  if (!faces) margin = 2 * radius - s;
   if (within) *within = margin;
   return margin < 0 ? 0 : margin == 0 ? 1 : 2;
 }
@@ -813,13 +827,13 @@ RawCandidates FindRawCandidates(const FilletInput& input, int first, int second,
     const bool secondThenFirst = LinesMeet(input, second, first);
     bool found = false;
     if (firstThenSecond != secondThenFirst) {
+      // Normals exactly opposite have no bisector; the division then
+      // leaves nothing finite and the lines are intersected instead.
       const double den = 1 + dot(firstNormal, secondNormal);
-      if (den > 0.5) {
-        center =
-            (firstThenSecond ? LineEnd(input, first) : LineEnd(input, second)) +
-            (firstNormal + secondNormal) * (radius / den);
-        found = IsFinite(center);
-      }
+      center =
+          (firstThenSecond ? LineEnd(input, first) : LineEnd(input, second)) +
+          (firstNormal + secondNormal) * (radius / den);
+      found = IsFinite(center);
     }
     if (!found)
       found = IntersectLines(firstStart + firstNormal * radius, firstVec,
@@ -977,15 +991,27 @@ bool TripleCut(const FilletInput& input, int c, int a, int b, double radius) {
   if (c == a || c == b) return false;
   const std::array<int, 3> e{a, b, c};
   // Pair (e[i+1], e[i+2]) leaves out e[i].
+  // A pair that meets at a vertex with its normals on the same side comes
+  // first: its ball is known there however small the angle between the two
+  // (see below), where the general expression loses it.
+  auto meets = [&](int i) {
+    const int p = e[(i + 1) % 3], q = e[(i + 2) % 3];
+    return dot(LineNormal(input, p), LineNormal(input, q)) > 0 &&
+           (LinesMeet(input, p, q) || LinesMeet(input, q, p));
+  };
   int best = -1;
   double bestCross = 0;
+  bool bestMeets = false;
   for (int i = 0; i < 3; ++i) {
     const double cross = std::abs(la::cross(LineNormal(input, e[(i + 1) % 3]),
                                             LineNormal(input, e[(i + 2) % 3])));
-    if (best < 0 || cross < bestCross ||
-        (cross == bestCross && e[i] < e[best])) {
+    const bool meet = meets(i);
+    if (best < 0 || (meet && !bestMeets) ||
+        (meet == bestMeets &&
+         (cross < bestCross || (cross == bestCross && e[i] < e[best])))) {
       best = i;
       bestCross = cross;
+      bestMeets = meet;
     }
   }
   int x = e[(best + 1) % 3], y = e[(best + 2) % 3];
@@ -1005,10 +1031,33 @@ bool TripleCut(const FilletInput& input, int c, int a, int b, double radius) {
   const double kz = dot(nz, LineStart(input, z) - origin) + radius;
   const double dzx = LineCross(input, z, x) * std::abs(la::cross(nz, nx));
   const double dxy = LineCross(input, x, y) * std::abs(la::cross(nx, ny));
-  const double g = dot(nx, ny) < 0 ? dzx * FacingGap(input, x, y, radius) +
-                                         la::cross(nx + ny, nz) * kx + dxy * kz
-                                   : dzx * (ky - kx) +
-                                         la::cross(ny - nx, nz) * kx + dxy * kz;
+  double g;
+  const bool meet = LinesMeet(input, x, y);
+  if (bestMeets) {
+    // Two lines that meet at a vertex and run nearly the same way: G and
+    // cross(n_x, n_y) both vanish with the angle between them, and rounding
+    // would decide their ratio. But the ball tangent to both is known
+    // without either - at the vertex, along the bisector of the normals -
+    // and G is cross(n_x, n_y) times how far short of r it is from z.
+    const vec2 corner = meet ? LineEnd(input, x) : LineEnd(input, y);
+    const vec2 center = corner + (nx + ny) * (radius / (1 + dot(nx, ny)));
+    // Against a line facing one of the pair across a channel, measured as
+    // every other ball in that channel is: from the gap between z and the
+    // line of the pair that faces it most squarely, at the point where
+    // this ball touches that line.
+    const int w = dot(nz, nx) <= dot(nz, ny) ? x : y;
+    const vec2 nw = w == x ? nx : ny;
+    const double beyond =
+        dot(nz, nw) < 0
+            ? FacingBeyond(input, w, z, center - nw * radius, radius)
+            : dot(nz, center - LineStart(input, z)) - radius;
+    g = -LineCross(input, x, y) * beyond;
+  } else {
+    g = dot(nx, ny) < 0
+            ? dzx * FacingGap(input, x, y, radius) +
+                  la::cross(nx + ny, nz) * kx + dxy * kz
+            : dzx * (ky - kx) + la::cross(ny - nx, nz) * kx + dxy * kz;
+  }
   const int signG = g > 0 ? parity : g < 0 ? -parity : 0;
   return signG * LineCross(input, a, b) > 0;
 }
@@ -1029,6 +1078,8 @@ bool CornerCut(const FilletInput& input, int f, int before, double radius) {
 // The limit of edge `line` at an end in a corner (kCorner): whether the ball
 // touching g and the line (root `root` of `roots`) stops before the corner
 // ball there. Past it, the corner's other edge cuts the ball.
+int Slope(const FilletInput& input, int m, int line, double radius);
+
 bool CornerLimit(const FilletInput& input, int g, int line, bool atEnd,
                  int root, int roots, double radius) {
   const int before = atEnd ? line : input.prevEdges[line];
@@ -1040,7 +1091,7 @@ bool CornerLimit(const FilletInput& input, int g, int line, bool atEnd,
   if (!IsVertex(g)) {
     // dist(., M) - r grows along the line where it leans away from M.
     const int m = FeatureEdge(g);
-    const int slope = (input.invert ? -1 : 1) * LineCross(input, m, line);
+    const int slope = Slope(input, m, line, radius);
     return atEnd ? (cut ? slope < 0 : slope > 0)
                  : (cut ? slope > 0 : slope < 0);
   }
@@ -1094,20 +1145,67 @@ bool PointInBall(const FilletInput& input, int line, vec2 v, vec2 p,
 //    in order along it; S strictly inside the circle separates them, else
 //    both lie on the side of S that P's foot does.
 // `strict` leaves a ball tangent exactly at V to the other side.
+// Sign of dist(S, M) - r for the ball tangent to edge `line` at one of its
+// ends, M the line of edge m: negative if M cuts it.
+int EndValue(const FilletInput& input, int m, int line, bool atEnd,
+             double radius) {
+  const vec2 v = atEnd ? EdgeEnd(input, line) : EdgeStart(input, line);
+  // An end of the other line found inside this ball - the decision its
+  // own vertex case is made from - means the line cuts the ball: read
+  // from there, not computed again.
+  if (PointInBall(input, line, v, LineStart(input, m), radius) ||
+      PointInBall(input, line, v, LineEnd(input, m), radius))
+    return -1;
+  const double f = LineBeyond(input, line, m, v, radius);
+  return f > 0 ? 1 : f < 0 ? -1 : 0;
+}
+
+// Which way dist(S, M) - r changes as the ball tangent to edge `line` moves
+// along it from start to end: it is linear, so where it has been found to
+// have different signs at the two ends of the edge - at an end in a corner,
+// for the corner ball there (CornerCut) - it grows from the negative end to
+// the positive one, and the ball that just touches M lies between them. The
+// direction is read from those signs, not from the cross product of the two
+// directions: for lines that are parallel as far as rounding can tell, that
+// product could say the distance falls where the two ends say it rises, and
+// then neither this edge nor the vertices at its ends would keep the ball.
+// Only where the ends agree does the cross product decide.
+int Slope(const FilletInput& input, int m, int line, double radius) {
+  // Over the whole run of the edge: its two ends are where the values are
+  // furthest apart. `at` is where along the run the ball of each value is
+  // tangent - the corner ball of a short run can lie before the one at its
+  // start.
+  const vec2 origin = LineStart(input, line);
+  const vec2 d = LineEnd(input, line) - origin;
+  auto value = [&](bool atEnd, double& at) {
+    const int piece = atEnd ? input.runLast[line] : input.runFirst[line];
+    const int before = atEnd ? piece : input.prevEdges[piece];
+    const int other = atEnd ? NextEdge(input, piece) : before;
+    at = atEnd ? 1 : 0;
+    if (input.kindsReady && input.endKinds[before] == kCorner &&
+        Run(input, m) != Run(input, other)) {
+      const vec2 n = LineNormal(input, piece), no = LineNormal(input, other);
+      const double den = 1 + dot(n, no);
+      const double along = dot((n + no) * (radius / den), d) / dot(d, d);
+      if (std::isfinite(along)) at += along;
+      return CornerCut(input, LineFeature(m), before, radius) ? -1 : 1;
+    }
+    return EndValue(input, m, piece, atEnd, radius);
+  };
+  double startAt, endAt;
+  const int start = value(false, startAt), end = value(true, endAt);
+  if (start != end && startAt != endAt)
+    return (end > start) == (endAt > startAt) ? 1 : -1;
+  return (input.invert ? -1 : 1) * LineCross(input, m, line);
+}
+
 bool SegmentLimit(const FilletInput& input, int g, int line, bool atEnd,
                   int root, int roots, double radius, bool strict = false) {
   const vec2 v = atEnd ? EdgeEnd(input, line) : EdgeStart(input, line);
   if (!IsVertex(g)) {
     const int m = FeatureEdge(g);
-    // An end of the other line found inside this ball - the decision its
-    // own vertex case is made from - means the line cuts the ball: read
-    // from there, not computed again.
-    const bool cut = PointInBall(input, line, v, LineStart(input, m), radius) ||
-                     PointInBall(input, line, v, LineEnd(input, m), radius);
-    const double f = cut ? -1 : LineBeyond(input, line, m, v, radius);
-    const int sf = f > 0 ? 1 : f < 0 ? -1 : 0;
-    const int inward =
-        (atEnd ? -1 : 1) * LineCross(input, m, line) * (input.invert ? -1 : 1);
+    const int sf = EndValue(input, m, line, atEnd, radius);
+    const int inward = (atEnd ? -1 : 1) * Slope(input, m, line, radius);
     return strict ? sf * inward < 0 : sf * inward <= 0;
   }
   const vec2 p = EdgeStart(input, FeatureEdge(g));
@@ -1149,17 +1247,14 @@ bool LineLimit(const FilletInput& input, int g, int line, bool atEnd, int root,
 void BuildEndKinds(FilletInput& input, double radius) {
   const int numEdges = static_cast<int>(input.edges.size());
   std::vector<int> turns(numEdges);
+  std::vector<double> pieceAngles(numEdges);
   for (int e = 0; e < numEdges; ++e) {
-    const vec2 a = EdgeStart(input, e), b = EdgeEnd(input, e);
-    const vec2 c = EdgeEnd(input, NextEdge(input, e));
-    const vec2 d1 = b - a, d2 = c - b;
-    const double cross = la::cross(d1, d2);
-    turns[e] = SameDirection(a, b, b, c)
-                   ? 0
-                   : (input.invert ? -1 : 1) * (cross > 0   ? 1
-                                                : cross < 0 ? -1
-                                                            : 0);
+    const vec2 d = EdgeEnd(input, e) - EdgeStart(input, e);
+    pieceAngles[e] = std::atan2(d.y, d.x);
   }
+  for (int e = 0; e < numEdges; ++e)
+    turns[e] = (input.invert ? -1 : 1) *
+               TurnSign(pieceAngles[e], pieceAngles[NextEdge(input, e)]);
 
   input.runFirst.assign(numEdges, -1);
   input.runLast.assign(numEdges, -1);
@@ -1172,6 +1267,12 @@ void BuildEndKinds(FilletInput& input, double radius) {
       input.runLast[piece] = last;
       if (piece == last) break;
     }
+  }
+  // All pieces of a run have the same angle.
+  input.angles.resize(numEdges);
+  for (int e = 0; e < numEdges; ++e) {
+    if (input.runFirst[e] < 0) input.runFirst[e] = input.runLast[e] = e;
+    input.angles[e] = pieceAngles[input.runFirst[e]];
   }
   input.normals.resize(numEdges);
   for (int e = 0; e < numEdges; ++e) {
@@ -1195,6 +1296,7 @@ void BuildEndKinds(FilletInput& input, double radius) {
                                    true, 0, 1, radius);
     input.endKinds[e] = real ? kCorner : kShortCorner;
   }
+  input.kindsReady = true;
 }
 
 // The same decision for the root that can reach V, as the vertex case at V
@@ -1323,6 +1425,57 @@ void AppendFillets(const FilletInput& input, int first, int second, int kind,
   }
 }
 
+// A ball pivoting on a vertex stops at the first thing it meets. Around the
+// vertex, a contact y keeps the ball's center out of one arc of the circle
+// of radius r: from the ball that leaves the vertex for y, on in the
+// direction the ball turns, to the ball that arrives from y. A ball touching
+// the vertex is cut by y only if its center is within that arc. All such
+// balls are placed around the vertex by one angle each, so two balls that
+// leave it for different contacts cannot each be found inside the other's
+// arc - which, decided separately on their own distances, they could, leaving
+// the vertex with no ball at all.
+// Returns whether `fillet`, touching the vertex `pivot`, is within the arc of
+// feature y; true if y has no such pair of balls to compare with.
+bool InArcAround(const FilletInput& input, const FilletGeometry& fillet,
+                 int pivot, int y, double radius) {
+  const int pivotEdge = input.prevEdges[FeatureEdge(pivot)];
+  const int yEdge =
+      IsVertex(y) ? input.prevEdges[FeatureEdge(y)] : FeatureEdge(y);
+  if (pivotEdge == yEdge) return true;
+  const bool pivotFirst = pivotEdge < yEdge;
+  const int kind = IsVertex(y)  ? kVertexVertex
+                   : pivotFirst ? kVertexLine
+                                : kLineVertex;
+  const int first = pivotFirst ? pivotEdge : yEdge;
+  const int second = pivotFirst ? yEdge : pivotEdge;
+  std::vector<FilletGeometry> rivals;
+  const RawCandidates raws =
+      FindRawCandidates(input, first, second, kind, radius);
+  for (size_t i = 0; i < raws.size(); ++i)
+    AppendFillets(input, first, second, kind, raws[i], rivals);
+  if (rivals.size() != 2) return true;
+  const FilletGeometry* leaves = nullptr;
+  const FilletGeometry* arrives = nullptr;
+  for (const FilletGeometry& g : rivals) {
+    if (g.from.feature == pivot) leaves = &g;
+    if (g.to.feature == pivot) arrives = &g;
+  }
+  if (!leaves || !arrives || leaves == arrives) return true;
+  const vec2 v = EdgeStart(input, FeatureEdge(pivot));
+  auto angle = [&](vec2 c) { return std::atan2(c.y - v.y, c.x - v.x); };
+  // The ball turns about the vertex from the normal of the edge ending
+  // there to that of the edge starting there: counterclockwise with invert.
+  const double a = angle(input.invert ? leaves->center : arrives->center);
+  const double b = angle(input.invert ? arrives->center : leaves->center);
+  const double x = angle(fillet.pivotCenter);
+  // Exactly at an end of the arc the two balls are one - where a row of
+  // vertices lies along the ball's own tangent, say - and only one of them
+  // may be kept: the one whose contact comes first.
+  if (x == a || x == b)
+    return y < (fillet.from.feature == pivot ? fillet.to : fillet.from).feature;
+  return a < b ? a < x && x < b : x > a || x < b;
+}
+
 // Whether edge c cuts the fillet ball. Its nearest point to the center is
 // either inside the edge (its line) or one of its endpoints (a vertex).
 // Endpoints matter even when convex: across a narrow gap a spike tip can be
@@ -1348,7 +1501,11 @@ bool Blocks(const FilletInput& input, const FilletGeometry& fillet, int c,
     const int g = fillet.from.feature, h = fillet.to.feature;
     if (!IsVertex(g) && !IsVertex(h))
       return TripleCut(input, c, FeatureEdge(g), FeatureEdge(h), radius);
-    return s < radius;
+    if (!(s < radius)) return false;
+    return (!IsVertex(g) ||
+            InArcAround(input, fillet, g, LineFeature(c), radius)) &&
+           (!IsVertex(h) ||
+            InArcAround(input, fillet, h, LineFeature(c), radius));
   }
   // A vertex on a line the ball is tangent to is never closer than radius.
   const int point = t <= 0 ? StartPoint(input, c) : EndPoint(input, c);
@@ -1358,7 +1515,31 @@ bool Blocks(const FilletInput& input, const FilletGeometry& fillet, int c,
          point == EndPoint(input, FeatureEdge(feature))))
       return false;
   }
-  return length(fillet.center - (t <= 0 ? p0 : p1)) < radius;
+  // Nor is the far end of an edge at a vertex the ball touches: the ball's
+  // center was found within the vertex's sector, on the far side of that
+  // edge's normal, which is the same question.
+  for (const int feature : {fillet.from.feature, fillet.to.feature}) {
+    if (IsVertex(feature) &&
+        (point == EndPoint(input, FeatureEdge(feature)) ||
+         point == StartPoint(input, input.prevEdges[FeatureEdge(feature)])))
+      return false;
+  }
+  const int g = fillet.from.feature, h = fillet.to.feature;
+  // A vertex in a corner that opens towards the ball has no ball of its own
+  // around the pivot to be compared with. A ball on the ball side of both
+  // edges there that contains it is cut by one of those edges, and for a
+  // ball turning about a vertex those edges are compared in order around
+  // it: theirs is the decision.
+  const int into = t <= 0 ? input.prevEdges[c] : c;
+  const vec2 fromCorner = fillet.center - (t <= 0 ? p0 : p1);
+  if ((IsVertex(g) || IsVertex(h)) && input.endKinds[into] > kStraight &&
+      dot(LineNormal(input, into), fromCorner) > 0 &&
+      dot(LineNormal(input, NextEdge(input, into)), fromCorner) > 0)
+    return false;
+  if (!(length(fillet.center - (t <= 0 ? p0 : p1)) < radius)) return false;
+  const int y = VertexFeature(t <= 0 ? c : NextEdge(input, c));
+  return (!IsVertex(g) || InArcAround(input, fillet, g, y, radius)) &&
+         (!IsVertex(h) || InArcAround(input, fillet, h, y, radius));
 }
 
 // Edges through a point the ball touches are at distance exactly radius from
@@ -1437,7 +1618,10 @@ std::vector<FilletGeometry> FindFilletPairs(
           continue;
         RawCandidate raw = raws[i];
         Conform(input, first, second, kind, raw, radius);
+        const size_t before = candidates.size();
         AppendFillets(input, first, second, kind, raw, candidates);
+        for (size_t k = before; k < candidates.size(); ++k)
+          candidates[k].pivotCenter = raws[i].center;
       }
     }
   }
