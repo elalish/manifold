@@ -745,6 +745,16 @@ int LineVertexBalls(const FilletInput& input, int line, int vertexEdge,
                      FacingBeyond(input, j, line, vertex, radius);
     if (!faces || m > margin) margin = m;
     faces = true;
+    // An edge parallel to the line as far as their angles tell shares no
+    // ball with it, so it is the same distance from it at both of its ends:
+    // both of its vertices take the one value, measured at its start, so
+    // that the edges next to it do not find the ball cut at one of them
+    // and clear at the other.
+    if (LineCross(input, j, line) == 0) {
+      margin = 0.5 * radius * dot(sum, sum) -
+               FacingBeyond(input, j, line, LineStart(input, j), radius);
+      break;
+    }
   }
   if (!faces) margin = 2 * radius - s;
   if (within) *within = margin;
