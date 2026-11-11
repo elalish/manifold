@@ -1476,6 +1476,21 @@ bool InArcAround(const FilletInput& input, const FilletGeometry& fillet,
   return a < b ? a < x && x < b : x > a || x < b;
 }
 
+// A ball rolling along a line is cut by a vertex between the two balls that
+// are tangent to the line and touch the vertex. Whether the ball tangent to
+// the line at `end` is one of those is read from where the three touch the
+// line, in order along it - the order their arcs' ends are traced in - so a
+// ball between two lines and the balls that touch the vertex and either line
+// are told the same thing. A line with no such pair of balls is out of the
+// vertex's reach.
+bool BetweenOnLine(const FilletInput& input, int vertexEdge,
+                   const FilletEnd& end, double radius) {
+  const IntersectResult balls =
+      LineVertexCenters(input, FeatureEdge(end.feature), vertexEdge, radius);
+  if (balls.count < 2) return false;
+  return balls.params[0] < end.t && end.t < balls.params[1];
+}
+
 // Whether edge c cuts the fillet ball. Its nearest point to the center is
 // either inside the edge (its line) or one of its endpoints (a vertex).
 // Endpoints matter even when convex: across a narrow gap a spike tip can be
@@ -1536,6 +1551,10 @@ bool Blocks(const FilletInput& input, const FilletGeometry& fillet, int c,
       dot(LineNormal(input, into), fromCorner) > 0 &&
       dot(LineNormal(input, NextEdge(input, into)), fromCorner) > 0)
     return false;
+  if (!IsVertex(g) && !IsVertex(h)) {
+    return BetweenOnLine(input, into, fillet.from, radius) &&
+           BetweenOnLine(input, into, fillet.to, radius);
+  }
   if (!(length(fillet.center - (t <= 0 ? p0 : p1)) < radius)) return false;
   const int y = VertexFeature(t <= 0 ? c : NextEdge(input, c));
   return (!IsVertex(g) || InArcAround(input, fillet, g, y, radius)) &&
