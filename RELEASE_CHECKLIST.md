@@ -4,7 +4,7 @@
 1. Verify our model-viewer [example](https://manifoldcad.org/model-viewer) is functional - select Union and Intersection.
 1. Verify [make-manifold](https://manifoldcad.org/make-manifold) is functional. Try dropping [DragonAttenuation.glb](https://github.com/KhronosGroup/glTF-Sample-Assets/blob/main/Models/DragonAttenuation/glTF-Binary/DragonAttenuation.glb) in and verify you can select "View Manifold GLB" and that the dragon is still present while the backdrop is removed. Download the GLB.
 1. Run the Prepare release workflow from the Actions tab with the new version number. It sets the version in CMakeLists.txt, pyproject.toml, flake.nix, package.json and test-cmake.sh, refreshes the package-lock files, and opens a PR.
-1. A PR opened by the workflow doesn't start CI on its own, so close and reopen it to run the tests. Run the build_wheels workflow from the Actions tab on the PR's branch with publish unchecked, since PR CI doesn't build wheels. Once both pass, merge.
+1. CI on that PR waits for approval, since a workflow opened it. Select "Approve workflows to run" in the PR's merge box. PR CI doesn't build wheels, so also run the build_wheels workflow from the Actions tab on the PR's branch with publish unchecked. Once both pass, merge.
 1. On Github, draft a new release, make a new tag with the version number, add release notes, and publish.
 1. Check the Actions and verify that both PyPI and npm publishing actions ran successfully.
 1. Verify the npm [package](https://www.npmjs.com/package/manifold-3d?activeTab=code) looks good - unpacked size should be close to 1MB.
@@ -30,11 +30,10 @@ Then follow the checklist above, with these differences:
 - Run Prepare release with "Use workflow from" set to the release branch. The
   PR it opens then targets that branch.
 - Tag the merge commit on the release branch.
-- The site doesn't deploy from a release branch. Use
-  [Deploying manually](#deploying-manually) if the release needs its own
-  `vX.Y.Z/` copy.
+- The site doesn't deploy from a release branch.
 - npm publishing tags the release as `latest`. If a newer version is already
-  out, move `latest` back afterwards with `npm dist-tag`.
+  out, move `latest` back afterwards with
+  `npm dist-tag add manifold-3d@<newer version> latest`.
 
 ## Adding wheels to a published release
 
