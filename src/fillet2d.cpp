@@ -1156,6 +1156,23 @@ int EndValue(const FilletInput& input, int m, int line, bool atEnd,
   if (PointInBall(input, line, v, LineStart(input, m), radius) ||
       PointInBall(input, line, v, LineEnd(input, m), radius))
     return -1;
+  // For a line facing the edge, from how far the vertex itself is within the
+  // ball's width of that line (LineVertexBalls): the one number the vertex's
+  // own balls are counted and placed from, and the one the other edge at
+  // the vertex reads. Taken from each edge's own line, the two could say
+  // the ball is cut on one side of the vertex and clear on the other, with
+  // the vertex left out, and each edge would keep a ball of its own there.
+  const vec2 nL = LineNormal(input, line), nM = LineNormal(input, m);
+  if (dot(nL, nM) < 0) {
+    double within = std::numeric_limits<double>::quiet_NaN();
+    LineVertexBalls(input, m, atEnd ? line : input.prevEdges[line], radius,
+                    &within);
+    if (!std::isnan(within)) {
+      const vec2 sum = nL + nM;
+      const double f = 0.5 * radius * dot(sum, sum) - within;
+      return f > 0 ? 1 : f < 0 ? -1 : 0;
+    }
+  }
   const double f = LineBeyond(input, line, m, v, radius);
   return f > 0 ? 1 : f < 0 ? -1 : 0;
 }
@@ -1924,7 +1941,22 @@ std::vector<CrossSection> TraceFillets(
     // two is not a new question either - a departure before any arrival
     // ends a stretch of the result boundary that the last arrival began, so
     // the start of the cycle is on it and the shift is 1.
-    const size_t shift = PositionLess(dep[0], arr[0]) ? 1 : 0;
+    // At the same position the arrival comes first - a ball that arrives
+    // and at once leaves for somewhere else - unless the two are the two
+    // arcs of one ball squeezed through a neck: there the boundary on
+    // either side of the neck crosses over to the other, so each contact
+    // sees the departure first.
+    auto neck = [&](const BoundaryEvent& d, const BoundaryEvent& a) {
+      const FilletGeometry& out = geometries[d.fillet];
+      const FilletGeometry& in = geometries[a.fillet];
+      return out.from.feature == in.to.feature &&
+             out.to.feature == in.from.feature;
+    };
+    const size_t shift =
+        PositionLess(dep[0], arr[0]) ||
+                (!PositionLess(arr[0], dep[0]) && neck(dep[0], arr[0]))
+            ? 1
+            : 0;
     for (size_t k = 0; k < m; ++k) {
       next[arr[k].fillet] = static_cast<int>(dep[(k + shift) % m].fillet);
       wraps[arr[k].fillet] = k + shift >= m;
