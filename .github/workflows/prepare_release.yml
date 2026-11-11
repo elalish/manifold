@@ -16,7 +16,6 @@ jobs:
   prepare_release:
     runs-on: ubuntu-latest
     permissions:
-      actions: write
       contents: write
       pull-requests: write
     steps:
@@ -73,9 +72,3 @@ jobs:
           --base "$GITHUB_REF_NAME" \
           --title "Release v$VERSION" \
           --body-file /tmp/pr-body.md
-        # A PR opened with GITHUB_TOKEN starts no workflows, but a dispatch
-        # does, so start the PR's checks here. build_wheels runs without
-        # publishing, since PR CI doesn't build wheels.
-        for workflow in manifold.yml check_format.yml tsan.yml build_wheels.yml; do
-          gh workflow run "$workflow" --ref "release/v$VERSION"
-        done
