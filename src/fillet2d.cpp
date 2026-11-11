@@ -255,6 +255,20 @@ int DotSign(vec2 a, vec2 b, vec2 c, vec2 d) {
   return sum > 0 ? 1 : sum < 0 ? -1 : 0;
 }
 
+// Whether the segments a0 a1 and b0 b1 run the same way to within the
+// rounding of their own coordinates: moving an end by less than the spacing
+// of representable numbers there would make them exactly parallel. The rule
+// for a straight vertex between two pieces of a split edge.
+bool SameDirection(vec2 a0, vec2 a1, vec2 b0, vec2 b1) {
+  const vec2 d1 = a1 - a0, d2 = b1 - b0;
+  const double size = std::max({std::abs(a0.x), std::abs(a0.y), std::abs(a1.x),
+                                std::abs(a1.y), std::abs(b0.x), std::abs(b0.y),
+                                std::abs(b1.x), std::abs(b1.y)});
+  const double grid =
+      std::numeric_limits<double>::epsilon() * size * (length(d1) + length(d2));
+  return std::abs(la::cross(d1, d2)) <= grid && dot(d1, d2) > 0;
+}
+
 // The line an edge lies on is that of its whole straight run: decisions
 // about lines are made from the run's two ends, so that all pieces of one
 // split edge are the same line in every one of them.
@@ -1041,6 +1055,31 @@ bool CornerLimit(const FilletInput& input, int g, int line, bool atEnd,
   return atEnd ? foot <= 0 : foot >= 0;
 }
 
+// dist(S, M) - r, up to a positive factor, for S = v + n r, the center of the
+// ball tangent to the line of edge `line` at its point v, and M the line of
+// edge m. For lines facing each other, from the gap between them
+// (FacingBeyond), so that it agrees with every other decision about the
+// same channel; otherwise directly, as |dM| |dL| (dist(S, M) - r).
+double LineBeyond(const FilletInput& input, int line, int m, vec2 v,
+                  double radius) {
+  if (dot(LineNormal(input, line), LineNormal(input, m)) < 0)
+    return FacingBeyond(input, line, m, v, radius);
+  const double sigma = input.invert ? -1 : 1;
+  const vec2 dL = LineEnd(input, line) - LineStart(input, line);
+  const vec2 m0 = LineStart(input, m);
+  const vec2 dM = LineEnd(input, m) - m0;
+  return length(dL) * (sigma * la::cross(dM, v - m0) - radius * length(dM)) +
+         radius * dot(dM, dL);
+}
+
+// Whether the point p is strictly inside that ball: |S - P|^2 - r^2 =
+// |v - p|^2 - 2 r s, as v is on the line.
+bool PointInBall(const FilletInput& input, int line, vec2 v, vec2 p,
+                 double radius) {
+  const vec2 w = v - p;
+  return dot(w, w) - 2 * radius * HeightOverLine(input, line, p) < 0;
+}
+
 // The edge-or-vertex decision at one end V of edge `line`, for the ball
 // touching contact g and the line on root `root` of `roots`: whether its
 // tangent point is within the edge at that end (t <= 1 at the end, t >= 0 at
@@ -1058,39 +1097,22 @@ bool CornerLimit(const FilletInput& input, int g, int line, bool atEnd,
 bool SegmentLimit(const FilletInput& input, int g, int line, bool atEnd,
                   int root, int roots, double radius, bool strict = false) {
   const vec2 v = atEnd ? EdgeEnd(input, line) : EdgeStart(input, line);
-  const vec2 start = LineStart(input, line);
-  const vec2 end = LineEnd(input, line);
-  const double sigma = input.invert ? -1 : 1;
-  const vec2 dL = end - start;
-  const double lenL = length(dL);
   if (!IsVertex(g)) {
     const int m = FeatureEdge(g);
-    const vec2 m0 = LineStart(input, m);
-    const vec2 m1 = LineEnd(input, m);
-    const vec2 dM = m1 - m0;
-    const vec2 nL = LineNormal(input, line), nM = LineNormal(input, m);
-    // dist(S, M) - r. For lines facing each other, from the gap between
-    // them (FacingGap) and how it changes up to S, so that it agrees with
-    // every other decision about the same channel; otherwise directly, as
-    // |dM| |dL| (dist(S, M) - r).
-    double f;
-    if (dot(nL, nM) < 0) {
-      f = FacingBeyond(input, line, m, v, radius);
-    } else {
-      f = lenL * (sigma * la::cross(dM, v - m0) - radius * length(dM)) +
-          radius * dot(dM, dL);
-    }
+    // An end of the other line found inside this ball - the decision its
+    // own vertex case is made from - means the line cuts the ball: read
+    // from there, not computed again.
+    const bool cut = PointInBall(input, line, v, LineStart(input, m), radius) ||
+                     PointInBall(input, line, v, LineEnd(input, m), radius);
+    const double f = cut ? -1 : LineBeyond(input, line, m, v, radius);
     const int sf = f > 0 ? 1 : f < 0 ? -1 : 0;
-    const int inward = (atEnd ? -1 : 1) * CrossSign(m1, m0, end, start) *
-                       static_cast<int>(sigma);
+    const int inward =
+        (atEnd ? -1 : 1) * LineCross(input, m, line) * (input.invert ? -1 : 1);
     return strict ? sf * inward < 0 : sf * inward <= 0;
   }
   const vec2 p = EdgeStart(input, FeatureEdge(g));
-  const vec2 w = v - p;
-  // |S - P|^2 - r^2 = |w|^2 - 2 r s, as v is on the line.
-  const bool inside =
-      dot(w, w) - 2 * radius * HeightOverLine(input, line, p) < 0;
-  if (inside && roots == 2) return root == (atEnd ? 0 : 1);
+  if (PointInBall(input, line, v, p, radius) && roots == 2)
+    return root == (atEnd ? 0 : 1);
   const int foot = -AlongLine(input, line, v, p);
   return atEnd ? foot <= 0 : foot >= 0;
 }
@@ -1132,11 +1154,7 @@ void BuildEndKinds(FilletInput& input, double radius) {
     const vec2 c = EdgeEnd(input, NextEdge(input, e));
     const vec2 d1 = b - a, d2 = c - b;
     const double cross = la::cross(d1, d2);
-    const double size = std::max({std::abs(a.x), std::abs(a.y), std::abs(b.x),
-                                  std::abs(b.y), std::abs(c.x), std::abs(c.y)});
-    const double grid = std::numeric_limits<double>::epsilon() * size *
-                        (length(d1) + length(d2));
-    turns[e] = std::abs(cross) <= grid && dot(d1, d2) > 0
+    turns[e] = SameDirection(a, b, b, c)
                    ? 0
                    : (input.invert ? -1 : 1) * (cross > 0   ? 1
                                                 : cross < 0 ? -1
@@ -1663,27 +1681,13 @@ std::vector<CrossSection> TraceFillets(
     std::sort(arr.begin(), arr.end(), EventLess);
     std::sort(dep.begin(), dep.end(), EventLess);
 
-    // Alternation leaves at most one departure before the first arrival, so
-    // arrival k pairs with departure k + shift, shift 0 or 1. Pick the shift
-    // whose order violations are fewest: noise only affects near ties, a wrong
-    // shift breaks nearly every pair. Events at the same position are
-    // consistent with either order, so ties never count; when both shifts fit
-    // equally, a tie is read as an empty stretch (arrival, then departure).
-    auto violations = [&](size_t shift) {
-      size_t count = 0;
-      for (size_t k = 0; k < m; ++k) {
-        const bool wrap = k + shift >= m;
-        const BoundaryEvent& d = dep[(k + shift) % m];
-        if (wrap) {
-          if (PositionLess(arr[0], d)) ++count;
-        } else {
-          if (PositionLess(d, arr[k])) ++count;
-          if (k + 1 < m && PositionLess(arr[k + 1], d)) ++count;
-        }
-      }
-      return count;
-    };
-    const size_t shift = violations(1) < violations(0) ? 1 : 0;
+    // The ball of an arrival rolls on along the boundary until the next
+    // event, which is therefore a departure: the events alternate, and
+    // arrival k pairs with departure k + shift, shift 0 or 1. Which of the
+    // two is not a new question either - a departure before any arrival
+    // ends a stretch of the result boundary that the last arrival began, so
+    // the start of the cycle is on it and the shift is 1.
+    const size_t shift = PositionLess(dep[0], arr[0]) ? 1 : 0;
     for (size_t k = 0; k < m; ++k) {
       next[arr[k].fillet] = static_cast<int>(dep[(k + shift) % m].fillet);
       wraps[arr[k].fillet] = k + shift >= m;
