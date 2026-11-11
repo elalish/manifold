@@ -309,8 +309,6 @@ NB_MODULE(manifold3d, m) {
              const std::function<nb::object(
                  vec3, const nb::ndarray<nb::numpy, const double,
                                          nb::c_contig>&)>& f) {
-            if (newNumProp < 0)
-              throw std::runtime_error("new_num_prop must be non-negative");
             const int oldNumProp = self.NumProp();
             return self.SetProperties(newNumProp, [newNumProp, oldNumProp, &f](
                                                       double* newProps, vec3 v,

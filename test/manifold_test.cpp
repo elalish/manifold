@@ -15,6 +15,7 @@
 #include "manifold/manifold.h"
 
 #include <algorithm>
+#include <limits>
 
 #include "../src/execution_impl.h"
 #include "gtest/gtest.h"
@@ -215,6 +216,65 @@ TEST(Manifold, InvalidInput7) {
   Manifold tet(cube);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::RunIndexWrongLength);
+}
+
+TEST(Manifold, InvalidInputRunIndexPastEnd) {
+  MeshGL tetGL = TetGL();
+  tetGL.runIndex = {0, 3000};
+  tetGL.runOriginalID = {1};
+  Manifold tet(tetGL);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::RunIndexWrongLength);
+}
+
+TEST(Manifold, InvalidInputRunIndexDecreasing) {
+  MeshGL tetGL = TetGL();
+  tetGL.runIndex = {0, 9, 6, static_cast<uint32_t>(tetGL.triVerts.size())};
+  tetGL.runOriginalID = {1, 2, 3};
+  Manifold tet(tetGL);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::RunIndexWrongLength);
+}
+
+TEST(Manifold, InvalidInputRunIndexStart) {
+  MeshGL tetGL = TetGL();
+  tetGL.runIndex = {6};
+  tetGL.runOriginalID = {1};
+  Manifold tet(tetGL);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::RunIndexWrongLength);
+}
+
+TEST(Manifold, InvalidInputRunIDsWithoutIndex) {
+  MeshGL tetGL = TetGL();
+  tetGL.runIndex.clear();
+  tetGL.runOriginalID = {1, 2};
+  Manifold tet(tetGL);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::RunIndexWrongLength);
+}
+
+TEST(Manifold, InvalidInputShortTangents) {
+  MeshGL tetGL = TetGL();
+  tetGL.halfedgeTangent = {1, 1, 1, 1};
+  Manifold tet(tetGL);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::InvalidConstruction);
+}
+
+TEST(Manifold, LongTangents) {
+  MeshGL tetGL = TetGL();
+  tetGL.halfedgeTangent.resize(4 * tetGL.triVerts.size() + 4, 0);
+  EXPECT_EQ(Manifold(tetGL).Status(), Manifold::Error::NoError);
+}
+
+TEST(Manifold, InvalidInputNoProperties) {
+  MeshGL in;
+  in.numProp = 0;
+  in.vertProperties.resize(15);
+  Manifold tet(in);
+  EXPECT_TRUE(tet.IsEmpty());
+  EXPECT_EQ(tet.Status(), Manifold::Error::MissingPositionProperties);
 }
 
 TEST(Manifold, ErrorPropagationDecompose) {
@@ -816,6 +876,37 @@ TEST(Manifold, Extrude) {
   EXPECT_EQ(donut.Genus(), 1);
   EXPECT_FLOAT_EQ(donut.Volume(), 12.0);
   EXPECT_FLOAT_EQ(donut.SurfaceArea(), 48.0);
+}
+
+TEST(Manifold, ExtrudeInvalid) {
+  const Polygons square = {{{0, 0}, {1, 0}, {1, 1}, {0, 1}}};
+  EXPECT_EQ(Manifold::Extrude(square, 1, 4, NAN).Status(),
+            Manifold::Error::InvalidConstruction);
+  EXPECT_EQ(Manifold::Extrude(square, 1, 4, 0, vec2(INFINITY)).Status(),
+            Manifold::Error::InvalidConstruction);
+  EXPECT_EQ(Manifold::Extrude({{{0, 0}, {1, 0}, {NAN, 1}}}, 1).Status(),
+            Manifold::Error::InvalidConstruction);
+  EXPECT_EQ(Manifold::Extrude({{{0, 0}}}, 1).Status(),
+            Manifold::Error::InvalidConstruction);
+}
+
+TEST(Manifold, ShortContours) {
+  const SimplePolygon square = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+  EXPECT_DOUBLE_EQ(Manifold::Extrude({square, {{5, 5}}, {}}, 1).Volume(), 1);
+  const SimplePolygon offset = {{1, 0}, {2, 0}, {2, 1}, {1, 1}};
+  const Manifold revolved = Manifold::Revolve({offset}, 32);
+  EXPECT_DOUBLE_EQ(
+      Manifold::Revolve({offset, {{5, 5}}, {{1, 2}, {2, 2}}, {}}, 32).Volume(),
+      revolved.Volume());
+}
+
+TEST(Manifold, ExtrudeNegativeDivisions) {
+  Manifold extrusion =
+      Manifold::Extrude({{{0, 0}, {1, 0}, {1, 1}, {0, 1}}}, 1, -5);
+  EXPECT_EQ(extrusion.Status(), Manifold::Error::InvalidConstruction);
+  extrusion = Manifold::Extrude({{{0, 0}, {1, 0}, {1, 1}, {0, 1}}}, 1,
+                                std::numeric_limits<int>::max());
+  EXPECT_EQ(extrusion.Status(), Manifold::Error::ResultTooLarge);
 }
 
 TEST(Manifold, ExtrudeSquare) {
