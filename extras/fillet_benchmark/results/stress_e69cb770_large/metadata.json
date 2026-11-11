@@ -1,0 +1,42 @@
+{
+  "source_commit": "e69cb770a9af1a47c116a7022d16adb2eeb20a3c",
+  "arguments": {
+    "binary": "/home/dmal_gradstudent_myt/Project/manifold/build/fillet-benchmark/fillet_stress",
+    "root": "/home/dmal_gradstudent_myt/Project/manifold",
+    "output": "extras/fillet_benchmark/results/stress_e69cb770_large",
+    "seconds": 400,
+    "seeds": 1,
+    "transforms": 1,
+    "workers": 2,
+    "cases": [
+      "Zebra",
+      "Zebra3"
+    ],
+    "segments": [
+      20,
+      32
+    ],
+    "strict": false
+  },
+  "case_count": 2,
+  "planned_jobs": 4,
+  "factors": [
+    -0.5,
+    -1,
+    -2,
+    -5,
+    -10,
+    -20,
+    -50,
+    -100,
+    0.1,
+    0.3,
+    0.5,
+    0.7,
+    0.9
+  ],
+  "build": "Release, sequential, assertions/debug off",
+  "completed_jobs": 4,
+  "wall_seconds": 240.2556419968605,
+  "deadline_reached": false
+}

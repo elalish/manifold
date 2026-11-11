@@ -1,0 +1,70 @@
+Source commit: e69cb770a9af1a47c116a7022d16adb2eeb20a3c
+
+src/fillet2d.cpp SHA256: 6e74e7329dd0a6928499580cb03e7cf611d2398ef0f83ce58baf9d567a651201
+
+$ uname -a
+Linux 388ddfdfd42f 5.15.0-70-generic #77-Ubuntu SMP Tue Mar 21 14:02:37 UTC 2023 x86_64 x86_64 x86_64 GNU/Linux
+
+
+$ c++ --version
+c++ (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0
+Copyright (C) 2021 Free Software Foundation, Inc.
+This is free software; see the source for copying conditions.  There is NO
+warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+
+
+
+$ lscpu
+Architecture:                    x86_64
+CPU op-mode(s):                  32-bit, 64-bit
+Address sizes:                   46 bits physical, 48 bits virtual
+Byte Order:                      Little Endian
+CPU(s):                          24
+On-line CPU(s) list:             0-23
+Vendor ID:                       GenuineIntel
+Model name:                      12th Gen Intel(R) Core(TM) i9-12900K
+CPU family:                      6
+Model:                           151
+Thread(s) per core:              2
+Core(s) per socket:              16
+Socket(s):                       1
+Stepping:                        2
+CPU max MHz:                     5200.0000
+CPU min MHz:                     800.0000
+BogoMIPS:                        6374.40
+Flags:                           fpu vme de pse tsc msr pae mce cx8 apic sep mtrr pge mca cmov pat pse36 clflush dts acpi mmx fxsr sse sse2 ss ht tm pbe syscall nx pdpe1gb rdtscp lm constant_tsc art arch_perfmon pebs bts rep_good nopl xtopology nonstop_tsc cpuid aperfmperf tsc_known_freq pni pclmulqdq dtes64 monitor ds_cpl vmx smx est tm2 ssse3 sdbg fma cx16 xtpr pdcm pcid sse4_1 sse4_2 x2apic movbe popcnt tsc_deadline_timer aes xsave avx f16c rdrand lahf_lm abm 3dnowprefetch cpuid_fault epb cat_l2 invpcid_single cdp_l2 ssbd ibrs ibpb stibp ibrs_enhanced tpr_shadow vnmi flexpriority ept vpid ept_ad fsgsbase tsc_adjust bmi1 avx2 smep bmi2 erms invpcid rdt_a rdseed adx smap clflushopt clwb intel_pt sha_ni xsaveopt xsavec xgetbv1 xsaves split_lock_detect avx_vnni dtherm ida arat pln pts hwp hwp_notify hwp_act_window hwp_epp hwp_pkg_req umip pku ospke waitpkg gfni vaes vpclmulqdq tme rdpid movdiri movdir64b fsrm md_clear serialize pconfig arch_lbr flush_l1d arch_capabilities
+Virtualization:                  VT-x
+L1d cache:                       640 KiB (16 instances)
+L1i cache:                       768 KiB (16 instances)
+L2 cache:                        14 MiB (10 instances)
+L3 cache:                        30 MiB (1 instance)
+NUMA node(s):                    1
+NUMA node0 CPU(s):               0-23
+Vulnerability Itlb multihit:     Not affected
+Vulnerability L1tf:              Not affected
+Vulnerability Mds:               Not affected
+Vulnerability Meltdown:          Not affected
+Vulnerability Mmio stale data:   Not affected
+Vulnerability Retbleed:          Not affected
+Vulnerability Spec store bypass: Mitigation; Speculative Store Bypass disabled via prctl and seccomp
+Vulnerability Spectre v1:        Mitigation; usercopy/swapgs barriers and __user pointer sanitization
+Vulnerability Spectre v2:        Mitigation; Enhanced IBRS, IBPB conditional, RSB filling, PBRSB-eIBRS SW sequence
+Vulnerability Srbds:             Not affected
+Vulnerability Tsx async abort:   Not affected
+
+
+Sequential static Release build; -O3 -ffp-contract=off; debug/assertions off. Eight worker processes for broad/deep stress. No source implementation edits after source commit.
+
+Initial unit sweep: 125 passed; two 90-second timeouts (Zebra/Zebra3).
+
+Both timeout cases passed on rerun: exit 0
+
+[----------] 2 tests from Polygon.Fillet
+
+[       OK ] Polygon.Fillet.Zebra (169047 ms)
+
+[       OK ] Polygon.Fillet.Zebra3 (157292 ms)
+
+[----------] 2 tests from Polygon.Fillet (326340 ms total)
+
+[  PASSED  ] 2 tests.
