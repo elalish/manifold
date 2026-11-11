@@ -5,6 +5,7 @@ on:
     branches: [ master, 'v*-release' ]
   pull_request:
     branches: [ master, 'v*-release' ]
+  workflow_dispatch:
 
 jobs:
   check_format:
