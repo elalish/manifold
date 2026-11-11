@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// nanobind includes Python.h, which must come before any standard header: it
+// sets feature macros such as _POSIX_C_SOURCE that they would set otherwise.
+#include "nanobind/nanobind.h"
+// (keep the above first)
 #include <optional>
 #include <string>
 
@@ -19,7 +23,6 @@
 #include "manifold/cross_section.h"
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
-#include "nanobind/nanobind.h"
 #include "nanobind/ndarray.h"
 #include "nanobind/operators.h"
 #include "nanobind/stl/function.h"
