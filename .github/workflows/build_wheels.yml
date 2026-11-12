@@ -28,7 +28,8 @@ jobs:
       - if: matrix.os == 'macos-15'
         run: echo "CIBW_ARCHS=arm64 universal2" >> "$GITHUB_ENV"
       - if: matrix.os == 'windows-11-arm'
-        run: echo "CIBW_BUILD=cp311-* cp312-* cp313-* cp314-*" >> $env:GITHUB_ENV
+        # NumPy has no Windows Arm wheels for these, so the tests can't run.
+        run: echo "CIBW_SKIP=cp39-win_arm64 cp310-win_arm64" >> $env:GITHUB_ENV
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.sha }}
