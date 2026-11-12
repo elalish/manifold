@@ -37,12 +37,13 @@ Then follow the checklist above, with these differences:
 
 ## Adding wheels to a published release
 
-To add files a release is missing, such as wheels for a new Python version,
-run the build_wheels workflow from the Actions tab on master with `tag` set to
-the release (e.g. `v3.5.4`). It builds that tag's source with master's
-workflow. Run it once with publish unchecked to check the build, then again
-with publish checked. PyPI only accepts files it doesn't already have, so
-existing files are never replaced.
+PyPI only accepts new files for a release during its first 14 days. Within
+that window, to add files a release is missing, such as wheels for a new Python
+version, run the build_wheels workflow from the Actions tab on master with
+`tag` set to the release (e.g. `v3.5.4`). It builds that tag's source with
+master's workflow. Run it once with publish unchecked to check the build, then
+again with publish checked. PyPI only accepts files it doesn't already have, so
+existing files are never replaced. After 14 days, make a patch release instead.
 
 ## Where the site is published
 
