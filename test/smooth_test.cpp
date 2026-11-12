@@ -285,6 +285,19 @@ TEST(Smooth, InvalidTangents) {
   EXPECT_EQ(smooth.Status(), Manifold::Error::InvalidTangents);
 }
 
+TEST(Smooth, NormalIdxOutOfRange) {
+  const Manifold cube = Manifold::Cube();
+  EXPECT_EQ(cube.SmoothByNormals(-1).Status(),
+            Manifold::Error::InvalidConstruction);
+  // Channels past NumProp count as missing normals, same as zero normals.
+  const double missing =
+      cube.SetProperties(3, nullptr).SmoothByNormals(0).Refine(4).Volume();
+  EXPECT_DOUBLE_EQ(cube.SmoothByNormals(0).Refine(4).Volume(), missing);
+  EXPECT_DOUBLE_EQ(
+      cube.SetProperties(3, nullptr).SmoothByNormals(5).Refine(4).Volume(),
+      missing);
+}
+
 TEST(Smooth, Mirrored) {
   const auto tet = Manifold::Tetrahedron().Scale({1, 2, 3}).GetMeshGL();
   Manifold smooth = Manifold::Smooth(tet);

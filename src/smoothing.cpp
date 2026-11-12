@@ -268,6 +268,8 @@ namespace manifold {
  * normalIdx shows the beginning of where normals are stored in the properties.
  */
 vec3 Manifold::Impl::GetNormal(int halfedge, int normalIdx) const {
+  // Channels past numProp_ count as missing normals.
+  if (normalIdx > numProp_ - 3) return vec3(0.0);
   const int prop = halfedge_.Prop(halfedge);
   vec3 normal;
   for (const int i : {0, 1, 2}) {

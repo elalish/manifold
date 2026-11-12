@@ -288,11 +288,13 @@ NB_MODULE(manifold3d, m) {
             return self.WarpBatch([&warp_func](VecView<vec3> v) {
               auto tmp = warp_func(v);
               nb::ndarray<double, nb::shape<-1, 3>, nanobind::c_contig> tmpnd;
-              if (!nb::try_cast(tmp, tmpnd) || tmpnd.ndim() != 2)
-                throw std::runtime_error(
-                    "Invalid vector shape, expected (:, 3)");
-              std::copy(tmpnd.data(), tmpnd.data() + v.size() * 3,
-                        &v.data()->x);
+              if (!nb::try_cast(tmp, tmpnd) || tmpnd.ndim() != 2 ||
+                  tmpnd.shape(0) != v.size())
+                throw std::runtime_error("Invalid vector shape, expected (" +
+                                         std::to_string(v.size()) + ", 3)");
+              if (v.size() > 0)
+                std::copy(tmpnd.data(), tmpnd.data() + v.size() * 3,
+                          &v.data()->x);
             });
           },
           nb::arg("warp_func"), manifold__warp_batch__warp_func)
@@ -319,6 +321,9 @@ NB_MODULE(manifold3d, m) {
                                            std::to_string(newNumProp) + ")");
                 for (int i = 0; i < newNumProp; i++) newProps[i] = array(i);
               } else if (nb::try_cast(result, vec)) {
+                if (vec.size() != static_cast<size_t>(newNumProp))
+                  throw std::runtime_error("Invalid vector length, expected " +
+                                           std::to_string(newNumProp));
                 for (int i = 0; i < newNumProp; i++) newProps[i] = vec[i];
               } else {
                 throw std::runtime_error(
@@ -374,7 +379,8 @@ NB_MODULE(manifold3d, m) {
       .def("get_tolerance", &Manifold::GetTolerance, manifold__get_tolerance)
       .def("set_tolerance", &Manifold::SetTolerance,
            manifold__set_tolerance__tolerance)
-      .def("simplify", &Manifold::Simplify, manifold__simplify__tolerance)
+      .def("simplify", &Manifold::Simplify, nb::arg("tolerance") = 0,
+           manifold__simplify__tolerance)
       .def("as_original", &Manifold::AsOriginal, manifold__as_original)
       .def("is_empty", &Manifold::IsEmpty, manifold__is_empty)
       .def("decompose", &Manifold::Decompose, manifold__decompose)
@@ -491,6 +497,8 @@ NB_MODULE(manifold3d, m) {
              std::vector<double> bounds, double edgeLength, double level = 0.0,
              double tolerance = -1) {
             // Same format as Manifold.bounding_box
+            if (bounds.size() != 6)
+              throw std::runtime_error("bounds must have 6 elements");
             Box bound = {vec3(bounds[0], bounds[1], bounds[2]),
                          vec3(bounds[3], bounds[4], bounds[5])};
 
@@ -539,9 +547,13 @@ NB_MODULE(manifold3d, m) {
              const std::optional<nb::ndarray<float, nb::shape<-1, 3, 4>,
                                              nb::c_contig>>& halfedgeTangent,
              float tolerance) {
+            if (vertProp.shape(1) < 3)
+              throw std::runtime_error(
+                  "vert_properties must have at least 3 columns");
             new (self) MeshGL();
             MeshGL& out = *self;
             out.numProp = vertProp.shape(1);
+            out.tolerance = tolerance;
             out.vertProperties = toVector(vertProp.data(), vertProp.size());
 
             out.triVerts = toVector(triVerts.data(), triVerts.size());
@@ -598,7 +610,7 @@ NB_MODULE(manifold3d, m) {
       .def_prop_ro(
           "tri_verts",
           [](const MeshGL& self) {
-            return nb::ndarray<nb::numpy, const int, nb::c_contig>(
+            return nb::ndarray<nb::numpy, const uint32_t, nb::c_contig>(
                 self.triVerts.data(), {self.triVerts.size() / 3, 3},
                 nb::handle());
           },
@@ -653,10 +665,14 @@ NB_MODULE(manifold3d, m) {
                  nb::ndarray<uint64_t, nb::shape<-1>, nb::c_contig>>& faceID,
              const std::optional<nb::ndarray<double, nb::shape<-1, 3, 4>,
                                              nb::c_contig>>& halfedgeTangent,
-             float tolerance) {
+             double tolerance) {
+            if (vertProp.shape(1) < 3)
+              throw std::runtime_error(
+                  "vert_properties must have at least 3 columns");
             new (self) MeshGL64();
             MeshGL64& out = *self;
             out.numProp = vertProp.shape(1);
+            out.tolerance = tolerance;
             out.vertProperties = toVector(vertProp.data(), vertProp.size());
 
             out.triVerts = toVector(triVerts.data(), triVerts.size());
@@ -781,6 +797,8 @@ NB_MODULE(manifold3d, m) {
              const std::function<double(double, double, double)>& f,
              std::vector<double> bounds, double edgeLength, double level,
              double tolerance) {
+            if (bounds.size() != 6)
+              throw std::runtime_error("bounds must have 6 elements");
             Box bound = {vec3(bounds[0], bounds[1], bounds[2]),
                          vec3(bounds[3], bounds[4], bounds[5])};
             std::function<double(vec3)> cppToPython = [&f](vec3 v) {
@@ -943,9 +961,6 @@ NB_MODULE(manifold3d, m) {
             return self.Warp([&warp_func](vec2& v) { v = warp_func(v); });
           },
           nb::arg("warp_func"), cross_section__warp__warp_func)
-      .def("warp_batch", &CrossSection::WarpBatch, nb::arg("warp_func"),
-           cross_section__warp_batch__warp_func)
-
       .def(
           "warp_batch",
           [](const CrossSection& self,
@@ -954,11 +969,13 @@ NB_MODULE(manifold3d, m) {
             return self.WarpBatch([&warp_func](VecView<vec2> v) {
               auto tmp = warp_func(v);
               nb::ndarray<double, nb::shape<-1, 2>, nanobind::c_contig> tmpnd;
-              if (!nb::try_cast(tmp, tmpnd) || tmpnd.ndim() != 2)
-                throw std::runtime_error(
-                    "Invalid vector shape, expected (:, 2)");
-              std::copy(tmpnd.data(), tmpnd.data() + v.size() * 2,
-                        &v.data()->x);
+              if (!nb::try_cast(tmp, tmpnd) || tmpnd.ndim() != 2 ||
+                  tmpnd.shape(0) != v.size())
+                throw std::runtime_error("Invalid vector shape, expected (" +
+                                         std::to_string(v.size()) + ", 2)");
+              if (v.size() > 0)
+                std::copy(tmpnd.data(), tmpnd.data() + v.size() * 2,
+                          &v.data()->x);
             });
           },
           nb::arg("warp_func"), cross_section__warp_batch__warp_func)

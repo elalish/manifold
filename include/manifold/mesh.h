@@ -101,7 +101,9 @@ namespace manifold {
 template <typename Precision, typename I>
 struct MeshGLP {
   /// Number of property vertices
-  I NumVert() const { return vertProperties.size() / numProp; };
+  I NumVert() const {
+    return numProp == 0 ? 0 : vertProperties.size() / numProp;
+  };
   /// Number of triangles
   I NumTri() const { return triVerts.size() / 3; };
   /// Number of triangle runs
@@ -166,8 +168,10 @@ struct MeshGLP {
 
   /**
    * Updates the mergeFromVert and mergeToVert vectors in order to create a
-   * manifold solid. If the MeshGL is already manifold, no change will occur
-   * and the function will return false. Otherwise, this will merge verts
+   * manifold solid. If the MeshGL is already manifold, or is invalid (fewer
+   * than 3 properties, merge vectors of different lengths, or out-of-range
+   * indices), no change will occur and the function will return false.
+   * Otherwise, this will merge verts
    * along open edges within tolerance (the maximum of the MeshGL tolerance
    * and the baseline bounding-box tolerance), keeping any from the existing
    * merge vectors, and return true.
