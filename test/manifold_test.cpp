@@ -359,6 +359,19 @@ TEST(Manifold, NormalsRotateBeforeCalc) {
   EXPECT_EQ(bad, 0);
 }
 
+TEST(Manifold, LargeRotationsPreserveVolume) {
+  const Manifold cube = Manifold::Cube({2, 3, 4});
+  for (const double angle : {1e18, -1e18, 1e20, -1e20}) {
+    for (int axis = 0; axis < 3; ++axis) {
+      vec3 angles(0.0);
+      angles[axis] = angle;
+      const Manifold rotated = cube.Rotate(angles.x, angles.y, angles.z);
+      ASSERT_EQ(rotated.Status(), Manifold::Error::NoError);
+      EXPECT_NEAR(rotated.Volume(), cube.Volume(), 1e-10);
+    }
+  }
+}
+
 TEST(Manifold, NormalsRotateAfterCalc) {
   // Rotation *after* CalculateNormals: Impl::Transform eager-transforms the
   // stored slot 0..2 so it tracks the new orientation.
