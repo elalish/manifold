@@ -99,6 +99,11 @@ def set_version(root: Path, major: str, minor: str, patch: str) -> list[Path]:
             re.compile(r"(MANIFOLD_VERSION_NUMBER\()\d+,\s*\d+,\s*\d+(\))"),
             rf"\g<1>{major}, {minor}, {patch}\g<2>",
         ),
+        (
+            Path("scripts/test-pkgconfig.sh"),
+            re.compile(r"(MANIFOLD_VERSION_NUMBER\()\d+,\s*\d+,\s*\d+(\))"),
+            rf"\g<1>{major}, {minor}, {patch}\g<2>",
+        ),
     ]
 
     # The lockfiles embed the version in their manifold-3d entries. Editing

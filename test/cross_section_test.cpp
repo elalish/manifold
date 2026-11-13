@@ -513,6 +513,90 @@ TEST(CrossSection, OffsetMultipleDisjointOuters) {
   EXPECT_EQ(merged.NumContour(), 1);
 }
 
+// An inset past a near-circle's radius must remove it, not leave a phantom.
+TEST(CrossSection, OffsetCollapsedOuterVanishes) {
+  const CrossSection disc = CrossSection::Circle(1, 64);
+  for (double delta : {-1.0, -1.5, -3.0}) {
+    for (auto jt :
+         {CrossSection::JoinType::Round, CrossSection::JoinType::Miter,
+          CrossSection::JoinType::Square, CrossSection::JoinType::Bevel}) {
+      EXPECT_TRUE(disc.Offset(delta, jt, 2, 64).IsEmpty())
+          << "delta " << delta << " join " << static_cast<int>(jt);
+    }
+  }
+  const CrossSection large = CrossSection::Circle(5, 64).Translate({20, 0});
+  const CrossSection inset =
+      (disc + large).Offset(-2, CrossSection::JoinType::Round, 2, 64);
+  EXPECT_EQ(inset.NumContour(), 1);
+  EXPECT_NEAR(inset.Area(),
+              large.Offset(-2, CrossSection::JoinType::Round, 2, 64).Area(),
+              1e-6);
+}
+
+// The dual case: a hole narrower than twice the dilation fills in.
+TEST(CrossSection, OffsetCollapsedHoleVanishes) {
+  const CrossSection plate = CrossSection::Circle(10, 128);
+  const CrossSection ring = plate - CrossSection::Circle(1, 64);
+  ASSERT_EQ(ring.NumContour(), 2);
+  for (double delta : {1.0, 1.5, 3.0}) {
+    const CrossSection grown =
+        ring.Offset(delta, CrossSection::JoinType::Round, 2, 64);
+    const CrossSection solid =
+        plate.Offset(delta, CrossSection::JoinType::Round, 2, 64);
+    EXPECT_EQ(grown.NumContour(), 1) << "delta " << delta;
+    EXPECT_NEAR(grown.Area(), solid.Area(), 1e-6) << "delta " << delta;
+  }
+  // A hole wider than twice the dilation must survive.
+  const CrossSection big = plate - CrossSection::Circle(4, 64);
+  const CrossSection partial =
+      big.Offset(1.5, CrossSection::JoinType::Round, 2, 64);
+  EXPECT_EQ(partial.NumContour(), 2);
+}
+
+// Other shapes turn phantom only once the offset passes about their
+// circumradius, well after they should vanish.
+TEST(CrossSection, OffsetFarCollapsedContoursVanish) {
+  const auto round = CrossSection::JoinType::Round;
+  const auto rounded = [&](const CrossSection& cs, double r) {
+    return cs.Offset(-r, round, 2, 64).Offset(r, round, 2, 64);
+  };
+  SimplePolygon triangle;
+  for (int i = 0; i < 3; ++i) {
+    const double a = kPi / 2 + 2 * kPi * i / 3;
+    triangle.push_back({2 * std::cos(a), 2 * std::sin(a)});
+  }
+  const CrossSection annulus =
+      CrossSection::Circle(4, 128) - CrossSection::Circle(3, 128);
+  const SimplePolygon wedge = {{0, 0}, {8, -4}, {8, 4}};
+  struct Case {
+    const char* name;
+    CrossSection shape;
+    std::vector<double> deltas;  // Past the shape's phantom onset.
+  };
+  const std::vector<Case> cases = {
+      {"pill",
+       CrossSection::Square({4, 1e-4}, true).Offset(1, round, 2, 64),
+       {5, 50}},
+      {"rounded rectangle",
+       rounded(CrossSection::Square({4, 2}, true), 0.5).Rotate(30),
+       {3, 50}},
+      {"tilted bar", CrossSection::Square({10, 0.5}, true).Rotate(37), {6, 50}},
+      {"triangle", CrossSection(triangle), {4.5, 50}},
+      {"rounded C", rounded(annulus - CrossSection(wedge), 0.49), {4.5, 50}},
+  };
+  const CrossSection plate = CrossSection::Circle(100, 256);
+  for (const auto& c : cases) {
+    for (double d : c.deltas) {
+      EXPECT_TRUE(c.shape.Offset(-d, round, 2, 64).IsEmpty())
+          << c.name << " inset " << d;
+      const CrossSection grown = (plate - c.shape).Offset(d, round, 2, 64);
+      EXPECT_EQ(grown.NumContour(), 1) << c.name << " hole dilate " << d;
+      EXPECT_NEAR(grown.Area(), plate.Offset(d, round, 2, 64).Area(), 1e-6)
+          << c.name << " hole dilate " << d;
+    }
+  }
+}
+
 TEST(CrossSection, FourConcurrentEdges) {
   auto rhomb = [](double angleDegrees) {
     const double angle = angleDegrees * kPi / 180.;
@@ -1321,15 +1405,13 @@ TEST(CrossSection, CollinearSegmentOverlap) {
   EXPECT_NEAR(cs.Area(), 14.0, 1e-9);
 }
 
-// Audit target: collinearity gate in CollectIntersectionPairs. N polygon
+// Audit target: shared-endpoint gate in BuildIncidenceLists. N polygon
 // wedges all share the origin as a vertex; every pair shares that
-// endpoint. The gate must drop pairs that fan out at the center (no
-// T-junction possible) while letting through pairs that need their
-// non-shared endpoints checked. Result must be the inscribed regular
-// N-gon: one contour, area = N/2 * sin(2pi/N). If the gate over-drops
-// (filters something needed), interior wedge boundaries leak through;
-// if it under-drops (filters nothing), the test still passes but the
-// pre-1a057638 perf gain is gone.
+// endpoint. The gate must exempt pairs that fan out at the center (no
+// T-junction possible) while keeping pairs whose non-shared endpoints
+// need checking. Result must be the inscribed regular N-gon: one
+// contour, area = N/2 * sin(2pi/N). If the gate exempts something
+// needed, interior wedge boundaries leak through.
 TEST(CrossSection, ManyPolygonsShareCenterVertex) {
   constexpr int N = 8;
   Polygons polys;

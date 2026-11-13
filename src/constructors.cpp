@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <limits>
+
 #include "csg_tree.h"
 #include "disjoint_sets.h"
 #include "impl.h"
@@ -226,11 +228,28 @@ Manifold Manifold::Sphere(double radius, int circularSegments) {
 Manifold Manifold::Extrude(const Polygons& crossSection, double height,
                            int nDivisions, double twistDegrees, vec2 scaleTop) {
   ZoneScoped;
-  if (crossSection.size() == 0 || height <= 0.0) {
+  if (!(height > 0.0) || !std::isfinite(height) || nDivisions < 0 ||
+      !std::isfinite(twistDegrees) || !la::all(la::isfinite(scaleTop))) {
     return Invalid();
   }
+  // Contours with fewer than 3 verts have no area.
+  Polygons polygons;
+  for (const SimplePolygon& poly : crossSection) {
+    if (poly.size() < 3) continue;
+    for (const vec2& v : poly) {
+      if (!la::all(la::isfinite(v))) return Invalid();
+    }
+    polygons.push_back(poly);
+  }
+  if (polygons.empty()) return Invalid();
+  // Vert indices are int.
+  int64_t numVert = 0;
+  for (const SimplePolygon& poly : polygons) numVert += poly.size();
+  if (numVert * (nDivisions + int64_t(2)) > std::numeric_limits<int>::max()) {
+    return PropagateStatus(Error::ResultTooLarge);
+  }
   return Manifold(
-      ExtrudeImpl(crossSection, height, nDivisions, twistDegrees, scaleTop));
+      ExtrudeImpl(polygons, height, nDivisions, twistDegrees, scaleTop));
 }
 
 /**
@@ -252,6 +271,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   Polygons polygons;
   double radius = 0;
   for (const SimplePolygon& poly : crossSection) {
+    if (poly.size() < 3) continue;
     size_t i = 0;
     while (i < poly.size() && poly[i].x < 0) {
       ++i;

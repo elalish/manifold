@@ -8,11 +8,13 @@ from pathlib import Path
 
 from system_metadata import resolve_metadata
 
+SECONDS = r"([0-9]*\.?[0-9]+(?:[eE][+-]?[0-9]+)?)"
+
 # fallback: extract only time value when nTri label is not present
-TIME_PATTERN = re.compile(r"time\s*=\s*([0-9]*\.?[0-9]+)\s*sec")
+TIME_PATTERN = re.compile(rf"time\s*=\s*{SECONDS}\s*sec")
 # primary: extract both nTri bucket and timing from perfTest output
 TRI_TIME_PATTERN = re.compile(
-    r"nTri\s*=\s*([0-9]+)\s*,\s*time\s*=\s*([0-9]*\.?[0-9]+)\s*sec"
+    rf"nTri\s*=\s*([0-9]+)\s*,\s*time\s*=\s*{SECONDS}\s*sec"
 )
 PEAK_RSS_PATTERN = re.compile(
     r"PEAK_RSS\s+nTri=([^\s]+)\s+size_index=([0-9]+)\s+"

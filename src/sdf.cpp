@@ -493,6 +493,12 @@ void Manifold::Impl::CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
     return;
   }
 
+  if (!bounds.IsFinite() || la::any(la::less(bounds.max, bounds.min)) ||
+      !std::isfinite(edgeLength) || edgeLength <= 0) {
+    MakeEmpty(Error::InvalidConstruction);
+    return;
+  }
+
   if (tolerance <= 0) {
     tolerance = std::numeric_limits<double>::infinity();
   }
@@ -500,10 +506,21 @@ void Manifold::Impl::CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
   auto& vertPos = vertPos_;
 
   const vec3 dim = bounds.Size();
-  const ivec3 gridSize(dim / edgeLength + 1.0);
+  // Grid positions are decoded with int shifts. The voxel array holds
+  // 2^(1 + sum of gridPow) doubles, and its size in bytes must fit in 64 bits.
+  const vec3 gridSizeD = dim / edgeLength + 1.0;
+  if (la::maxelem(gridSizeD) > (1 << 28)) {
+    MakeEmpty(Error::ResultTooLarge);
+    return;
+  }
+  const ivec3 gridSize(gridSizeD);
   const vec3 spacing = dim / (vec3(gridSize - 1));
 
   const ivec3 gridPow = ComputeGridPow(gridSize);
+  if (1 + gridPow.x + gridPow.y + gridPow.z + 3 > 64) {
+    MakeEmpty(Error::ResultTooLarge);
+    return;
+  }
   const uint64_t maxIndex = EncodeIndex(ivec4(gridSize + 2, 1), gridPow);
 
   // Parallel policies violate will crash language runtimes with runtime locks

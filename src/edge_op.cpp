@@ -792,16 +792,21 @@ bool Manifold::Impl::SplitQuad(int edge, bool nextDiag) {
   const int triN = NumTri();
   const int triS = triN + 1;
   for (int i = 0; i < 6; ++i) halfedge_.push_back(-1, -1, -1);
+  // The caller passes edge from the nondegenerate triangle, so triB is
+  // degenerate and the fan lies in triA's face, while triB's normal and ref may
+  // come from another face.
   if (meshRelation_.triRef.size() > 0) {
-    const TriRef refB = meshRelation_.triRef[triB];
+    const TriRef refA = meshRelation_.triRef[triA];
     const TriRef refC = meshRelation_.triRef[triC];
-    meshRelation_.triRef.push_back(refB);
+    meshRelation_.triRef[triB] = refA;
+    meshRelation_.triRef.push_back(refA);
     meshRelation_.triRef.push_back(refC);
   }
   if (faceNormal_.size() > 0) {
-    const vec3 normalB = faceNormal_[triB];
+    const vec3 normalA = faceNormal_[triA];
     const vec3 normalC = faceNormal_[triC];
-    faceNormal_.push_back(normalB);
+    faceNormal_[triB] = normalA;
+    faceNormal_.push_back(normalA);
     faceNormal_.push_back(normalC);
   }
 
