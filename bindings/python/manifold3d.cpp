@@ -208,6 +208,10 @@ std::vector<T> toVector(const T* arr, size_t size) {
 
 using namespace manifold_docstrings;
 
+// Releases the GIL while the C++ call runs. Used on the calls that observe an
+// ExecutionContext, so another Python thread can cancel them.
+using release_gil = nb::call_guard<nb::gil_scoped_release>;
+
 // strip original :params: and replace with ours
 const std::string manifold__rotate_xyz =
     manifold__rotate__x_degrees__y_degrees__z_degrees;
@@ -250,7 +254,7 @@ NB_MODULE(manifold3d, m) {
       .def(nb::self ^ nb::self, manifold__operator_xor__q)
       .def(
           "hull", [](const Manifold& self) { return self.Hull(); },
-          manifold__hull)
+          manifold__hull, release_gil())
       .def_static(
           "batch_hull",
           [](std::vector<Manifold> ms) { return Manifold::Hull(ms); },
@@ -356,11 +360,13 @@ NB_MODULE(manifold3d, m) {
            manifold__calculate_normals__normal_idx__min_sharp_angle)
       .def("smooth_by_normals", &Manifold::SmoothByNormals,
            nb::arg("normal_idx") = 0, manifold__smooth_by_normals__normal_idx)
-      .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n)
+      .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n,
+           release_gil())
       .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
-           manifold__refine_to_length__length)
+           manifold__refine_to_length__length, release_gil())
       .def("refine_to_tolerance", &Manifold::RefineToTolerance,
-           nb::arg("tolerance"), manifold__refine_to_tolerance__tolerance)
+           nb::arg("tolerance"), manifold__refine_to_tolerance__tolerance,
+           release_gil())
       .def("to_mesh", &Manifold::GetMeshGL, nb::arg("normal_idx") = -1,
            manifold__get_mesh_gl__normal_idx)
       .def("to_mesh64", &Manifold::GetMeshGL64, nb::arg("normal_idx") = -1,
@@ -396,9 +402,10 @@ NB_MODULE(manifold3d, m) {
            nb::arg("origin_offset"),
            manifold__trim_by_plane__normal__origin_offset)
       .def("minkowski_sum", &Manifold::MinkowskiSum, nb::arg("other"),
-           manifold__minkowski_sum__other)
+           manifold__minkowski_sum__other, release_gil())
       .def("minkowski_difference", &Manifold::MinkowskiDifference,
-           nb::arg("other"), manifold__minkowski_difference__other)
+           nb::arg("other"), manifold__minkowski_difference__other,
+           release_gil())
       .def(
           "slice",
           [](const Manifold& self, double height) {
@@ -411,7 +418,7 @@ NB_MODULE(manifold3d, m) {
             return CrossSection(self.Project()).Simplify(self.GetEpsilon());
           },
           manifold__project)
-      .def("status", &Manifold::Status, manifold__status)
+      .def("status", &Manifold::Status, manifold__status, release_gil())
       .def("with_context", &Manifold::WithContext, nb::arg("ctx"),
            manifold__with_context__ctx)
       .def(
@@ -733,7 +740,13 @@ NB_MODULE(manifold3d, m) {
       .def_ro("normal", &RayHit::normal)
       .def_ro("crossing", &RayHit::crossing);
 
-  nb::class_<ExecutionContext>(m, "ExecutionContext")
+  nb::class_<ExecutionContext>(
+      m, "ExecutionContext",
+      "Reports progress and allows cancellation. Another thread can call "
+      "cancel() while Manifold.status(), refine*(), minkowski_*() or hull(), "
+      "or this class's from_mesh() or level_set(), runs. On Python before "
+      "3.13.8, join any thread running these calls before the interpreter "
+      "exits.")
       .def(nb::init<>())
       .def("cancel", &ExecutionContext::Cancel)
       .def("cancelled", &ExecutionContext::Cancelled)
@@ -744,7 +757,10 @@ NB_MODULE(manifold3d, m) {
       .def(
           "from_mesh",
           [](ExecutionContext& ctx, const MeshGL& mesh) {
-            return ctx.FromMeshGL(mesh);
+            // Copied while holding the GIL, since Mesh.merge() can modify mesh.
+            const MeshGL copy = mesh;
+            nb::gil_scoped_release release;
+            return ctx.FromMeshGL(copy);
           },
           nb::arg("mesh"),
           "Ingest a MeshGL into a Manifold under this context, so the ingest "
@@ -752,7 +768,10 @@ NB_MODULE(manifold3d, m) {
       .def(
           "from_mesh",
           [](ExecutionContext& ctx, const MeshGL64& mesh) {
-            return ctx.FromMeshGL(mesh);
+            // Copied while holding the GIL, since Mesh.merge() can modify mesh.
+            const MeshGL64 copy = mesh;
+            nb::gil_scoped_release release;
+            return ctx.FromMeshGL(copy);
           },
           nb::arg("mesh"),
           "Ingest a MeshGL64 into a Manifold under this context, so the ingest "
