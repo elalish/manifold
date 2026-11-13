@@ -51,7 +51,7 @@ install.components = ["bindings"]
 [tool.cibuildwheel]
 build-frontend = "build"
 test-requires = ["trimesh", "pytest"]
-test-command = "python {project}/bindings/python/examples/run_all.py"
+test-command = "python {project}/bindings/python/examples/run_all.py && python -m pytest {project}/bindings/python/tests"
 # Setuptools bug causes collision between pypy and cpython artifacts
 manylinux-x86_64-image = "manylinux_2_28"
 musllinux-x86_64-image = "musllinux_1_2"
