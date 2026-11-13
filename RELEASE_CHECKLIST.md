@@ -33,8 +33,9 @@ Then follow the checklist above, with these differences:
 - Tag the merge commit on the release branch.
 - The site doesn't deploy from a release branch.
 - npm publishing tags the release as `latest`. If a newer version is already
-  out, move `latest` back afterwards with
-  `npm dist-tag add manifold-3d@<newer version> latest`.
+  out, move `latest` back afterwards for both packages with
+  `npm dist-tag add manifold-3d@<newer version> latest` and
+  `npm dist-tag add manifold-cad@<newer version> latest`.
 
 ## Adding wheels to a published release
 
