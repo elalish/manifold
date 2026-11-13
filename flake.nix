@@ -14,7 +14,7 @@
     flake-utils.lib.eachDefaultSystem
       (system:
       let
-        manifold-version = "3.5.4";
+        manifold-version = "3.5.5";
         pkgs = import nixpkgs {
           inherit system;
           overlays = [
