@@ -1813,3 +1813,31 @@ TEST(CrossSectionComplex, OffsetRoundMergingContours) {
     }
   }
 }
+
+TEST(CrossSectionComplex, OffsetMiterWavyRing) {
+  // Timed: a detailed contour whose offset edges cross one another in every
+  // wave, since the offset distance exceeds the waves' radius of curvature.
+  constexpr int n = 4096;
+  SimplePolygon ring;
+  for (int i = 0; i < n; ++i) {
+    const double a = 2 * kPi * i / n;
+    const double r = 50 + 0.5 * std::sin(256 * a);
+    ring.push_back({r * std::cos(a), r * std::sin(a)});
+  }
+  const CrossSection input(ring);
+  // The input lies between circles of radius 49.5 (less a margin for chords)
+  // and 50.5. With the default miter limit of 2, an outward offset reaches at
+  // most 2 * delta past the larger circle.
+  const double inner = 49.49;
+  const double outer = 50.5;
+  for (int i = 0; i < 2; ++i) {
+    for (double delta : {1.0, -1.0}) {
+      SCOPED_TRACE(delta);
+      const auto result = input.Offset(delta, CrossSection::JoinType::Miter);
+      ASSERT_EQ(result.NumContour(), 1);
+      const double reach = delta > 0 ? 2 * delta : delta;
+      EXPECT_GT(result.Area(), kPi * (inner + delta) * (inner + delta));
+      EXPECT_LT(result.Area(), kPi * (outer + reach) * (outer + reach));
+    }
+  }
+}
