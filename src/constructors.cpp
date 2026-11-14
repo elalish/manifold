@@ -262,11 +262,15 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
  * @param crossSection A set of non-overlapping polygons to revolve.
  * @param circularSegments Number of segments along its diameter. Default is
  * calculated by the static Defaults.
- * @param revolveDegrees Number of degrees to revolve. Default is 360 degrees.
+ * @param revolveDegrees Number of degrees to revolve. Must be finite and
+ * nonzero. Default is 360 degrees.
  */
 Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
                            double revolveDegrees) {
   ZoneScoped;
+  if (!std::isfinite(revolveDegrees) || revolveDegrees == 0.0) {
+    return Invalid();
+  }
 
   Polygons polygons;
   double radius = 0;
@@ -309,7 +313,8 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   const int nDivisions =
       circularSegments > 2
           ? circularSegments
-          : Quality::GetCircularSegments(radius) * revolveDegrees / 360;
+          : std::max(1, static_cast<int>(Quality::GetCircularSegments(radius) *
+                                         revolveDegrees / 360));
 
   auto pImpl_ = std::make_shared<Impl>();
   auto& vertPos = pImpl_->vertPos_;
