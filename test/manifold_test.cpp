@@ -1012,6 +1012,29 @@ TEST(Manifold, PartialRevolveOffset) {
   }
 }
 
+TEST(Manifold, PartialRevolveSmallAngle) {
+  // The default 12 segments for radius 2 cover 30 degrees each, so 10 degrees
+  // is less than one segment.
+  Polygons square = CrossSection::Square({1, 1}).Translate({1, 0}).ToPolygons();
+  Manifold revolute = Manifold::Revolve(square, 0, 10);
+  EXPECT_EQ(revolute.Genus(), 0);
+  // Area 1 at mean radius 1.5, swept 10 degrees.
+  EXPECT_NEAR(revolute.Volume(), 1.5 * kPi / 18, 0.01);
+}
+
+TEST(Manifold, RevolveInvalidAngle) {
+  Polygons square = CrossSection::Square({1, 1}).Translate({1, 0}).ToPolygons();
+  const double inf = std::numeric_limits<double>::infinity();
+  for (const double degrees :
+       {0.0, std::numeric_limits<double>::quiet_NaN(), inf, -inf}) {
+    for (const int segments : {0, 12}) {
+      EXPECT_EQ(Manifold::Revolve(square, segments, degrees).Status(),
+                Manifold::Error::InvalidConstruction)
+          << "degrees " << degrees << ", segments " << segments;
+    }
+  }
+}
+
 TEST(Manifold, Warp) {
   CrossSection square = CrossSection::Square({1, 1});
   Manifold shape =
