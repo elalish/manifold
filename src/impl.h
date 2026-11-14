@@ -302,6 +302,7 @@ void Manifold::Impl::ForVert(
 template <typename Precision, typename I>
 Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
                      ExecutionContext::Impl* ctx) {
+  MANIFOLD_BEGIN_PHASE_TIMING();
   // Entry-time cancel wins over empty/malformed input; past this gate,
   // validation errors win over races.
   if (IsCancelled(ctx)) {

@@ -486,6 +486,7 @@ void Manifold::Impl::CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
                                     double edgeLength, double level,
                                     double tolerance, bool canParallel,
                                     ExecutionContext::Impl* ctx) {
+  MANIFOLD_BEGIN_PHASE_TIMING();
   // Pre-cancel wins over the (potentially large) voxel allocation and the
   // sampling pass below.
   if (IsCancelled(ctx)) {
