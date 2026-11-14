@@ -123,7 +123,8 @@ void Quality::SetCircularSegments(int number) {
  * segments there will be.
  */
 int Quality::GetCircularSegments(double radius) {
-  if (circularSegments_ > 0) return circularSegments_;
+  const int segments = circularSegments_;
+  if (segments > 0) return segments;
   int nSegA = 360.0 / circularAngle_;
   // Keep nSegL a double so the truncating cast happens after fmin bounds it by
   // nSegA; a raw int cast is undefined for non-finite or huge radius.
