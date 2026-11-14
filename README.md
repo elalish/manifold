@@ -55,7 +55,7 @@ Manifold has bindings to many other languages, some maintained in this repositor
 
 ### [ManifoldCAD.org]
 
-If you like OpenSCAD / JSCAD, you might also like [ManifoldCAD][ManifoldCAD.org] - our own solid modelling web app where you script in JS/TS. This uses our npm package, [manifold-3d](https://www.npmjs.com/package/manifold-3d), built via WASM. It's not quite as fast as our raw C++, but it's hard to beat for interoperability.
+If you like OpenSCAD / JSCAD, you might also like [ManifoldCAD][ManifoldCAD.org] - our own solid modelling web app where you script in JS/TS. This uses our npm packages: [manifold-3d](https://www.npmjs.com/package/manifold-3d), the library built via WASM, and [manifold-cad](https://www.npmjs.com/package/manifold-cad), the scripting runtime and command line tool built on top of it. It's not quite as fast as our raw C++, but it's hard to beat for interoperability.
 
 ### [Python Colab Example]
 
@@ -96,7 +96,7 @@ Please avoid saving to STL files! They are lossy and inefficient - when saving a
 
 If you use vertex properties for things like interpolated normals or texture UV coordinates, [glTF](https://www.khronos.org/Gltf) is recommended, specifically using the [`EXT_mesh_manifold`](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Vendor/EXT_mesh_manifold/README.md) extension. This allows for the lossless and efficient transmission of manifoldness even with property boundaries. Try our [make-manifold](https://manifoldcad.org/make-manifold) page to add this extension to your existing glTF/GLB models. 
 
-Manifold provides high precision OBJ file IO, but it is limited in functionality and is primarily to aid in testing. If you are using our npm module, we have a much more capable [gltf-io.ts](https://github.com/elalish/manifold/blob/master/bindings/wasm/examples/gltf-io.ts) you can use instead. For other languages we strongly recommend using existing packages that focus on 3D file I/O, e.g. [trimesh](https://trimesh.org/) for Python, particularly when using vertex properties or materials.
+Manifold provides high precision OBJ file IO, but it is limited in functionality and is primarily to aid in testing. If you are using our npm module, we have a much more capable [gltf-io.ts](https://github.com/elalish/manifold/blob/master/bindings/wasm/manifold-cad/lib/gltf-io.ts) you can use instead. For other languages we strongly recommend using existing packages that focus on 3D file I/O, e.g. [trimesh](https://trimesh.org/) for Python, particularly when using vertex properties or materials.
 Example for integrating with [Assimp](https://github.com/assimp/assimp) is in `extras/meshIO.cpp`, which is used by files such as `extras/convert_file.cpp`.
 
 ## Building

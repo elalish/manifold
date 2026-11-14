@@ -70,8 +70,24 @@ jobs:
         cd build
         emmake make
 
+    # manifold-3d goes first, because manifold-cad depends on that exact
+    # version. A version that is already on npm is skipped, so if
+    # manifold-cad fails, re-running the job does not fail on manifold-3d.
     - name: Publish to npm
       run: |
+        publish_if_new() {
+          name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          # npm view prints nothing (and may still succeed) for a version
+          # that does not exist, so compare its output instead.
+          if [ "$(npm view "$name@$version" version 2> /dev/null)" = "$version" ]; then
+            echo "$name@$version is already on npm; skipping."
+          else
+            npm publish
+          fi
+        }
         cd ./bindings/wasm/
         npm ci
-        npm publish
+        publish_if_new
+        cd manifold-cad
+        publish_if_new

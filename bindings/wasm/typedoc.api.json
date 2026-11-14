@@ -2,16 +2,17 @@
   "$schema": "https://typedoc.org/schema.json",
   "extends": ["./typedoc.common.json"],
   "name": "Manifold WASM Developer Guide",
+  "displayBasePath": "./manifold-cad",
   "customCss": "./documents/developer-guide.css",
   "out": "docs/jsapi",
   "entryPoints": [
     "./manifold.d.ts",
-    "./lib/*.ts"
+    "./manifold-cad/lib/*.ts"
   ],
   "exclude": [
-    "./lib/scene-builder.ts",
+    "./manifold-cad/lib/scene-builder.ts",
     "./**/*.test.ts",
-    "./lib/*.d.ts"
+    "./manifold-cad/lib/*.d.ts"
   ],
   "sortEntryPoints": false,
   "projectDocuments": [

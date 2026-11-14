@@ -4,7 +4,7 @@ group: ManifoldCAD
 ---
 # Embedding ManifoldCAD
 
-There are three ways to use manifold in your own projects:
+There are three ways to use manifold in your own projects.  The first two need the [manifold-cad](https://www.npmjs.com/package/manifold-cad) npm package (`npm install manifold-cad`); the third needs only `manifold-3d`.
 
  1. Using the ManifoldCAD worker.  The worker adds overhead, but it will sandbox scripts.  It also makes it possible to include packages at runtime.
  1. Using ManifoldCAD libraries directly.  ManifoldCAD implements importers, exporters, and garbage collection amongst other utilities.  These modules are reasonably light and can be used outside of manifoldCAD.
@@ -17,14 +17,14 @@ The worker is a code evaluation sandbox intended to run as a [web worker](https:
 See:
 
   * {@link lib/worker | worker API}
-  * [manifold-cad](https://github.com/elalish/manifold/blob/master/bindings/wasm/bin/manifold-cad) CLI
+  * [manifold-cad](https://github.com/elalish/manifold/blob/master/bindings/wasm/manifold-cad/bin/manifold-cad) CLI
 
 ### Detecting the worker
 
 > [!NOTE]
 > There are slight behaviour differences between scripts running inside the manifoldCAD worker, and those outside.
 >
-> See our [import integration tests](https://github.com/elalish/manifold/blob/master/bindings/wasm/test/import.test.ts) for examples.
+> See our [import integration tests](https://github.com/elalish/manifold/blob/master/bindings/wasm/manifold-cad/test/import.test.ts) for examples.
 
 When evaluated through the worker, {@link manifoldCAD!isManifoldCAD | isManifoldCAD()} will return true.  Otherwise it returns false.
 

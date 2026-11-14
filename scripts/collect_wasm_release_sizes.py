@@ -26,6 +26,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 SCHEMA_VERSION = 2
+# manifold.wasm ships in manifold-3d only; manifold-cad depends on it rather
+# than carrying a copy, so manifold-3d remains the package to measure.
 PACKAGE = "manifold-3d"
 REGISTRY_URL = f"https://registry.npmjs.org/{PACKAGE}"
 WASM_URL = "https://cdn.jsdelivr.net/npm/{package}@{version}/manifold.wasm"
