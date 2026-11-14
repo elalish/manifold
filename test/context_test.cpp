@@ -928,6 +928,24 @@ TEST(Context, MeshGLCancelConcurrent) {
 }
 #endif  // MANIFOLD_PAR == 1
 
+// Two threads ingesting through one shared ctx. Progress is undefined in this
+// case, but the calls must not race. Meaningful under TSan, which builds with
+// MANIFOLD_TIMING so the phase timing is compiled in.
+#if MANIFOLD_PAR == 1
+TEST(Context, MeshGLSharedContextConcurrent) {
+  MeshGL mesh = Manifold::Sphere(1.0, 64).GetMeshGL();
+  ExecutionContext ctx;
+  auto ingest = [&] {
+    for (int i = 0; i < 20; ++i) {
+      EXPECT_EQ(ctx.FromMeshGL(mesh).Status(), Manifold::Error::NoError);
+    }
+  };
+  std::thread a(ingest), b(ingest);
+  a.join();
+  b.join();
+}
+#endif  // MANIFOLD_PAR == 1
+
 // FromMeshGL then a Boolean on the same ctx: counters reset between.
 TEST(Context, MeshGLReuseForBoolean) {
   ExecutionContext ctx;
