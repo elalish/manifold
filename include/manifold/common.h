@@ -136,7 +136,10 @@ inline double sind(double x) {
  *
  * @param x Angle in degrees.
  */
-inline double cosd(double x) { return sind(x + 90.0); }
+inline double cosd(double x) {
+  if (!la::isfinite(x)) return NAN;
+  return sind(90.0 - std::fmod(std::fabs(x), 360.0));
+}
 /** @} */
 
 /** @addtogroup Structs

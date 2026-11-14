@@ -15,12 +15,37 @@
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 
 #include "../src/atomic_compat.h"
 #include "../src/shared.h"
 #include "gtest/gtest.h"
 
 using namespace manifold;
+
+TEST(Utils, CosdLargeAngles) {
+  for (const double angle : {1e18, -1e18, 1e20, -1e20, 1e100, -1e100,
+                             std::numeric_limits<double>::max(),
+                             -std::numeric_limits<double>::max()}) {
+    SCOPED_TRACE(testing::Message() << "angle = " << angle);
+    const double reduced = std::remainder(angle, 360.0);
+    EXPECT_NEAR(cosd(angle), std::cos(radians(reduced)), 1e-15);
+    EXPECT_NEAR(sind(angle) * sind(angle) + cosd(angle) * cosd(angle), 1.0,
+                1e-15);
+  }
+}
+
+TEST(Utils, CosdQuadrantBoundaries) {
+  const double expected[] = {1.0, 0.0, -1.0, 0.0};
+  for (int quarter = -8; quarter <= 8; ++quarter) {
+    EXPECT_DOUBLE_EQ(cosd(quarter * 90.0), expected[(quarter + 8) % 4]);
+  }
+  for (const double angle : {std::numeric_limits<double>::infinity(),
+                             -std::numeric_limits<double>::infinity(),
+                             std::numeric_limits<double>::quiet_NaN()}) {
+    EXPECT_TRUE(std::isnan(cosd(angle)));
+  }
+}
 
 TEST(Utils, BarycentricAllWeightsSnappedToZero) {
   // Both points are within tolerance of every edge, but not any vertex.

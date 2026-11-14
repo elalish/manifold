@@ -2739,6 +2739,13 @@ TEST(CrossSection, Rect) {
   EXPECT_TRUE(Rect().IsEmpty());
 }
 
+TEST(CrossSection, LargeRotationsPreserveArea) {
+  const CrossSection rectangle = CrossSection::Square({2, 3});
+  for (const double angle : {1e18, -1e18, 1e20, -1e20}) {
+    EXPECT_NEAR(rectangle.Rotate(angle).Area(), rectangle.Area(), 1e-10);
+  }
+}
+
 TEST(CrossSection, Transform) {
   auto sq = CrossSection::Square({10., 10.});
   auto a = sq.Rotate(45).Scale({2, 3}).Translate({4, 5});
