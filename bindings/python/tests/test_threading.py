@@ -1,13 +1,14 @@
 """Tests for calling the bindings from several threads."""
 
 import sys
+import sysconfig
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pytest
 
-from manifold3d import Error, ExecutionContext, Manifold
+from manifold3d import Error, ExecutionContext, Manifold, Mesh
 
 THREADS = 4
 TIMEOUT = 60
@@ -155,6 +156,41 @@ def test_cancel_from_another_thread(case):
         sys.setswitchinterval(interval)
     assert not thread.is_alive()
     assert result["status"] == Error.Cancelled
+
+
+@pytest.mark.skipif(
+    not sysconfig.get_config_var("Py_GIL_DISABLED"),
+    reason="needs a free-threaded Python",
+)
+def test_import_keeps_gil_disabled():
+    assert not sys._is_gil_enabled()
+
+
+def test_merge_while_others_read_mesh():
+    # Normals split the vertices, so the mesh without its merge list is open
+    # and merge() rebuilds the list.
+    full = sponge().calculate_normals(0).to_mesh()
+    verts = np.array(full.vert_properties)
+    tris = np.array(full.tri_verts)
+    merged = mesh_key(Manifold(full))
+    before = mesh_key(Manifold(Mesh(verts, tris)))
+    assert before[0] != merged[0]
+
+    for _ in range(50):
+        mesh = Mesh(verts, tris)
+
+        def work(i):
+            if i == 0:
+                assert mesh.merge()
+                return []
+            return [mesh_key(Manifold(mesh)) for _ in range(4)]
+
+        for keys in run_concurrently(work):
+            for key in keys:
+                if key[0] == before[0]:
+                    assert_same_mesh(before, key)
+                else:
+                    assert_same_mesh(merged, key)
 
 
 def test_separate_trees_match_serial():
