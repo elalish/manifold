@@ -751,8 +751,10 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode(
       // eval of any op on the stack returns Cancelled.
       auto cancelled = ErrorLeaf(Manifold::Error::Cancelled);
       for (auto& frame : stack) {
+        auto guard = frame->op_node->impl_.GetGuard();
         if (!frame->op_node->cache_) frame->op_node->cache_ = cancelled;
       }
+      auto guard = impl_.GetGuard();
       cache_ = cancelled;
       return cache_;
     }
@@ -837,6 +839,7 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode(
       }
     }
   }
+  auto guard = impl_.GetGuard();
   return cache_;
 }
 
@@ -857,24 +860,26 @@ size_t CsgOpNode::NumLeaves() const {
   // An already-evaluated CsgOpNode counts as a single leaf for the purposes
   // of estimating remaining boolean work. Iterative walk: `+=` chains can
   // produce very deep CsgOpNode trees that would blow the call stack if
-  // this were recursive.
-  if (cache_ != nullptr) return 1;
+  // this were recursive. Another thread may evaluate a shared op node
+  // meanwhile, so read cache_ under the node's guard and hold each child
+  // op node by shared_ptr, since its evaluation can drop the children.
   size_t total = 0;
-  std::vector<const CsgOpNode*> stack;
-  stack.push_back(this);
+  std::vector<std::shared_ptr<const CsgOpNode>> stack;
+  stack.push_back(
+      std::static_pointer_cast<const CsgOpNode>(shared_from_this()));
   while (!stack.empty()) {
-    const CsgOpNode* op = stack.back();
+    std::shared_ptr<const CsgOpNode> op = stack.back();
     stack.pop_back();
+    auto impl = op->impl_.GetGuard();
     if (op->cache_ != nullptr) {
       total += 1;
       continue;
     }
-    auto impl = op->impl_.GetGuard();
     for (const auto& child : *impl) {
       if (child->GetNodeType() == CsgNodeType::Leaf) {
         total += 1;
       } else {
-        stack.push_back(static_cast<const CsgOpNode*>(child.get()));
+        stack.push_back(std::static_pointer_cast<const CsgOpNode>(child));
       }
     }
   }
