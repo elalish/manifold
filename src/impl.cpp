@@ -737,9 +737,6 @@ static std::ostream& WriteOBJWithEpsilon(std::ostream& stream,
   stream << "# ======= begin mesh ======" << std::endl;
   stream << "# float_format = " << (hexFloat ? "hexfloat" : "fixed")
          << std::endl;
-  stream << "# tolerance = ";
-  writeValue(mesh.tolerance);
-  stream << std::endl;
   if (epsilon.has_value()) {
     stream << "# epsilon = ";
     writeValue(epsilon.value());
@@ -766,18 +763,13 @@ static std::ostream& WriteOBJWithEpsilon(std::ostream& stream,
   return stream;
 }
 
-static std::pair<MeshGL64, std::optional<double>> ReadOBJWithEpsilon(
-    std::istream& stream) {
+static MeshGL64 ReadOBJMesh(std::istream& stream) {
   static const std::string FLOAT_PATTERN =
       "(-?(?:0[xX][0-9a-fA-F]+(?:\\.[0-9a-fA-F]*)?[pP][+\\-]?\\d+|\\d+(?:\\."
       "\\d*)?(?:[eE][+\\-]?\\d+)?))";
   static const std::string FACE_ELEMENT = "(\\d+)(?:\\S+)?";
   static const std::string TRAILING_SPACES = "(?:\\s*)";
   static const std::string SEPARATOR = "\\s+";
-  static const std::regex TOLERANCE_COMMENT_PATTERN(
-      "^# tolerance = " + FLOAT_PATTERN + TRAILING_SPACES);
-  static const std::regex EPSILON_COMMENT_PATTERN(
-      "^# epsilon = " + FLOAT_PATTERN + TRAILING_SPACES);
   static const std::regex VERTEX_PATTERN("^v" + SEPARATOR + FLOAT_PATTERN +
                                          SEPARATOR + FLOAT_PATTERN + SEPARATOR +
                                          FLOAT_PATTERN + TRAILING_SPACES);
@@ -786,8 +778,7 @@ static std::pair<MeshGL64, std::optional<double>> ReadOBJWithEpsilon(
                                        FACE_ELEMENT + TRAILING_SPACES);
 
   MeshGL64 mesh;
-  std::optional<double> epsilon;
-  if (!stream.good()) return std::make_pair(mesh, epsilon);
+  if (!stream.good()) return mesh;
 
   constexpr size_t BUFFER_SIZE = 1000;
   std::array<char, BUFFER_SIZE> buffer;
@@ -805,11 +796,7 @@ static std::pair<MeshGL64, std::optional<double>> ReadOBJWithEpsilon(
     if (i == BUFFER_SIZE) continue;
     buffer[i] = '\0';
     // check pattern...
-    if (std::regex_match(buffer.data(), m, TOLERANCE_COMMENT_PATTERN)) {
-      mesh.tolerance = FromChars(m[1]);
-    } else if (std::regex_match(buffer.data(), m, EPSILON_COMMENT_PATTERN)) {
-      epsilon = {FromChars(m[1])};
-    } else if (std::regex_match(buffer.data(), m, VERTEX_PATTERN)) {
+    if (std::regex_match(buffer.data(), m, VERTEX_PATTERN)) {
       for (int j : {0, 1, 2})
         mesh.vertProperties.push_back(FromChars(m[j + 1]));
     } else if (std::regex_match(buffer.data(), m, FACE_PATTERN)) {
@@ -818,23 +805,21 @@ static std::pair<MeshGL64, std::optional<double>> ReadOBJWithEpsilon(
     }
   }
 
-  return std::make_pair(mesh, epsilon);
+  return mesh;
 }
 
 /**
  * Import a mesh from a Wavefront OBJ file.
  */
-MeshGL64 ReadOBJ(std::istream& stream) {
-  return ReadOBJWithEpsilon(stream).first;
-}
+MeshGL64 ReadOBJ(std::istream& stream) { return ReadOBJMesh(stream); }
 
 /**
  * Import a mesh from a Wavefront OBJ file.
- * This supports reading tolerance and epsilon values from WriteOBJ.
+ * Legacy Manifold tolerance and epsilon comments are ignored.
  */
 Manifold Manifold::ReadOBJ(std::istream& stream) {
   if (!stream.good()) return Invalid();
-  auto [mesh, epsilon] = ReadOBJWithEpsilon(stream);
+  MeshGL64 mesh = ReadOBJMesh(stream);
   auto impl = std::make_shared<Impl>(mesh);
   return Manifold(impl);
 }
@@ -859,8 +844,8 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
 
 /**
  * Export the mesh to a Wavefront OBJ file in a way that preserves the full
- * 64-bit precision of the vertex positions, as well as storing metadata such as
- * the tolerance and epsilon.
+ * 64-bit precision of the vertex positions, as well as storing epsilon
+ * metadata.
  */
 bool Manifold::WriteOBJ(std::ostream& stream) const {
   if (!stream.good()) return false;

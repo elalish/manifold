@@ -76,7 +76,7 @@ struct ReindexFace {
 };
 
 template <typename Precision, typename I>
-bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
+bool MergeMeshGLP(MeshGLP<Precision, I>& mesh, Precision requestedTolerance) {
   ZoneScoped;
 
   if (mesh.numProp < 3 ||
@@ -173,7 +173,7 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
     bBox.max[i] = minMax.second;
   }
 
-  const double tolerance = std::max(static_cast<double>(mesh.tolerance),
+  const double tolerance = std::max(static_cast<double>(requestedTolerance),
                                     (std::is_same<Precision, float>::value
                                          ? std::numeric_limits<float>::epsilon()
                                          : kPrecision) *
@@ -620,9 +620,9 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
  * manifold solid. If the MeshGL is already manifold, or is invalid (fewer than
  * 3 properties, merge vectors of different lengths, or out-of-range indices),
  * no change will occur and the function will return false. Otherwise, this
- * will merge verts along open edges within tolerance (the maximum of the MeshGL
- * tolerance and the baseline bounding-box tolerance), keeping any from the
- * existing merge vectors, and return true.
+ * will merge verts along open edges within tolerance (the maximum of the
+ * specified tolerance and the baseline bounding-box tolerance), keeping any
+ * from the existing merge vectors, and return true.
  *
  * There is no guarantee the result will be manifold - this is a best-effort
  * helper function designed primarily to aid in the case where a manifold
@@ -631,13 +631,13 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
  * will report an error status if it is not manifold.
  */
 template <>
-bool MeshGL::Merge() {
-  return MergeMeshGLP(*this);
+bool MeshGL::Merge(float tolerance) {
+  return MergeMeshGLP(*this, tolerance);
 }
 
 template <>
-bool MeshGL64::Merge() {
-  return MergeMeshGLP(*this);
+bool MeshGL64::Merge(double tolerance) {
+  return MergeMeshGLP(*this, tolerance);
 }
 
 }  // namespace manifold

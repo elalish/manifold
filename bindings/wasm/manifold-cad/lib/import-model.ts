@@ -495,8 +495,7 @@ function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
     if (!manifold && tolerance) {
       // That didn't work either.
       // Can we adjust the model within tolerance?
-      mesh.tolerance = tolerance;
-      mesh.merge();
+      mesh.merge(tolerance);
       manifold = tryToMakeManifold(mesh);
     }
     if (!manifold) continue;

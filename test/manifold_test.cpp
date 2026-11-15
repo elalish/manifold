@@ -1398,6 +1398,13 @@ TEST(Manifold, Merge) {
   CheckCube(cubeSTL);
 }
 
+TEST(Manifold, MergeTolerance) {
+  MeshGL mesh = CubeSTL();
+  mesh.vertProperties[0] += 1e-4f;
+  EXPECT_TRUE(mesh.Merge(1e-3f));
+  EXPECT_EQ(Manifold(mesh).Status(), Manifold::Error::NoError);
+}
+
 TEST(Manifold, MergeCollapsedEdgeParity) {
   MeshGL mesh;
   mesh.vertProperties = {0, 0, 0,  //
@@ -1587,7 +1594,6 @@ TEST(Manifold, MergeDegenerates) {
 
 TEST(Manifold, MergeRefine) {
   MeshGL mesh;
-  mesh.tolerance = 1e-5;
   mesh.vertProperties = {
       0.01383194,  -1.88699961, -1.09618223, -0.72694844, -1.30568409,
       -1.09618223, -0.72694844, -1.30568397, -1.09618223, -1.14769018,

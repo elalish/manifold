@@ -533,9 +533,10 @@ ManifoldMeshGL* manifold_meshgl_copy(const ManifoldMeshGL* m) {
   return to_c(new MeshGL(*from_c(m)));
 }
 
-ManifoldMeshGL* manifold_meshgl_merge(const ManifoldMeshGL* m) {
+ManifoldMeshGL* manifold_meshgl_merge(const ManifoldMeshGL* m,
+                                      float tolerance) {
   auto duplicate = new MeshGL(*from_c(m));
-  duplicate->Merge();
+  duplicate->Merge(tolerance);
   return to_c(duplicate);
 }
 
@@ -554,9 +555,10 @@ ManifoldMeshGL64* manifold_meshgl64_copy(const ManifoldMeshGL64* m) {
   return to_c(new MeshGL64(*from_c(m)));
 }
 
-ManifoldMeshGL64* manifold_meshgl64_merge(const ManifoldMeshGL64* m) {
+ManifoldMeshGL64* manifold_meshgl64_merge(const ManifoldMeshGL64* m,
+                                          double tolerance) {
   auto duplicate = new MeshGL64(*from_c(m));
-  duplicate->Merge();
+  duplicate->Merge(tolerance);
   return to_c(duplicate);
 }
 
@@ -638,10 +640,6 @@ const float* manifold_meshgl_halfedge_tangent(const ManifoldMeshGL* m) {
   return from_c(m)->halfedgeTangent.data();
 }
 
-float manifold_meshgl_tolerance(const ManifoldMeshGL* m) {
-  return from_c(m)->tolerance;
-}
-
 size_t manifold_meshgl_run_flags_length(const ManifoldMeshGL* m) {
   return from_c(m)->runFlags.size();
 }
@@ -721,10 +719,6 @@ const uint64_t* manifold_meshgl64_face_id(const ManifoldMeshGL64* m) {
 }
 const double* manifold_meshgl64_halfedge_tangent(const ManifoldMeshGL64* m) {
   return from_c(m)->halfedgeTangent.data();
-}
-
-double manifold_meshgl64_tolerance(const ManifoldMeshGL64* m) {
-  return from_c(m)->tolerance;
 }
 
 size_t manifold_meshgl64_run_flags_length(const ManifoldMeshGL64* m) {

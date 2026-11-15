@@ -151,19 +151,13 @@ struct MeshGLP {
   /// from. Simplification will maintain all edges between triangles with
   /// different faceIDs. Input faceIDs will be maintained to the outputs, but if
   /// none are given, they will be filled in with Manifold's coplanar face
-  /// calculation based on mesh tolerance.
+  /// calculation based on the library's precision settings.
   std::vector<I> faceID;
   /// Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
   /// non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
   /// as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
   /// Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
   std::vector<Precision> halfedgeTangent;
-  /// Tolerance for mesh simplification. When creating a Manifold, the tolerance
-  /// used will be the maximum of this and a baseline tolerance from the size of
-  /// the bounding box. Any edge shorter than tolerance may be collapsed.
-  /// Tolerance may be enlarged when floating point error accumulates.
-  Precision tolerance = 0;
-
   MeshGLP() = default;
 
   /**
@@ -171,10 +165,9 @@ struct MeshGLP {
    * manifold solid. If the MeshGL is already manifold, or is invalid (fewer
    * than 3 properties, merge vectors of different lengths, or out-of-range
    * indices), no change will occur and the function will return false.
-   * Otherwise, this will merge verts
-   * along open edges within tolerance (the maximum of the MeshGL tolerance
-   * and the baseline bounding-box tolerance), keeping any from the existing
-   * merge vectors, and return true.
+   * Otherwise, this will merge verts along open edges within tolerance (the
+   * maximum of the specified tolerance and the baseline bounding-box
+   * tolerance), keeping any from the existing merge vectors, and return true.
    *
    * There is no guarantee the result will be manifold - this is a
    * best-effort helper function designed primarily to aid in the case where
@@ -182,8 +175,11 @@ struct MeshGLP {
    * were lost due to a round-trip through a file format. Constructing a
    * Manifold from the result will report an error status if it is not
    * manifold.
+   *
+   * @param tolerance Minimum vertex separation to merge, before applying the
+   * bounding-box and precision-based floor.
    */
-  bool Merge();
+  bool Merge(Precision tolerance = 0);
 
   /**
    * Returns the x, y, z position of the ith vertex.
