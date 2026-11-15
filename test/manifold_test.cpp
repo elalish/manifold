@@ -15,7 +15,11 @@
 #include "manifold/manifold.h"
 
 #include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <limits>
+#include <thread>
+#include <vector>
 
 #include "../src/execution_impl.h"
 #include "gtest/gtest.h"
@@ -804,6 +808,37 @@ TEST(Manifold, Sphere) {
   Manifold sphere = Manifold::Sphere(1.0, 4 * n);
   EXPECT_EQ(sphere.NumTri(), n * n * 8);
 }
+
+// Native-only: the WASM build is single-threaded (no pthread), so std::thread
+// construction throws, which aborts under -fno-exceptions.
+#ifndef __EMSCRIPTEN__
+TEST(Manifold, CircularSegmentsWhileReset) {
+  // Both states of the setting give 8 segments for radius 1, so any other
+  // result means the reader saw a mix of the two.
+  std::atomic<bool> stop{false};
+  std::atomic<int> wrong{0};
+  std::thread writer([&] {
+    while (!stop) {
+      Quality::SetCircularSegments(8);
+      Quality::SetCircularSegments(0);
+    }
+  });
+  std::vector<std::thread> readers;
+  for (int i = 0; i < 3; ++i) {
+    readers.emplace_back([&] {
+      while (!stop) {
+        if (Quality::GetCircularSegments(1.0) != 8) ++wrong;
+      }
+    });
+  }
+  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  stop = true;
+  writer.join();
+  for (auto& t : readers) t.join();
+  Quality::ResetToDefaults();
+  EXPECT_EQ(wrong.load(), 0);
+}
+#endif
 
 TEST(Manifold, Cylinder) {
   int n = 10000;
