@@ -364,12 +364,12 @@ jobs:
         cd bindings/wasm
         wasmpath=$(pwd)
         npmtestpath=../npmtest
-        # Create an npm package.
-        npm ci && npm pack
-        # Install it in an empty directory.
+        # Create both npm packages.
+        npm ci && npm pack && (cd manifold-cad && npm pack)
+        # Install them in an empty directory.
         mkdir -p ${npmtestpath} && cd ${npmtestpath}
-        npm install ${wasmpath}/manifold-3d*.tgz
-        cp ${wasmpath}/test/fixtures/npm/* .
+        npm install ${wasmpath}/manifold-3d-*.tgz ${wasmpath}/manifold-cad/manifold-cad-*.tgz
+        cp ${wasmpath}/manifold-cad/test/fixtures/npm/* .
         # Positive case smoke test.
         npx manifold-cad ./unitSphere.mjs ./unitSphere.glb && echo "Positive smoke test succeeded"
         # Negative case smoke test.

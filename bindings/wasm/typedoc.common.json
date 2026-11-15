@@ -1,5 +1,6 @@
 {
   "$schema": "https://typedoc.org/schema.json",
+  "tsconfig": "./manifold-cad/tsconfig.json",
   "favicon": "https://manifoldcad.org/samples/models/favicon.png",
   "navigationLinks": {
     "ManifoldCAD.org": "https://manifoldCAD.org",
@@ -34,7 +35,7 @@
   },
   "exclude": [
     "**/*.test.*",
-    "./lib/*.d.ts",
+    "./manifold-cad/lib/*.d.ts",
     "editor/**"
   ],
   "groupOrder": [

@@ -16,6 +16,7 @@
     "@gltf-transform/functions": "^4.2.0",
     "@google/model-viewer": "^4.1.0",
     "manifold-3d": "file:../..",
+    "manifold-cad": "file:../../manifold-cad",
     "simple-dropzone": "0.8.3"
   },
   "devDependencies": {

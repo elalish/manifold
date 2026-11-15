@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Set the release version across every file that carries it.
 
-The version lives in five places in five different formats, and keeping them
-in sync by hand is how master ended up on 3.5.1 while v3.5.2 was already
+The version lives in several places in several different formats, and keeping
+them in sync by hand is how master ended up on 3.5.1 while v3.5.2 was already
 tagged. Run this instead:
 
     python3 scripts/set_version.py 3.6.0
@@ -46,10 +46,25 @@ def replace_all(path: Path, pattern: re.Pattern, replacement: str) -> bool:
 
 def set_version(root: Path, major: str, minor: str, patch: str) -> list[Path]:
     dotted = f"{major}.{minor}.{patch}"
+    # manifold-cad's exact dependency on manifold-3d. Only an exact version
+    # matches, so "file:../.." links in the examples are left alone.
+    pin_pattern = re.compile(r'("manifold-3d":\s*")\d+\.\d+\.\d+(")')
     edits = [
         (
             Path("bindings/wasm/package.json"),
             re.compile(r'("version":\s*")\d+\.\d+\.\d+(")'),
+            rf"\g<1>{dotted}\g<2>",
+        ),
+        # manifold-cad is released together with manifold-3d, so it shares
+        # the version and pins exactly the manifold-3d it was released with.
+        (
+            Path("bindings/wasm/manifold-cad/package.json"),
+            re.compile(r'("version":\s*")\d+\.\d+\.\d+(")'),
+            rf"\g<1>{dotted}\g<2>",
+        ),
+        (
+            Path("bindings/wasm/manifold-cad/package.json"),
+            pin_pattern,
             rf"\g<1>{dotted}\g<2>",
         ),
         (
@@ -102,8 +117,19 @@ def set_version(root: Path, major: str, minor: str, patch: str) -> list[Path]:
         p.relative_to(root)
         for p in root.glob("bindings/wasm/examples/*/package-lock.json")
     )
+    # Lockfiles that link manifold-cad also carry its version and its pin.
+    # The key is "manifold-cad" in the workspace lockfile and
+    # "../../manifold-cad" in the examples.
+    cad_lock_pattern = re.compile(
+        r'("(?:\.\./\.\./)?manifold-cad":\s*\{\s*\n\s*"version":\s*")'
+        r'\d+\.\d+\.\d+(")'
+    )
     for lockfile in lockfiles:
         edits.append((lockfile, lock_pattern, rf"\g<1>{dotted}\g<2>"))
+        text = (root / lockfile).read_text(encoding="utf-8")
+        if '"node_modules/manifold-cad"' in text:
+            edits.append((lockfile, cad_lock_pattern, rf"\g<1>{dotted}\g<2>"))
+            edits.append((lockfile, pin_pattern, rf"\g<1>{dotted}\g<2>"))
 
     changed = []
     for relative, pattern, replacement in edits:

@@ -20,6 +20,7 @@
  * @group none
  * @see {@link "Using Manifold" | Using Manifold}
  * @see {@link "Manifold Examples" | Manifold Examples}
+ * @module manifold
  */
 
 export type * from './manifold-global-types';
