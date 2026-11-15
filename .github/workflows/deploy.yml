@@ -19,13 +19,22 @@ on:
 jobs:
   deploy_github_pages:
     runs-on: ubuntu-latest
-    # Skip when the CI run that triggered us failed.
-    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
+    permissions:
+      actions: read    # download the CI artifact
+      contents: write  # push to gh-pages
+    # The branches filter above matches the head branch name of any CI run,
+    # including a pull request from a fork's master branch. Deploy only after
+    # CI succeeds on a push.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
 
     steps:
     - uses: actions/checkout@v7
       with:
         ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.ref) || (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || github.ref }}
+        persist-credentials: false
 
     # github.sha is the ref the workflow was launched from, which on a manual
     # dispatch is not the ref being deployed. Use what checkout landed on so
