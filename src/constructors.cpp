@@ -271,6 +271,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   if (!std::isfinite(revolveDegrees) || revolveDegrees == 0.0) {
     return Invalid();
   }
+  // A negative angle builds the positive sweep and mirrors it in y below.
   const bool negative = revolveDegrees < 0;
   revolveDegrees = std::abs(revolveDegrees);
 
@@ -396,7 +397,8 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
     }
   }
 
-  // A negative angle sweeps the other way: mirror in y and flip the winding.
+  // Mirror in y for a negative angle, and flip the winding to keep the volume
+  // positive.
   if (negative) {
     for (vec3& v : vertPos) v.y = -v.y;
     for (ivec3& tri : triVerts) std::swap(tri.y, tri.z);
