@@ -1319,9 +1319,8 @@ export class Mesh {
   /**
    * Optional: Length NumTri, contains the source face ID this triangle comes
    * from. Simplification will maintain all edges between triangles with
-   * different faceIDs. Input faceIDs will be maintained to the outputs, but if
-   * none are given, they will be filled in with Manifold's coplanar face
-   * calculation based on mesh tolerance.
+   * different faceIDs. Input faceIDs will be maintained to the outputs,
+   * otherwise this vector will be empty.
    */
   faceID: Uint32Array;
 
