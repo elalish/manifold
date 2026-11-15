@@ -1036,20 +1036,30 @@ TEST(Manifold, RevolveInvalidAngle) {
 }
 
 TEST(Manifold, RevolveNegativeAngle) {
-  Polygons square = CrossSection::Square({1, 1}).Translate({1, 0}).ToPolygons();
-  for (const int segments : {0, 12}) {
-    for (const double degrees : {10.0, 90.0, 360.0, 400.0}) {
-      Manifold positive = Manifold::Revolve(square, segments, degrees);
-      Manifold negative = Manifold::Revolve(square, segments, -degrees);
-      EXPECT_EQ(negative.Status(), Manifold::Error::NoError);
-      EXPECT_EQ(negative.Genus(), positive.Genus());
-      EXPECT_NEAR(negative.Volume(), positive.Volume(), 1e-9)
-          << "degrees " << -degrees << ", segments " << segments;
-      // The negative sweep goes the other way, mirroring the positive one in y.
-      const Box posBox = positive.BoundingBox();
-      const Box negBox = negative.BoundingBox();
-      EXPECT_NEAR(negBox.min.y, -posBox.max.y, 1e-9);
-      EXPECT_NEAR(negBox.max.y, -posBox.min.y, 1e-9);
+  // One profile away from the axis and one touching it.
+  for (const vec2 offset : {vec2(1, 0), vec2(0, 0)}) {
+    Polygons square =
+        CrossSection::Square({1, 1}).Translate(offset).ToPolygons();
+    for (const int segments : {0, 12}) {
+      for (const double degrees : {10.0, 90.0, 360.0, 400.0}) {
+        Manifold positive = Manifold::Revolve(square, segments, degrees);
+        Manifold negative = Manifold::Revolve(square, segments, -degrees);
+        EXPECT_EQ(negative.Status(), Manifold::Error::NoError);
+        EXPECT_GE(negative.OriginalID(), 0);
+        EXPECT_EQ(negative.Genus(), positive.Genus());
+        EXPECT_NEAR(negative.Volume(), positive.Volume(), 1e-9)
+            << "degrees " << -degrees << ", segments " << segments;
+        // The negative sweep goes the other way, mirroring the positive one
+        // in y.
+        const Box posBox = positive.BoundingBox();
+        const Box negBox = negative.BoundingBox();
+        EXPECT_NEAR(negBox.min.x, posBox.min.x, 1e-9);
+        EXPECT_NEAR(negBox.max.x, posBox.max.x, 1e-9);
+        EXPECT_NEAR(negBox.min.y, -posBox.max.y, 1e-9);
+        EXPECT_NEAR(negBox.max.y, -posBox.min.y, 1e-9);
+        EXPECT_NEAR(negBox.min.z, posBox.min.z, 1e-9);
+        EXPECT_NEAR(negBox.max.z, posBox.max.z, 1e-9);
+      }
     }
   }
 }

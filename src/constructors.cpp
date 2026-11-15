@@ -263,7 +263,7 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
  * @param circularSegments Number of segments along its diameter. Default is
  * calculated by the static Defaults.
  * @param revolveDegrees Number of degrees to revolve. Must be finite and
- * nonzero. Default is 360 degrees.
+ * nonzero. A negative value revolves the other way. Default is 360 degrees.
  */
 Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
                            double revolveDegrees) {
@@ -271,6 +271,8 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   if (!std::isfinite(revolveDegrees) || revolveDegrees == 0.0) {
     return Invalid();
   }
+  const bool negative = revolveDegrees < 0;
+  revolveDegrees = std::abs(revolveDegrees);
 
   Polygons polygons;
   double radius = 0;
@@ -392,6 +394,12 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
     for (auto& t : frontTriangles) {
       triVerts.push_back({endPoses[t.z], endPoses[t.y], endPoses[t.x]});
     }
+  }
+
+  // A negative angle sweeps the other way: mirror in y and flip the winding.
+  if (negative) {
+    for (vec3& v : vertPos) v.y = -v.y;
+    for (ivec3& tri : triVerts) std::swap(tri.y, tri.z);
   }
 
   pImpl_->CreateHalfedges(triVertsDH);

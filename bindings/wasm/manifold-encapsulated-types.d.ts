@@ -169,6 +169,8 @@ export class CrossSection {
    *
    * @param circularSegments Number of segments along its diameter. Default is
    * calculated by the static Defaults.
+   * @param revolveDegrees Number of degrees to revolve. Must be finite and
+   * nonzero. A negative value revolves the other way. Default is 360 degrees.
    * @group Transformations
    */
   revolve(circularSegments?: number, revolveDegrees?: number): Manifold;
@@ -588,7 +590,7 @@ export class Manifold {
    * @param circularSegments Number of segments along its diameter. Default is
    * calculated by the static Defaults.
    * @param revolveDegrees Number of degrees to revolve. Must be finite and
-   * nonzero. Default is 360 degrees.
+   * nonzero. A negative value revolves the other way. Default is 360 degrees.
    * @group Polygons
    */
   static revolve(
