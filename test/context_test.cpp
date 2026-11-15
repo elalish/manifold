@@ -322,6 +322,46 @@ TEST(Context, ExecutionContextConcurrentProgress) {
   // (Not asserting sawProgress to avoid CI flakes.)
 }
 
+// Threads evaluate trees that share an unevaluated subtree, starting together.
+// Thread 0 evaluates without a context, which collapses the shared nodes,
+// thread 1 evaluates the shared root under a cancelled context, which marks it
+// Cancelled, thread 2 evaluates the same root under its own context, and thread
+// 3 counts the shared nodes under its own context.
+// Any thread may see Cancelled from thread 1. This test is meant to be run
+// under ThreadSanitizer.
+TEST(Context, ExecutionContextSharedSubtreeConcurrent) {
+  constexpr int kThreads = 4;
+  for (int round = 0; round < 50; ++round) {
+    Manifold shared = Manifold::Cube(vec3(2), true);
+    const Manifold hole = Manifold::Cylinder(3, 0.3, -1, 12, true);
+    for (int i = 0; i < 4; ++i) {
+      const Manifold h = hole.Translate(vec3(0.4 * (i - 1.5), 0, 0));
+      shared = (shared - h) + h.Rotate(90, 0, 0).Translate(vec3(0, 0, 3));
+    }
+
+    std::atomic<int> ready{0};
+    std::vector<Manifold::Error> status(kThreads);
+    std::vector<std::thread> threads;
+    for (int t = 0; t < kThreads; ++t) {
+      threads.emplace_back([&, t] {
+        Manifold m =
+            t == 1 || t == 2 ? shared : shared.Translate(vec3(t, 0, 0));
+        ExecutionContext ctx;
+        if (t == 1) ctx.Cancel();
+        ready++;
+        while (ready.load() < kThreads) {
+        }
+        status[t] = t == 0 ? m.Status() : m.WithContext(ctx).Status();
+      });
+    }
+    for (auto& thread : threads) thread.join();
+    for (int t = 0; t < kThreads; ++t) {
+      EXPECT_TRUE(status[t] == Manifold::Error::NoError ||
+                  status[t] == Manifold::Error::Cancelled);
+    }
+  }
+}
+
 // Trivial Booleans (empty input, no intersection) early-return from
 // Boolean3::Result before any phase() site executes. The PhaseBalance scope
 // guard must still credit a full kPhasesPerBoolean phases on those returns
