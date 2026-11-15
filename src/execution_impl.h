@@ -84,12 +84,6 @@ struct ExecutionContext::Impl {
   std::atomic<int> doneBooleans{0};
   std::atomic<int> totalPhases{0};
   std::atomic<int> donePhases{0};
-#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
-  // Wall-clock of the last phase boundary, for per-phase timing via
-  // ADVANCE_PHASE_OR_RETURN. Stamped at the static-factory reset; touched only
-  // by the op's own thread.
-  std::chrono::high_resolution_clock::time_point lastPhase{};
-#endif
 
  private:
   std::atomic<bool> cancel{false};
@@ -114,16 +108,13 @@ inline bool IsCancelled(ExecutionContext::Impl* ctx) {
 }
 
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
-// Times the span since the previous phase boundary (or the static-factory
-// reset) and prints it when verbose >= 2. Called by ADVANCE_PHASE_OR_RETURN;
-// defined in execution_impl.cpp so <chrono>/<iostream> stay out of this
+// Per-op local phase-timing state. Each op keeps this on its own stack rather
+// than on the shared ctx, so concurrent ops (booleans in a CSG tree, or calls
+// sharing one ctx) don't clobber each other's baseline. `uid` tags the printed
+// lines so the interleaved output of parallel ops can be split apart.
+// RecordPhase prints the span since the previous boundary when verbose >= 2;
+// it is defined in execution_impl.cpp so <iostream> stays out of this
 // widely-included header.
-void RecordPhase(ExecutionContext::Impl* ctx, const char* file, int line);
-
-// Per-op local phase-timing state. Boolean3::Result keeps this on its own
-// stack rather than on the shared ctx, so concurrent booleans in a CSG tree
-// don't clobber each other's baseline. `uid` tags the printed lines so the
-// interleaved output of parallel booleans can be split apart.
 struct LocalPhaseTiming {
   std::chrono::high_resolution_clock::time_point last;
   int uid;
@@ -138,12 +129,18 @@ void RecordPhase(LocalPhaseTiming& timing, int phase, const char* file,
 /** @ingroup Private
  *
  * Phase-boundary checkpoint for `Manifold::Impl` methods (relies on
- * `this->MakeEmpty`). Call count must equal the method's `kPhasesPer*`.
+ * `this->MakeEmpty` and on a `MANIFOLD_BEGIN_PHASE_TIMING()` at the top of the
+ * method). Call count must equal the method's `kPhasesPer*`.
  */
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
-#define MANIFOLD_RECORD_PHASE(ctx) \
-  manifold::RecordPhase((ctx), __FILE__, __LINE__)
+#define MANIFOLD_BEGIN_PHASE_TIMING() \
+  manifold::LocalPhaseTiming phaseTiming = manifold::BeginLocalPhaseTiming()
+#define MANIFOLD_RECORD_PHASE(ctx)                                         \
+  manifold::RecordPhase(phaseTiming,                                       \
+                        (ctx)->donePhases.load(std::memory_order_relaxed), \
+                        __FILE__, __LINE__)
 #else
+#define MANIFOLD_BEGIN_PHASE_TIMING() ((void)0)
 #define MANIFOLD_RECORD_PHASE(ctx) ((void)0)
 #endif
 

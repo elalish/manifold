@@ -973,7 +973,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // ctx attached); this keeps the result-size summary, tagged with the same uid
   // so it groups with this boolean's phase lines.
   if (ManifoldParams().verbose >= 2) {
-    std::cout << "  [b" << phaseTiming.uid << "] " << outR.NumVert()
+    std::cout << "  [op" << phaseTiming.uid << "] " << outR.NumVert()
               << " verts and " << outR.NumTri() << " tris" << std::endl;
   }
 #endif
