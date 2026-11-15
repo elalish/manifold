@@ -1,9 +1,9 @@
 /**
- * {@include ../README.md#IncludeInUserGuide}
+ * {@include ../../README.md#IncludeInUserGuide}
  *
- * {@include ../documents/using-manifoldcad.md}
+ * {@include ../../documents/using-manifoldcad.md}
  *
- * {@include ../documents/tips.md}
+ * {@include ../../documents/tips.md}
  *
  * @packageDocumentation
  * @module manifoldCAD
