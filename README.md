@@ -231,6 +231,13 @@ python binding documentation:
 
 For more detailed documentation, please refer to the C++ API.
 
+`manifold3d` supports free-threaded Python (3.14t and later) and keeps the
+GIL disabled, so threads can build and evaluate Manifolds in parallel.
+Manifold and CrossSection objects are immutable and can be shared between
+threads. On regular Python, the calls that report progress to an
+`ExecutionContext` release the GIL, so another thread can watch progress or
+cancel them.
+
 ### Windows Shenanigans
 
 Windows users should build with `-DBUILD_SHARED_LIBS=OFF`, as enabling shared

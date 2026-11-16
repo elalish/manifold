@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-nanobind_add_module(manifold3d NB_STATIC STABLE_ABI LTO autogen_docstrings.inl
+nanobind_add_module(manifold3d NB_STATIC STABLE_ABI FREE_THREADED LTO autogen_docstrings.inl
                     manifold3d.cpp
 )
 
