@@ -642,7 +642,12 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
   }
   // Duplicate verts with different props
   std::vector<int> vert2idx(impl.NumVert(), -1);
-  std::vector<std::vector<ivec2>> vertPropPair(impl.NumVert());
+  std::vector<int> vertPropHead(impl.NumVert(), -1);
+  // One entry per output vertex: property index and the next output vertex
+  // sharing its geometric vertex. Keep the bins in contiguous storage rather
+  // than allocating a separate vector for every geometric vertex.
+  std::vector<ivec2> vertPropPair;
+  vertPropPair.reserve(numVert);
   out.vertProperties.reserve(numVert * static_cast<size_t>(out.numProp));
 
   for (size_t run = 0; run < out.runOriginalID.size(); ++run) {
@@ -652,19 +657,18 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
         const int prop = impl.halfedge_.Prop(3 * triNew2Old[tri] + i);
         const int vert = out.triVerts[3 * tri + i];
 
-        auto& bin = vertPropPair[vert];
-        bool bFound = false;
-        for (const auto& b : bin) {
-          if (b.x == prop) {
-            bFound = true;
-            out.triVerts[3 * tri + i] = b.y;
-            break;
-          }
+        int found = vertPropHead[vert];
+        while (found >= 0 && vertPropPair[found].x != prop) {
+          found = vertPropPair[found].y;
         }
-        if (bFound) continue;
+        if (found >= 0) {
+          out.triVerts[3 * tri + i] = found;
+          continue;
+        }
         const int idx = out.vertProperties.size() / out.numProp;
         out.triVerts[3 * tri + i] = idx;
-        bin.push_back({prop, idx});
+        vertPropPair.push_back({prop, vertPropHead[vert]});
+        vertPropHead[vert] = idx;
 
         for (int p : {0, 1, 2}) {
           out.vertProperties.push_back(impl.vertPos_[vert][p]);
