@@ -275,6 +275,7 @@ Python</h2>
 <div class="fragment"><div class="line">&gt;&gt;&gt; import manifold3d</div>
 <div class="line">&gt;&gt;&gt; help(manifold3d)</div>
 </div><!-- fragment --><p>For more detailed documentation, please refer to the C++ API.</p>
+<p><span class="tt">manifold3d</span> supports free-threaded Python (3.14t and later) and keeps the GIL disabled, so threads can build and evaluate Manifolds in parallel. Manifold and CrossSection objects are immutable and can be shared between threads. On regular Python, the calls that report progress to an <span class="tt">ExecutionContext</span> release the GIL, so another thread can watch progress or cancel them.</p>
 <h2 class="doxsection"><a class="anchor" id="autotoc_md13"></a>
 Windows Shenanigans</h2>
 <p>Windows users should build with <span class="tt">-DBUILD_SHARED_LIBS=OFF</span>, as enabling shared libraries in general makes things very complicated.</p>
