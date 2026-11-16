@@ -518,48 +518,45 @@ NB_MODULE(manifold3d, m) {
              const std::optional<
                  nb::ndarray<uint32_t, nb::shape<-1>, nb::c_contig>>& faceID,
              const std::optional<nb::ndarray<float, nb::shape<-1, 3, 4>,
-                                             nb::c_contig>>& halfedgeTangent,
-             float tolerance) {
+                                             nb::c_contig>>& halfedgeTangent) {
             if (vertProp.shape(1) < 3)
               throw std::runtime_error(
                   "vert_properties must have at least 3 columns");
             new (self) MeshGL();
-            MeshGL& out = *self;
-            out.numProp = vertProp.shape(1);
-            out.tolerance = tolerance;
-            out.vertProperties = toVector(vertProp.data(), vertProp.size());
+            self->numProp = vertProp.shape(1);
+            self->vertProperties = toVector(vertProp.data(), vertProp.size());
 
-            out.triVerts = toVector(triVerts.data(), triVerts.size());
+            self->triVerts = toVector(triVerts.data(), triVerts.size());
 
             if (mergeFromVert.has_value())
-              out.mergeFromVert =
+              self->mergeFromVert =
                   toVector(mergeFromVert->data(), mergeFromVert->size());
 
             if (mergeToVert.has_value())
-              out.mergeToVert =
+              self->mergeToVert =
                   toVector(mergeToVert->data(), mergeToVert->size());
 
             if (runIndex.has_value())
-              out.runIndex = toVector(runIndex->data(), runIndex->size());
+              self->runIndex = toVector(runIndex->data(), runIndex->size());
 
             if (runOriginalID.has_value())
-              out.runOriginalID =
+              self->runOriginalID =
                   toVector(runOriginalID->data(), runOriginalID->size());
 
             if (runTransform.has_value()) {
-              out.runTransform =
+              self->runTransform =
                   toVector(runTransform->data(), runTransform->size());
             }
 
             if (runFlags.has_value()) {
-              out.runFlags = toVector(runFlags->data(), runFlags->size());
+              self->runFlags = toVector(runFlags->data(), runFlags->size());
             }
 
             if (faceID.has_value())
-              out.faceID = toVector(faceID->data(), faceID->size());
+              self->faceID = toVector(faceID->data(), faceID->size());
 
             if (halfedgeTangent.has_value()) {
-              out.halfedgeTangent =
+              self->halfedgeTangent =
                   toVector(halfedgeTangent->data(), halfedgeTangent->size());
             }
           },
@@ -570,7 +567,7 @@ NB_MODULE(manifold3d, m) {
           nb::arg("run_original_id") = nb::none(),
           nb::arg("run_transform") = nb::none(),
           nb::arg("run_flags") = nb::none(), nb::arg("face_id") = nb::none(),
-          nb::arg("halfedge_tangent") = nb::none(), nb::arg("tolerance") = 0)
+          nb::arg("halfedge_tangent") = nb::none())
       .def_prop_ro(
           "vert_properties",
           [](const MeshGL& self) {
@@ -612,7 +609,8 @@ NB_MODULE(manifold3d, m) {
       .def_ro("face_id", &MeshGL::faceID)
       .def("backside", &MeshGL::Backside, nb::arg("run"))
       .def("has_normals", &MeshGL::HasNormals, nb::arg("run"))
-      .def("merge", &MeshGL::Merge, mesh_gl__merge);
+      .def("merge", &MeshGL::Merge, nb::arg("tolerance") = 0.0f,
+           mesh_gl__merge__tolerance);
 
   nb::class_<MeshGL64>(m, "Mesh64")
       .def(
@@ -637,48 +635,45 @@ NB_MODULE(manifold3d, m) {
              const std::optional<
                  nb::ndarray<uint64_t, nb::shape<-1>, nb::c_contig>>& faceID,
              const std::optional<nb::ndarray<double, nb::shape<-1, 3, 4>,
-                                             nb::c_contig>>& halfedgeTangent,
-             double tolerance) {
+                                             nb::c_contig>>& halfedgeTangent) {
             if (vertProp.shape(1) < 3)
               throw std::runtime_error(
                   "vert_properties must have at least 3 columns");
             new (self) MeshGL64();
-            MeshGL64& out = *self;
-            out.numProp = vertProp.shape(1);
-            out.tolerance = tolerance;
-            out.vertProperties = toVector(vertProp.data(), vertProp.size());
+            self->numProp = vertProp.shape(1);
+            self->vertProperties = toVector(vertProp.data(), vertProp.size());
 
-            out.triVerts = toVector(triVerts.data(), triVerts.size());
+            self->triVerts = toVector(triVerts.data(), triVerts.size());
 
             if (mergeFromVert.has_value())
-              out.mergeFromVert =
+              self->mergeFromVert =
                   toVector(mergeFromVert->data(), mergeFromVert->size());
 
             if (mergeToVert.has_value())
-              out.mergeToVert =
+              self->mergeToVert =
                   toVector(mergeToVert->data(), mergeToVert->size());
 
             if (runIndex.has_value())
-              out.runIndex = toVector(runIndex->data(), runIndex->size());
+              self->runIndex = toVector(runIndex->data(), runIndex->size());
 
             if (runOriginalID.has_value())
-              out.runOriginalID =
+              self->runOriginalID =
                   toVector(runOriginalID->data(), runOriginalID->size());
 
             if (runTransform.has_value()) {
-              out.runTransform =
+              self->runTransform =
                   toVector(runTransform->data(), runTransform->size());
             }
 
             if (runFlags.has_value()) {
-              out.runFlags = toVector(runFlags->data(), runFlags->size());
+              self->runFlags = toVector(runFlags->data(), runFlags->size());
             }
 
             if (faceID.has_value())
-              out.faceID = toVector(faceID->data(), faceID->size());
+              self->faceID = toVector(faceID->data(), faceID->size());
 
             if (halfedgeTangent.has_value()) {
-              out.halfedgeTangent =
+              self->halfedgeTangent =
                   toVector(halfedgeTangent->data(), halfedgeTangent->size());
             }
           },
@@ -689,7 +684,7 @@ NB_MODULE(manifold3d, m) {
           nb::arg("run_original_id") = nb::none(),
           nb::arg("run_transform") = nb::none(),
           nb::arg("run_flags") = nb::none(), nb::arg("face_id") = nb::none(),
-          nb::arg("halfedge_tangent") = nb::none(), nb::arg("tolerance") = 0)
+          nb::arg("halfedge_tangent") = nb::none())
       .def_prop_ro(
           "vert_properties",
           [](const MeshGL64& self) {
@@ -731,7 +726,8 @@ NB_MODULE(manifold3d, m) {
       .def_ro("face_id", &MeshGL64::faceID)
       .def("backside", &MeshGL64::Backside, nb::arg("run"))
       .def("has_normals", &MeshGL64::HasNormals, nb::arg("run"))
-      .def("merge", &MeshGL64::Merge, mesh_gl__merge);
+      .def("merge", &MeshGL64::Merge, nb::arg("tolerance") = 0.0,
+           "Merge open-edge vertices within tolerance.");
 
   nb::class_<RayHit>(m, "RayHit")
       .def_ro("face_id", &RayHit::faceID)

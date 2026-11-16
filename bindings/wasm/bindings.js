@@ -400,8 +400,7 @@ Module.setup = function() {
       faceID,
       halfedgeTangent,
       runTransform,
-      runFlags,
-      tolerance = 0
+      runFlags
     } = {}) {
       this.numProp = numProp;
       this.triVerts = triVerts;
@@ -414,7 +413,6 @@ Module.setup = function() {
       this.halfedgeTangent = halfedgeTangent;
       this.runTransform = runTransform;
       this.runFlags = runFlags;
-      this.tolerance = tolerance;
     }
 
     get numTri() {
@@ -429,8 +427,8 @@ Module.setup = function() {
       return this.runOriginalID.length;
     }
 
-    merge() {
-      const {changed, mesh} = Module._Merge(this);
+    merge(tolerance = 0) {
+      const {changed, mesh} = Module._Merge(this, tolerance);
       Object.assign(this, {...mesh});
       return changed;
     }

@@ -63,7 +63,7 @@ ManifoldMeshGL* manifold_get_meshgl(const ManifoldManifold* m);
 ManifoldMeshGL* manifold_get_meshgl_w_normals(const ManifoldManifold* m,
                                               int32_t normalIdx);
 ManifoldMeshGL* manifold_meshgl_copy(const ManifoldMeshGL* m);
-ManifoldMeshGL* manifold_meshgl_merge(const ManifoldMeshGL* m);
+ManifoldMeshGL* manifold_meshgl_merge(const ManifoldMeshGL* m, float tolerance);
 
 ManifoldMeshGL64* manifold_meshgl64(const double* vert_props, size_t n_verts,
                                     size_t n_props, const uint64_t* tri_verts,
@@ -82,7 +82,8 @@ ManifoldMeshGL64* manifold_get_meshgl64(const ManifoldManifold* m);
 ManifoldMeshGL64* manifold_get_meshgl64_w_normals(const ManifoldManifold* m,
                                                   int32_t normalIdx);
 ManifoldMeshGL64* manifold_meshgl64_copy(const ManifoldMeshGL64* m);
-ManifoldMeshGL64* manifold_meshgl64_merge(const ManifoldMeshGL64* m);
+ManifoldMeshGL64* manifold_meshgl64_merge(const ManifoldMeshGL64* m,
+                                          double tolerance);
 
 // SDF
 // By default, the execution policy (sequential or parallel) of
@@ -459,7 +460,6 @@ const float* manifold_meshgl_run_transform(const ManifoldMeshGL* m);
 const uint32_t* manifold_meshgl_face_id(const ManifoldMeshGL* m);
 const float* manifold_meshgl_halfedge_tangent(const ManifoldMeshGL* m);
 const uint8_t* manifold_meshgl_run_flags(const ManifoldMeshGL* m);
-float manifold_meshgl_tolerance(const ManifoldMeshGL* m);
 size_t manifold_meshgl_num_run(const ManifoldMeshGL* m);
 int manifold_meshgl_backside(const ManifoldMeshGL* m, size_t run);
 int manifold_meshgl_has_normals(const ManifoldMeshGL* m, size_t run);
@@ -487,7 +487,6 @@ const double* manifold_meshgl64_run_transform(const ManifoldMeshGL64* m);
 const uint64_t* manifold_meshgl64_face_id(const ManifoldMeshGL64* m);
 const double* manifold_meshgl64_halfedge_tangent(const ManifoldMeshGL64* m);
 const uint8_t* manifold_meshgl64_run_flags(const ManifoldMeshGL64* m);
-double manifold_meshgl64_tolerance(const ManifoldMeshGL64* m);
 size_t manifold_meshgl64_num_run(const ManifoldMeshGL64* m);
 int manifold_meshgl64_backside(const ManifoldMeshGL64* m, size_t run);
 int manifold_meshgl64_has_normals(const ManifoldMeshGL64* m, size_t run);
