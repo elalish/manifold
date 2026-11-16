@@ -94,8 +94,9 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
                         TransformIterator(verts.end(), t));
     }
     composedHulls.push_back(Manifold::Hull(simpleHull));
-    // Convex - Non-Convex Minkowski: Slower
-  } else if ((inset || !aConvex) && bConvex) {
+    // Hull each A face with all B vertices when B is convex. For erosion,
+    // convex A also permits this: A eroded by B equals A eroded by B's hull.
+  } else if (bConvex || (inset && aConvex)) {
     const size_t numTri = aImpl->NumTri();
     const VecView<vec3> verts = bImpl->vertPos_;
 
@@ -123,7 +124,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
     // Non-Convex - Non-Convex Minkowski: Very Slow
     // Process A faces sequentially with periodic batch reduction to balance
     // memory usage and performance.
-  } else if (!bConvex) {
+  } else {
     const size_t numTriA = aImpl->NumTri();
     const size_t numTriB = bImpl->NumTri();
 

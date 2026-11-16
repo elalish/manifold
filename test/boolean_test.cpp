@@ -897,7 +897,30 @@ TEST(Boolean, ConvexNonConvexMinkowskiDifference) {
     }
     // Swapping these operands is not an equivalent operation.
     EXPECT_TRUE(cutter.MinkowskiDifference(cube).IsEmpty());
+    // A cutter whose boundary surrounds A must still remove all of A.
+    for (const vec3 offset : {vec3(0.0), vec3(-7, 4, 2)}) {
+      const Manifold small = Manifold::Cube(vec3(1.0), true).Translate(offset);
+      const Manifold removed =
+          small.MinkowskiDifference(cutter.Scale(vec3(3.0)));
+      ASSERT_EQ(removed.Status(), Manifold::Error::NoError);
+      EXPECT_TRUE(removed.IsEmpty());
+    }
   }
+
+  // The hull equivalence also holds for a convex base with non-axis-aligned
+  // faces.
+  const Manifold tetrahedron = Manifold::Tetrahedron()
+                                   .Scale(vec3(5.0))
+                                   .Rotate(17, 23, 11)
+                                   .Translate({-7, 3, 2});
+  const Manifold cutter = cross.Scale(vec3(0.2));
+  const Manifold expected = tetrahedron.MinkowskiDifference(cutter.Hull());
+  const Manifold result = tetrahedron.MinkowskiDifference(cutter);
+  ASSERT_EQ(expected.Status(), Manifold::Error::NoError);
+  ASSERT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(expected.IsEmpty());
+  EXPECT_TRUE((expected - result).IsEmpty());
+  EXPECT_TRUE((result - expected).IsEmpty());
 }
 
 /**
