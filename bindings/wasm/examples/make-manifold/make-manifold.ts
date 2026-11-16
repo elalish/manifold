@@ -126,10 +126,9 @@ async function readGLB(url: string): Promise<Document> {
       tmp.mesh.runOriginalID[i] = firstID + i;
       id2properties.set(firstID + i, tmp.runProperties[i]);
     }
-    const manifoldMesh = new Mesh(tmp.mesh);
     disposeMesh(mesh);
     // Make the mesh manifold if it's close.
-    manifoldMesh.merge();
+    const manifoldMesh = new Mesh(tmp.mesh).merge();
 
     try {
       // Test manifoldness - will throw if not.

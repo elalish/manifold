@@ -92,8 +92,7 @@ TEST(Boolean, MeshGLRoundTrip) {
 }
 
 TEST(Boolean, Normals) {
-  MeshGL cubeGL = CubeSTL();
-  cubeGL.Merge();
+  const MeshGL cubeGL = CubeSTL().Merge();
   const Manifold cube(cubeGL);
   const Manifold sphere = Manifold::Sphere(60).CalculateNormals(0).AsOriginal();
   const MeshGL sphereGL = sphere.GetMeshGL();
@@ -111,8 +110,7 @@ TEST(Boolean, Normals) {
 
   output.mergeFromVert.clear();
   output.mergeToVert.clear();
-  output.Merge();
-  Manifold roundTrip(output);
+  Manifold roundTrip(output.Merge());
 
   RelatedGL(roundTrip, {cubeGL, sphereGL}, true, true);
 }

@@ -535,9 +535,7 @@ ManifoldMeshGL* manifold_meshgl_copy(const ManifoldMeshGL* m) {
 
 ManifoldMeshGL* manifold_meshgl_merge(const ManifoldMeshGL* m,
                                       float tolerance) {
-  auto duplicate = new MeshGL(*from_c(m));
-  duplicate->Merge(tolerance);
-  return to_c(duplicate);
+  return to_c(new MeshGL(from_c(m)->Merge(tolerance)));
 }
 
 ManifoldMeshGL64* manifold_get_meshgl64(const ManifoldManifold* m) {
@@ -557,9 +555,7 @@ ManifoldMeshGL64* manifold_meshgl64_copy(const ManifoldMeshGL64* m) {
 
 ManifoldMeshGL64* manifold_meshgl64_merge(const ManifoldMeshGL64* m,
                                           double tolerance) {
-  auto duplicate = new MeshGL64(*from_c(m));
-  duplicate->Merge(tolerance);
-  return to_c(duplicate);
+  return to_c(new MeshGL64(from_c(m)->Merge(tolerance)));
 }
 
 size_t manifold_meshgl_num_prop(const ManifoldMeshGL* m) {
