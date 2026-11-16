@@ -177,7 +177,15 @@ struct MeshGLP {
    *
    * @param tolerance Merge open-edge verts closer than this.
    */
-  [[nodiscard]] MeshGLP Merge(Precision tolerance = 0) const;
+  [[nodiscard]] MeshGLP Merge(Precision tolerance = 0) const&;
+
+  /**
+   * Same as above, but merges in place and moves the result out instead of
+   * copying, e.g. `std::move(mesh).Merge()`.
+   *
+   * @param tolerance Merge open-edge verts closer than this.
+   */
+  [[nodiscard]] MeshGLP Merge(Precision tolerance = 0) &&;
 
   /**
    * Returns the x, y, z position of the ith vertex.

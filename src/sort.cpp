@@ -628,17 +628,29 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
  * will report an error status if it is not manifold.
  */
 template <>
-MeshGL MeshGL::Merge(float tolerance) const {
+MeshGL MeshGL::Merge(float tolerance) const& {
   MeshGL merged = *this;
   MergeMeshGLP(merged, tolerance);
   return merged;
 }
 
 template <>
-MeshGL64 MeshGL64::Merge(double tolerance) const {
+MeshGL MeshGL::Merge(float tolerance) && {
+  MergeMeshGLP(*this, tolerance);
+  return std::move(*this);
+}
+
+template <>
+MeshGL64 MeshGL64::Merge(double tolerance) const& {
   MeshGL64 merged = *this;
   MergeMeshGLP(merged, tolerance);
   return merged;
+}
+
+template <>
+MeshGL64 MeshGL64::Merge(double tolerance) && {
+  MergeMeshGLP(*this, tolerance);
+  return std::move(*this);
 }
 
 }  // namespace manifold

@@ -609,8 +609,12 @@ NB_MODULE(manifold3d, m) {
       .def_ro("face_id", &MeshGL::faceID)
       .def("backside", &MeshGL::Backside, nb::arg("run"))
       .def("has_normals", &MeshGL::HasNormals, nb::arg("run"))
-      .def("merge", &MeshGL::Merge, nb::arg("tolerance") = 0.0f,
-           mesh_gl__merge__tolerance);
+      .def(
+          "merge",
+          [](const MeshGL& self, float tolerance) {
+            return self.Merge(tolerance);
+          },
+          nb::arg("tolerance") = 0.0f, mesh_gl__merge__tolerance);
 
   nb::class_<MeshGL64>(m, "Mesh64")
       .def(
@@ -726,8 +730,13 @@ NB_MODULE(manifold3d, m) {
       .def_ro("face_id", &MeshGL64::faceID)
       .def("backside", &MeshGL64::Backside, nb::arg("run"))
       .def("has_normals", &MeshGL64::HasNormals, nb::arg("run"))
-      .def("merge", &MeshGL64::Merge, nb::arg("tolerance") = 0.0,
-           "Return a copy with open-edge vertices merged within tolerance.");
+      .def(
+          "merge",
+          [](const MeshGL64& self, double tolerance) {
+            return self.Merge(tolerance);
+          },
+          nb::arg("tolerance") = 0.0,
+          "Return a copy with open-edge vertices merged within tolerance.");
 
   nb::class_<RayHit>(m, "RayHit")
       .def_ro("face_id", &RayHit::faceID)

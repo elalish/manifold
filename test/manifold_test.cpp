@@ -1396,6 +1396,23 @@ TEST(Manifold, Merge) {
   CheckCube(merged);
 }
 
+TEST(Manifold, MergeMovesRvalue) {
+  auto expectMoves = [](auto mesh) {
+    const auto copied = mesh.Merge();
+    EXPECT_FALSE(copied.mergeFromVert.empty());
+    const auto* data = mesh.vertProperties.data();
+    const auto moved = std::move(mesh).Merge();
+    EXPECT_EQ(moved.vertProperties.data(), data);
+    EXPECT_EQ(moved.mergeFromVert, copied.mergeFromVert);
+    EXPECT_EQ(moved.mergeToVert, copied.mergeToVert);
+  };
+  expectMoves(CubeSTL());
+  MeshGL64 cube64 = Manifold::Cube().CalculateNormals(0).GetMeshGL64(0);
+  cube64.mergeFromVert.clear();
+  cube64.mergeToVert.clear();
+  expectMoves(cube64);
+}
+
 TEST(Manifold, MergeTolerance) {
   MeshGL mesh = CubeSTL();
   mesh.vertProperties[0] += 1e-4f;
