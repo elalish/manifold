@@ -149,8 +149,8 @@ struct MeshGLP {
   std::vector<uint8_t> runFlags;
   /// Optional: Length NumTri, contains the source face ID this triangle comes
   /// from. Simplification will maintain all edges between triangles with
-  /// different faceIDs. Input faceIDs will be maintained to the outputs,
-  /// otherwise this vector will be empty.
+  /// different faceIDs. Input faceIDs will be maintained to the outputs. If
+  /// no input has faceIDs, this vector will be empty.
   std::vector<I> faceID;
   /// Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
   /// non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
