@@ -175,8 +175,7 @@ struct MeshGLP {
    * Manifold from the result will report an error status if it is not
    * manifold.
    *
-   * @param tolerance Minimum vertex separation to merge, before applying the
-   * bounding-box and precision-based floor.
+   * @param tolerance Merge open-edge verts closer than this.
    */
   bool Merge(Precision tolerance = 0);
 
