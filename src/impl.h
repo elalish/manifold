@@ -554,13 +554,6 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
 
   const int numHalfedge = impl.halfedgeTangent_.size();
   out.halfedgeTangent.resize(4 * numHalfedge);
-  for (int i = 0; i < numHalfedge; ++i) {
-    const vec4 t = impl.halfedgeTangent_[i];
-    out.halfedgeTangent[4 * i] = t.x;
-    out.halfedgeTangent[4 * i + 1] = t.y;
-    out.halfedgeTangent[4 * i + 2] = t.z;
-    out.halfedgeTangent[4 * i + 3] = t.w;
-  }
   // Sort the triangles into runs
   std::vector<int> triNew2Old(numTri);
   std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
@@ -611,8 +604,17 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     if (!out.faceID.empty()) {
       out.faceID[tri] = std::max(ref.faceID, 0);
     }
-    for (const int i : {0, 1, 2})
+    for (const int i : {0, 1, 2}) {
       out.triVerts[3 * tri + i] = impl.halfedge_.Start(3 * oldTri + i);
+      if (numHalfedge > 0) {
+        // Tangents belong to halfedges, so follow the same run ordering as
+        // the triangle corners they describe.
+        const vec4 tangent = impl.halfedgeTangent_[3 * oldTri + i];
+        for (const int j : {0, 1, 2, 3}) {
+          out.halfedgeTangent[4 * (3 * tri + i) + j] = tangent[j];
+        }
+      }
+    }
 
     if (meshID != lastID) {
       manifold::Manifold::Impl::Relation rel;
