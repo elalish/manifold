@@ -378,7 +378,17 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
     }
     ASSERT_LT(i, originals.size());
     const MeshGL& inMesh = originals[i];
-    const float tolerance = 3 * std::max(output.tolerance, inMesh.tolerance);
+    auto meshScale = [](const MeshGL& mesh) {
+      Box bounds;
+      for (size_t vertex = 0; vertex < mesh.NumVert(); ++vertex)
+        bounds.Union(vec3(mesh.GetVertPos(vertex)));
+      return bounds.Scale();
+    };
+    const float tolerance =
+        3 *
+        std::max(Quality::GetRelativePrecision(),
+                 static_cast<double>(std::numeric_limits<float>::epsilon())) *
+        std::max(meshScale(output), meshScale(inMesh));
 
     for (uint32_t tri = output.runIndex[run] / 3;
          tri < output.runIndex[run + 1] / 3; ++tri) {

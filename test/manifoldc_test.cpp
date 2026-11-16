@@ -453,7 +453,7 @@ TEST(CBIND, meshgl_merge_returns_mem) {
 
   // This mesh is already manifold, so Merge() internally returns false.
   // The bug: old code returned the input pointer instead of the output buffer.
-  ManifoldMeshGL* merged = manifold_meshgl_merge(original);
+  ManifoldMeshGL* merged = manifold_meshgl_merge(original, 0.0f);
 
   EXPECT_NE(merged, original);
 
@@ -472,7 +472,7 @@ TEST(CBIND, meshgl64_merge_returns_mem) {
   ManifoldManifold* cube = manifold_cube(1.0, 1.0, 1.0, 0);
   ManifoldMeshGL64* original = manifold_get_meshgl64(cube);
 
-  ManifoldMeshGL64* merged = manifold_meshgl64_merge(original);
+  ManifoldMeshGL64* merged = manifold_meshgl64_merge(original, 0.0);
 
   EXPECT_NE(merged, original);
 
@@ -546,7 +546,6 @@ TEST(CBIND, meshgl_run_accessors) {
 
   // MeshGL
   ManifoldMeshGL* mesh = manifold_get_meshgl(result);
-  EXPECT_GE(manifold_meshgl_tolerance(mesh), 0.0f);
   EXPECT_EQ(manifold_meshgl_num_run(mesh), 2);
   EXPECT_EQ(manifold_meshgl_run_flags_length(mesh),
             manifold_meshgl_num_run(mesh));
@@ -558,7 +557,6 @@ TEST(CBIND, meshgl_run_accessors) {
 
   // MeshGL64
   ManifoldMeshGL64* mesh64 = manifold_get_meshgl64(result);
-  EXPECT_GE(manifold_meshgl64_tolerance(mesh64), 0.0);
   EXPECT_EQ(manifold_meshgl64_num_run(mesh64), 2);
   EXPECT_EQ(manifold_meshgl64_run_flags_length(mesh64),
             manifold_meshgl64_num_run(mesh64));

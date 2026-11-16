@@ -91,7 +91,6 @@ TEST(Properties, Tolerance) {
   EXPECT_EQ(imperfect2.NumTri(), 12);
 
   MeshGL mesh = imperfect.GetMeshGL();
-  mesh.tolerance = tol;
   Manifold imperfect3(mesh);
   EXPECT_EQ(imperfect3.NumTri(), 28);  // Don't automatically simplify
 
