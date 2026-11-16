@@ -606,8 +606,10 @@ struct Rect {
    */
   constexpr Rect Transform(const mat2x3& m) const {
     Rect rect;
-    rect.min = m * vec3(min, 1);
-    rect.max = m * vec3(max, 1);
+    vec2 minT = m * vec3(min, 1);
+    vec2 maxT = m * vec3(max, 1);
+    rect.min = la::min(minT, maxT);
+    rect.max = la::max(minT, maxT);
     return rect;
   }
   ///@}
