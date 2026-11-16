@@ -304,7 +304,7 @@ bool Manifold::Impl::IsConvex() const {
 bool Manifold::Impl::IsVug() const {
   const double volume = GetProperty(Property::Volume);
   const double area = GetProperty(Property::SurfaceArea);
-  return volume < -area * tolerance_;
+  return volume < -area * bBox_.Scale() * Quality::GetRelativePrecision();
 }
 
 double Manifold::Impl::GetProperty(Property prop) const {

@@ -426,9 +426,11 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
 }
 
 /**
- * This operation returns a vector of Manifolds that are topologically
- * disconnected. If everything is connected, the vector is length one,
- * containing a copy of the original. It is the inverse operation of Compose().
+ * This operation returns a vector of topologically disconnected Manifolds,
+ * keeping enclosed negative-volume shells with their enclosing
+ * positive-volume shell. If everything is connected, the vector is length
+ * one, containing a copy of the original. It is the inverse operation of
+ * Compose().
  */
 std::vector<Manifold> Manifold::Decompose() const {
   ZoneScoped;
@@ -453,7 +455,8 @@ std::vector<Manifold> Manifold::Decompose() const {
   Vec<int> vertLabel(componentIndices);
 
   const int numVert = NumVert();
-  std::vector<Manifold> meshes;
+  std::vector<std::shared_ptr<Impl>> components;
+  std::vector<int> componentLabels;
   for (int i = 0; i < numComponents; ++i) {
     auto impl = std::make_shared<Impl>();
 
@@ -486,6 +489,125 @@ std::vector<Manifold> Manifold::Decompose() const {
     impl->CalculateBBox();
     impl->SortGeometry();
 
+    components.push_back(std::move(impl));
+    componentLabels.push_back(i);
+  }
+
+  const int numMeshes = static_cast<int>(components.size());
+  std::vector<bool> isVug(numMeshes);
+  bool hasVug = false;
+  for (int i = 0; i < numMeshes; ++i) {
+    isVug[i] = components[i]->IsVug();
+    hasVug |= isVug[i];
+  }
+  if (!hasVug) {
+    std::vector<Manifold> meshes;
+    meshes.reserve(numMeshes);
+    for (auto& component : components) meshes.push_back(Manifold(component));
+    return meshes;
+  }
+
+  std::vector<double> volumes(numMeshes);
+  std::vector<int> parent(numMeshes, -1);
+  for (int i = 0; i < numMeshes; ++i) {
+    Manifold mesh(components[i]);
+    volumes[i] = mesh.Volume();
+  }
+
+  for (int i = 0; i < numMeshes; ++i) {
+    if (!isVug[i]) continue;
+    double smallestParentVolume = std::numeric_limits<double>::infinity();
+    const auto& childVerts = components[i]->vertPos_;
+    for (int j = 0; j < numMeshes; ++j) {
+      const double parentVolume = std::fabs(volumes[j]);
+      if (i == j || parentVolume <= std::fabs(volumes[i]) ||
+          parentVolume >= smallestParentVolume) {
+        continue;
+      }
+      const Box& childBox = components[i]->bBox_;
+      const Box& parentBox = components[j]->bBox_;
+      const vec3 eps(components[j]->epsilon_);
+      const Box expandedParentBox(parentBox.min - eps, parentBox.max + eps);
+      if (!expandedParentBox.Contains(childBox)) continue;
+
+      if (components[j]->PointWinding(
+              VecView<const vec3>(childVerts.data(), 1))[0] == 1) {
+        parent[i] = j;
+        smallestParentVolume = parentVolume;
+      }
+    }
+  }
+
+  std::vector<int> outputByComponent(numComponents, -1);
+  std::vector<int> outputRoot;
+  std::vector<int> outputComponentCount;
+  int numOutputs = 0;
+  for (int i = 0; i < numMeshes; ++i) {
+    if (!isVug[i]) {
+      outputByComponent[componentLabels[i]] = numOutputs++;
+      outputRoot.push_back(i);
+      outputComponentCount.push_back(1);
+    }
+  }
+  for (int i = 0; i < numMeshes; ++i) {
+    if (!isVug[i]) continue;
+    int ancestor = parent[i];
+    for (int hops = 0; ancestor >= 0 && isVug[ancestor] && hops <= numMeshes;
+         ++hops) {
+      ancestor = parent[ancestor];
+    }
+    if (ancestor >= 0) {
+      const int output = outputByComponent[componentLabels[ancestor]];
+      outputByComponent[componentLabels[i]] = output;
+      ++outputComponentCount[output];
+    } else {
+      outputByComponent[componentLabels[i]] = numOutputs++;
+      outputRoot.push_back(i);
+      outputComponentCount.push_back(1);
+    }
+  }
+
+  std::vector<Manifold> meshes;
+  meshes.reserve(numOutputs);
+  for (int i = 0; i < numOutputs; ++i) {
+    if (outputComponentCount[i] == 1) {
+      meshes.push_back(Manifold(components[outputRoot[i]]));
+      continue;
+    }
+
+    auto impl = std::make_shared<Impl>();
+
+    Vec<int> vertNew2Old(numVert);
+    const int nVert = copy_if(countAt(0), countAt(numVert), vertNew2Old.begin(),
+                              [i, &vertLabel, &outputByComponent](int v) {
+                                return outputByComponent[vertLabel[v]] == i;
+                              }) -
+                      vertNew2Old.begin();
+    impl->vertPos_.resize(nVert);
+    impl->vertNormal_.resize(nVert);
+    vertNew2Old.resize(nVert);
+    gather(vertNew2Old.begin(), vertNew2Old.end(), pImpl_->vertPos_.begin(),
+           impl->vertPos_.begin());
+    gather(vertNew2Old.begin(), vertNew2Old.end(), pImpl_->vertNormal_.begin(),
+           impl->vertNormal_.begin());
+
+    Vec<int> faceNew2Old;
+    faceNew2Old.reserve(NumTri());
+    const auto& halfedge = pImpl_->halfedge_;
+    for (size_t face = 0; face < NumTri(); ++face) {
+      const int component =
+          vertLabel[halfedge.Start(static_cast<int>(3 * face))];
+      if (outputByComponent[component] == i) {
+        faceNew2Old.push_back(static_cast<int>(face));
+      }
+    }
+
+    if (faceNew2Old.empty()) continue;
+
+    impl->GatherFaces(*pImpl_, faceNew2Old);
+    impl->ReindexVerts(vertNew2Old, pImpl_->NumVert());
+    impl->CalculateBBox();
+    impl->SortGeometry();
     meshes.push_back(Manifold(impl));
   }
   return meshes;

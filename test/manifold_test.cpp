@@ -775,6 +775,33 @@ TEST(Manifold, Decompose) {
   RelatedGL(manifolds, input);
 }
 
+TEST(Manifold, DecomposeGroupsEnclosedNegativeVolume) {
+  const Manifold outer = Manifold::Cube({10, 10, 10}, true);
+  const Manifold largeVug =
+      Manifold::Cube({4, 4, 4}, true).Translate({-2, 0, 0});
+  const Manifold siblingVug =
+      Manifold::Cube({2, 2, 2}, true).Translate({2, 0, 0});
+  const Manifold island = Manifold::Cube({2, 2, 2}, true).Translate({-2, 0, 0});
+  const Manifold nestedVug =
+      Manifold::Cube({1, 1, 1}, true).Translate({-2, 0, 0});
+  const Manifold shape = outer - largeVug - siblingVug + island - nestedVug;
+
+  const auto components = shape.Decompose();
+
+  ASSERT_EQ(components.size(), 2);
+  std::vector<double> componentVolumes;
+  size_t componentTriangles = 0;
+  for (const Manifold& component : components) {
+    componentVolumes.push_back(component.Volume());
+    componentTriangles += component.NumTri();
+  }
+  std::sort(componentVolumes.begin(), componentVolumes.end());
+  EXPECT_NEAR(componentVolumes[0], 7, 1e-8);
+  EXPECT_NEAR(componentVolumes[1], 928, 1e-8);
+  EXPECT_NEAR(componentVolumes[0] + componentVolumes[1], shape.Volume(), 1e-8);
+  EXPECT_EQ(componentTriangles, shape.NumTri());
+}
+
 TEST(Manifold, DecomposeProps) {
   std::vector<MeshGL> input;
   std::vector<Manifold> manifoldList;
