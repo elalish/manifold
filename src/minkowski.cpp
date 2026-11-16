@@ -59,8 +59,8 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
 
   constexpr size_t BATCH_SIZE = 1000;
 
-  // If the convex manifold was supplied first, swap them!
-  if (aConvex && !bConvex) {
+  // Only the sum is commutative; erosion must preserve the first operand.
+  if (!inset && aConvex && !bConvex) {
     std::swap(aImpl, bImpl);
     std::swap(aConvex, bConvex);
   }
@@ -123,7 +123,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
     // Non-Convex - Non-Convex Minkowski: Very Slow
     // Process A faces sequentially with periodic batch reduction to balance
     // memory usage and performance.
-  } else if (!aConvex && !bConvex) {
+  } else if (!bConvex) {
     const size_t numTriA = aImpl->NumTri();
     const size_t numTriB = bImpl->NumTri();
 
