@@ -18,7 +18,9 @@
 #include <atomic>
 #include <chrono>
 #include <limits>
+#include <stdexcept>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 #include "../src/execution_impl.h"
@@ -29,6 +31,15 @@
 namespace {
 
 using namespace manifold;
+
+bool SameMeshPayload(const MeshGL64& a, const MeshGL64& b) {
+  return std::tie(a.numProp, a.vertProperties, a.triVerts, a.mergeFromVert,
+                  a.mergeToVert, a.runIndex, a.runOriginalID, a.runTransform,
+                  a.runFlags, a.faceID, a.halfedgeTangent) ==
+         std::tie(b.numProp, b.vertProperties, b.triVerts, b.mergeFromVert,
+                  b.mergeToVert, b.runIndex, b.runOriginalID, b.runTransform,
+                  b.runFlags, b.faceID, b.halfedgeTangent);
+}
 
 template <typename T>
 int NumUnique(const std::vector<T>& in) {
@@ -88,6 +99,94 @@ TEST(Manifold, GetMeshGL) {
   auto mesh_out2 = manifold2.GetMeshGL();
   Identical(mesh_out, mesh_out2);
 }
+
+TEST(Manifold, SharedTopologyCopyIsolation) {
+  const Manifold sphere =
+      Manifold::Sphere(1, 16).CalculateNormals(0, 180).SmoothByNormals();
+  const Manifold cube = Manifold::Cube().Refine(2).CalculateNormals(0, 30);
+  for (const Manifold& source : {sphere, cube}) {
+    const MeshGL64 original = source.GetMeshGL64();
+    const std::vector<std::function<Manifold(const Manifold&)>> operations = {
+        [](const Manifold& m) { return m.CalculateNormals(0, 30); },
+        [](const Manifold& m) { return m.Refine(2); },
+        [](const Manifold& m) { return m.Simplify(0.02); },
+        [](const Manifold& m) { return m.RemoveDegenerates(); },
+        [](const Manifold& m) { return m.Mirror({1, 2, 3}); },
+        [](const Manifold& m) { return m.AsOriginal(); },
+        [](const Manifold& m) { return m.CalculateCurvature(3, 4); },
+        [](const Manifold& m) { return m.SetProperties(1, nullptr); },
+        [](const Manifold& m) { return m.SmoothByNormals(); },
+        [](const Manifold& m) {
+          return m.Warp([](vec3& p) { p.x += 0.1 * p.z * p.z; });
+        },
+        [](const Manifold& m) {
+          return m.WarpBatch([](VecView<vec3> points) {
+            for (vec3& p : points) p.y += 0.1 * p.x * p.x;
+          });
+        },
+        [](const Manifold& m) {
+          return m - Manifold::Cube({0.5, 0.5, 0.5}, true);
+        }};
+    for (size_t i = 0; i < operations.size(); ++i) {
+      SCOPED_TRACE(i);
+      const Manifold result = operations[i](source);
+      EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+      EXPECT_TRUE(SameMeshPayload(source.GetMeshGL64(), original));
+    }
+    const Manifold invalid = source.WarpBatch([](VecView<vec3> points) {
+      points[0].x = std::numeric_limits<double>::quiet_NaN();
+    });
+    EXPECT_EQ(invalid.Status(), Manifold::Error::NonFiniteVertex);
+    EXPECT_TRUE(SameMeshPayload(source.GetMeshGL64(), original));
+  }
+}
+
+#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+TEST(Manifold, SharedTopologyThrowingCallbacks) {
+  const Manifold source = Manifold::Cube().CalculateNormals(0, 30);
+  const MeshGL64 original = source.GetMeshGL64();
+  EXPECT_THROW(source.WarpBatch([](VecView<vec3> points) {
+    points[0].x += 1;
+    throw std::runtime_error("warp callback");
+  }),
+               std::runtime_error);
+  EXPECT_TRUE(SameMeshPayload(source.GetMeshGL64(), original));
+  EXPECT_THROW(
+      source.SetProperties(3,
+                           [](double* prop, vec3, const double*) {
+                             prop[0] = 42;
+                             throw std::runtime_error("property callback");
+                           }),
+      std::runtime_error);
+  EXPECT_TRUE(SameMeshPayload(source.GetMeshGL64(), original));
+}
+#endif
+
+#ifndef __EMSCRIPTEN__
+TEST(Manifold, SharedTopologyConcurrentCopies) {
+  const Manifold source = Manifold::Sphere(1, 16).CalculateNormals(0, 180);
+  const MeshGL64 original = source.GetMeshGL64();
+  std::atomic<bool> intact = true;
+  std::vector<std::thread> threads;
+  for (int i = 0; i < 4; ++i) {
+    threads.emplace_back([&] {
+      for (int iteration = 0; iteration < 10; ++iteration) {
+        const Manifold result = source.CalculateNormals(0, 30)
+                                    .Refine(2)
+                                    .Mirror({1, 2, 3})
+                                    .SetProperties(1, nullptr);
+        if (result.Status() != Manifold::Error::NoError ||
+            !SameMeshPayload(source.GetMeshGL64(), original)) {
+          intact = false;
+        }
+      }
+    });
+  }
+  for (auto& thread : threads) thread.join();
+  EXPECT_TRUE(intact);
+  EXPECT_TRUE(SameMeshPayload(source.GetMeshGL64(), original));
+}
+#endif
 
 TEST(Manifold, MeshDeterminism) {
   Manifold cube1 = Manifold::Cube(vec3(2.0, 2.0, 2.0), true);
