@@ -1664,7 +1664,11 @@ TEST(CrossSectionComplex, SweepRequeuedRemaindersExactOutput) {
   // pending edge. Inputs whose crossings are exact rarely reach the cases
   // below; in these, crossings round to points about an ulp apart. The
   // expected output keeps the resulting ulp-scale features, such as the
-  // near-duplicate vertices at (2, 8/3).
+  // near-duplicate vertices at (2, 8/3). The first two cases reach the merge
+  // of equal pending edges but don't depend on it: unmerged, the equal edges
+  // are emitted separately and their multiplicities sum in the output.
+  // SweepOppositeOverlappingRemainders does depend on it. The third case
+  // depends on the sweep erasing an event before processing it.
   struct Case {
     const char* name;
     Polygons input;
