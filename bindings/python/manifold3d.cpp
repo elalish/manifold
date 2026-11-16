@@ -610,7 +610,7 @@ NB_MODULE(manifold3d, m) {
       .def("backside", &MeshGL::Backside, nb::arg("run"))
       .def("has_normals", &MeshGL::HasNormals, nb::arg("run"))
       .def("merge", &MeshGL::Merge, nb::arg("tolerance") = 0.0f,
-           "Merge open-edge vertices within tolerance.");
+           mesh_gl__merge__tolerance);
 
   nb::class_<MeshGL64>(m, "Mesh64")
       .def(
