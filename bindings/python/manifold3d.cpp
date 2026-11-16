@@ -727,7 +727,7 @@ NB_MODULE(manifold3d, m) {
       .def("backside", &MeshGL64::Backside, nb::arg("run"))
       .def("has_normals", &MeshGL64::HasNormals, nb::arg("run"))
       .def("merge", &MeshGL64::Merge, nb::arg("tolerance") = 0.0,
-           "Merge open-edge vertices within tolerance.");
+           mesh_gl__merge__tolerance);
 
   nb::class_<RayHit>(m, "RayHit")
       .def_ro("face_id", &RayHit::faceID)
