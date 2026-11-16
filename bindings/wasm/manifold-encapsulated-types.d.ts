@@ -1092,7 +1092,8 @@ export class Manifold {
   surfaceArea(): number;
 
   /**
-   * Returns the volume of the manifold.
+   * Returns the volume of the manifold. Negative volume is considered a class
+   * of overlapped geometry and should be avoided as much as self-intersection.
    *
    * @group Measurement
    */
@@ -1119,9 +1120,9 @@ export class Manifold {
 
   /**
    * Returns the winding number of this manifold around each of the given
-   * points. Returns 0 for points outside and a non-zero value (typically ±1)
-   * for points inside a simple closed surface. May exceed ±1 in magnitude for
-   * manifolds with overlapping regions.
+   * points. Returns 0 for points outside and 1 for points
+   * inside a non-overlapped manifold. Any other values indicate overlapping
+   * regions, e.g. -1 for inverted regions, 2 for double-enclosed regions.
    *
    * @param points The 3D query points.
    *

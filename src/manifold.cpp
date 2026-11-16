@@ -325,7 +325,7 @@ MeshGL64 Manifold::GetMeshGL64(int normalIdx) const {
 bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
 /**
  * Returns the reason for an input Mesh producing an empty Manifold. This Status
- * will carry on through operations like NaN propogation, ensuring an errored
+ * will carry on through operations like NaN propagation, ensuring an errored
  * mesh doesn't get mysteriously lost. Empty meshes may still show
  * NoError, for instance the intersection of non-overlapping meshes.
  */
@@ -433,7 +433,8 @@ double Manifold::SurfaceArea() const {
 }
 
 /**
- * Returns the volume of the manifold.
+ * Returns the volume of the manifold. Negative volume is considered a class of
+ * overlapped geometry and should be avoided as much as self-intersection.
  */
 double Manifold::Volume() const {
   return GetCsgLeafNode().GetImpl()->GetProperty(Impl::Property::Volume);
@@ -1159,9 +1160,9 @@ std::vector<RayHit> Manifold::RayCast(vec3 origin, vec3 endpoint) const {
 
 /**
  * Returns the winding number of this manifold around each of the given points.
- * Returns 0 for points outside, and a non-zero value (typically ±1) for points
- * inside a simple closed surface. For manifolds with overlapping regions the
- * magnitude may exceed 1.
+ * Returns 0 for points outside, and 1 for points
+ * inside a non-overlapped manifold. Any other values indicate overlapping
+ * regions, e.g. -1 for inverted regions, 2 for double-enclosed regions.
  *
  * @param points The 3D query points.
  */
