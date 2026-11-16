@@ -536,11 +536,12 @@ void Manifold::Impl::Warp(std::function<void(vec3&)> warpFunc) {
 
 void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   warpFunc(vertPos_.view());
-  CalculateBBox();
+  // CalculateBBox can discard vertices when the bounds are non-finite.
   if (!IsFinite()) {
     MakeEmpty(Error::NonFiniteVertex);
     return;
   }
+  CalculateBBox();
   SortGeometry();
   SetFaceAndVertNormals();
   meshRelation_.originalID = -1;
