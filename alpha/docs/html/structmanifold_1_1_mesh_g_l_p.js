@@ -3,7 +3,7 @@ var structmanifold_1_1_mesh_g_l_p =
     [ "NumVert", "structmanifold_1_1_mesh_g_l_p.html#abe8f3e86d9e52e570b74cba17026579c", null ],
     [ "NumTri", "structmanifold_1_1_mesh_g_l_p.html#a8458191a8d6a8f4faeca38353a034826", null ],
     [ "NumRun", "structmanifold_1_1_mesh_g_l_p.html#a36b548c8ff4c27089ea7a40b9c94b6ec", null ],
-    [ "Merge", "structmanifold_1_1_mesh_g_l_p.html#a2078d075bef279041b67769e4197c254", null ],
+    [ "Merge", "structmanifold_1_1_mesh_g_l_p.html#a2f53477408ad67a6f9f607fcd282f693", null ],
     [ "GetVertPos", "structmanifold_1_1_mesh_g_l_p.html#ad7bfcdc27db8d7486f016bf63052625d", null ],
     [ "GetTriVerts", "structmanifold_1_1_mesh_g_l_p.html#a0d413b0c710e37a4e5a9fbaebe74b93f", null ],
     [ "GetTangent", "structmanifold_1_1_mesh_g_l_p.html#ab2842d78e1ce13e2e1228d91b1c9dcfb", null ],
@@ -20,6 +20,5 @@ var structmanifold_1_1_mesh_g_l_p =
     [ "runTransform", "structmanifold_1_1_mesh_g_l_p.html#a4a2f4e21de0e8026daf67353dfd3458b", null ],
     [ "runFlags", "structmanifold_1_1_mesh_g_l_p.html#a4bce13a5930d514634403ea7b105d370", null ],
     [ "faceID", "structmanifold_1_1_mesh_g_l_p.html#ad1ba52e9b88c6ad61e719a7ae1b0f66b", null ],
-    [ "halfedgeTangent", "structmanifold_1_1_mesh_g_l_p.html#a987ae155e6c5981adb174a4898bfdfab", null ],
-    [ "tolerance", "structmanifold_1_1_mesh_g_l_p.html#ab47a93bffcbb73ec3769de2cc6c695f2", null ]
+    [ "halfedgeTangent", "structmanifold_1_1_mesh_g_l_p.html#a987ae155e6c5981adb174a4898bfdfab", null ]
 ];

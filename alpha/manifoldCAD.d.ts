@@ -1601,9 +1601,8 @@ export declare class Mesh {
     /**
      * Optional: Length NumTri, contains the source face ID this triangle comes
      * from. Simplification will maintain all edges between triangles with
-     * different faceIDs. Input faceIDs will be maintained to the outputs, but if
-     * none are given, they will be filled in with Manifold's coplanar face
-     * calculation based on mesh tolerance.
+     * different faceIDs. Input faceIDs will be maintained to the outputs,
+     * otherwise this vector will be empty.
      */
     faceID: Uint32Array;
 
@@ -1614,14 +1613,6 @@ export declare class Mesh {
      * Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
      */
     halfedgeTangent: Float32Array;
-
-    /**
-     * Tolerance for mesh simplification. When creating a Manifold, the tolerance
-     * used will be the maximum of this and a baseline tolerance from the size of
-     * the bounding box. Any edge shorter than tolerance may be collapsed.
-     * Tolerance may be enlarged when floating point error accumulates.
-     */
-    tolerance: number;
 
     /**
      * Number of triangles
@@ -1643,7 +1634,7 @@ export declare class Mesh {
      * Updates the mergeFromVert and mergeToVert vectors in order to create a
      * manifold solid. If the MeshGL is already manifold, no change will occur and
      * the function will return false. Otherwise, this will merge verts along open
-     * edges within tolerance (the maximum of the MeshGL tolerance and the
+     * edges within tolerance (the maximum of the specified tolerance and the
      * baseline bounding-box tolerance), keeping any from the existing merge
      * vectors.
      *
@@ -1652,8 +1643,10 @@ export declare class Mesh {
      * multi-material MeshGL was produced, but its merge vectors were lost due to
      * a round-trip through a file format. Constructing a Manifold from the result
      * will report a Status if it is not manifold.
+     *
+     * @param tolerance Default 0, with a bounding-box and precision-based floor.
      */
-    merge(): boolean;
+    merge(tolerance?: number): boolean;
 
     /**
      * Gets the three vertex indices of this triangle in CCW order.
@@ -1735,7 +1728,6 @@ export declare interface MeshOptions {
     runTransform?: Float32Array;
     faceID?: Uint32Array;
     halfedgeTangent?: Float32Array;
-    tolerance?: number;
 }
 
 /**

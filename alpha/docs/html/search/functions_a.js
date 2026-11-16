@@ -4,7 +4,7 @@ var searchData=
   ['manifoldparams_1',['ManifoldParams',['../group___debug.html#ga4a00dd8e8dff2c4f8a9105d1a5558275',1,'manifold']]],
   ['matchestrinormals_2',['MatchesTriNormals',['../classmanifold_1_1_manifold.html#a611a5fd95dc5d49cd88182b8ead722b7',1,'manifold::Manifold']]],
   ['mengersponge_3',['MengerSponge',['../group___samples.html#ga31bc13b03579ca41da7ae9b5ba171fae',1,'manifold']]],
-  ['merge_4',['Merge',['../structmanifold_1_1_mesh_g_l_p.html#a2078d075bef279041b67769e4197c254',1,'manifold::MeshGLP']]],
+  ['merge_4',['Merge',['../structmanifold_1_1_mesh_g_l_p.html#a2f53477408ad67a6f9f607fcd282f693',1,'manifold::MeshGLP']]],
   ['mingap_5',['MinGap',['../classmanifold_1_1_manifold.html#a1b7ab47f4da039eb3dff5b46ba71658b',1,'manifold::Manifold']]],
   ['minkowskidifference_6',['MinkowskiDifference',['../classmanifold_1_1_manifold.html#a47715067c292eeaafdc48aab3a604829',1,'manifold::Manifold']]],
   ['minkowskisum_7',['MinkowskiSum',['../classmanifold_1_1_manifold.html#ae174a8240802779eca5a0416af7ea78b',1,'manifold::Manifold']]],
