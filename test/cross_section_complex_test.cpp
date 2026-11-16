@@ -1845,3 +1845,62 @@ TEST(CrossSectionComplex, OffsetMiterWavyRing) {
     }
   }
 }
+
+TEST(CrossSectionComplex, DifferenceManyContoursFewCrossings) {
+  // Timed: 1600 small rings minus 16 large circles. Few edges cross, so this
+  // measures the cost per edge rather than per crossing.
+  constexpr int side = 40;
+  constexpr int segments = 32;
+  constexpr double ringRadius = 0.4;
+  constexpr double holeRadius = 2.5;
+  Polygons rings;
+  for (int y = 0; y < side; ++y) {
+    for (int x = 0; x < side; ++x) {
+      SimplePolygon ring;
+      for (int k = 0; k < segments; ++k) {
+        const double a = 2 * kPi * k / segments;
+        ring.push_back(
+            {x + ringRadius * std::cos(a), y + ringRadius * std::sin(a)});
+      }
+      rings.push_back(ring);
+    }
+  }
+  std::vector<CrossSection> operands = {CrossSection(rings)};
+  std::vector<vec2> holeCenters;
+  for (int j = 0; j < 4; ++j) {
+    for (int i = 0; i < 4; ++i) {
+      holeCenters.push_back({5.3 + 10 * i, 5.3 + 10 * j});
+      operands.push_back(CrossSection::Circle(holeRadius, segments)
+                             .Translate(holeCenters.back()));
+    }
+  }
+  // A ring inside a hole's inscribed circle is removed. Any other ring that
+  // reaches inside the hole's circumscribed circle may be cut; counting those
+  // bounds the area from below.
+  const double inscribed = holeRadius * std::cos(kPi / segments);
+  int removed = 0, cut = 0;
+  for (int y = 0; y < side; ++y) {
+    for (int x = 0; x < side; ++x) {
+      for (const vec2& c : holeCenters) {
+        const double d = la::length(vec2(x, y) - c);
+        if (d + ringRadius <= inscribed) {
+          ++removed;
+        } else if (d - ringRadius < holeRadius) {
+          ++cut;
+        }
+      }
+    }
+  }
+  const double ringArea =
+      segments * ringRadius * ringRadius * std::sin(2 * kPi / segments) / 2;
+  const double maxArea = (side * side - removed) * ringArea;
+  for (int i = 0; i < 2; ++i) {
+    const auto result = CrossSection::BatchBoolean(operands, OpType::Subtract);
+    ASSERT_EQ(result.NumContour(), side * side - removed);
+    if (i == 0) {
+      EXPECT_LE(result.Area(), maxArea + 1e-9);
+      EXPECT_GE(result.Area(), maxArea - cut * ringArea);
+      EXPECT_GT(cut, 0);
+    }
+  }
+}
