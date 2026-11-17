@@ -467,6 +467,21 @@ TEST(Manifold, NormalsNonStandardSlotNotRecorded) {
   EXPECT_FALSE(mesh.HasNormals(0));
 }
 
+TEST(Manifold, NormalsDroppedWithChannels) {
+  // With fewer than three properties left, the recorded normals no longer
+  // exist, so export must not write them into the next vertex.
+  const Manifold m = (Manifold::Cube(vec3(2), true) + Manifold::Sphere(5, 8))
+                         .CalculateNormals(0)
+                         .SetProperties(1, nullptr);
+  const MeshGL64 mesh = m.GetMeshGL64();
+  ASSERT_EQ(mesh.numProp, 4);
+  for (size_t run = 0; run < mesh.runOriginalID.size(); ++run)
+    EXPECT_FALSE(mesh.HasNormals(run));
+  for (size_t v = 0; v < mesh.NumVert(); ++v)
+    EXPECT_EQ(mesh.vertProperties[4 * v + 3], 0) << v;
+  EXPECT_NEAR(Manifold(mesh).Volume(), m.Volume(), 1e-9);
+}
+
 TEST(Manifold, NormalsSharedPropVertMixedFlagsUndefined) {
   // hasNormals is per-run, but a single propVert holds one slot 0..2
   // value. If a hand-built MeshGL shares a propVert between a
@@ -869,6 +884,41 @@ TEST(Manifold, CircularSegmentsWhileReset) {
   EXPECT_EQ(wrong.load(), 0);
 }
 #endif
+
+TEST(Manifold, CircularSegmentsTinyAngle) {
+  // 360 / angle doesn't fit in an int here, so the edge length should decide.
+  Quality::SetMinCircularAngle(1e-9);
+  const int small = Quality::GetCircularSegments(1.0);
+  const int large = Quality::GetCircularSegments(100.0);
+  const int huge = Quality::GetCircularSegments(1e300);
+  Quality::ResetToDefaults();
+  Quality::SetMinCircularAngle(NAN);
+  Quality::SetMinCircularEdgeLength(NAN);
+  const int nan = Quality::GetCircularSegments(1.0);
+  Quality::ResetToDefaults();
+  EXPECT_EQ(nan, 8);
+  EXPECT_EQ(small, 8);
+  EXPECT_EQ(large, 628);
+  EXPECT_GT(huge, 1000000);
+}
+
+TEST(Manifold, AssignToMovedFrom) {
+  Manifold a = Manifold::Cube();
+  const Manifold b = std::move(a);
+  a = b;
+  EXPECT_EQ(a.Volume(), 1);
+
+  Manifold c = Manifold::Cube();
+  const Manifold d = std::move(c);
+  Manifold e(c);
+  e = d;
+  EXPECT_EQ(e.Volume(), 1);
+
+  Manifold f = Manifold::Sphere(1);
+  f = c;
+  f = d;
+  EXPECT_EQ(f.Volume(), 1);
+}
 
 TEST(Manifold, Cylinder) {
   int n = 10000;

@@ -83,7 +83,7 @@ double Quality::GetRelativePrecision() { return relativePrecision_; }
  * Default is 10 degrees.
  */
 void Quality::SetMinCircularAngle(double angle) {
-  if (angle <= 0) return;
+  if (!(angle > 0)) return;  // also rejects NaN
   circularAngle_ = angle;
 }
 
@@ -97,7 +97,7 @@ void Quality::SetMinCircularAngle(double angle) {
  * increase if the the segments hit the minimum angle. Default is 1.0.
  */
 void Quality::SetMinCircularEdgeLength(double length) {
-  if (length <= 0) return;
+  if (!(length > 0)) return;  // also rejects NaN
   circularEdgeLength_ = length;
 }
 
@@ -125,11 +125,12 @@ void Quality::SetCircularSegments(int number) {
 int Quality::GetCircularSegments(double radius) {
   const int segments = circularSegments_;
   if (segments > 0) return segments;
-  int nSegA = 360.0 / circularAngle_;
-  // Keep nSegL a double so the truncating cast happens after fmin bounds it by
-  // nSegA; a raw int cast is undefined for non-finite or huge radius.
-  double nSegL = 2.0 * std::abs(radius) * kPi / circularEdgeLength_;
-  int nSeg = fmin(nSegA, nSegL) + 3;
+  // Clamp in double before the truncating cast, which is undefined for a
+  // non-finite or huge radius, or a tiny angle.
+  const double nSegA = 360.0 / circularAngle_;
+  const double nSegL = 2.0 * std::abs(radius) * kPi / circularEdgeLength_;
+  const double kMaxSeg = std::numeric_limits<int>::max() - 3;
+  int nSeg = std::min(fmin(nSegA, nSegL), kMaxSeg) + 3;
   nSeg -= nSeg % 4;
   return std::max(nSeg, 4);
 }
@@ -155,7 +156,10 @@ Manifold::~Manifold() = default;
 Manifold::Manifold(Manifold&&) noexcept = default;
 Manifold& Manifold::operator=(Manifold&&) noexcept = default;
 
+// The defaulted move ops leave the source without a mutex, so the copy ops
+// below must handle a moved-from Manifold on either side.
 Manifold::Manifold(const Manifold& other) {
+  if (!other.pNodeMutex_) return;
   std::lock_guard<std::mutex> lock(*other.pNodeMutex_);
   pNode_ = other.pNode_;
   AtomicStoreShared(&ctx_, AtomicLoadShared(&other.ctx_));
@@ -184,6 +188,8 @@ Manifold Manifold::FromImpl(std::shared_ptr<Impl> pImpl) {
 
 Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
+    if (!other.pNodeMutex_) return *this = Manifold(other);
+    if (!pNodeMutex_) pNodeMutex_ = std::make_shared<std::mutex>();
     std::scoped_lock lock(*pNodeMutex_, *other.pNodeMutex_);
     pNode_ = other.pNode_;
     AtomicStoreShared(&ctx_, AtomicLoadShared(&other.ctx_));
@@ -655,9 +661,10 @@ Manifold Manifold::WarpBatch(
  *
  * If propFunc is a nullptr, this function will just set the channel to zeroes.
  *
- * Any normals recording set by `CalculateNormals()` is preserved. If the new
- * properties overwrite slot 0..2 with non-normal data, the recording becomes
- * stale; re-call `CalculateNormals()` (or use a numProp < 3 call followed by
+ * Any normals recording set by `CalculateNormals()` is preserved if numProp is
+ * at least 3, and dropped otherwise. If the new properties overwrite slot 0..2
+ * with non-normal data, the recording becomes stale; re-call
+ * `CalculateNormals()` (or use a numProp < 3 call followed by
  * CalculateNormals) to reset.
  *
  * @param numProp The new number of properties per vertex.
@@ -696,6 +703,12 @@ Manifold Manifold::SetProperties(
   }
 
   pImpl->numProp_ = numProp;
+  // Normals need slots 0..2, so with fewer channels the recording is dropped.
+  if (numProp < 3) {
+    for (auto& m : pImpl->meshRelation_.meshIDtransform) {
+      m.second.hasNormals = false;
+    }
+  }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
