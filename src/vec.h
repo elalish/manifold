@@ -91,11 +91,7 @@ class Vec : public VecView<T> {
       // Share storage just like copy assignment. MakeUnique() detaches before
       // mutation; copying into an unshared Vec still needs its own buffer.
       count_ = nullptr;
-      if (vec.count_ != nullptr) {
-        *this = vec;
-      } else {
-        *this = Vec(vec.view());
-      }
+      *this = vec;
     } else {
       *this = Vec(vec.view());
     }
@@ -148,6 +144,10 @@ class Vec : public VecView<T> {
   Vec& operator=(const Vec& other) {
     ZoneScopedN("Vec operator=(other)");
     if (&other == this) return *this;
+    if constexpr (shared) {
+      // A moved-from SharedVec has no reference counter.
+      if (other.count_ == nullptr) return *this = Vec();
+    }
     dealloc();
     if constexpr (shared) {
       other.count_->fetch_add(1);

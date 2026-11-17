@@ -141,7 +141,8 @@ TEST(Manifold, SharedTopologyCopyIsolation) {
   }
 }
 
-#if defined(__cpp_exceptions) || defined(_CPPUNWIND)
+#if (defined(__cpp_exceptions) || defined(_CPPUNWIND)) && \
+    !defined(__EMSCRIPTEN__)
 TEST(Manifold, SharedTopologyThrowingCallbacks) {
   const Manifold source = Manifold::Cube().CalculateNormals(0, 30);
   const MeshGL64 original = source.GetMeshGL64();

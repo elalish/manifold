@@ -73,6 +73,52 @@ TEST(Utils, SharedVecCopyConstructionAndDetach) {
   EXPECT_EQ(sharedMove[0], 7);
 }
 
+TEST(Utils, SharedVecCopyAssignmentFromMovedFrom) {
+  const int values[] = {2, 3, 5};
+  SharedVec<int> source(VecView<const int>(values, 3));
+  const SharedVec<int> owner(std::move(source));
+  const int* const originalData = owner.data();
+
+  const auto assignAndReuse = [&](SharedVec<int> destination) {
+    EXPECT_EQ(&(destination = source), &destination);
+    EXPECT_TRUE(destination.empty());
+    EXPECT_EQ(destination.capacity(), 0);
+    EXPECT_EQ(destination.data(), nullptr);
+    destination.MakeUnique();
+    destination.push_back(7);
+
+    SharedVec<int> copy(destination);
+    copy.MakeUnique();
+    copy[0] = 11;
+    EXPECT_EQ(destination.size(), 1);
+    EXPECT_EQ(destination[0], 7);
+    EXPECT_EQ(copy[0], 11);
+    EXPECT_TRUE(source.empty());
+    EXPECT_EQ(owner.data(), originalData);
+    ASSERT_EQ(owner.size(), 3);
+    for (size_t i = 0; i < owner.size(); ++i) EXPECT_EQ(owner[i], values[i]);
+  };
+
+  {
+    SCOPED_TRACE("empty destination");
+    assignAndReuse(SharedVec<int>());
+  }
+  {
+    SCOPED_TRACE("unique nonempty destination");
+    assignAndReuse(SharedVec<int>(2, 17));
+  }
+  {
+    SCOPED_TRACE("shared nonempty destination");
+    assignAndReuse(owner);
+  }
+
+  source = owner;
+  EXPECT_EQ(source.data(), owner.data());
+  source.MakeUnique();
+  source[0] = 13;
+  EXPECT_EQ(owner[0], 2);
+}
+
 #ifndef __EMSCRIPTEN__
 TEST(Utils, SharedVecConcurrentCopyAndDetach) {
   const SharedVec<int> source(128, 23);
