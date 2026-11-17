@@ -899,9 +899,10 @@ TEST(Boolean, ConvexNonConvexMinkowskiDifference) {
     EXPECT_TRUE(cutter.MinkowskiDifference(cube).IsEmpty());
     // A cutter whose boundary surrounds A must still remove all of A.
     for (const vec3 offset : {vec3(0.0), vec3(-7, 4, 2)}) {
-      const Manifold small = Manifold::Cube(vec3(1.0), true).Translate(offset);
+      const Manifold smallCube =
+          Manifold::Cube(vec3(1.0), true).Translate(offset);
       const Manifold removed =
-          small.MinkowskiDifference(cutter.Scale(vec3(3.0)));
+          smallCube.MinkowskiDifference(cutter.Scale(vec3(3.0)));
       ASSERT_EQ(removed.Status(), Manifold::Error::NoError);
       EXPECT_TRUE(removed.IsEmpty());
     }
