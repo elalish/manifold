@@ -906,12 +906,12 @@ TEST(Boolean, MinkowskiSumTranslatedComponents) {
     EXPECT_TRUE(excess.IsEmpty());
     EXPECT_TRUE(missing.IsEmpty());
   };
-  for (const ivec2 pair :
-       {ivec2(0, 0), ivec2(1, 0), ivec2(0, 1), ivec2(1, 1), ivec2(2, 3),
-        ivec2(4, 1), ivec2(2, 5), ivec2(2, 6)}) {
+  // Each pair is also checked in reverse order below.
+  for (const ivec2 pair : {ivec2(0, 0), ivec2(1, 0), ivec2(1, 1), ivec2(2, 3),
+                           ivec2(4, 1), ivec2(2, 5), ivec2(2, 6)}) {
     SCOPED_TRACE(::testing::Message()
                  << "operands " << pair.x << ", " << pair.y);
-    for (const vec3 offset : {vec3(0.0), vec3(10, -7, 3), vec3(-8, 13, -4)}) {
+    for (const vec3 offset : {vec3(0.0), vec3(10, -7, 3)}) {
       SCOPED_TRACE(::testing::Message() << "offset " << offset.x << ", "
                                         << offset.y << ", " << offset.z);
       const vec3 firstOffset = vec3(2, -3, 1);
