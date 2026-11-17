@@ -189,6 +189,36 @@ TEST(Manifold, SharedTopologyConcurrentCopies) {
 }
 #endif
 
+TEST(Manifold, WarpNonFiniteResults) {
+  const Manifold cube = Manifold::Cube();
+  const double inf = std::numeric_limits<double>::infinity();
+  for (const double value :
+       {inf, -inf, std::numeric_limits<double>::quiet_NaN()}) {
+    for (int axis : {0, 1, 2}) {
+      SCOPED_TRACE(testing::Message()
+                   << "value " << value << ", axis " << axis);
+      const Manifold warped = cube.Warp([=](vec3& p) { p[axis] = value; });
+      EXPECT_EQ(warped.Status(), Manifold::Error::NonFiniteVertex);
+      for (bool all : {false, true}) {
+        SCOPED_TRACE(all);
+        const Manifold batch = cube.WarpBatch([=](VecView<vec3> points) {
+          for (size_t i = 0; i < (all ? points.size() : 1); ++i)
+            points[i][axis] = value;
+        });
+        EXPECT_EQ(batch.Status(), Manifold::Error::NonFiniteVertex);
+      }
+    }
+  }
+  const Manifold finite = cube.Warp([](vec3& p) { p *= 2.0; });
+  EXPECT_EQ(finite.Status(), Manifold::Error::NoError);
+  EXPECT_NEAR(finite.Volume(), 8, 1e-12);
+  EXPECT_EQ(cube.Status(), Manifold::Error::NoError);
+  EXPECT_NEAR(cube.Volume(), 1, 1e-12);
+  const Manifold empty = Manifold().WarpBatch([](VecView<vec3>) {});
+  EXPECT_TRUE(empty.IsEmpty());
+  EXPECT_EQ(empty.Status(), Manifold::Error::NoError);
+}
+
 TEST(Manifold, MeshDeterminism) {
   Manifold cube1 = Manifold::Cube(vec3(2.0, 2.0, 2.0), true);
   Manifold cube2 = Manifold::Cube(vec3(2.0, 2.0, 2.0), true)

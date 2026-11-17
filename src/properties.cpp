@@ -44,26 +44,31 @@ struct CurvatureAngles {
       edge[i] = vertPos[endVert] - vertPos[startVert];
       edgeLength[i] = la::length(edge[i]);
       edge[i] /= edgeLength[i];
-      const int neighborTri = halfedge.Pair(edgeIdx) / 3;
-      const double dihedral =
-          0.25 * edgeLength[i] *
-          math::asin(la::dot(la::cross(triNormal[tri], triNormal[neighborTri]),
-                             edge[i]));
-      AtomicAdd(meanCurvature[startVert], dihedral);
-      AtomicAdd(meanCurvature[endVert], dihedral);
+      if (!meanCurvature.empty()) {
+        const int neighborTri = halfedge.Pair(edgeIdx) / 3;
+        const double dihedral =
+            0.25 * edgeLength[i] *
+            math::asin(la::dot(
+                la::cross(triNormal[tri], triNormal[neighborTri]), edge[i]));
+        AtomicAdd(meanCurvature[startVert], dihedral);
+        AtomicAdd(meanCurvature[endVert], dihedral);
+      }
       AtomicAdd(degree[startVert], 1.0);
     }
 
     vec3 phi;
-    phi[0] = math::acos(-la::dot(edge[2], edge[0]));
-    phi[1] = math::acos(-la::dot(edge[0], edge[1]));
-    phi[2] = kPi - phi[0] - phi[1];
+    if (!gaussianCurvature.empty()) {
+      phi[0] = math::acos(-la::dot(edge[2], edge[0]));
+      phi[1] = math::acos(-la::dot(edge[0], edge[1]));
+      phi[2] = kPi - phi[0] - phi[1];
+    }
     const double area3 = edgeLength[0] * edgeLength[1] *
                          la::length(la::cross(edge[0], edge[1])) / 6;
 
     for (int i : {0, 1, 2}) {
       const int vert = halfedge.Start(3 * tri + i);
-      AtomicAdd(gaussianCurvature[vert], -phi[i]);
+      if (!gaussianCurvature.empty())
+        AtomicAdd(gaussianCurvature[vert], -phi[i]);
       AtomicAdd(area[vert], area3);
     }
   }
@@ -332,8 +337,8 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   ZoneScoped;
   if (IsEmpty()) return;
   if (gaussianIdx < 0 && meanIdx < 0) return;
-  Vec<double> vertMeanCurvature(NumVert(), 0);
-  Vec<double> vertGaussianCurvature(NumVert(), kTwoPi);
+  Vec<double> vertMeanCurvature(meanIdx >= 0 ? NumVert() : 0, 0);
+  Vec<double> vertGaussianCurvature(gaussianIdx >= 0 ? NumVert() : 0, kTwoPi);
   Vec<double> vertArea(NumVert(), 0);
   Vec<double> degree(NumVert(), 0);
   auto policy = autoPolicy(NumTri(), 1e4);
@@ -344,8 +349,10 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
              [&vertMeanCurvature, &vertGaussianCurvature, &vertArea,
               &degree](const int vert) {
                const double factor = degree[vert] / (6 * vertArea[vert]);
-               vertMeanCurvature[vert] *= factor;
-               vertGaussianCurvature[vert] *= factor;
+               if (!vertMeanCurvature.empty())
+                 vertMeanCurvature[vert] *= factor;
+               if (!vertGaussianCurvature.empty())
+                 vertGaussianCurvature[vert] *= factor;
              });
 
   const int oldNumProp = NumProp();
