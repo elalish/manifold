@@ -382,8 +382,8 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
     prop2vert.resize(numVert);
     std::iota(prop2vert.begin(), prop2vert.end(), 0);
     for (size_t i = 0; i < meshGL.mergeFromVert.size(); ++i) {
-      const uint32_t from = meshGL.mergeFromVert[i];
-      const uint32_t to = meshGL.mergeToVert[i];
+      const auto from = meshGL.mergeFromVert[i];
+      const auto to = meshGL.mergeToVert[i];
       if (from >= numVert || to >= numVert) {
         MakeEmpty(Error::MergeIndexOutOfBounds);
         return;
@@ -478,7 +478,7 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   for (size_t i = 0; i < numTri; ++i) {
     ivec3 triP, triV;
     for (const size_t j : {0, 1, 2}) {
-      uint32_t vert = (uint32_t)meshGL.triVerts[3 * i + j];
+      const auto vert = meshGL.triVerts[3 * i + j];
       if (vert >= numVert) {
         MakeEmpty(Error::VertexOutOfBounds);
         return;
