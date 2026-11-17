@@ -197,6 +197,17 @@ TEST(Triangulation, ShortContours) {
   EXPECT_EQ(Triangulate({square, {{2, 2}}}).size(), 2);
 }
 
+// Benchmark: triangulate one large, smooth, non-convex contour, like a finely
+// sampled curve. Triangulation time should grow nearly linearly with the
+// vertex count.
+TEST(Triangulation, LargeSmoothContour) {
+  const int numVert = 20000;
+  const Polygons polys = SmoothBlob(numVert);
+  std::vector<ivec3> triangles;
+  EXPECT_NO_THROW(triangles = Triangulate(polys));
+  EXPECT_EQ(triangles.size(), numVert - 2);
+}
+
 #ifndef MANIFOLD_NO_IOSTREAM
 void RegisterPolygonTests() {
   std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",

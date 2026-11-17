@@ -640,6 +640,24 @@ TEST(Boolean, Perturb3) {
   }
 }
 
+// Benchmark: intersect two solids with large faces triangulated from finely
+// sampled contours. Each extrusion's caps are single smooth polygons, and each
+// solid's caps cut through the other's walls, so the broadphase work depends
+// on how the triangulator splits the caps.
+TEST(Boolean, SmoothExtrusionCrossing) {
+  const int numVert = 5000;
+  const Polygons blob = SmoothBlob(numVert);
+  const Manifold slab = Manifold::Extrude(blob, 2).Translate({0, 0, -1});
+  const Manifold crossed = slab.Rotate(90, 0, 0);
+  const Manifold result = slab ^ crossed;
+
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(result.Genus(), 0);
+  // The intersection is close to a 2 x 2 bar spanning the blob along x.
+  const double width = blob[0][0].x - blob[0][numVert / 2].x;
+  EXPECT_NEAR(result.Volume(), 4 * width, 0.05 * width);
+}
+
 TEST(Boolean, Coplanar) {
   Manifold cylinder =
       WithPositionColors(Manifold::Cylinder(1.0, 1.0).AsOriginal());

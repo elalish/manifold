@@ -138,6 +138,22 @@ Polygons SquareHole(double xOffset) {
   return polys;
 }
 
+// A finely sampled, smooth, slightly non-convex contour: a circle with a few
+// small Fourier perturbations, so Triangulate can't use its convex fast path.
+Polygons SmoothBlob(int numVert, double radius) {
+  const int freq[] = {3, 5, 7, 11, 13};
+  Polygons polys(1);
+  polys[0].reserve(numVert);
+  for (int i = 0; i < numVert; ++i) {
+    const double angle = kTwoPi * i / numVert;
+    double r = radius;
+    for (int j = 0; j < 5; ++j)
+      r += 0.02 * radius * std::sin(freq[j] * angle + j);
+    polys[0].push_back({r * std::cos(angle), r * std::sin(angle)});
+  }
+  return polys;
+}
+
 MeshGL Csaszar() {
   MeshGL csaszar;
   csaszar.numProp = 3;
