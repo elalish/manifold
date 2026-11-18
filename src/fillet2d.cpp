@@ -1118,8 +1118,21 @@ bool TripleCut(const FilletInput& input, int c, int a, int b, double radius) {
     // balls at the vertex (EndValue), which this ball lies between.
     double within = std::numeric_limits<double>::quiet_NaN();
     LineVertexBalls(input, z, input.runLast[meet ? x : y], radius, &within);
-    if (!std::isnan(within))
-      beyond = radius * (1 + dot(nz, nx + ny) / (1 + dot(nx, ny))) - within;
+    if (!std::isnan(within)) {
+      // dist(ball, z) - r = r (1 + n_z . (n_x + n_y) / (1 + n_x . n_y)) -
+      // within, and the bracket is (n_z + n_w) . (n_x + n_y) / (1 + n_x .
+      // n_y) for w either of x and y. With w the one z faces, n_z + n_w is
+      // the small vector that line's own ball at the vertex is measured by,
+      // and a corner next to a channel reads the channel's width as the
+      // edge along it does.
+      // Split once more as |n_z + n_w|^2 + (n_z + n_w) . (n_o - n_w), o
+      // the other of the two: the square is what w's own ball is measured
+      // by and is never negative, and the rest is a product of two small
+      // vectors where the edges hardly turn.
+      const vec2 u = nz + nw;
+      const vec2 turn = (w == x ? ny : nx) - nw;
+      beyond = radius * (dot(u, u) + dot(u, turn)) / (1 + dot(nx, ny)) - within;
+    }
     g = -LineCross(input, x, y) * beyond;
   } else {
     g = dot(nx, ny) < 0
