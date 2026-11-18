@@ -1,0 +1,55 @@
+{
+  "source_commit": "674cb6939607240fbb4db7d14e97d652937bc01e",
+  "arguments": {
+    "binary": "/home/dmal_gradstudent_myt/Project/manifold/build/fillet-benchmark/fillet_stress",
+    "root": "/home/dmal_gradstudent_myt/Project/manifold",
+    "output": "extras/fillet_benchmark/results/stress_674cb693_updated/deep",
+    "seconds": 900,
+    "seeds": 1024,
+    "transforms": 60,
+    "workers": 8,
+    "cases": [
+      "Comb",
+      "Concave2",
+      "KissingZigzag",
+      "Slit",
+      "Sponge",
+      "Sponge3",
+      "Sponge4",
+      "SpongeThin",
+      "SquareHoles",
+      "TShape",
+      "TouchingHole2",
+      "Ugly"
+    ],
+    "segments": [
+      20
+    ],
+    "strict": true
+  },
+  "case_count": 12,
+  "planned_jobs": 768,
+  "factors": [
+    -0.5,
+    -1,
+    -2,
+    -5,
+    -10,
+    -20,
+    -50,
+    -100,
+    0.1,
+    0.3,
+    0.5,
+    0.7,
+    0.9
+  ],
+  "build": "Release, sequential, assertions/debug off",
+  "completed_jobs": 768,
+  "wall_seconds": 464.08275494910777,
+  "deadline_reached": false,
+  "source_worktree_sha256": "537d3df2e81907696c21a5398e2b363105cf150625d319c46d36212335df2e12",
+  "source_has_uncommitted_changes": true,
+  "source_snapshot": "../fillet2d_snapshot.cpp",
+  "source_diff": "../worktree.patch"
+}

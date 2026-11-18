@@ -1,0 +1,45 @@
+{
+  "source_commit": "674cb6939607240fbb4db7d14e97d652937bc01e",
+  "arguments": {
+    "binary": "/home/dmal_gradstudent_myt/Project/manifold/build/fillet-benchmark/fillet_stress",
+    "root": "/home/dmal_gradstudent_myt/Project/manifold",
+    "output": "extras/fillet_benchmark/results/stress_674cb693_updated/broad",
+    "seconds": 900,
+    "seeds": 256,
+    "transforms": 8,
+    "workers": 8,
+    "cases": null,
+    "segments": [
+      20,
+      8,
+      32,
+      64
+    ],
+    "strict": false
+  },
+  "case_count": 118,
+  "planned_jobs": 3256,
+  "factors": [
+    -0.5,
+    -1,
+    -2,
+    -5,
+    -10,
+    -20,
+    -50,
+    -100,
+    0.1,
+    0.3,
+    0.5,
+    0.7,
+    0.9
+  ],
+  "build": "Release, sequential, assertions/debug off",
+  "completed_jobs": 3256,
+  "wall_seconds": 300.66006301157176,
+  "deadline_reached": false,
+  "source_worktree_sha256": "537d3df2e81907696c21a5398e2b363105cf150625d319c46d36212335df2e12",
+  "source_has_uncommitted_changes": true,
+  "source_snapshot": "../fillet2d_snapshot.cpp",
+  "source_diff": "../worktree.patch"
+}
