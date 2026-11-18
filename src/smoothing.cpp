@@ -432,6 +432,33 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
                halfedge_.SetProp(i, -1);
              });
 
+  // An old property vertex may recur after a property seam, including in a
+  // different normal group. Track its latest group and output row instead of
+  // relying on adjacent halfedges. Groups are visited consecutively, so this
+  // gives one row per (old property, normal group) in linear time.
+  Vec<ivec2> propNormalGroup(NumPropVert(), ivec2(-1));
+  int nextNormalGroup = 0;
+  auto setNormal = [&](int prop, int group, vec3 normal) {
+    ivec2& mapped = propNormalGroup[prop];
+    if (mapped.x != group) {
+      int newProp = prop;
+      if (mapped.x >= 0) {
+        newProp = NumPropVert();
+        // Grow geometrically so the total cost of splits stays linear.
+        properties_.extend(numProp);
+        std::fill(properties_.begin() + newProp * numProp, properties_.end(),
+                  0.0);
+      }
+      mapped = {group, newProp};
+      auto start = oldProperties.begin() + prop * oldNumProp;
+      std::copy(start, start + oldNumProp,
+                properties_.begin() + newProp * numProp);
+      for (const int i : {0, 1, 2})
+        properties_[newProp * numProp + normalIdx + i] = normal[i];
+    }
+    return mapped.y;
+  };
+
   // Cached per-meshID inverse-normal-transform for the legacy non-zero
   // normalIdx path. Lazily populated on first lookup; reused across all
   // verts in the loop below.
@@ -474,19 +501,11 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
               ? worldNormal
               : getTransform(meshRelation_.triRef[startEdge / 3].meshID) *
                     worldNormal;
-      int lastProp = -1;
       ForVert(startEdge, [&](int current) {
         const int prop = oldHalfedgeProp[current];
-        halfedge_.SetProp(current, prop);
-        if (prop == lastProp) return;
-        lastProp = prop;
-        // update property vertex
-        auto start = oldProperties.begin() + prop * oldNumProp;
-        std::copy(start, start + oldNumProp,
-                  properties_.begin() + prop * numProp);
-        for (const int i : {0, 1, 2})
-          properties_[prop * numProp + normalIdx + i] = normal[i];
+        halfedge_.SetProp(current, setNormal(prop, nextNormalGroup, normal));
       });
+      ++nextNormalGroup;
       continue;
     }
 
@@ -540,43 +559,15 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
       normals[i] = SafeNormalize(n);
     }
 
-    int lastGroup = 0;
-    int lastProp = -1;
-    int newProp = -1;
     int idx = 0;
     ForVert(endEdge, [&](int current1) {
       const int prop = oldHalfedgeProp[current1];
-      auto start = oldProperties.begin() + prop * oldNumProp;
-
-      if (groups[idx] != lastGroup && groups[idx] != 0 && prop == lastProp) {
-        // split property vertex, duplicating but with an updated normal
-        lastGroup = groups[idx];
-        newProp = NumPropVert();
-        // Grow geometrically so the total cost of splits stays linear in the
-        // number of property verts.
-        properties_.extend(numProp);
-        std::fill(properties_.begin() + newProp * numProp, properties_.end(),
-                  0.0);
-        std::copy(start, start + oldNumProp,
-                  properties_.begin() + newProp * numProp);
-        for (const int i : {0, 1, 2}) {
-          properties_[newProp * numProp + normalIdx + i] =
-              normals[groups[idx]][i];
-        }
-      } else if (prop != lastProp) {
-        // update property vertex
-        lastProp = prop;
-        newProp = prop;
-        std::copy(start, start + oldNumProp,
-                  properties_.begin() + prop * numProp);
-        for (const int i : {0, 1, 2})
-          properties_[prop * numProp + normalIdx + i] = normals[groups[idx]][i];
-      }
-
-      // point to updated property vertex
-      halfedge_.SetProp(current1, newProp);
+      const int group = groups[idx];
+      halfedge_.SetProp(
+          current1, setNormal(prop, nextNormalGroup + group, normals[group]));
       ++idx;
     });
+    nextNormalGroup += normals.size();
   }
   // Release the spare capacity left by geometric growth.
   if (properties_.capacity() > properties_.size()) properties_.shrink_to_fit();

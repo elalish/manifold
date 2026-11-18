@@ -257,6 +257,60 @@ TEST(Properties, CalculateNormals) {
   EXPECT_EQ(numBad2, 0);
 }
 
+TEST(Properties, CalculateNormalsWithPropertySeams) {
+  const MeshGL64 cube = Manifold::Cube().GetMeshGL64();
+  MeshGL64 mesh = cube;
+  mesh.numProp = 7;
+  mesh.vertProperties.clear();
+  for (size_t v = 0; v < cube.NumVert(); ++v) {
+    const vec3 p = cube.GetVertPos(v);
+    mesh.vertProperties.insert(mesh.vertProperties.end(),
+                               {p.x, p.y, p.z, 0, 0, 0, 0});
+  }
+  // Give one triangle a different color. The remaining color property is
+  // shared across several sharp normal groups around each of its vertices.
+  vec3 coloredCenter(0.0);
+  for (int corner : {0, 1, 2}) {
+    const auto original = cube.triVerts[corner];
+    const vec3 p = cube.GetVertPos(original);
+    coloredCenter += p / 3.0;
+    const size_t duplicate = mesh.NumVert();
+    mesh.vertProperties.insert(mesh.vertProperties.end(),
+                               {p.x, p.y, p.z, 0, 0, 0, 1});
+    mesh.mergeFromVert.push_back(duplicate);
+    mesh.mergeToVert.push_back(original);
+    mesh.triVerts[corner] = duplicate;
+  }
+  const Manifold input(mesh);
+  ASSERT_EQ(input.Status(), Manifold::Error::NoError);
+  for (double sharpAngle : {0.0, 52.5}) {
+    SCOPED_TRACE(sharpAngle);
+    const Manifold result = input.CalculateNormals(0, sharpAngle);
+    ASSERT_EQ(result.Status(), Manifold::Error::NoError);
+    EXPECT_DOUBLE_EQ(result.Volume(), 1.0);
+    EXPECT_NEAR(result.SmoothByNormals().Refine(3).Volume(), 1.0, 1e-12);
+    const MeshGL64 out = result.GetMeshGL64();
+    ASSERT_EQ(out.NumTri(), 12);
+    ASSERT_EQ(out.numProp, 7);
+    for (size_t tri = 0; tri < out.NumTri(); ++tri) {
+      const vec3 a = out.GetVertPos(out.triVerts[3 * tri]);
+      const vec3 b = out.GetVertPos(out.triVerts[3 * tri + 1]);
+      const vec3 c = out.GetVertPos(out.triVerts[3 * tri + 2]);
+      const vec3 expected = la::normalize(la::cross(b - a, c - a));
+      const double color =
+          la::length((a + b + c) / 3.0 - coloredCenter) < 1e-12 ? 1 : 0;
+      for (int corner : {0, 1, 2}) {
+        const auto v = out.triVerts[3 * tri + corner];
+        for (int axis : {0, 1, 2}) {
+          EXPECT_NEAR(out.vertProperties[7 * v + 3 + axis], expected[axis],
+                      1e-12);
+        }
+        EXPECT_DOUBLE_EQ(out.vertProperties[7 * v + 6], color);
+      }
+    }
+  }
+}
+
 TEST(Properties, PropertyIndexTooLarge) {
   const Manifold cube = Manifold::Cube();
   EXPECT_EQ(
