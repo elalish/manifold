@@ -344,6 +344,35 @@ TEST(Manifold, InvalidInput6) {
   EXPECT_EQ(tet.Status(), Manifold::Error::VertexOutOfBounds);
 }
 
+TEST(Manifold, InvalidInput64BitIndex) {
+  // Indices past 2^32 must not wrap around to a valid 32-bit index.
+  const MeshGL tetGL = TetGL();
+  MeshGL64 tet;
+  tet.numProp = tetGL.numProp;
+  tet.vertProperties.assign(tetGL.vertProperties.begin(),
+                            tetGL.vertProperties.end());
+  tet.triVerts.assign(tetGL.triVerts.begin(), tetGL.triVerts.end());
+  tet.mergeFromVert.assign(tetGL.mergeFromVert.begin(),
+                           tetGL.mergeFromVert.end());
+  tet.mergeToVert.assign(tetGL.mergeToVert.begin(), tetGL.mergeToVert.end());
+  ASSERT_EQ(Manifold(tet).Status(), Manifold::Error::NoError);
+
+  const uint64_t wrap = uint64_t(1) << 32;
+  MeshGL64 badTri = tet;
+  badTri.triVerts[1] += wrap;
+  EXPECT_EQ(Manifold(badTri).Status(), Manifold::Error::VertexOutOfBounds);
+
+  MeshGL64 badMergeTo = tet;
+  badMergeTo.mergeToVert[0] += wrap;
+  EXPECT_EQ(Manifold(badMergeTo).Status(),
+            Manifold::Error::MergeIndexOutOfBounds);
+
+  MeshGL64 badMergeFrom = tet;
+  badMergeFrom.mergeFromVert[0] += wrap;
+  EXPECT_EQ(Manifold(badMergeFrom).Status(),
+            Manifold::Error::MergeIndexOutOfBounds);
+}
+
 TEST(Manifold, InvalidInput7) {
   MeshGL cube = CubeUV();
   cube.runIndex = {0, 1, static_cast<uint32_t>(cube.triVerts.size())};
@@ -830,6 +859,30 @@ TEST(Manifold, ObjRoundTrip) {
   Manifold m2 = Manifold::ReadOBJ(ss);
   EXPECT_EQ(m2.Status(), Manifold::Error::NoError);
   EXPECT_EQ(m2.Volume(), 1);
+}
+
+// A unit tetrahedron, missing its last face line.
+constexpr char kTetOBJ[] =
+    "v 0 0 0\nv 1 0 0\nv 0 1 0\nv 0 0 1\nf 1 3 2\nf 1 2 4\nf 1 4 3\n";
+
+TEST(Manifold, ObjNoTrailingNewline) {
+  // The final line used to pick up the EOF value as an extra character. Put a
+  // vertex last, since the face pattern happened to tolerate it.
+  std::istringstream ss(
+      "f 1 3 2\nf 1 2 4\nf 1 4 3\nf 2 3 4\nv 0 0 0\nv 1 0 0\nv 0 1 0\nv 0 0 1");
+  const Manifold m = Manifold::ReadOBJ(ss);
+  EXPECT_EQ(m.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(m.NumVert(), 4);
+}
+
+TEST(Manifold, ObjHugeFaceIndex) {
+  // Indices too large for int, or for any integer type, must not throw.
+  for (const char* index :
+       {"2147483648", "4294967298", "99999999999999999999999"}) {
+    std::istringstream ss(std::string(kTetOBJ) + "f 2 3 " + index + "\n");
+    const Manifold m = Manifold::ReadOBJ(ss);
+    EXPECT_EQ(m.Status(), Manifold::Error::VertexOutOfBounds) << index;
+  }
 }
 #endif
 

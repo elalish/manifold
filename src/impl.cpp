@@ -17,6 +17,9 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#ifndef MANIFOLD_NO_IOSTREAM
+#include <charconv>
+#endif
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -791,8 +794,8 @@ static MeshGL64 ReadOBJMesh(std::istream& stream) {
     // not using std::basic_istream<...>::getline because getline throws when
     // the size exceeds the limit, but we don't want exception related code
     size_t i = 0;
-    char c;
-    while (!stream.eof() && (c = stream.get()) != '\n' && c != '\r')
+    int c;
+    while ((c = stream.get()) != EOF && c != '\n' && c != '\r')
       if (i < BUFFER_SIZE) buffer[i++] = c;
     if (i == BUFFER_SIZE) continue;
     buffer[i] = '\0';
@@ -801,8 +804,15 @@ static MeshGL64 ReadOBJMesh(std::istream& stream) {
       for (int j : {0, 1, 2})
         mesh.vertProperties.push_back(FromChars(m[j + 1]));
     } else if (std::regex_match(buffer.data(), m, FACE_PATTERN)) {
-      for (int j : {0, 1, 2})
-        mesh.triVerts.push_back(std::stoi(m[j + 1].str()) - 1);
+      for (int j : {0, 1, 2}) {
+        // An index that doesn't fit is out of bounds anyway, and stoi would
+        // throw on it.
+        uint64_t index = 0;
+        const auto result =
+            std::from_chars(m[j + 1].first, m[j + 1].second, index);
+        if (result.ec != std::errc()) index = 0;
+        mesh.triVerts.push_back(index - 1);
+      }
     }
   }
 
