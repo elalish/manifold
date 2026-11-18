@@ -238,6 +238,10 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
       impl.status_ = node->pImpl_->status_;
       return ImplToLeaf(std::move(impl));
     }
+    // Compose applies pending transforms directly, bypassing Impl::Transform.
+    if (!all(la::isfinite(node->transform_))) {
+      return ErrorLeaf(Manifold::Error::NonFiniteVertex);
+    }
     bbox = bbox.Union(node->GetBoundingBox());
 
     vertIndices.push_back(numVert);

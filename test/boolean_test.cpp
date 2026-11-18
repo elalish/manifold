@@ -1198,6 +1198,91 @@ TEST(Boolean, BatchBoolean) {
   EXPECT_FLOAT_EQ(subtract.SurfaceArea(), 14904.597);
 }
 
+TEST(Boolean, NonFiniteTransformInUnion) {
+  const Manifold cube = Manifold::Cube();
+  const Manifold other = cube.Translate({3, 0, 0});
+  const double inf = std::numeric_limits<double>::infinity();
+  for (const double value :
+       {inf, -inf, std::numeric_limits<double>::quiet_NaN()}) {
+    for (int column = 0; column < 4; ++column) {
+      for (int row = 0; row < 3; ++row) {
+        SCOPED_TRACE(testing::Message()
+                     << value << " at " << column << ", " << row);
+        mat3x4 transform(la::identity);
+        transform[column][row] = value;
+        const Manifold evaluated = cube.Transform(transform);
+        ASSERT_EQ(evaluated.Status(), Manifold::Error::NonFiniteVertex);
+        for (const bool first : {false, true}) {
+          const Manifold pending = cube.Transform(transform);
+          const Manifold result = first ? pending + other : other + pending;
+          const Manifold reference =
+              first ? evaluated + other : other + evaluated;
+          EXPECT_NO_THROW({ EXPECT_EQ(result.Status(), reference.Status()); });
+        }
+      }
+    }
+  }
+}
+
+TEST(Boolean, NonFiniteTransformInBatchBoolean) {
+  const Manifold cube = Manifold::Cube();
+  const double inf = std::numeric_limits<double>::infinity();
+  // Include the single-leaf case and both sides of BatchUnion's chunk limit.
+  for (const int count : {1, 3, 1000, 1001}) {
+    for (const int badIndex : {0, count - 1}) {
+      SCOPED_TRACE(testing::Message() << count << " leaves, bad " << badIndex);
+      for (const OpType op :
+           {OpType::Add, OpType::Subtract, OpType::Intersect}) {
+        std::vector<Manifold> pending;
+        for (int i = 0; i < count; ++i)
+          pending.push_back(cube.Translate({3.0 * i, 0, 0}));
+        pending[badIndex] = cube.Translate({inf, 0, 0});
+        std::vector<Manifold> evaluated = pending;
+        // Keep the pending leaf independent: Status() caches its transform.
+        evaluated[badIndex] = cube.Translate({inf, 0, 0});
+        ASSERT_EQ(evaluated[badIndex].Status(),
+                  Manifold::Error::NonFiniteVertex);
+        const Manifold reference = Manifold::BatchBoolean(evaluated, op);
+        ASSERT_EQ(reference.Status(), Manifold::Error::NonFiniteVertex);
+        const Manifold result = Manifold::BatchBoolean(pending, op);
+        EXPECT_NO_THROW({ EXPECT_EQ(result.Status(), reference.Status()); });
+      }
+    }
+  }
+}
+
+TEST(Boolean, NonFiniteTransformStatusPrecedence) {
+  const Manifold cube = Manifold::Cube();
+  const Manifold other = cube.Translate({3, 0, 0});
+  const double inf = std::numeric_limits<double>::infinity();
+  // Include an empty input and a still-pending Boolean, not only mesh leaves.
+  for (int sourceIndex = 0; sourceIndex < 3; ++sourceIndex) {
+    const auto source = [&]() {
+      if (sourceIndex == 0) return Manifold();
+      if (sourceIndex == 1) return Manifold::Sphere(0);
+      return cube + cube.Translate({0.5, 0, 0});
+    };
+    const Manifold evaluated = source().Translate({inf, 0, 0});
+    const auto expected = evaluated.Status();
+    ASSERT_EQ(expected, sourceIndex == 1 ? Manifold::Error::InvalidConstruction
+                                         : Manifold::Error::NonFiniteVertex);
+    const Manifold pending = source().Translate({inf, 0, 0});
+    EXPECT_NO_THROW({
+      EXPECT_EQ(Manifold::BatchBoolean({pending, other}, OpType::Add).Status(),
+                expected);
+    });
+  }
+  ExecutionContext ctx;
+  ctx.Cancel();
+  const Manifold pending = cube.Translate({inf, 0, 0}) + other;
+  EXPECT_EQ(pending.WithContext(ctx).Status(), Manifold::Error::Cancelled);
+  // Valid empty inputs keep their existing success semantics.
+  const Manifold emptyUnion =
+      Manifold::BatchBoolean({Manifold(), other}, OpType::Add);
+  EXPECT_EQ(emptyUnion.Status(), Manifold::Error::NoError);
+  EXPECT_DOUBLE_EQ(emptyUnion.Volume(), 1.0);
+}
+
 namespace {
 // Convex face pieces, as lists of x, y, z corners, swept by a cube of the
 // given half-size (a Minkowski sum of a voxel shape's faces, which is full of
