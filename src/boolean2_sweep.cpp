@@ -24,7 +24,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
-#include <cstring>
+#include <functional>
 #include <limits>
 #include <map>
 #include <unordered_map>
@@ -628,21 +628,10 @@ PolySet2 CollectThenMeasure(PolySet2 arr, WindRule rule) {
   return std::move(measure.Out());
 }
 
-// Keys compare with ==, under which -0 equals +0, so -0 hashes as +0.
 struct PointHash {
-  static uint64_t Bits(double d) {
-    if (d == 0) d = 0;
-    uint64_t bits;
-    std::memcpy(&bits, &d, sizeof(bits));
-    return bits;
-  }
-  // Round coordinates have all-zero low bits, so mix with the splitmix64
-  // finalizer to spread them across buckets.
   size_t operator()(const vec2& p) const {
-    uint64_t h = Bits(p.x) * 0x9E3779B97F4A7C15ull + Bits(p.y);
-    h = (h ^ (h >> 30)) * 0xBF58476D1CE4E5B9ull;
-    h = (h ^ (h >> 27)) * 0x94D049BB133111EBull;
-    return static_cast<size_t>(h ^ (h >> 31));
+    const std::hash<double> hash;
+    return hash64bit(hash(p.x) ^ hash64bit(hash(p.y)));
   }
 };
 
