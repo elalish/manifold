@@ -932,6 +932,82 @@ TEST(Boolean, MinkowskiSumTranslatedComponents) {
   }
 }
 
+TEST(Boolean, MinkowskiDifferenceEmptyBase) {
+  const Manifold cube = Manifold::Cube();
+  const Manifold cross =
+      Manifold::Cube({4, 1, 1}, true) + Manifold::Cube({1, 2, 1}, true);
+  const Manifold components = cube + cube.Translate({4, 0, 0});
+  const std::vector<Manifold> bases = {
+      Manifold(), cube - cube,
+      (cube - cube).Translate({3, -2, 5}).Rotate(30, 45, 60),
+      Manifold().SetProperties(2, nullptr).AsOriginal()};
+  const std::vector<Manifold> cutters = {cube, cross, components, Manifold()};
+  for (size_t i = 0; i < bases.size(); ++i) {
+    ASSERT_TRUE(bases[i].IsEmpty());
+    for (size_t j = 0; j < cutters.size(); ++j) {
+      SCOPED_TRACE(::testing::Message() << "base " << i << ", cutter " << j);
+      const Manifold result = bases[i].MinkowskiDifference(cutters[j]);
+      EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+      EXPECT_TRUE(result.IsEmpty());
+      EXPECT_EQ(result.NumVert(), 0);
+      EXPECT_EQ(result.NumTri(), 0);
+      EXPECT_EQ(result.Volume(), 0);
+      EXPECT_EQ(result.NumProp(), bases[i].NumProp());
+      EXPECT_EQ(result.OriginalID(), bases[i].OriginalID());
+    }
+  }
+}
+
+TEST(Boolean, MinkowskiEmptyOperandControls) {
+  const Manifold empty;
+  const Manifold cube = Manifold::Cube();
+  const Manifold cross =
+      Manifold::Cube({4, 1, 1}, true) + Manifold::Cube({1, 2, 1}, true);
+  const std::vector<Manifold> shapes = {
+      cube, cross, cube + cube.Translate({4, 0, 0}), empty};
+  for (size_t i = 0; i < shapes.size(); ++i) {
+    SCOPED_TRACE(::testing::Message() << "shape " << i);
+    const MeshGL expected = shapes[i].GetMeshGL();
+    for (const Manifold& result :
+         {shapes[i].MinkowskiDifference(empty), shapes[i].MinkowskiSum(empty),
+          empty.MinkowskiSum(shapes[i])}) {
+      EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+      EXPECT_EQ(result.IsEmpty(), shapes[i].IsEmpty());
+      const MeshGL actual = result.GetMeshGL();
+      EXPECT_EQ(actual.vertProperties, expected.vertProperties);
+      EXPECT_EQ(actual.triVerts, expected.triVerts);
+    }
+  }
+}
+
+TEST(Boolean, MinkowskiEmptyBaseInputErrors) {
+  MeshGL mesh = Manifold::Cube().GetMeshGL();
+  mesh.vertProperties[0] = std::numeric_limits<float>::quiet_NaN();
+  const Manifold errored(mesh);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  const Manifold empty;
+  EXPECT_EQ(empty.MinkowskiDifference(errored).Status(),
+            Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.MinkowskiDifference(empty).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Boolean, MinkowskiDifferenceEmptyBaseCancelled) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  const Manifold cube = Manifold::Cube();
+  const std::vector<Manifold> bases = {Manifold(), cube - cube};
+  const std::vector<Manifold> cutters = {cube, Manifold()};
+  for (const Manifold& base : bases) {
+    ASSERT_TRUE(base.IsEmpty());
+    for (const Manifold& cutter : cutters) {
+      const Manifold result = base.WithContext(ctx).MinkowskiDifference(cutter);
+      EXPECT_EQ(result.Status(), Manifold::Error::Cancelled);
+      EXPECT_TRUE(result.IsEmpty());
+    }
+  }
+}
+
 /**
  * This tests that non-intersecting geometry is properly retained.
  */

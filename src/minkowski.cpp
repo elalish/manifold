@@ -52,6 +52,9 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
   };
   if (IsCancelled(ctx)) return cancelled();
 
+  // Eroding an empty base must not return the other operand.
+  if (inset && IsEmpty()) return Manifold(std::make_shared<Impl>(*this));
+
   const Impl* aImpl = this;
   const Impl* bImpl = &other;
 
