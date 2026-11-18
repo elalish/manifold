@@ -19,10 +19,71 @@
 #include <thread>
 
 #include "../src/atomic_compat.h"
+#include "../src/collider.h"
 #include "../src/shared.h"
 #include "gtest/gtest.h"
 
 using namespace manifold;
+
+TEST(Utils, SegmentQueryPrunesOffRayLeaves) {
+  // The diagonal crosses 16 cells, but its AABB covers all 256. Count leaf
+  // candidates rather than timing the traversal so this stays deterministic.
+  const Box gridBounds(vec3(0.0), vec3(16, 16, 1));
+  std::vector<std::pair<uint32_t, Box>> cells;
+  for (int x = 0; x < 16; ++x) {
+    for (int y = 0; y < 16; ++y) {
+      const vec3 center(x + 0.5, y + 0.5, 0.5);
+      cells.emplace_back(Collider::MortonCode(center, gridBounds),
+                         Box(center - 0.25, center + 0.25));
+    }
+  }
+  std::sort(cells.begin(), cells.end(),
+            [](const auto& a, const auto& b) { return a.first < b.first; });
+  Vec<Box> boxes(cells.size());
+  Vec<uint32_t> morton(cells.size());
+  for (size_t i = 0; i < cells.size(); ++i) {
+    morton[i] = cells[i].first;
+    boxes[i] = cells[i].second;
+  }
+  const Collider collider(boxes, morton);
+  const vec3 a(-1, -1, 0.5), b(17, 17, 0.5);
+  const Box bounds(a, b);
+  std::vector<int> candidates;
+  auto record = [&](int, int leaf) { candidates.push_back(leaf); };
+  auto recorder = MakeSimpleRecorder(record);
+  auto boxQuery = [&](int) { return bounds; };
+  collider.Collisions(recorder, boxQuery, 1, false);
+  EXPECT_EQ(candidates.size(), 256);
+
+  for (const bool reverse : {false, true}) {
+    candidates.clear();
+    const collider_internal::SegmentQuery segment{bounds, reverse ? b : a,
+                                                  reverse ? a - b : b - a, 0.0};
+    auto query = [&](int) { return segment; };
+    collider.Collisions(recorder, query, 1, false);
+    ASSERT_EQ(candidates.size(), 16);
+    for (const int leaf : candidates)
+      EXPECT_DOUBLE_EQ(boxes[leaf].min.x, boxes[leaf].min.y);
+  }
+}
+
+TEST(Utils, SegmentQueryClosedSlabs) {
+  // A flat face and a point are valid BVH boxes. Include the endpoint, and
+  // handle a direction parallel to a slab without dividing by zero.
+  const Box face(vec3(0, 0, 0), vec3(0, 1, 1));
+  const Box point(vec3(0.0), vec3(0.0));
+  const vec3 a(-1, -1, 0), b(0.0);
+  const collider_internal::SegmentQuery endpoint{Box(a, b), a, b - a, 0.0};
+  EXPECT_TRUE(endpoint.DoesOverlap(face));
+  EXPECT_TRUE(endpoint.DoesOverlap(point));
+
+  const vec3 c(-1, -1, 0), d(1, 1, 0);
+  const collider_internal::SegmentQuery crossing{Box(c, d), c, d - c, 0.0};
+  EXPECT_TRUE(crossing.DoesOverlap(face));
+  EXPECT_TRUE(crossing.DoesOverlap(point));
+  const Box offRay(vec3(-0.5, 0.5, 0), vec3(-0.25, 0.75, 0));
+  EXPECT_FALSE(crossing.DoesOverlap(offRay));
+}
 
 TEST(Utils, SharedVecCopyConstructionAndDetach) {
   const int values[] = {2, 3, 5};
