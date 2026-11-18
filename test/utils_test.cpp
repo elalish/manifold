@@ -16,12 +16,132 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <thread>
 
 #include "../src/atomic_compat.h"
 #include "../src/shared.h"
 #include "gtest/gtest.h"
 
 using namespace manifold;
+
+TEST(Utils, SharedVecCopyConstructionAndDetach) {
+  const int values[] = {2, 3, 5};
+  const SharedVec<int> source(VecView<const int>(values, 3));
+  SharedVec<int> copy(source);
+  EXPECT_EQ(copy.data(), source.data());
+  copy.MakeUnique();
+  EXPECT_NE(copy.data(), source.data());
+  copy.data()[0] = 7;
+  *std::next(copy.begin()) = 11;
+  copy.push_back(13);
+  EXPECT_EQ(source.size(), 3);
+  EXPECT_EQ(source[0], 2);
+  EXPECT_EQ(source[1], 3);
+  EXPECT_EQ(source[2], 5);
+  EXPECT_EQ(copy[0], 7);
+  EXPECT_EQ(copy[1], 11);
+  EXPECT_EQ(copy[3], 13);
+
+  Vec<int> valueCopy(source);
+  EXPECT_NE(valueCopy.data(), source.data());
+  valueCopy[2] = 17;
+  EXPECT_EQ(source[2], 5);
+
+  SharedVec<int> sharedForMove(source);
+  Vec<int> moved(std::move(sharedForMove));
+  EXPECT_NE(moved.data(), source.data());
+  moved[0] = 19;
+  EXPECT_EQ(source[0], 2);
+
+  SharedVec<int> sharedForAssignment(source);
+  Vec<int> assigned;
+  assigned = std::move(sharedForAssignment);
+  EXPECT_NE(assigned.data(), source.data());
+  assigned[1] = 29;
+  EXPECT_EQ(source[1], 3);
+
+  SharedVec<int> empty;
+  SharedVec<int> emptyCopy(empty);
+  emptyCopy.MakeUnique();
+  emptyCopy.push_back(31);
+  EXPECT_TRUE(empty.empty());
+
+  SharedVec<int> sharedMove(std::move(copy));
+  SharedVec<int> movedFromCopy(copy);
+  EXPECT_TRUE(movedFromCopy.empty());
+  movedFromCopy.push_back(37);
+  EXPECT_EQ(sharedMove[0], 7);
+}
+
+TEST(Utils, SharedVecCopyAssignmentFromMovedFrom) {
+  const int values[] = {2, 3, 5};
+  SharedVec<int> source(VecView<const int>(values, 3));
+  const SharedVec<int> owner(std::move(source));
+  const int* const originalData = owner.data();
+
+  const auto assignAndReuse = [&](SharedVec<int> destination) {
+    EXPECT_EQ(&(destination = source), &destination);
+    EXPECT_TRUE(destination.empty());
+    EXPECT_EQ(destination.capacity(), 0);
+    EXPECT_EQ(destination.data(), nullptr);
+    destination.MakeUnique();
+    destination.push_back(7);
+
+    SharedVec<int> copy(destination);
+    copy.MakeUnique();
+    copy[0] = 11;
+    EXPECT_EQ(destination.size(), 1);
+    EXPECT_EQ(destination[0], 7);
+    EXPECT_EQ(copy[0], 11);
+    EXPECT_TRUE(source.empty());
+    EXPECT_EQ(owner.data(), originalData);
+    ASSERT_EQ(owner.size(), 3);
+    for (size_t i = 0; i < owner.size(); ++i) EXPECT_EQ(owner[i], values[i]);
+  };
+
+  {
+    SCOPED_TRACE("empty destination");
+    assignAndReuse(SharedVec<int>());
+  }
+  {
+    SCOPED_TRACE("unique nonempty destination");
+    assignAndReuse(SharedVec<int>(2, 17));
+  }
+  {
+    SCOPED_TRACE("shared nonempty destination");
+    assignAndReuse(owner);
+  }
+
+  source = owner;
+  EXPECT_EQ(source.data(), owner.data());
+  source.MakeUnique();
+  source[0] = 13;
+  EXPECT_EQ(owner[0], 2);
+}
+
+#ifndef __EMSCRIPTEN__
+TEST(Utils, SharedVecConcurrentCopyAndDetach) {
+  const SharedVec<int> source(128, 23);
+  std::atomic<bool> intact = true;
+  std::vector<std::thread> threads;
+  for (int thread = 0; thread < 8; ++thread) {
+    threads.emplace_back([&source, &intact, thread] {
+      for (int iteration = 0; iteration < 100; ++iteration) {
+        SharedVec<int> copy(source);
+        if (copy.data() != source.data()) intact = false;
+        copy.MakeUnique();
+        std::fill(copy.begin(), copy.end(), thread);
+        for (int value : source) {
+          if (value != 23) intact = false;
+        }
+      }
+    });
+  }
+  for (auto& thread : threads) thread.join();
+  EXPECT_TRUE(intact);
+}
+
+#endif  // __EMSCRIPTEN__
 
 TEST(Utils, CosdLargeAngles) {
   for (const double angle : {1e18, -1e18, 1e20, -1e20, 1e100, -1e100,
