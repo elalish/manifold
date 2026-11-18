@@ -36,7 +36,9 @@ def test_vector_export_owns_writeable_resizable_storage(kind):
 @pytest.mark.parametrize("geometry", ["section", "slice", "projection"])
 def test_polygon_exports_are_independent_of_source_and_each_other(geometry):
     if geometry == "section":
-        section = CrossSection.square((4, 4)) - CrossSection.square((2, 2)).translate((1, 1))
+        section = CrossSection.square((4, 4)) - CrossSection.square((2, 2)).translate(
+            (1, 1)
+        )
     elif geometry == "slice":
         section = Manifold.cube((4, 4, 2)).slice(1)
     else:
@@ -54,7 +56,9 @@ def test_polygon_exports_are_independent_of_source_and_each_other(geometry):
     gc.collect()
     # Reuse native-sized allocations after all geometry and source vectors
     # have gone away; returned arrays and their views must remain valid.
-    churn = [np.full(reference.shape, 123.0) for reference in expected for _ in range(16)]
+    churn = [
+        np.full(reference.shape, 123.0) for reference in expected for _ in range(16)
+    ]
     for array, reference in zip(second, expected):
         view = array[::-1]
         np.testing.assert_array_equal(view, reference[::-1])
