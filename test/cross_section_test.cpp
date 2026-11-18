@@ -2739,6 +2739,34 @@ TEST(CrossSection, Rect) {
   EXPECT_TRUE(Rect().IsEmpty());
 }
 
+TEST(CrossSection, RectAxisAlignedTransform) {
+  const Rect original({1, 2}, {4, 6});
+  const struct {
+    const char* name;
+    mat2x3 transform;
+    Rect expected;
+  } cases[] = {
+      {"translate", {{1, 0}, {0, 1}, {10, 20}}, {{11, 22}, {14, 26}}},
+      {"mirror x", {{-1, 0}, {0, 1}, {10, 20}}, {{6, 22}, {9, 26}}},
+      {"mirror y", {{1, 0}, {0, -1}, {10, 20}}, {{11, 14}, {14, 18}}},
+      {"rotate 90", {{0, 1}, {-1, 0}, {10, 20}}, {{4, 21}, {8, 24}}},
+      {"rotate 180", {{-1, 0}, {0, -1}, {10, 20}}, {{6, 14}, {9, 18}}},
+      {"rotate 270", {{0, -1}, {1, 0}, {10, 20}}, {{12, 16}, {16, 19}}},
+      {"scale", {{-2, 0}, {0, 3}, {10, 20}}, {{2, 26}, {8, 38}}},
+  };
+  for (const auto& test : cases) {
+    SCOPED_TRACE(test.name);
+    const Rect transformed = original.Transform(test.transform);
+    EXPECT_DOUBLE_EQ(transformed.min.x, test.expected.min.x);
+    EXPECT_DOUBLE_EQ(transformed.min.y, test.expected.min.y);
+    EXPECT_DOUBLE_EQ(transformed.max.x, test.expected.max.x);
+    EXPECT_DOUBLE_EQ(transformed.max.y, test.expected.max.y);
+    EXPECT_DOUBLE_EQ(transformed.Area(), test.expected.Area());
+    EXPECT_FALSE(transformed.IsEmpty());
+    EXPECT_TRUE(transformed.Contains(test.expected.Center()));
+  }
+}
+
 TEST(CrossSection, LargeRotationsPreserveArea) {
   const CrossSection rectangle = CrossSection::Square({2, 3});
   for (const double angle : {1e18, -1e18, 1e20, -1e20}) {
