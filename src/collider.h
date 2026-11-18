@@ -113,6 +113,18 @@ struct SegmentQuery {
   }
 };
 
+inline bool Overlaps(const Box& box, const Box& query) {
+  return box.DoesOverlap(query);
+}
+
+inline bool Overlaps(const Box& box, const vec3& query) {
+  return box.DoesOverlap(query);
+}
+
+inline bool Overlaps(const Box& box, const SegmentQuery& query) {
+  return query.DoesOverlap(box);
+}
+
 struct CreateRadixTree {
   VecView<int> nodeParent_;
   VecView<std::pair<int, int>> internalChildren_;
@@ -210,11 +222,7 @@ struct FindCollision {
   inline int RecordCollision(std::invoke_result_t<F, const int> query, int node,
                              const int queryIdx, Local& local) {
     auto box = nodeBBox_[node];
-    bool overlaps;
-    if constexpr (std::is_same_v<decltype(query), SegmentQuery>)
-      overlaps = query.DoesOverlap(box);
-    else
-      overlaps = box.DoesOverlap(query);
+    const bool overlaps = Overlaps(box, query);
     if (overlaps && IsLeaf(node)) {
       int leafIdx = Node2Leaf(node);
       if (!selfCollision || leafIdx != queryIdx) {
