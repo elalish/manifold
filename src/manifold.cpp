@@ -598,10 +598,12 @@ Manifold Manifold::Transform(const mat3x4& m) const {
  * @param normal The normal vector of the plane to be mirrored over
  */
 Manifold Manifold::Mirror(vec3 normal) const {
-  auto leafImpl = GetCsgLeafNode().GetImpl();
-  if (leafImpl->status_ != Error::NoError)
-    return PropagateStatus(leafImpl->status_);
   if (la::length(normal) == 0.) {
+    // A degenerate mirror must not hide an existing error behind its empty
+    // result. Other mirrors stay deferred; Impl::Transform propagates errors.
+    auto leafImpl = GetCsgLeafNode().GetImpl();
+    if (leafImpl->status_ != Error::NoError)
+      return PropagateStatus(leafImpl->status_);
     return Manifold();
   }
   auto n = la::normalize(normal);
