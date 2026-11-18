@@ -302,3 +302,18 @@ TEST(Properties, Coplanar) {
 
   if (options.exportModels) WriteTestOBJ("coplanar.obj", result);
 }
+
+TEST(Properties, CalculateCurvatureDeterministic) {
+  // Above the parallel threshold, where the per-vertex sums used to depend on
+  // thread scheduling.
+  const Manifold sphere = Manifold::Sphere(1, 256);
+  ASSERT_GT(sphere.NumTri(), 10000);
+  const MeshGL64 first = sphere.CalculateCurvature(3, 4).GetMeshGL64();
+  for (int i = 0; i < 3; ++i) {
+    const MeshGL64 again = sphere.CalculateCurvature(3, 4).GetMeshGL64();
+    ASSERT_EQ(again.vertProperties.size(), first.vertProperties.size());
+    for (size_t j = 0; j < first.vertProperties.size(); ++j)
+      ASSERT_EQ(again.vertProperties[j], first.vertProperties[j])
+          << "run " << i << " property " << j;
+  }
+}
