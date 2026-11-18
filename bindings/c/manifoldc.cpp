@@ -519,14 +519,12 @@ ManifoldManifoldVec* manifold_decompose(const ManifoldManifold* m) {
 }
 
 ManifoldMeshGL* manifold_get_meshgl(const ManifoldManifold* m) {
-  auto mesh = from_c(m)->GetMeshGL();
-  return to_c(new MeshGL(mesh));
+  return to_c(new MeshGL(from_c(m)->GetMeshGL()));
 }
 
 ManifoldMeshGL* manifold_get_meshgl_w_normals(const ManifoldManifold* m,
                                               int32_t normalIdx) {
-  auto mesh = from_c(m)->GetMeshGL(normalIdx);
-  return to_c(new MeshGL(mesh));
+  return to_c(new MeshGL(from_c(m)->GetMeshGL(normalIdx)));
 }
 
 ManifoldMeshGL* manifold_meshgl_copy(const ManifoldMeshGL* m) {
@@ -541,14 +539,12 @@ ManifoldMeshGL* manifold_meshgl_merge(const ManifoldMeshGL* m,
 }
 
 ManifoldMeshGL64* manifold_get_meshgl64(const ManifoldManifold* m) {
-  auto mesh = from_c(m)->GetMeshGL64();
-  return to_c(new MeshGL64(mesh));
+  return to_c(new MeshGL64(from_c(m)->GetMeshGL64()));
 }
 
 ManifoldMeshGL64* manifold_get_meshgl64_w_normals(const ManifoldManifold* m,
                                                   int32_t normalIdx) {
-  auto mesh = from_c(m)->GetMeshGL64(normalIdx);
-  return to_c(new MeshGL64(mesh));
+  return to_c(new MeshGL64(from_c(m)->GetMeshGL64(normalIdx)));
 }
 
 ManifoldMeshGL64* manifold_meshgl64_copy(const ManifoldMeshGL64* m) {

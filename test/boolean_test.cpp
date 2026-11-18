@@ -924,6 +924,69 @@ TEST(Boolean, ConvexNonConvexMinkowskiDifference) {
   EXPECT_TRUE((result - expected).IsEmpty());
 }
 
+TEST(Boolean, MinkowskiSumTranslatedComponents) {
+  std::vector<std::vector<Box>> inputs = {
+      {{{0, 0, 0}, {1, 1, 1}}},
+      {{{0, 0, 0}, {2, 1, 1}}, {{0, 0, 0}, {1, 2, 1}}},
+      {{{0, 0, 0}, {1, 1, 1}}, {{20, 0, 0}, {21, 1, 1}}},
+      {{{10, 0, 0}, {15, 5, 5}}, {{40, 0, 0}, {45, 5, 5}}},
+      {{{0, 0, 0}, {3, 1, 1}},
+       {{0, 2, 0}, {3, 3, 1}},
+       {{0, 1, 0}, {1, 2, 1}},
+       {{2, 1, 0}, {3, 2, 1}}},
+      {{{0, 0, 0}, {5, 5, 1}},
+       {{0, 0, 4}, {5, 5, 5}},
+       {{0, 0, 1}, {5, 1, 4}},
+       {{0, 4, 1}, {5, 5, 4}},
+       {{0, 1, 1}, {1, 4, 4}},
+       {{4, 1, 1}, {5, 4, 4}}}};
+  // A separate solid nested inside the cavity adds a third surface component.
+  inputs.push_back(inputs.back());
+  inputs.back().push_back({{2, 2, 2}, {3, 3, 3}});
+  const auto makeSolid = [](const std::vector<Box>& boxes) {
+    std::vector<Manifold> parts;
+    for (const Box& box : boxes)
+      parts.push_back(Manifold::Cube(box.Size()).Translate(box.min));
+    return Manifold::BatchBoolean(parts, OpType::Add);
+  };
+  const auto expectSameSolid = [](const Manifold& actual,
+                                  const Manifold& expected) {
+    ASSERT_EQ(actual.Status(), Manifold::Error::NoError);
+    ASSERT_EQ(expected.Status(), Manifold::Error::NoError);
+    EXPECT_NEAR(actual.Volume(), expected.Volume(), 1e-8);
+    const Manifold excess = actual - expected;
+    const Manifold missing = expected - actual;
+    ASSERT_EQ(excess.Status(), Manifold::Error::NoError);
+    ASSERT_EQ(missing.Status(), Manifold::Error::NoError);
+    EXPECT_TRUE(excess.IsEmpty());
+    EXPECT_TRUE(missing.IsEmpty());
+  };
+  // Each pair is also checked in reverse order below.
+  for (const ivec2 pair : {ivec2(0, 0), ivec2(1, 0), ivec2(1, 1), ivec2(2, 3),
+                           ivec2(4, 1), ivec2(2, 5), ivec2(2, 6)}) {
+    SCOPED_TRACE(::testing::Message()
+                 << "operands " << pair.x << ", " << pair.y);
+    for (const vec3 offset : {vec3(0.0), vec3(10, -7, 3)}) {
+      SCOPED_TRACE(::testing::Message() << "offset " << offset.x << ", "
+                                        << offset.y << ", " << offset.z);
+      const vec3 firstOffset = vec3(2, -3, 1);
+      const Manifold first = makeSolid(inputs[pair.x]).Translate(firstOffset);
+      const Manifold second = makeSolid(inputs[pair.y]).Translate(offset);
+      const Manifold sum = first.MinkowskiSum(second);
+      std::vector<Box> sumBoxes;
+      for (const Box& a : inputs[pair.x])
+        for (const Box& b : inputs[pair.y])
+          sumBoxes.push_back({a.min + b.min, a.max + b.max});
+      const Manifold expected =
+          makeSolid(sumBoxes).Translate(firstOffset + offset);
+      expectSameSolid(sum, expected);
+      expectSameSolid(second.MinkowskiSum(first), expected);
+      expectSameSolid(first, makeSolid(inputs[pair.x]).Translate(firstOffset));
+      expectSameSolid(second, makeSolid(inputs[pair.y]).Translate(offset));
+    }
+  }
+}
+
 /**
  * This tests that non-intersecting geometry is properly retained.
  */

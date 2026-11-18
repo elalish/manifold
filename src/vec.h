@@ -87,9 +87,14 @@ class Vec : public VecView<T> {
   // cannot be template methods
   inline Vec(const Vec<T, true>& vec) : VecView<T>() {
     ZoneScopedN("Vec(const vec&)");
-    // initialized with operator=
-    if constexpr (shared) count_ = nullptr;
-    *this = Vec(vec.view());
+    if constexpr (shared) {
+      // Share storage just like copy assignment. MakeUnique() detaches before
+      // mutation; copying into an unshared Vec still needs its own buffer.
+      count_ = nullptr;
+      *this = vec;
+    } else {
+      *this = Vec(vec.view());
+    }
   }
 
   inline Vec(const Vec<T, false>& vec) : VecView<T>() {
@@ -103,6 +108,8 @@ class Vec : public VecView<T> {
     if constexpr (shared) {
       this->count_ = other.count_;
       other.count_ = nullptr;
+    } else {
+      if (other.count_ != nullptr) other.MakeUnique();
     }
     moveContent(other);
   }
@@ -137,6 +144,10 @@ class Vec : public VecView<T> {
   Vec& operator=(const Vec& other) {
     ZoneScopedN("Vec operator=(other)");
     if (&other == this) return *this;
+    if constexpr (shared) {
+      // A moved-from SharedVec has no reference counter.
+      if (other.count_ == nullptr) return *this = Vec();
+    }
     dealloc();
     if constexpr (shared) {
       other.count_->fetch_add(1);
@@ -185,7 +196,11 @@ class Vec : public VecView<T> {
 
   inline Vec<T, shared>& operator=(Vec<T, !shared>&& other) {
     dealloc();
-    if constexpr (shared) this->count_ = new std::atomic<int>(1);
+    if constexpr (shared) {
+      this->count_ = new std::atomic<int>(1);
+    } else {
+      if (other.count_ != nullptr) other.MakeUnique();
+    }
     moveContent(other);
     return *this;
   }

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "disjoint_sets.h"
 #include "execution_impl.h"
 #include "impl.h"
 #include "parallel.h"
@@ -75,13 +76,38 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
     return Manifold(result);
   }
 
-  std::shared_ptr<Impl> aImplCopy = std::make_shared<Impl>(*aImpl);
-  Manifold a(aImplCopy);
   std::vector<Manifold> composedHulls;
-  // Reserve space: 1 for base + batches for non-convex cases
+  // Reserve for face batches; component seeds may require additional space.
   size_t numBatches = (aImpl->NumTri() + BATCH_SIZE - 1) / BATCH_SIZE;
   composedHulls.reserve(1 + numBatches);
-  composedHulls.push_back(a);
+  if (inset) {
+    composedHulls.push_back(Manifold(std::make_shared<Impl>(*aImpl)));
+  } else if (!aConvex && bConvex) {
+    // A translated by any point of B belongs to A + B; unshifted A may not.
+    Manifold a(std::make_shared<Impl>(*aImpl));
+    composedHulls.push_back(a.Translate(bImpl->vertPos_[0]));
+  } else if (!aConvex && !bConvex) {
+    // Face-pair sweeps do not fill components contained inside the other
+    // operand. Seed both directions at a vertex of each boundary component,
+    // including cavity surfaces, without adding anything outside A + B.
+    auto addSeeds = [&composedHulls](const Impl& source, const Impl& shape) {
+      DisjointSets components(source.NumVert());
+      for (size_t edge = 0; edge < source.halfedge_.size(); ++edge) {
+        if (source.halfedge_.IsForward(edge)) {
+          components.unite(source.halfedge_.Start(edge),
+                           source.halfedge_.End(edge));
+        }
+      }
+      Manifold base(std::make_shared<Impl>(shape));
+      for (size_t vert = 0; vert < source.NumVert(); ++vert) {
+        if (components.find(vert) == vert) {
+          composedHulls.push_back(base.Translate(source.vertPos_[vert]));
+        }
+      }
+    };
+    addSeeds(*bImpl, *aImpl);
+    addSeeds(*aImpl, *bImpl);
+  }
 
   // Convex-Convex Minkowski: Very Fast
   if (!inset && aConvex && bConvex) {

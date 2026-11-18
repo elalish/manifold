@@ -25,11 +25,13 @@
 namespace {
 using namespace manifold;
 
+// Computes each triangle's contributions to its vertices' curvature sums. The
+// sums are accumulated afterwards in triangle order, so the result doesn't
+// depend on the execution policy or thread scheduling.
 struct CurvatureAngles {
-  VecView<double> meanCurvature;
-  VecView<double> gaussianCurvature;
-  VecView<double> area;
-  VecView<double> degree;
+  VecView<double> dihedral;  // per halfedge, if mean curvature is requested
+  VecView<double> angle;     // per halfedge, if Gaussian curvature is requested
+  VecView<double> area3;     // per triangle, a third of its area
   const Halfedges& halfedge;
   VecView<const vec3> vertPos;
   VecView<const vec3> triNormal;
@@ -44,28 +46,24 @@ struct CurvatureAngles {
       edge[i] = vertPos[endVert] - vertPos[startVert];
       edgeLength[i] = la::length(edge[i]);
       edge[i] /= edgeLength[i];
-      const int neighborTri = halfedge.Pair(edgeIdx) / 3;
-      const double dihedral =
-          0.25 * edgeLength[i] *
-          math::asin(la::dot(la::cross(triNormal[tri], triNormal[neighborTri]),
-                             edge[i]));
-      AtomicAdd(meanCurvature[startVert], dihedral);
-      AtomicAdd(meanCurvature[endVert], dihedral);
-      AtomicAdd(degree[startVert], 1.0);
+      if (!dihedral.empty()) {
+        const int neighborTri = halfedge.Pair(edgeIdx) / 3;
+        dihedral[edgeIdx] =
+            0.25 * edgeLength[i] *
+            math::asin(la::dot(
+                la::cross(triNormal[tri], triNormal[neighborTri]), edge[i]));
+      }
     }
 
-    vec3 phi;
-    phi[0] = math::acos(-la::dot(edge[2], edge[0]));
-    phi[1] = math::acos(-la::dot(edge[0], edge[1]));
-    phi[2] = kPi - phi[0] - phi[1];
-    const double area3 = edgeLength[0] * edgeLength[1] *
-                         la::length(la::cross(edge[0], edge[1])) / 6;
-
-    for (int i : {0, 1, 2}) {
-      const int vert = halfedge.Start(3 * tri + i);
-      AtomicAdd(gaussianCurvature[vert], -phi[i]);
-      AtomicAdd(area[vert], area3);
+    if (!angle.empty()) {
+      const double phi0 = math::acos(-la::dot(edge[2], edge[0]));
+      const double phi1 = math::acos(-la::dot(edge[0], edge[1]));
+      angle[3 * tri] = phi0;
+      angle[3 * tri + 1] = phi1;
+      angle[3 * tri + 2] = kPi - phi0 - phi1;
     }
+    area3[tri] = edgeLength[0] * edgeLength[1] *
+                 la::length(la::cross(edge[0], edge[1])) / 6;
   }
 };
 
@@ -332,20 +330,41 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   ZoneScoped;
   if (IsEmpty()) return;
   if (gaussianIdx < 0 && meanIdx < 0) return;
-  Vec<double> vertMeanCurvature(NumVert(), 0);
-  Vec<double> vertGaussianCurvature(NumVert(), kTwoPi);
-  Vec<double> vertArea(NumVert(), 0);
-  Vec<double> degree(NumVert(), 0);
+  const size_t numHalfedge = halfedge_.size();
+  Vec<double> dihedral(meanIdx >= 0 ? numHalfedge : 0);
+  Vec<double> angle(gaussianIdx >= 0 ? numHalfedge : 0);
+  Vec<double> area3(NumTri());
   auto policy = autoPolicy(NumTri(), 1e4);
   for_each(policy, countAt(0_uz), countAt(NumTri()),
-           CurvatureAngles{vertMeanCurvature, vertGaussianCurvature, vertArea,
-                           degree, halfedge_, vertPos_, faceNormal_});
+           CurvatureAngles{dihedral, angle, area3, halfedge_, vertPos_,
+                           faceNormal_});
+
+  // Sequential, so each vertex sums its terms in the same order every time.
+  Vec<double> vertMeanCurvature(meanIdx >= 0 ? NumVert() : 0, 0);
+  Vec<double> vertGaussianCurvature(gaussianIdx >= 0 ? NumVert() : 0, kTwoPi);
+  Vec<double> vertArea(NumVert(), 0);
+  Vec<int> degree(NumVert(), 0);
+  for (size_t tri = 0; tri < NumTri(); ++tri) {
+    for (const int i : {0, 1, 2}) {
+      const size_t edge = 3 * tri + i;
+      const int startVert = halfedge_.Start(edge);
+      if (!dihedral.empty()) {
+        vertMeanCurvature[startVert] += dihedral[edge];
+        vertMeanCurvature[halfedge_.End(edge)] += dihedral[edge];
+      }
+      degree[startVert] += 1;
+      if (!angle.empty()) vertGaussianCurvature[startVert] -= angle[edge];
+      vertArea[startVert] += area3[tri];
+    }
+  }
   for_each_n(policy, countAt(0), NumVert(),
              [&vertMeanCurvature, &vertGaussianCurvature, &vertArea,
               &degree](const int vert) {
                const double factor = degree[vert] / (6 * vertArea[vert]);
-               vertMeanCurvature[vert] *= factor;
-               vertGaussianCurvature[vert] *= factor;
+               if (!vertMeanCurvature.empty())
+                 vertMeanCurvature[vert] *= factor;
+               if (!vertGaussianCurvature.empty())
+                 vertGaussianCurvature[vert] *= factor;
              });
 
   const int oldNumProp = NumProp();
