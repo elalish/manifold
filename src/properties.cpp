@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cmath>
 #include <limits>
 
 #if MANIFOLD_PAR == 1
@@ -496,6 +497,15 @@ struct MinDistanceRecorder {
 double Manifold::Impl::MinGap(const Manifold::Impl& other,
                               double searchLength) const {
   ZoneScoped;
+  // The distance between the cached mesh bounds is a lower bound on every
+  // triangle-pair distance. Avoid building face boxes and querying the collider
+  // when even those bounds lie beyond the requested clearance.
+  const vec3 gap = la::max(vec3(0.0), la::max(bBox_.min - other.bBox_.max,
+                                              other.bBox_.min - bBox_.max));
+  if (searchLength > 0 && std::hypot(gap.x, gap.y, gap.z) >= searchLength) {
+    return searchLength;
+  }
+
   Vec<Box> faceBoxOther;
   Vec<uint32_t> faceMortonOther;
 

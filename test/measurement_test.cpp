@@ -226,6 +226,40 @@ TEST(Measurement, MinGapSphereSphereOutOfBounds) {
   EXPECT_FLOAT_EQ(distance, 0.8);
 }
 
+TEST(Measurement, MinGapBoundingBoxClearance) {
+  const auto a = Manifold::Cube(vec3(1), true);
+  const auto b = a.Translate({4, 5, 0});
+  // The boxes have axis separations 3 and 4: their closest corners are 5 apart.
+  // Check both sides of the bound as well as a diagonal gap whose individual
+  // axis separations are less than the search distance.
+  for (double limit : {0.25, 4.5, std::nextafter(5.0, 0.0), 5.0,
+                       std::nextafter(5.0, 6.0), 6.0}) {
+    const double expected = std::min(5.0, limit);
+    EXPECT_DOUBLE_EQ(a.MinGap(b, limit), expected);
+    EXPECT_DOUBLE_EQ(b.MinGap(a, limit), expected);
+  }
+
+  // Intersecting bounding boxes do not imply intersecting solids.
+  const auto sphere = Manifold::Sphere(1, 32);
+  const auto diagonal = sphere.Translate({2, 2, 0});
+  EXPECT_DOUBLE_EQ(sphere.MinGap(diagonal, 0.5), 0.5);
+  EXPECT_NEAR(sphere.MinGap(diagonal, 1), 2 * std::sqrt(2) - 2, 1e-12);
+  EXPECT_DOUBLE_EQ(a.MinGap(a.Translate({0.5, 0, 0}), 0.25), 0);
+}
+
+TEST(Measurement, MinGapBoundingBoxEmptyAndNonpositiveLimits) {
+  const auto cube = Manifold::Cube();
+  const auto far = cube.Translate({10, 0, 0});
+  EXPECT_DOUBLE_EQ(Manifold().MinGap(cube, 0.25), 0.25);
+  EXPECT_DOUBLE_EQ(cube.MinGap(Manifold(), 0.25), 0.25);
+  // Keep the existing nonpositive-limit behavior outside the positive-clearance
+  // shortcut, including the absolute value returned for a negative limit.
+  for (double limit : {0.0, -0.25}) {
+    EXPECT_DOUBLE_EQ(cube.MinGap(far, limit), std::abs(limit));
+    EXPECT_DOUBLE_EQ(cube.MinGap(cube, limit), 0);
+  }
+}
+
 TEST(Measurement, MinGapClosestPointOnEdge) {
   auto a = Manifold::Cube({1, 1, 1}, true).Rotate(0, 0, 45);
   auto b =
