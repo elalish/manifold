@@ -23,6 +23,72 @@
 
 using namespace manifold;
 
+TEST(Utils, BoxSignedScale) {
+  const Box original({1, 2, 3}, {4, 6, 8});
+  for (double x : {-2., 0., 2.}) {
+    for (double y : {-3., 0., 3.}) {
+      for (double z : {-4., 0., 4.}) {
+        const vec3 scale(x, y, z);
+        SCOPED_TRACE(testing::Message() << x << ", " << y << ", " << z);
+        const Box scaled = original * scale;
+        Box assigned = original;
+        assigned *= scale;
+        EXPECT_EQ(assigned, scaled);
+        EXPECT_TRUE(scaled.Contains(original.Center() * scale));
+        for (int i : {0, 1, 2}) {
+          EXPECT_DOUBLE_EQ(scaled.Size()[i],
+                           original.Size()[i] * std::abs(scale[i]));
+        }
+        for (double px : {1., 4.})
+          for (double py : {2., 6.})
+            for (double pz : {3., 8.})
+              EXPECT_TRUE(scaled.Contains(vec3(px, py, pz) * scale));
+        EXPECT_TRUE(scaled.DoesOverlap(scaled));
+      }
+    }
+  }
+}
+
+TEST(Utils, RectSignedScale) {
+  const Rect original({1, 2}, {4, 6});
+  for (double x : {-2., 0., 2.}) {
+    for (double y : {-3., 0., 3.}) {
+      const vec2 scale(x, y);
+      SCOPED_TRACE(testing::Message() << x << ", " << y);
+      const Rect scaled = original * scale;
+      Rect assigned = original;
+      assigned *= scale;
+      EXPECT_EQ(assigned.min, scaled.min);
+      EXPECT_EQ(assigned.max, scaled.max);
+      EXPECT_TRUE(scaled.Contains(original.Center() * scale));
+      EXPECT_DOUBLE_EQ(scaled.Area(), original.Area() * std::abs(x * y));
+      EXPECT_EQ(scaled.IsEmpty(), x == 0 || y == 0);
+      for (double px : {1., 4.})
+        for (double py : {2., 6.})
+          EXPECT_TRUE(scaled.Contains(vec2(px, py) * scale));
+      EXPECT_TRUE(scaled.DoesOverlap(scaled));
+    }
+  }
+}
+
+TEST(Utils, SignedScalePreservesEmptyBounds) {
+  for (double factor : {-2., 0., 2.}) {
+    const Box box;
+    EXPECT_EQ(box * vec3(factor), box);
+    Box assignedBox;
+    assignedBox *= vec3(factor);
+    EXPECT_EQ(assignedBox, box);
+    const Rect rect;
+    const Rect scaledRect = rect * vec2(factor);
+    EXPECT_EQ(scaledRect.min, rect.min);
+    EXPECT_EQ(scaledRect.max, rect.max);
+    Rect assignedRect;
+    assignedRect *= vec2(factor);
+    EXPECT_EQ(assignedRect.min, rect.min);
+    EXPECT_EQ(assignedRect.max, rect.max);
+  }
+}
+
 TEST(Utils, CosdLargeAngles) {
   for (const double angle : {1e18, -1e18, 1e20, -1e20, 1e100, -1e100,
                              std::numeric_limits<double>::max(),

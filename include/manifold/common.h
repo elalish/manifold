@@ -406,23 +406,18 @@ struct Box {
   }
 
   /**
-   * Scale this box by the given vector.
+   * Scale this box by the given vector, preserving ordered bounds when a
+   * component is negative. An empty box remains empty.
    */
   constexpr Box operator*(vec3 scale) const {
-    Box out;
-    out.min = min * scale;
-    out.max = max * scale;
-    return out;
+    if (la::any(la::greater(min, max))) return *this;
+    return Box(min * scale, max * scale);
   }
 
   /**
    * Scale this box in-place by the given vector.
    */
-  Box& operator*=(vec3 scale) {
-    min *= scale;
-    max *= scale;
-    return *this;
-  }
+  Box& operator*=(vec3 scale) { return *this = *this * scale; }
 
   /**
    * Does this box overlap the one given (including equality)?
@@ -579,23 +574,18 @@ struct Rect {
   }
 
   /**
-   * Scale this rectangle by the given vector.
+   * Scale this rectangle by the given vector, preserving ordered bounds when
+   * a component is negative. An empty bounding rectangle remains empty.
    */
   constexpr Rect operator*(const vec2 scale) const {
-    Rect out;
-    out.min = min * scale;
-    out.max = max * scale;
-    return out;
+    if (la::any(la::greater(min, max))) return *this;
+    return Rect(min * scale, max * scale);
   }
 
   /**
    * Scale this rectangle in-place by the given vector.
    */
-  Rect& operator*=(const vec2 scale) {
-    min *= scale;
-    max *= scale;
-    return *this;
-  }
+  Rect& operator*=(const vec2 scale) { return *this = *this * scale; }
 
   /**
    * Transform the rectangle by the given axis-aligned affine transform.

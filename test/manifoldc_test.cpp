@@ -115,6 +115,29 @@ TEST(CBIND, include_pt_mutates_bounds) {
   manifold_delete_box(box);
 }
 
+TEST(CBIND, signed_bounds_scale) {
+  ManifoldRect* rect = manifold_rect(1, 2, 4, 6);
+  ManifoldRect* scaledRect = manifold_rect_mul(rect, -2, 3);
+  EXPECT_TRUE(manifold_rect_contains_pt(scaledRect, -5, 12));
+  EXPECT_FALSE(manifold_rect_is_empty(scaledRect));
+  EXPECT_DOUBLE_EQ(manifold_rect_dimensions(scaledRect).x, 6);
+  EXPECT_DOUBLE_EQ(manifold_rect_dimensions(scaledRect).y, 12);
+  EXPECT_DOUBLE_EQ(manifold_rect_min(rect).x, 1);
+
+  ManifoldBox* box = manifold_box(1, 2, 3, 4, 6, 8);
+  ManifoldBox* scaledBox = manifold_box_mul(box, -2, 3, -4);
+  EXPECT_TRUE(manifold_box_contains_pt(scaledBox, -5, 12, -22));
+  EXPECT_DOUBLE_EQ(manifold_box_dimensions(scaledBox).x, 6);
+  EXPECT_DOUBLE_EQ(manifold_box_dimensions(scaledBox).y, 12);
+  EXPECT_DOUBLE_EQ(manifold_box_dimensions(scaledBox).z, 20);
+  EXPECT_DOUBLE_EQ(manifold_box_min(box).x, 1);
+
+  manifold_delete_rect(rect);
+  manifold_delete_rect(scaledRect);
+  manifold_delete_box(box);
+  manifold_delete_box(scaledBox);
+}
+
 #ifndef MANIFOLD_NO_IOSTREAM
 TEST(CBIND, obj_round_trip) {
   ManifoldManifold* cube = manifold_cube(1.0, 1.0, 1.0, 1);
