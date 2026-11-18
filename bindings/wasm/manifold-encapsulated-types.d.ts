@@ -1065,13 +1065,13 @@ export class Manifold {
   boundingBox(): Box;
 
   /**
-   * Return a copy of the manifold simplified to the given tolerance, but with
-   * its actual tolerance value unchanged. The result will contain a subset of
-   * the original verts and all surfaces will have moved by less than tolerance.
+   * Return a simplified copy of the manifold. The tolerance controls the local
+   * error when collapsing edges, measured relative to nearby face planes.
+   * Thin features can disappear, leaving points on the original surface farther
+   * than the tolerance from the result.
    *
-   * @param tolerance The maximum distance between the original and simplified
-   *     meshes. If not given or is less than the current tolerance, the current
-   *     tolerance is used.
+   * @param tolerance Simplification tolerance, lower-bounded by the manifold's
+   *     epsilon.
    * @group Transformations
    */
   simplify(tolerance?: number): Manifold;
