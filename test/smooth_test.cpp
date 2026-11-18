@@ -343,6 +343,48 @@ TEST(Smooth, Manual) {
   }
 }
 
+TEST(Smooth, ExportTangentsFollowTriangleRuns) {
+  const Manifold sphere =
+      Manifold::Sphere(1, 12).CalculateNormals(0, 180).SmoothByNormals();
+  const Manifold ellipsoid = sphere.Scale({1, 2, 3}).Translate({6, 0, 0});
+  const Manifold tetrahedron = Manifold::Tetrahedron()
+                                   .CalculateNormals(0, 180)
+                                   .SmoothByNormals()
+                                   .Translate({-6, 0, 0});
+  const std::vector<Manifold> cases = {
+      sphere,
+      ellipsoid,
+      Manifold::BatchBoolean({sphere, ellipsoid}, OpType::Add),
+      Manifold::BatchBoolean({ellipsoid, sphere}, OpType::Add),
+      Manifold::BatchBoolean({ellipsoid, tetrahedron, sphere}, OpType::Add),
+      Manifold::BatchBoolean(
+          {ellipsoid, Manifold::Cube().Translate({-5, 0, 0})}, OpType::Add)};
+
+  for (size_t i = 0; i < cases.size(); ++i) {
+    SCOPED_TRACE(i);
+    const Manifold& source = cases[i];
+    const Manifold expected = source.Refine(3);
+    ASSERT_EQ(expected.Status(), Manifold::Error::NoError);
+    const auto check = [&](const auto& mesh, double tolerance) {
+      const Manifold restored(mesh);
+      ASSERT_EQ(restored.Status(), Manifold::Error::NoError);
+      const Manifold actual = restored.Refine(3);
+      ASSERT_EQ(actual.Status(), Manifold::Error::NoError);
+      EXPECT_EQ(actual.NumTri(), expected.NumTri());
+      EXPECT_NEAR(actual.Volume(), expected.Volume(), tolerance);
+      EXPECT_NEAR(actual.SurfaceArea(), expected.SurfaceArea(), tolerance);
+      const Manifold extra = actual - expected;
+      const Manifold missing = expected - actual;
+      ASSERT_EQ(extra.Status(), Manifold::Error::NoError);
+      ASSERT_EQ(missing.Status(), Manifold::Error::NoError);
+      EXPECT_NEAR(extra.Volume(), 0, tolerance);
+      EXPECT_NEAR(missing.Volume(), 0, tolerance);
+    };
+    check(source.GetMeshGL(), 1e-4);
+    check(source.GetMeshGL64(), 1e-9);
+  }
+}
+
 TEST(Smooth, InvalidTangents) {
   Manifold cube = Manifold::Cube().CalculateNormals(0, 180).SmoothByNormals();
   MeshGL withTangents = cube.GetMeshGL();
