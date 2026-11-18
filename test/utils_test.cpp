@@ -85,6 +85,20 @@ TEST(Utils, SegmentQueryClosedSlabs) {
   EXPECT_FALSE(crossing.DoesOverlap(offRay));
 }
 
+#ifndef __EMSCRIPTEN__
+TEST(Utils, VecAbortsWhenAllocationFails) {
+  // More elements than size_t can address. Abort at the allocation rather
+  // than return a null buffer for later writes to go through.
+#ifdef GTEST_FLAG_SET
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
+#else
+  testing::GTEST_FLAG(death_test_style) = "threadsafe";
+#endif
+  Vec<double> vec;
+  EXPECT_DEATH(vec.reserve(std::numeric_limits<size_t>::max() / 4), "");
+}
+#endif
+
 TEST(Utils, SharedVecCopyConstructionAndDetach) {
   const int values[] = {2, 3, 5};
   const SharedVec<int> source(VecView<const int>(values, 3));
