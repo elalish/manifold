@@ -742,8 +742,11 @@ double CrossSection::Area() const {
  * Return the number of vertices in the CrossSection.
  */
 size_t CrossSection::NumVert() const {
+  // Affine transforms preserve contour sizes. Keep them deferred when only
+  // the topology is requested, without copying or rounding vertex positions.
+  std::lock_guard<std::mutex> lock(pathsMutex_);
   size_t numVert = 0;
-  for (const auto& path : GetPaths()->paths_) numVert += path.size();
+  for (const auto& path : paths_->paths_) numVert += path.size();
   return numVert;
 }
 
@@ -751,12 +754,18 @@ size_t CrossSection::NumVert() const {
  * Return the number of contours (both outer and inner paths) in the
  * CrossSection.
  */
-size_t CrossSection::NumContour() const { return GetPaths()->paths_.size(); }
+size_t CrossSection::NumContour() const {
+  std::lock_guard<std::mutex> lock(pathsMutex_);
+  return paths_->paths_.size();
+}
 
 /**
  * Does the CrossSection contain any contours?
  */
-bool CrossSection::IsEmpty() const { return GetPaths()->paths_.empty(); }
+bool CrossSection::IsEmpty() const {
+  std::lock_guard<std::mutex> lock(pathsMutex_);
+  return paths_->paths_.empty();
+}
 
 /**
  * Returns the axis-aligned bounding rectangle of all the CrossSections'
