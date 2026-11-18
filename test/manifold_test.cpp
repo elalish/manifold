@@ -1480,6 +1480,60 @@ TEST(Manifold, Project) {
  * Testing more advanced Manifold operations.
  */
 
+TEST(Manifold, ProjectRefinedSphereContours) {
+  // Cross the silhouette buffer's growth boundaries with regular polygons of
+  // known area. Mirroring must preserve the winding of the projected solid.
+  for (int segments : {128, 132, 256, 260}) {
+    SCOPED_TRACE(segments);
+    const Manifold sphere = Manifold::Sphere(1, segments);
+    const double area = 0.5 * segments * sind(360.0 / segments);
+    for (const vec3 scale : {vec3(1), vec3(-2, 3, -1)}) {
+      const Polygons projected = sphere.Scale(scale).Project();
+      ASSERT_EQ(projected.size(), 1);
+      ASSERT_EQ(projected.front().size(), segments);
+      for (const vec2 point : projected.front()) {
+        EXPECT_NEAR(point.x * point.x / (scale.x * scale.x) +
+                        point.y * point.y / (scale.y * scale.y),
+                    1, 1e-12);
+      }
+      EXPECT_NEAR(CrossSection(projected).Area(),
+                  area * std::abs(scale.x * scale.y), 1e-10);
+    }
+  }
+}
+
+TEST(Manifold, ProjectGrowingContoursAndHoles) {
+  EXPECT_TRUE(Manifold().Project().empty());
+  const CrossSection section =
+      CrossSection::Circle(3, 132) - CrossSection::Circle(1, 132) +
+      CrossSection::Circle(0.5, 260).Translate({10, 0});
+  const Manifold prism =
+      Manifold::Extrude(section.ToPolygons(), 2, 4).Refine(2);
+  ASSERT_EQ(prism.Status(), Manifold::Error::NoError);
+  for (const vec3 scale : {vec3(1), vec3(-2, 3, -1)}) {
+    const CrossSection projected(prism.Scale(scale).Project());
+    const CrossSection expected = section.Scale({scale.x, scale.y});
+    EXPECT_EQ(projected.NumContour(), 3);
+    EXPECT_NEAR(projected.Area(), expected.Area(), 1e-9);
+    EXPECT_LT((projected - expected).Area() + (expected - projected).Area(),
+              1e-9);
+  }
+
+  // Many small components exercise a much denser set of cusp edges.
+  std::vector<Manifold> parts;
+  for (int i = 0; i < 129; ++i) {
+    parts.push_back(
+        Manifold::Tetrahedron().Translate({4.0 * (i % 16), 4.0 * (i / 16), 0}));
+  }
+  const Polygons projected =
+      Manifold::BatchBoolean(parts, OpType::Add).Project();
+  ASSERT_EQ(projected.size(), parts.size());
+  for (const SimplePolygon& contour : projected) {
+    EXPECT_EQ(contour.size(), 4);
+    EXPECT_NEAR(CrossSection(contour).Area(), 4, 1e-12);
+  }
+}
+
 TEST(Manifold, Transform) {
   Manifold cube = Manifold::Cube({1, 2, 3});
   Manifold cube2 = cube;
