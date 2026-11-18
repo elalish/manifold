@@ -436,6 +436,7 @@ Polygons Manifold::Impl::Project() const {
   const mat2x3 projection = GetAxisAlignedProjection({0, 0, 1});
   // A mesh's silhouette usually contains far fewer edges than the mesh itself.
   Vec<Halfedge> cusps;
+  // Vec::push_back starts at 128 elements; reserve less for smaller meshes.
   cusps.reserve(std::min(NumEdge(), size_t{128}));
   for (size_t i = 0; i < halfedge_.size(); ++i) {
     const int pair = halfedge_.Pair(i);
