@@ -1522,7 +1522,28 @@ bool Passes(const FilletInput& input, int first, int second, int kind,
 // intersection is ill-conditioned), and the center follows.
 void Conform(const FilletInput& input, int first, int second, int kind,
              RawCandidate& raw, double radius) {
-  auto clamp = [](double t) { return !(t > 0) ? 0.0 : t > 1 ? 1.0 : t; };
+  // An edge holds the ball between its ends, and at an end in a corner only
+  // as far as the corner ball there (CornerLimit): that is what the ball was
+  // accepted within, and where it is put if its computed place is beyond.
+  // In a strip just as wide as the ball, closed off at its end, the ball
+  // between the two sides is then the one that also touches the end -
+  // not one centered on the end itself, bulging out through it.
+  auto limit = [&](int e, bool atEnd) {
+    const double at = atEnd ? 1 : 0;
+    const int before = atEnd ? e : input.prevEdges[e];
+    if (!input.kindsReady || input.endKinds[before] != kCorner) return at;
+    const int other = atEnd ? NextEdge(input, e) : before;
+    const vec2 n = LineNormal(input, e), no = LineNormal(input, other);
+    const vec2 d = EdgeEnd(input, e) - EdgeStart(input, e);
+    const double along =
+        dot((n + no) * (radius / (1 + dot(n, no))), d) / dot(d, d);
+    return std::isfinite(along) ? at + along : at;
+  };
+  auto clampTo = [&](int e, double t) {
+    double lo = limit(e, false), hi = limit(e, true);
+    if (!(lo <= hi)) lo = 0, hi = 1;
+    return !(t > lo) ? lo : t > hi ? hi : t;
+  };
   auto offsetPoint = [&](int e, double t) {
     return PointOnEdge(input, e, t) + LineNormal(input, e) * radius;
   };
@@ -1532,7 +1553,7 @@ void Conform(const FilletInput& input, int first, int second, int kind,
     return dot(c - start, d) / dot(d, d);
   };
   if (!FirstIsVertex(kind)) {
-    const double t = clamp(raw.firstT);
+    const double t = clampTo(first, raw.firstT);
     if (t != raw.firstT) {
       raw.firstT = t;
       raw.center = offsetPoint(first, t);
@@ -1540,11 +1561,12 @@ void Conform(const FilletInput& input, int first, int second, int kind,
     }
   }
   if (!SecondIsVertex(kind)) {
-    const double t = clamp(raw.secondT);
+    const double t = clampTo(second, raw.secondT);
     if (t != raw.secondT) {
       raw.secondT = t;
       raw.center = offsetPoint(second, t);
-      if (!FirstIsVertex(kind)) raw.firstT = clamp(project(first, raw.center));
+      if (!FirstIsVertex(kind))
+        raw.firstT = clampTo(first, project(first, raw.center));
     }
   }
 }
