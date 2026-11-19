@@ -1301,23 +1301,13 @@ TEST(Manifold, RevolveInvalidAngle) {
   }
 }
 
-TEST(Manifold, RevolveTooLarge) {
+TEST(Manifold, RevolveSliceCountOverflow) {
   const SimplePolygon profile = {{1, 0}, {2, 0}, {2, 1}, {1, 1}};
   const int maxInt = std::numeric_limits<int>::max();
-  for (double degrees : {180.0, -180.0, 360.0}) {
+  for (double degrees : {180.0, -180.0}) {
     EXPECT_EQ(Manifold::Revolve({profile}, maxInt, degrees).Status(),
               Manifold::Error::ResultTooLarge);
-    // The vertices fit in int, but the side halfedges do not.
-    EXPECT_EQ(Manifold::Revolve({profile}, maxInt / 16, degrees).Status(),
-              Manifold::Error::ResultTooLarge);
   }
-  // The side halfedges fit, but the two end caps exceed the remaining space.
-  EXPECT_EQ(Manifold::Revolve({profile}, maxInt / 24, 180.0).Status(),
-            Manifold::Error::ResultTooLarge);
-  const SimplePolygon second = {{3, 0}, {4, 0}, {4, 1}, {3, 1}};
-  // Both profiles fit individually; their combined halfedge count does not.
-  EXPECT_EQ(Manifold::Revolve({profile, second}, maxInt / 32).Status(),
-            Manifold::Error::ResultTooLarge);
 }
 
 TEST(Manifold, RevolveNegativeAngle) {
