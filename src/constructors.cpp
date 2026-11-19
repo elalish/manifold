@@ -319,17 +319,47 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
           : std::max(1, static_cast<int>(Quality::GetCircularSegments(radius) *
                                          revolveDegrees / 360));
 
+  // Vertices and halfedges are indexed by int. Count before constructing the
+  // revolved mesh, including the extra slice of a partial revolution.
+  constexpr int64_t maxIndex = std::numeric_limits<int>::max();
+  const int64_t sliceCount = int64_t(nDivisions) + !isFullRevolution;
+  if (sliceCount > maxIndex) return PropagateStatus(Error::ResultTooLarge);
+  int64_t numVertices = 0;
+  int64_t numHalfedges = 0;
+  for (const auto& poly : polygons) {
+    for (const vec2& point : poly) {
+      if (point.x > 0.0) {
+        numVertices += sliceCount;
+        // Each off-axis point contributes two side triangles per division.
+        numHalfedges += 6 * int64_t(nDivisions);
+      } else {
+        ++numVertices;
+      }
+      if (numVertices > maxIndex || numHalfedges > maxIndex)
+        return PropagateStatus(Error::ResultTooLarge);
+    }
+  }
+
   auto pImpl_ = std::make_shared<Impl>();
+  std::vector<ivec3> frontTriangles;
+  if (!isFullRevolution) {
+    frontTriangles = Triangulate(polygons, pImpl_->epsilon_);
+    if (frontTriangles.size() > (maxIndex - numHalfedges) / 6)
+      return PropagateStatus(Error::ResultTooLarge);
+    numHalfedges += 6 * frontTriangles.size();
+  }
   auto& vertPos = pImpl_->vertPos_;
+  vertPos.reserve(numVertices);
   Vec<ivec3> triVertsDH;
   auto& triVerts = triVertsDH;
+  triVerts.reserve(numHalfedges / 3);
 
   std::vector<int> startPoses;
   std::vector<int> endPoses;
 
   const double dPhi = revolveDegrees / nDivisions;
   // first and last slice are distinguished if not a full revolution.
-  const int nSlices = isFullRevolution ? nDivisions : nDivisions + 1;
+  const int nSlices = static_cast<int>(sliceCount);
 
   for (const auto& poly : polygons) {
     size_t nPosVerts = 0;
@@ -387,7 +417,6 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
 
   // Add front and back triangles if not a full revolution.
   if (!isFullRevolution) {
-    std::vector<ivec3> frontTriangles = Triangulate(polygons, pImpl_->epsilon_);
     for (auto& t : frontTriangles) {
       triVerts.push_back({startPoses[t.x], startPoses[t.y], startPoses[t.z]});
     }
@@ -395,6 +424,8 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
     for (auto& t : frontTriangles) {
       triVerts.push_back({endPoses[t.z], endPoses[t.y], endPoses[t.x]});
     }
+    // Release the cap scratch before constructing the mesh's halfedges.
+    frontTriangles = std::vector<ivec3>();
   }
 
   // Mirror in y for a negative angle, and flip the winding to keep the volume
