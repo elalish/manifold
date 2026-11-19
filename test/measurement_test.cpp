@@ -18,6 +18,8 @@
 //   - `DistanceTriangleTriangleSquared` (the per-triangle primitive
 //     MinGap is built on)
 
+#include <limits>
+
 #include "../src/tri_dist.h"
 #include "gtest/gtest.h"
 #include "manifold/manifold.h"
@@ -285,8 +287,16 @@ TEST(Measurement, MinGapBoundingBoxTouchingAndContained) {
   EXPECT_DOUBLE_EQ(outer.MinGap(inner, 0.25), 0);
   EXPECT_DOUBLE_EQ(inner.MinGap(outer, 0.25), 0);
 
+  // Squaring a positive search cap can underflow to zero. A zero box gap
+  // must still reach the solid-intersection check instead of returning the cap.
+  const double tinyLimit = std::numeric_limits<double>::min();
+  EXPECT_DOUBLE_EQ(outer.MinGap(inner, tinyLimit), 0);
+  EXPECT_DOUBLE_EQ(inner.MinGap(outer, tinyLimit), 0);
+
   const auto cube = Manifold::Cube();
   EXPECT_DOUBLE_EQ(cube.MinGap(cube.Translate({1, 0, 0}), 0.25), 0);
+  EXPECT_DOUBLE_EQ(cube.MinGap(cube.Translate({2, 0, 0}), tinyLimit),
+                   tinyLimit);
   // Preserve the cap even for a positive gap below Boolean's tie tolerance.
   const double offset = std::nextafter(1.0, 2.0);
   const double limit = (offset - 1.0) / 2;

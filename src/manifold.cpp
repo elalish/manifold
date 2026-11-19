@@ -1158,7 +1158,9 @@ double Manifold::MinGap(const Manifold& other, double searchLength) const {
   const vec3 gap =
       la::max(vec3(0.0), la::max(impl->bBox_.min - otherImpl->bBox_.max,
                                  otherImpl->bBox_.min - impl->bBox_.max));
-  if (searchLength > 0 && std::hypot(gap.x, gap.y, gap.z) >= searchLength) {
+  const double gapSquared = la::length2(gap);
+  if (searchLength > 0 && gapSquared > 0 &&
+      gapSquared >= searchLength * searchLength) {
     return searchLength;
   }
 
