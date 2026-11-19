@@ -426,6 +426,48 @@ TEST(CBIND, polygons) {
   manifold_delete_polygons(ps);
 }
 
+TEST(CBIND, polygon_copies_own_their_storage) {
+  const ManifoldVec2 expected[] = {{0, 0}, {3, 0}, {0, 2}};
+  ManifoldVec2 points[] = {expected[0], expected[1], expected[2]};
+  ManifoldSimplePolygon* triangle = manifold_simple_polygon(points, 3);
+  ManifoldSimplePolygon* empty = manifold_simple_polygon(nullptr, 0);
+  const ManifoldSimplePolygon* inputs[] = {empty, triangle};
+  ManifoldPolygons* polygons = manifold_polygons(inputs, 2);
+
+  points[1] = {100, 200};
+  manifold_delete_simple_polygon(triangle);
+  manifold_delete_simple_polygon(empty);
+
+  ASSERT_EQ(manifold_polygons_length(polygons), 2);
+  ManifoldSimplePolygon* empty_copy = manifold_polygons_get_simple(polygons, 0);
+  ManifoldSimplePolygon* triangle_copy =
+      manifold_polygons_get_simple(polygons, 1);
+  manifold_delete_polygons(polygons);
+
+  EXPECT_EQ(manifold_simple_polygon_length(empty_copy), 0);
+  ASSERT_EQ(manifold_simple_polygon_length(triangle_copy), 3);
+  for (size_t i = 0; i < 3; ++i) {
+    ManifoldVec2 actual = manifold_simple_polygon_get_point(triangle_copy, i);
+    EXPECT_EQ(actual.x, expected[i].x);
+    EXPECT_EQ(actual.y, expected[i].y);
+  }
+  manifold_delete_simple_polygon(empty_copy);
+  manifold_delete_simple_polygon(triangle_copy);
+}
+
+TEST(CBIND, exported_polygons_outlive_cross_section) {
+  ManifoldCrossSection* square = manifold_cross_section_square(3, 2, false);
+  ManifoldPolygons* polygons = manifold_cross_section_to_polygons(square);
+  manifold_delete_cross_section(square);
+
+  ASSERT_EQ(manifold_polygons_length(polygons), 1);
+  EXPECT_EQ(manifold_polygons_simple_length(polygons, 0), 4);
+  ManifoldCrossSection* restored = manifold_cross_section_of_polygons(polygons);
+  manifold_delete_polygons(polygons);
+  EXPECT_DOUBLE_EQ(manifold_cross_section_area(restored), 6.0);
+  manifold_delete_cross_section(restored);
+}
+
 TEST(CBIND, triangulation) {
   ManifoldVec2 vs[] = {{0, 0}, {1, 1}, {1, 2}};
   ManifoldSimplePolygon* sp = manifold_simple_polygon(vs, 3);

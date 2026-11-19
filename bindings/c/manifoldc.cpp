@@ -68,6 +68,7 @@ extern "C" {
 ManifoldSimplePolygon* manifold_simple_polygon(const ManifoldVec2* ps,
                                                size_t length) {
   auto vec = new std::vector<vec2>;
+  vec->reserve(length);
   for (size_t i = 0; i < length; ++i) {
     vec->push_back({ps[i].x, ps[i].y});
   }
@@ -77,6 +78,7 @@ ManifoldSimplePolygon* manifold_simple_polygon(const ManifoldVec2* ps,
 ManifoldPolygons* manifold_polygons(const ManifoldSimplePolygon* const* ps,
                                     size_t length) {
   auto vec = new std::vector<SimplePolygon>;
+  vec->reserve(length);
   auto polys = reinterpret_cast<const SimplePolygon* const*>(ps);
   for (size_t i = 0; i < length; ++i) {
     vec->push_back(*polys[i]);
@@ -103,8 +105,7 @@ ManifoldVec2 manifold_simple_polygon_get_point(const ManifoldSimplePolygon* p,
 
 ManifoldSimplePolygon* manifold_polygons_get_simple(const ManifoldPolygons* ps,
                                                     size_t idx) {
-  auto sp = (*from_c(ps))[idx];
-  return to_c(new SimplePolygon(sp));
+  return to_c(new SimplePolygon((*from_c(ps))[idx]));
 }
 
 ManifoldVec2 manifold_polygons_get_point(const ManifoldPolygons* ps,
@@ -514,8 +515,7 @@ ManifoldManifold* manifold_compose(const ManifoldManifoldVec* ms) {
 }
 
 ManifoldManifoldVec* manifold_decompose(const ManifoldManifold* m) {
-  auto comps = from_c(m)->Decompose();
-  return to_c(new std::vector<Manifold>(comps));
+  return to_c(new std::vector<Manifold>(from_c(m)->Decompose()));
 }
 
 ManifoldMeshGL* manifold_get_meshgl(const ManifoldManifold* m) {
