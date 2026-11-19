@@ -1132,6 +1132,12 @@ bool TripleCut(const FilletInput& input, int c, int a, int b, double radius) {
       const vec2 u = nz + nw;
       const vec2 turn = (w == x ? ny : nx) - nw;
       beyond = radius * (dot(u, u) + dot(u, turn)) / (1 + dot(nx, ny)) - within;
+      // For z parallel to w as far as their angles tell, n_z + n_w is zero
+      // and what is computed for it is what rounding left of two normals
+      // that should cancel: its direction would decide a channel of exactly
+      // the ball's width one way at one end of a strip and the other way
+      // at the other. The gap itself is all there is.
+      if (LineCross(input, z, w) == 0) beyond = -within;
     }
     g = -LineCross(input, x, y) * beyond;
   } else {
