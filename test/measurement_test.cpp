@@ -260,6 +260,39 @@ TEST(Measurement, MinGapBoundingBoxEmptyAndNonpositiveLimits) {
   }
 }
 
+TEST(Measurement, MinGapBoundingBoxPendingCSG) {
+  auto make = []() {
+    return (Manifold::Cube() + Manifold::Cube().Translate({1, 0, 0}))
+        .Rotate(0, 0, 90)
+        .Translate({3, 4, 5});
+  };
+  for (double limit : {0.25, 7.0, 8.0}) {
+    for (bool reverse : {false, true}) {
+      // Leave both the Boolean and transforms unevaluated until MinGap.
+      const auto a = make();
+      const auto b = make().Translate({8, 0, 0});
+      const double expected = std::min(7.0, limit);
+      EXPECT_DOUBLE_EQ(reverse ? b.MinGap(a, limit) : a.MinGap(b, limit),
+                       expected);
+    }
+  }
+}
+
+TEST(Measurement, MinGapBoundingBoxTouchingAndContained) {
+  const auto outer = Manifold::Cube(vec3(10), true);
+  const auto inner = Manifold::Cube(vec3(1), true).Rotate(15, 30, 45);
+  // Separated surfaces of nested solids still have zero solid clearance.
+  EXPECT_DOUBLE_EQ(outer.MinGap(inner, 0.25), 0);
+  EXPECT_DOUBLE_EQ(inner.MinGap(outer, 0.25), 0);
+
+  const auto cube = Manifold::Cube();
+  EXPECT_DOUBLE_EQ(cube.MinGap(cube.Translate({1, 0, 0}), 0.25), 0);
+  // Preserve the cap even for a positive gap below Boolean's tie tolerance.
+  const double offset = std::nextafter(1.0, 2.0);
+  const double limit = (offset - 1.0) / 2;
+  EXPECT_DOUBLE_EQ(cube.MinGap(cube.Translate({offset, 0, 0}), limit), limit);
+}
+
 TEST(Measurement, MinGapClosestPointOnEdge) {
   auto a = Manifold::Cube({1, 1, 1}, true).Rotate(0, 0, 45);
   auto b =

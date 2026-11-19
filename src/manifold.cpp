@@ -1151,11 +1151,21 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
  * @param searchLength The maximum distance to search for a minimum gap.
  */
 double Manifold::MinGap(const Manifold& other, double searchLength) const {
+  const auto impl = GetCsgLeafNode().GetImpl();
+  const auto otherImpl = other.GetCsgLeafNode().GetImpl();
+  // The mesh bounds give a lower bound on the gap. If they are already beyond
+  // a positive search limit, even the solid intersection check is unnecessary.
+  const vec3 gap =
+      la::max(vec3(0.0), la::max(impl->bBox_.min - otherImpl->bBox_.max,
+                                 otherImpl->bBox_.min - impl->bBox_.max));
+  if (searchLength > 0 && std::hypot(gap.x, gap.y, gap.z) >= searchLength) {
+    return searchLength;
+  }
+
   auto intersect = *this ^ other;
   if (!intersect.IsEmpty()) return 0.0;
 
-  return GetCsgLeafNode().GetImpl()->MinGap(*other.GetCsgLeafNode().GetImpl(),
-                                            searchLength);
+  return impl->MinGap(*otherImpl, searchLength);
 }
 
 /**
