@@ -2168,6 +2168,21 @@ std::vector<CrossSection> TraceFillets(
   // otherwise, so it cannot hide pairing decisions in regular cases.
   if (!balanced()) {
     RemoveUnreachedFillets(input, geometries, removed);
+    // Only arcs that amount to nothing may go: one too flat to discretize
+    // (or just short of a full turn, which is one of those run the other
+    // way), and one of the two half-turns of a ball squeezed through a
+    // neck. Having to drop any other means a ball is missing somewhere, and
+    // what is left would close up across the gap into a different shape.
+    for (size_t i = 0; i < geometries.size(); ++i) {
+      if (!removed[i]) continue;
+      const FilletGeometry& g = geometries[i];
+      const double arc =
+          ArcAngle(EndAngle(input, g.from, g.center),
+                   EndAngle(input, g.to, g.center), input.invert);
+      const double flat = input.minArcAngle;
+      if (!(arc < flat || arc > 2 * M_PI - flat || std::abs(arc - M_PI) < flat))
+        return {};
+    }
     collectEvents();
     if (!balanced()) return {};
 #ifdef MANIFOLD_DEBUG
