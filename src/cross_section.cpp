@@ -80,6 +80,13 @@ std::shared_ptr<const PathImpl> shared_paths(Polygons paths) {
   return std::make_shared<const PathImpl>(std::move(paths));
 }
 
+std::shared_ptr<const PathImpl> shared_path(SimplePolygon path) {
+  Polygons paths;
+  // An initializer_list would make its element const and copy the vertices.
+  paths.push_back(std::move(path));
+  return shared_paths(std::move(paths));
+}
+
 void HullBacktrack(const vec2& point, std::vector<vec2>& stack) {
   size_t size = stack.size();
   while (size >= 2 &&
@@ -386,8 +393,7 @@ CrossSection CrossSection::Circle(double radius, int circularSegments) {
   const double dPhi = 360.0 / n;
   for (int i = 0; i < n; ++i)
     circle[i] = {radius * cosd(dPhi * i), radius * sind(dPhi * i)};
-  const double tol = InferEps({circle}, {});
-  return CrossSection(shared_paths({std::move(circle)}));
+  return CrossSection(shared_path(std::move(circle)));
 }
 
 /**
@@ -694,7 +700,7 @@ CrossSection CrossSection::Hull(
 
   SimplePolygon hull = HullImpl(points);
   if (hull.size() < 3) return CrossSection();
-  return CrossSection(shared_paths({std::move(hull)}));
+  return CrossSection(shared_path(std::move(hull)));
 }
 
 /**
@@ -713,7 +719,7 @@ CrossSection CrossSection::Hull(const SimplePolygon& pts) {
   SimplePolygon points = pts;  // HullImpl sorts in place
   SimplePolygon hull = HullImpl(points);
   if (hull.size() < 3) return CrossSection();
-  return CrossSection(shared_paths({std::move(hull)}));
+  return CrossSection(shared_path(std::move(hull)));
 }
 
 /**
