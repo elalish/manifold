@@ -63,8 +63,8 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
 
   constexpr size_t BATCH_SIZE = 1000;
 
-  // If the convex manifold was supplied first, swap them!
-  if (aConvex && !bConvex) {
+  // Only the sum is commutative; erosion must preserve the first operand.
+  if (!inset && aConvex && !bConvex) {
     std::swap(aImpl, bImpl);
     std::swap(aConvex, bConvex);
   }
@@ -123,8 +123,9 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
                         TransformIterator(verts.end(), t));
     }
     composedHulls.push_back(Manifold::Hull(simpleHull));
-    // Convex - Non-Convex Minkowski: Slower
-  } else if ((inset || !aConvex) && bConvex) {
+    // Hull each A face with all B vertices when B is convex. For erosion,
+    // convex A also permits this: A eroded by B equals A eroded by B's hull.
+  } else if (bConvex || (inset && aConvex)) {
     const size_t numTri = aImpl->NumTri();
     const VecView<vec3> verts = bImpl->vertPos_;
 
@@ -152,7 +153,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
     // Non-Convex - Non-Convex Minkowski: Very Slow
     // Process A faces sequentially with periodic batch reduction to balance
     // memory usage and performance.
-  } else if (!aConvex && !bConvex) {
+  } else {
     const size_t numTriA = aImpl->NumTri();
     const size_t numTriB = bImpl->NumTri();
 

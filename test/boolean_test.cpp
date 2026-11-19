@@ -867,6 +867,61 @@ TEST(Boolean, NonConvexNonConvexMinkowskiDifference) {
     WriteTestOBJ("minkowski-nonconvex-nonconvex-diff.obj", difference);
 }
 
+TEST(Boolean, ConvexNonConvexMinkowskiDifference) {
+  const Manifold cube = Manifold::Cube(vec3(10.0), true);
+  // For an axis-aligned box, erosion by this symmetric cross has an exact
+  // box result determined by the cross's extrema in each coordinate.
+  const Manifold cross =
+      Manifold::Cube({4, 1, 1}, true) + Manifold::Cube({1, 2, 1}, true);
+  for (const double rotation : {0.0, 90.0}) {
+    const Manifold cutter = cross.Rotate(0, 0, rotation);
+    const vec3 size = rotation == 0.0 ? vec3(6, 8, 9) : vec3(8, 6, 9);
+    for (const vec3 offset : {vec3(0.0), vec3(12, -7, 3)}) {
+      SCOPED_TRACE(::testing::Message()
+                   << "rotation " << rotation << " offset " << offset.x);
+      const Manifold input = cube.Translate(offset);
+      const Manifold expected = Manifold::Cube(size, true).Translate(offset);
+      const Manifold result = input.MinkowskiDifference(cutter);
+      ASSERT_EQ(result.Status(), Manifold::Error::NoError);
+      EXPECT_NEAR(result.Volume(), expected.Volume(), 1e-8);
+      const Manifold missing = expected - result;
+      const Manifold excess = result - expected;
+      ASSERT_EQ(missing.Status(), Manifold::Error::NoError);
+      ASSERT_EQ(excess.Status(), Manifold::Error::NoError);
+      EXPECT_TRUE(missing.IsEmpty());
+      EXPECT_TRUE(excess.IsEmpty());
+      EXPECT_DOUBLE_EQ(input.Volume(), 1000.0);
+      EXPECT_DOUBLE_EQ(cutter.Volume(), 5.0);
+    }
+    // Swapping these operands is not an equivalent operation.
+    EXPECT_TRUE(cutter.MinkowskiDifference(cube).IsEmpty());
+    // A cutter whose boundary surrounds A must still remove all of A.
+    for (const vec3 offset : {vec3(0.0), vec3(-7, 4, 2)}) {
+      const Manifold smallCube =
+          Manifold::Cube(vec3(1.0), true).Translate(offset);
+      const Manifold removed =
+          smallCube.MinkowskiDifference(cutter.Scale(vec3(3.0)));
+      ASSERT_EQ(removed.Status(), Manifold::Error::NoError);
+      EXPECT_TRUE(removed.IsEmpty());
+    }
+  }
+
+  // The hull equivalence also holds for a convex base with non-axis-aligned
+  // faces.
+  const Manifold tetrahedron = Manifold::Tetrahedron()
+                                   .Scale(vec3(5.0))
+                                   .Rotate(17, 23, 11)
+                                   .Translate({-7, 3, 2});
+  const Manifold cutter = cross.Scale(vec3(0.2));
+  const Manifold expected = tetrahedron.MinkowskiDifference(cutter.Hull());
+  const Manifold result = tetrahedron.MinkowskiDifference(cutter);
+  ASSERT_EQ(expected.Status(), Manifold::Error::NoError);
+  ASSERT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(expected.IsEmpty());
+  EXPECT_TRUE((expected - result).IsEmpty());
+  EXPECT_TRUE((result - expected).IsEmpty());
+}
+
 TEST(Boolean, MinkowskiSumTranslatedComponents) {
   std::vector<std::vector<Box>> inputs = {
       {{{0, 0, 0}, {1, 1, 1}}},
