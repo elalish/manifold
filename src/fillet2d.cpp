@@ -705,6 +705,11 @@ double FacingGap(const FilletInput& input, int a, int b, double radius) {
 // gap between the two lines and how it changes up to S.
 double FacingBeyond(const FilletInput& input, int line, int m, vec2 v,
                     double radius) {
+  // Between lines parallel as far as their angles tell, the normals cancel
+  // and the gap is the same all along: what rounding leaves of their sum
+  // would tilt one line against the other, differently for every caller.
+  // The one number for the pair is then all there is.
+  if (LineCross(input, line, m) == 0) return -FacingGap(input, line, m, radius);
   const vec2 nL = LineNormal(input, line), nM = LineNormal(input, m);
   const vec2 origin =
       LineStart(input, std::min(Run(input, line), Run(input, m)));
@@ -760,8 +765,9 @@ int LineVertexBalls(const FilletInput& input, int line, int vertexEdge,
     const vec2 nJ = LineNormal(input, j);
     if (!(dot(nM, nJ) < 0)) continue;
     const vec2 sum = nM + nJ;
-    const double m = 0.5 * radius * dot(sum, sum) -
-                     FacingBeyond(input, j, line, vertex, radius);
+    const double tilt =
+        LineCross(input, j, line) == 0 ? 0 : 0.5 * radius * dot(sum, sum);
+    const double m = tilt - FacingBeyond(input, j, line, vertex, radius);
     if (!faces || m > margin) margin = m;
     faces = true;
     // An edge parallel to the line as far as their angles tell shares no
@@ -770,8 +776,7 @@ int LineVertexBalls(const FilletInput& input, int line, int vertexEdge,
     // that the edges next to it do not find the ball cut at one of them
     // and clear at the other.
     if (LineCross(input, j, line) == 0) {
-      margin = 0.5 * radius * dot(sum, sum) -
-               FacingBeyond(input, j, line, LineStart(input, j), radius);
+      margin = -FacingBeyond(input, j, line, LineStart(input, j), radius);
       break;
     }
   }
@@ -1201,6 +1206,8 @@ bool TripleCut(const FilletInput& input, int c, int a, int b, double radius) {
             ? dzx * FacingGap(input, x, y, radius) +
                   la::cross(nx + ny, nz) * kx + dxy * kz
             : dzx * (ky - kx) + la::cross(ny - nx, nz) * kx + dxy * kz;
+    if (LineCross(input, x, y) == 0 && dot(nx, ny) < 0)
+      g = dzx * FacingGap(input, x, y, radius);
   }
   const int signG = g > 0 ? parity : g < 0 ? -parity : 0;
   return signG * LineCross(input, a, b) > 0;
@@ -1313,7 +1320,9 @@ int EndValue(const FilletInput& input, int m, int line, bool atEnd,
                     &within);
     if (!std::isnan(within)) {
       const vec2 sum = nL + nM;
-      const double f = 0.5 * radius * dot(sum, sum) - within;
+      const double f =
+          (LineCross(input, line, m) == 0 ? 0 : 0.5 * radius * dot(sum, sum)) -
+          within;
       return f > 0 ? 1 : f < 0 ? -1 : 0;
     }
   }
