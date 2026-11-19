@@ -51,6 +51,35 @@ struct EdgeRef {
   size_t edge;
 };
 
+// The direction of a line as an angle that makes "parallel" exact: the
+// direction is first turned into the upper half-plane, by a half-turn if
+// need be, and it is the angle of that - in [0, pi) - that is kept, with
+// whether it was turned. Two lines are parallel exactly when those angles
+// are the same number, and then all lines parallel to one are parallel to
+// each other. From one angle in (-pi, pi] per line they were not: a
+// direction and its opposite differ by a half-turn only as nearly as
+// rounding puts it, and "differs by pi" could hold between one line and
+// each of two others that differ from each other.
+struct LineAngle {
+  double folded = 0;
+  bool turned = false;
+};
+
+LineAngle AngleOf(vec2 d) {
+  const bool turned = d.y < 0 || (d.y == 0 && d.x < 0);
+  const vec2 up = turned ? -d : d;
+  return {std::atan2(up.y, up.x), turned};
+}
+
+// Sign of the turn from direction `from` to `to`: of the cross product of
+// the two directions. Zero for the same and for opposite directions.
+int TurnSign(LineAngle from, LineAngle to) {
+  if (from.folded == to.folded) return 0;
+  // Within the same half-turn the folded angles are in order; across, the
+  // one further round is a half-turn back.
+  return (from.folded < to.folded) == (from.turned == to.turned) ? 1 : -1;
+}
+
 struct FilletInput {
   const Polygons& loops;
   const std::vector<size_t>& loopOffsets;
@@ -74,7 +103,7 @@ struct FilletInput {
   // product of two lines' directions is read from the order of their angles
   // (LineCross), so those signs cannot contradict each other the way
   // separately rounded cross products of nearly parallel lines can.
-  std::vector<double> angles;
+  std::vector<LineAngle> angles;
   std::vector<int> runFirst;
   std::vector<int> runLast;
   // For each edge, a box around the centers of the balls that touch its line
@@ -277,16 +306,6 @@ vec2 LineStart(const FilletInput& input, int e) {
 
 vec2 LineEnd(const FilletInput& input, int e) {
   return input.ends[input.runLast[e]];
-}
-
-// Sign of the turn from direction angle `from` to `to`: of the cross product
-// of the two directions. Zero for the same and for opposite angles.
-int TurnSign(double from, double to) {
-  double turn = to - from;
-  if (turn > M_PI) turn -= 2 * M_PI;
-  if (turn < -M_PI) turn += 2 * M_PI;
-  if (turn == M_PI || turn == -M_PI) return 0;
-  return turn > 0 ? 1 : turn < 0 ? -1 : 0;
 }
 
 // Sign of the cross product of the directions of two edges' lines.
@@ -1413,10 +1432,10 @@ bool LineLimit(const FilletInput& input, int g, int line, bool atEnd, int root,
 void BuildEndKinds(FilletInput& input, double radius) {
   const int numEdges = static_cast<int>(input.edges.size());
   std::vector<int> turns(numEdges);
-  std::vector<double> pieceAngles(numEdges);
+  std::vector<LineAngle> pieceAngles(numEdges);
   for (int e = 0; e < numEdges; ++e) {
     const vec2 d = EdgeEnd(input, e) - EdgeStart(input, e);
-    pieceAngles[e] = std::atan2(d.y, d.x);
+    pieceAngles[e] = AngleOf(d);
   }
   for (int e = 0; e < numEdges; ++e)
     turns[e] = (input.invert ? -1 : 1) *
