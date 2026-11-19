@@ -1067,8 +1067,7 @@ export class Manifold {
   /**
    * Return a simplified copy of the manifold. The tolerance controls the local
    * error when collapsing edges, measured relative to nearby face planes.
-   * Thin features can disappear, leaving points on the original surface farther
-   * than the tolerance from the result.
+   * Simplification tends to remove features thinner than the tolerance.
    *
    * @param tolerance Simplification tolerance, lower-bounded by the manifold's
    *     epsilon.
