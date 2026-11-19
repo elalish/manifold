@@ -1643,12 +1643,15 @@ bool InArcAround(const FilletInput& input, const FilletGeometry& fillet,
 // ball between two lines and the balls that touch the vertex and either line
 // are told the same thing. A line with no such pair of balls is out of the
 // vertex's reach.
-bool BetweenOnLine(const FilletInput& input, int vertexEdge,
-                   const FilletEnd& end, double radius) {
+// 1 if it is strictly between them, 0 if it is exactly where one of them is,
+// -1 otherwise.
+int BetweenOnLine(const FilletInput& input, int vertexEdge,
+                  const FilletEnd& end, double radius) {
   const IntersectResult balls =
       LineVertexCenters(input, FeatureEdge(end.feature), vertexEdge, radius);
-  if (balls.count < 2) return false;
-  return balls.params[0] < end.t && end.t < balls.params[1];
+  if (balls.count < 2) return -1;
+  if (balls.params[0] < end.t && end.t < balls.params[1]) return 1;
+  return end.t == balls.params[0] || end.t == balls.params[1] ? 0 : -1;
 }
 
 // An arc by the features it runs between, for looking up whether a given
@@ -1719,8 +1722,12 @@ bool Blocks(const FilletInput& input, const FilletGeometry& fillet, int c,
       dot(LineNormal(input, NextEdge(input, into)), fromCorner) > 0)
     return false;
   if (!IsVertex(g) && !IsVertex(h)) {
-    return BetweenOnLine(input, into, fillet.from, radius) &&
-           BetweenOnLine(input, into, fillet.to, radius);
+    // On both of its lines - but the two ask the same thing, and where on
+    // one of them the ball is exactly where the vertex's own ball is, as
+    // far as positions along that line can tell, the other one decides.
+    const int from = BetweenOnLine(input, into, fillet.from, radius);
+    const int to = BetweenOnLine(input, into, fillet.to, radius);
+    return from >= 0 && to >= 0 && from + to > 0;
   }
   // A ball on one line and one vertex is on that line too, and its place
   // along it between the two balls that touch this vertex decides the same
@@ -1730,7 +1737,7 @@ bool Blocks(const FilletInput& input, const FilletGeometry& fillet, int c,
   // the line the two balls of this vertex are still well apart.
   if (!IsVertex(g) || !IsVertex(h))
     return BetweenOnLine(input, into, IsVertex(g) ? fillet.to : fillet.from,
-                         radius);
+                         radius) > 0;
   const int y = VertexFeature(t <= 0 ? c : NextEdge(input, c));
   // Two balls that reach one vertex from different contacts compete for it,
   // and their order around that vertex alone says which of them the other's
