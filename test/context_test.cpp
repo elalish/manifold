@@ -74,6 +74,32 @@ TEST(Context, ExecutionContextProgress) {
   EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
 }
 
+TEST(Context, ManifoldMirrorRemainsDeferred) {
+  const Manifold cube = Manifold::Cube();
+  const Manifold mirrored =
+      (cube + cube.Translate({0.5, 0, 0})).Mirror({1, 0, 0});
+
+  ExecutionContext ctx;
+  EXPECT_EQ(mirrored.WithContext(ctx).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), 1);
+  EXPECT_EQ(ctx.impl_->doneBooleans.load(), 1);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
+  EXPECT_DOUBLE_EQ(mirrored.Volume(), 1.5);
+  EXPECT_EQ(mirrored.BoundingBox(), Box({-1.5, 0, 0}, {0, 1, 1}));
+}
+
+TEST(Context, ManifoldMirrorCanBeCancelledBeforeEvaluation) {
+  const Manifold cube = Manifold::Cube();
+  const Manifold mirrored =
+      (cube + cube.Translate({0.5, 0, 0})).Mirror({1, 0, 0});
+
+  ExecutionContext ctx;
+  ctx.Cancel();
+  EXPECT_EQ(mirrored.WithContext(ctx).Status(), Manifold::Error::Cancelled);
+  EXPECT_EQ(ctx.impl_->totalBooleans.load(), 1);
+  EXPECT_EQ(ctx.impl_->doneBooleans.load(), 0);
+}
+
 // Forcing evaluation first, then observing with a fresh context, should
 // report no pending work: the Manifold is already a leaf.
 TEST(Context, ExecutionContextAlreadyEvaluated) {
