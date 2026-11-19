@@ -45,21 +45,6 @@ bool AllFinite(const mat2x3& m) {
   return true;
 }
 
-Polygons FilterSmallContours(const Polygons& paths, double epsilon) {
-  Polygons filtered;
-  filtered.reserve(paths.size());
-  for (const auto& path : paths) {
-    const double area = SignedArea(path);
-    Rect box;
-    for (const vec2& v : path) box.Union(v);
-    const vec2 size = box.Size();
-    if (std::fabs(area) > std::max(size.x, size.y) * epsilon) {
-      filtered.push_back(path);
-    }
-  }
-  return filtered;
-}
-
 Polygons TransformPolygons(const Polygons& paths, const mat2x3& transform) {
   const bool invert = la::determinant(mat2(transform)) < 0;
   Polygons out;
@@ -127,7 +112,7 @@ SimplePolygon HullImpl(SimplePolygon& points) {
 // min-heap over (deviation, index) with stamp-based lazy invalidation makes
 // each removal re-key only the two neighbors, so the pass is O(n log n).
 // Exactly-tied deviations remove the lowest original index first.
-SimplePolygon SimplifyRing(SimplePolygon ring, double tol) {
+SimplePolygon SimplifyRing(const SimplePolygon& ring, double tol) {
   const int n = static_cast<int>(ring.size());
   if (n <= 3) return ring;
   const double tol2 = tol * tol;
@@ -156,8 +141,13 @@ SimplePolygon SimplifyRing(SimplePolygon ring, double tol) {
   auto worse = [](const Entry& a, const Entry& b) {
     return a.d2 > b.d2 || (a.d2 == b.d2 && a.idx > b.idx);
   };
-  std::priority_queue<Entry, std::vector<Entry>, decltype(worse)> heap(worse);
-  for (int i = 0; i < n; ++i) heap.push({deviation2(i), 0, i});
+  std::vector<Entry> entries;
+  entries.reserve(n);
+  for (int i = 0; i < n; ++i) entries.push_back({deviation2(i), 0, i});
+  // Heapify the initial entries in linear time; later removals still update
+  // only the two neighboring vertices.
+  std::priority_queue<Entry, std::vector<Entry>, decltype(worse)> heap(
+      worse, std::move(entries));
 
   int numAlive = n;
   while (numAlive > 3 && !heap.empty()) {
@@ -631,12 +621,17 @@ CrossSection CrossSection::Simplify(double tolerance) const {
   // decimates at the cross-section's own tolerance, matching Manifold.
   tolerance = std::max(tolerance, InferEps(GetPaths()->paths_, {}));
   const Polygons& paths = GetPaths()->paths_;
-  const Polygons filtered = FilterSmallContours(paths, tolerance);
   Polygons out;
-  out.reserve(filtered.size());
-  for (const auto& ring : filtered) {
-    SimplePolygon simplified = SimplifyRing(ring, tolerance);
-    if (simplified.size() >= 3) out.push_back(std::move(simplified));
+  out.reserve(paths.size());
+  for (const auto& ring : paths) {
+    const double area = SignedArea(ring);
+    Rect box;
+    for (const vec2& v : ring) box.Union(v);
+    const vec2 size = box.Size();
+    if (std::fabs(area) > std::max(size.x, size.y) * tolerance) {
+      SimplePolygon simplified = SimplifyRing(ring, tolerance);
+      if (simplified.size() >= 3) out.push_back(std::move(simplified));
+    }
   }
   return CrossSection(shared_paths(std::move(out)));
 }
