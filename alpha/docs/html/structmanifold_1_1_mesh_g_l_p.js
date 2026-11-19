@@ -3,7 +3,7 @@ var structmanifold_1_1_mesh_g_l_p =
     [ "NumVert", "structmanifold_1_1_mesh_g_l_p.html#abe8f3e86d9e52e570b74cba17026579c", null ],
     [ "NumTri", "structmanifold_1_1_mesh_g_l_p.html#a8458191a8d6a8f4faeca38353a034826", null ],
     [ "NumRun", "structmanifold_1_1_mesh_g_l_p.html#a36b548c8ff4c27089ea7a40b9c94b6ec", null ],
-    [ "Merge", "structmanifold_1_1_mesh_g_l_p.html#a2f53477408ad67a6f9f607fcd282f693", null ],
+    [ "Merge", "structmanifold_1_1_mesh_g_l_p.html#a654c44a0abfbfaafca3ee5e25c118227", null ],
     [ "GetVertPos", "structmanifold_1_1_mesh_g_l_p.html#ad7bfcdc27db8d7486f016bf63052625d", null ],
     [ "GetTriVerts", "structmanifold_1_1_mesh_g_l_p.html#a0d413b0c710e37a4e5a9fbaebe74b93f", null ],
     [ "GetTangent", "structmanifold_1_1_mesh_g_l_p.html#ab2842d78e1ce13e2e1228d91b1c9dcfb", null ],

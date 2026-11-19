@@ -24,7 +24,7 @@ var searchData=
   ['math_21',['Math',['../group___math.html',1,'']]],
   ['max_22',['max',['../structlinalg_1_1detail_1_1max.html',1,'linalg::detail']]],
   ['mengersponge_23',['MengerSponge',['../group___samples.html#ga31bc13b03579ca41da7ae9b5ba171fae',1,'manifold']]],
-  ['merge_24',['Merge',['../structmanifold_1_1_mesh_g_l_p.html#a2f53477408ad67a6f9f607fcd282f693',1,'manifold::MeshGLP']]],
+  ['merge_24',['Merge',['../structmanifold_1_1_mesh_g_l_p.html#a654c44a0abfbfaafca3ee5e25c118227',1,'manifold::MeshGLP']]],
   ['mergefromvert_25',['mergeFromVert',['../structmanifold_1_1_mesh_g_l_p.html#a20914b2f5a7a50d20f3aec1d3773e7f3',1,'manifold::MeshGLP']]],
   ['mergetovert_26',['mergeToVert',['../structmanifold_1_1_mesh_g_l_p.html#a682c889a7ca4a6afeae54cdd484c6478',1,'manifold::MeshGLP']]],
   ['meshglp_27',['MeshGLP',['../structmanifold_1_1_mesh_g_l_p.html',1,'manifold']]],

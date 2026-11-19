@@ -106,7 +106,7 @@ I&#160;</td><td class="memItemRight"><b>NumTri</b> () const</td></tr>
 <tr class="memitem:a36b548c8ff4c27089ea7a40b9c94b6ec" id="r_a36b548c8ff4c27089ea7a40b9c94b6ec"><td class="memItemLeft"><a id="a36b548c8ff4c27089ea7a40b9c94b6ec" name="a36b548c8ff4c27089ea7a40b9c94b6ec"></a>
 I&#160;</td><td class="memItemRight"><b>NumRun</b> () const</td></tr>
 <tr class="memdesc:a36b548c8ff4c27089ea7a40b9c94b6ec"><td class="mdescLeft">&#160;</td><td class="mdescRight">Number of triangle runs. <br /></td></tr>
-<tr class="memitem:a2f53477408ad67a6f9f607fcd282f693" id="r_a2f53477408ad67a6f9f607fcd282f693"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a2f53477408ad67a6f9f607fcd282f693">Merge</a> (Precision tolerance=0)</td></tr>
+<tr class="memitem:a654c44a0abfbfaafca3ee5e25c118227" id="r_a654c44a0abfbfaafca3ee5e25c118227"><td class="memItemLeft">MeshGLP&#160;</td><td class="memItemRight"><a class="el" href="#a654c44a0abfbfaafca3ee5e25c118227">Merge</a> (Precision tolerance=0) const</td></tr>
 <tr class="memitem:ad7bfcdc27db8d7486f016bf63052625d" id="r_ad7bfcdc27db8d7486f016bf63052625d"><td class="memItemLeft">la::vec&lt; Precision, 3 &gt;&#160;</td><td class="memItemRight"><a class="el" href="#ad7bfcdc27db8d7486f016bf63052625d">GetVertPos</a> (size_t v) const</td></tr>
 <tr class="memitem:a0d413b0c710e37a4e5a9fbaebe74b93f" id="r_a0d413b0c710e37a4e5a9fbaebe74b93f"><td class="memItemLeft">la::vec&lt; I, 3 &gt;&#160;</td><td class="memItemRight"><a class="el" href="#a0d413b0c710e37a4e5a9fbaebe74b93f">GetTriVerts</a> (size_t t) const</td></tr>
 <tr class="memitem:ab2842d78e1ce13e2e1228d91b1c9dcfb" id="r_ab2842d78e1ce13e2e1228d91b1c9dcfb"><td class="memItemLeft">la::vec&lt; Precision, 4 &gt;&#160;</td><td class="memItemRight"><a class="el" href="#ab2842d78e1ce13e2e1228d91b1c9dcfb">GetTangent</a> (size_t h) const</td></tr>
@@ -136,7 +136,7 @@ struct manifold::MeshGLP&lt; Precision, I &gt;</div><p>Mesh input/output suitabl
 <p>The core (non-optional) parts of MeshGL are the triVerts indices buffer and the vertProperties interleaved vertex buffer, which follow the conventions of OpenGL (and other graphic libraries') buffers and are therefore generally easy to map directly to other applications' data structures.</p>
 <p>The triVerts vector has a stride of 3 and specifies triangles as vertex indices. For triVerts = [2, 4, 5, 3, 1, 6, ...], the triangles are [2, 4, 5], [3, 1, 6], etc. and likewise the halfedges are [2, 4], [4, 5], [5, 2], [3, 1], [1, 6], [6, 3], etc.</p>
 <p>The triVerts indices should form a manifold mesh: each of the 3 halfedges of each triangle should have exactly one paired halfedge in the list, defined as having the first index of one equal to the second index of the other and vice-versa. However, this is not always possible - consider e.g. a cube with normal-vector properties. Shared vertices would turn the cube into a ball by interpolating normals - the common solution is to duplicate each corner vertex into 3, each with the same position, but different normals corresponding to each face. This is exactly what should be done in MeshGL, however we request two additional vectors in this case: mergeFromVert and mergeToVert. Each vertex mergeFromVert[i] is merged into vertex mergeToVert[i], avoiding unreliable floating-point comparisons to recover the manifold topology. These merges are simply a union, so which is from and to doesn't matter.</p>
-<p>If you don't have merge vectors, you can create them with the <a class="el" href="#a2f53477408ad67a6f9f607fcd282f693">Merge()</a> method, however this will fail if the mesh is not already manifold within the set tolerance. For maximum reliability, always store the merge vectors with the mesh, e.g. using the EXT_mesh_manifold extension in glTF.</p>
+<p>If you don't have merge vectors, you can create them with the <a class="el" href="#a654c44a0abfbfaafca3ee5e25c118227">Merge()</a> method, however this will fail if the mesh is not already manifold within the set tolerance. For maximum reliability, always store the merge vectors with the mesh, e.g. using the EXT_mesh_manifold extension in glTF.</p>
 <p>You can have any number of arbitrary floating-point properties per vertex, and they will all be interpolated as necessary during operations. It is up to you to keep track of which channel represents what type of data. A few of <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>'s methods allow you to specify the channel where normals data starts, in order to update it automatically for transforms and such. This will be easier if your meshes all use the same channels for properties, but this is not a requirement. Operations between meshes with different numbers of properties will simply use the larger numProp and pad the smaller one with zeroes.</p>
 <p>On output, the triangles are sorted into runs (runIndex, runOriginalID, runTransform) that correspond to different mesh inputs. Other 3D libraries may refer to these runs as primitives of a mesh (as in glTF) or draw calls, as they often represent different materials on different parts of the mesh. It is generally a good idea to maintain a map of OriginalIDs to materials to make it easy to reapply them after a set of Boolean operations. These runs can also be used as input, and thus also ensure a lossless roundtrip of data through MeshGL.</p>
 <p>As an example, with runIndex = [0, 6, 18, 21] and runOriginalID = [1, 3, 3], there are 7 triangles, where the first two are from the input mesh with ID 1, the next 4 are from an input mesh with ID 3, and the last triangle is from a different copy (instance) of the input mesh with ID 3. These two instances can be distinguished by their different runTransform matrices.</p>
@@ -144,23 +144,31 @@ struct manifold::MeshGLP&lt; Precision, I &gt;</div><p>Mesh input/output suitabl
 <p>The halfedgeTangent vector is used to specify the weighted tangent vectors of each halfedge for the purpose of using the Refine methods to create a smoothly-interpolated surface. They can also be output when calculated automatically by the Smooth functions.</p>
 <p>MeshGL is an alias for the standard single-precision version. Use MeshGL64 to output the full double precision that <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> uses internally. </p>
 </div><a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
-<a id="a2f53477408ad67a6f9f607fcd282f693" name="a2f53477408ad67a6f9f607fcd282f693"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a2f53477408ad67a6f9f607fcd282f693">&#9670;&#160;</a></span>Merge()</h2>
+<a id="a654c44a0abfbfaafca3ee5e25c118227" name="a654c44a0abfbfaafca3ee5e25c118227"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a654c44a0abfbfaafca3ee5e25c118227">&#9670;&#160;</a></span>Merge()</h2>
 
 <div class="memitem">
 <div class="memproto">
 <div class="memtemplate">
 template&lt;typename Precision, typename I&gt; </div>
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname">bool Merge </td>
+          <td class="memname">MeshGLP Merge </td>
           <td>(</td>
           <td class="paramtype">Precision</td>          <td class="paramname"><span class="paramname"><em>tolerance</em></span><span class="paramdefsep"> = </span><span class="paramdefval">0</span></td><td>)</td>
-          <td></td>
+          <td> const</td>
         </tr>
       </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel nodiscard">nodiscard</span></span>  </td>
+  </tr>
+</table>
 </div><div class="memdoc">
-<p>Updates the mergeFromVert and mergeToVert vectors in order to create a manifold solid. If the MeshGL is already manifold, or is invalid (fewer than 3 properties, merge vectors of different lengths, or out-of-range indices), no change will occur and the function will return false. Otherwise, this will merge verts along open edges within tolerance (the maximum of the specified tolerance and the baseline bounding-box tolerance), keeping any from the existing merge vectors, and return true.</p>
+<p>Returns a copy with mergeFromVert and mergeToVert vectors updated in order to create a manifold solid. If the MeshGL is already manifold, or is invalid (fewer than 3 properties, merge vectors of different lengths, or out-of-range indices), the copy is unchanged. Otherwise, verts along open edges are merged within tolerance (the maximum of the specified tolerance and the baseline bounding-box tolerance), keeping any from the existing merge vectors.</p>
 <p>There is no guarantee the result will be manifold - this is a best-effort helper function designed primarily to aid in the case where a manifold multi-material MeshGL was produced, but its merge vectors were lost due to a round-trip through a file format. Constructing a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> from the result will report an error status if it is not manifold.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">

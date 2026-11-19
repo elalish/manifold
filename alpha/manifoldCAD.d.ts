@@ -1631,12 +1631,11 @@ export declare class Mesh {
     get numRun(): number;
 
     /**
-     * Updates the mergeFromVert and mergeToVert vectors in order to create a
-     * manifold solid. If the MeshGL is already manifold, no change will occur and
-     * the function will return false. Otherwise, this will merge verts along open
-     * edges within tolerance (the maximum of the specified tolerance and the
-     * baseline bounding-box tolerance), keeping any from the existing merge
-     * vectors.
+     * Returns a copy with mergeFromVert and mergeToVert vectors updated in order
+     * to create a manifold solid. If the MeshGL is already manifold, the merge
+     * vectors are unchanged. Otherwise, verts along open edges are merged within
+     * tolerance (the maximum of the specified tolerance and the baseline
+     * bounding-box tolerance), keeping any from the existing merge vectors.
      *
      * There is no guarantee the result will be manifold - this is a best-effort
      * helper function designed primarily to aid in the case where a manifold
@@ -1646,7 +1645,7 @@ export declare class Mesh {
      *
      * @param tolerance Default 0, with a bounding-box and precision-based floor.
      */
-    merge(tolerance?: number): boolean;
+    merge(tolerance?: number): Mesh;
 
     /**
      * Gets the three vertex indices of this triangle in CCW order.
