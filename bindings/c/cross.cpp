@@ -243,14 +243,12 @@ ManifoldRect* manifold_cross_section_bounds(const ManifoldCrossSection* cs) {
 
 ManifoldPolygons* manifold_cross_section_to_polygons(
     const ManifoldCrossSection* cs) {
-  auto ps = from_c(cs)->ToPolygons();
-  return to_c(new Polygons(ps));
+  return to_c(new Polygons(from_c(cs)->ToPolygons()));
 }
 
 ManifoldCrossSectionVec* manifold_cross_section_decompose(
     const ManifoldCrossSection* cs) {
-  auto comps = from_c(cs)->Decompose();
-  return to_c(new CrossSectionVec(comps));
+  return to_c(new CrossSectionVec(from_c(cs)->Decompose()));
 }
 #ifdef __cplusplus
 }
