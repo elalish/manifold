@@ -760,7 +760,8 @@ export class Manifold {
    * moved to the interpolated surface according to their barycentric
    * coordinates.
    *
-   * @param length The length that edges will be broken down to.
+   * @param length The length that edges will be broken down to. Its sign is
+   * ignored, and zero or NaN is an error.
    * @group Smoothing
    */
   refineToLength(length: number): Manifold;
@@ -775,7 +776,8 @@ export class Manifold {
    *
    * @param tolerance The desired maximum distance between the faceted mesh
    * produced and the exact smoothly curving surface. All vertices are exactly
-   * on the surface, within rounding error.
+   * on the surface, within rounding error. Its sign is ignored, and zero or NaN
+   * is an error.
    * @group Smoothing
    */
   refineToTolerance(tolerance: number): Manifold;

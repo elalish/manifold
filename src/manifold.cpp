@@ -45,6 +45,14 @@ bool PropertiesTooLarge(int64_t numProp, size_t numPropVert) {
   return numProp * static_cast<int64_t>(numPropVert) >
          std::numeric_limits<int>::max();
 }
+
+// Converts a requested division count to int. Counts this large are rejected
+// by Subdivide, so clamping only keeps the conversion defined.
+int ToDivisions(double divisions) {
+  return divisions < std::numeric_limits<int>::max()
+             ? static_cast<int>(divisions)
+             : std::numeric_limits<int>::max();
+}
 }  // namespace
 
 namespace manifold {
@@ -841,7 +849,8 @@ Manifold Manifold::Refine(int n) const {
  * `CalculateNormals()` is preserved; the new verts get linearly-interpolated
  * normals, which are less precise than recomputed ones but still meaningful.
  *
- * @param length The length that edges will be broken down to.
+ * @param length The length that edges will be broken down to. Its sign is
+ * ignored, and zero or NaN is an error.
  */
 Manifold Manifold::RefineToLength(double length) const {
   length = std::abs(length);
@@ -849,10 +858,11 @@ Manifold Manifold::RefineToLength(double length) const {
   auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
+  if (!(length > 0)) return Invalid();
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   pImpl->Refine(
       [length](vec3 edge, vec4, vec4) {
-        return static_cast<int>(la::length(edge) / length);
+        return ToDivisions(la::length(edge) / length);
       },
       false, ctx.get());
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
@@ -870,7 +880,8 @@ Manifold Manifold::RefineToLength(double length) const {
  *
  * @param tolerance The desired maximum distance between the faceted mesh
  * produced and the exact smoothly curving surface. All vertices are exactly on
- * the surface, within rounding error.
+ * the surface, within rounding error. Its sign is ignored, and zero or NaN is
+ * an error.
  */
 Manifold Manifold::RefineToTolerance(double tolerance) const {
   tolerance = std::abs(tolerance);
@@ -878,6 +889,7 @@ Manifold Manifold::RefineToTolerance(double tolerance) const {
   auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
+  if (!(tolerance > 0)) return Invalid();
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (!pImpl->halfedgeTangent_.empty()) {
     pImpl->Refine(
@@ -892,7 +904,7 @@ Manifold Manifold::RefineToTolerance(double tolerance) const {
           // Circular arc result plus heuristic term for non-circular curves
           const double d = 0.5 * (la::length(start) + la::length(end)) +
                            la::length(start - end);
-          return static_cast<int>(std::sqrt(3 * d / (4 * tolerance)));
+          return ToDivisions(std::sqrt(3 * d / (4 * tolerance)));
         },
         true, ctx.get());
   }
