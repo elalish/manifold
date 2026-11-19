@@ -574,9 +574,14 @@ CrossSection CrossSection::Transform(const mat2x3& m) const {
  * @param warpFunc A function that modifies a given vertex position.
  */
 CrossSection CrossSection::Warp(std::function<void(vec2&)> warpFunc) const {
-  return WarpBatch([&warpFunc](VecView<vec2> points) {
-    for (vec2& point : points) warpFunc(point);
-  });
+  Polygons paths = GetPaths()->paths_;
+  for (auto& path : paths) {
+    for (vec2& point : path) warpFunc(point);
+  }
+  // Scalar callbacks can modify the copied contours directly; only WarpBatch
+  // needs a second, contiguous buffer spanning all contours.
+  const double eps = InferEps(paths, {});
+  return CrossSection(shared_paths(ApplyFillRule(paths, eps, WindRule::Add)));
 }
 
 /**

@@ -2807,6 +2807,49 @@ TEST(CrossSection, Warp) {
   EXPECT_EQ(sq.NumContour(), 1);
 }
 
+TEST(CrossSection, ScalarWarpMatchesBatchAndPreservesInput) {
+  const CrossSection input = (CrossSection::Square({8, 6}) -
+                              CrossSection::Square({2, 2}).Translate({2, 2}))
+                                 .Mirror({1, 0})
+                                 .Translate({3, 5});
+  const Polygons original = input.ToPolygons();
+  std::vector<vec2> visited;
+  const CrossSection scalar = input.Warp([&visited](vec2& point) {
+    visited.push_back(point);
+    point.x += 0.01 * visited.size() * point.y;
+  });
+  size_t count = 0;
+  const CrossSection batched = input.WarpBatch([&count](VecView<vec2> points) {
+    for (vec2& point : points) point.x += 0.01 * ++count * point.y;
+  });
+  EXPECT_EQ(count, input.NumVert());
+  ASSERT_EQ(visited.size(), input.NumVert());
+  EXPECT_EQ(scalar.ToPolygons(), batched.ToPolygons());
+  EXPECT_EQ(input.ToPolygons(), original);
+  size_t index = 0;
+  for (const auto& path : original) {
+    for (const vec2& point : path) EXPECT_EQ(visited[index++], point);
+  }
+}
+
+TEST(CrossSection, ScalarWarpRegularizesCrossingAndEmptyContours) {
+  const CrossSection square = CrossSection::Square({2, 2});
+  const auto fold = [](vec2& point) {
+    if (point.y > 1) point.x = 2 - point.x;
+  };
+  const CrossSection folded = square.Warp(fold);
+  EXPECT_DOUBLE_EQ(folded.Area(), 1);
+  EXPECT_DOUBLE_EQ(square.Area(), 4);
+  EXPECT_EQ(folded.ToPolygons(), square
+                                     .WarpBatch([&fold](VecView<vec2> points) {
+                                       for (vec2& point : points) fold(point);
+                                     })
+                                     .ToPolygons());
+  int calls = 0;
+  EXPECT_TRUE(CrossSection().Warp([&calls](vec2&) { ++calls; }).IsEmpty());
+  EXPECT_EQ(calls, 0);
+}
+
 TEST(CrossSection, Decompose) {
   auto a = CrossSection::Square({2., 2.}, true) -
            CrossSection::Square({1., 1.}, true);
