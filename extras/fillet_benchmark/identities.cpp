@@ -3,7 +3,7 @@
 // satisfy, on inputs built to be degenerate.
 //
 //   identities <corpus file>... [--generated N] [--segments S] [--only NAME]
-//              [--log FILE] [--dump DIR]
+//              [--log FILE] [--dump DIR] [--quick]
 //
 // A fillet is not continuous in its radius: where a gap is exactly as wide as
 // the ball, a whole channel is there or not, and either answer is right. So
@@ -126,6 +126,8 @@ int segments = 367;
 std::string dumpDir;
 long dumped = 0;
 long inconclusive = 0;
+// Only the plain and contain checks.
+bool quick = false;
 
 std::string Describe(const Case& c, double radius, const std::string& extra) {
   std::ostringstream s;
@@ -240,6 +242,7 @@ void Check(const Case& c, double radius) {
       Record(c, "contain", at, escaped / inArea, "");
     }
 
+    if (quick) continue;
     for (const Map& map : maps) {
       const CrossSection moved(map.Apply(c.polys, false));
       const auto pieces = moved.Fillet(at * map.scale, segments);
@@ -369,6 +372,8 @@ int main(int argc, char** argv) {
       only = argv[++i];
     } else if (arg == "--dump") {
       dumpDir = argv[++i];
+    } else if (arg == "--quick") {
+      quick = true;
     } else if (arg == "--log") {
       logFile = argv[++i];
     } else {
