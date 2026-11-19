@@ -450,36 +450,34 @@ std::vector<Manifold> Manifold::Decompose() const {
     meshes[0] = *this;
     return meshes;
   }
-  Vec<int> vertLabel(componentIndices);
-
   const int numVert = NumVert();
-  std::vector<Manifold> meshes;
-  for (int i = 0; i < numComponents; ++i) {
-    auto impl = std::make_shared<Impl>();
+  const size_t numTri = pImpl_->NumTri();
+  std::vector<Vec<int>> componentVerts(numComponents);
+  std::vector<Vec<int>> componentFaces(numComponents);
+  for (int v = 0; v < numVert; ++v) {
+    componentVerts[componentIndices[v]].push_back(v);
+  }
+  const auto& halfedge = pImpl_->halfedge_;
+  for (size_t face = 0; face < numTri; ++face) {
+    const int v = halfedge.Start(static_cast<int>(3 * face));
+    componentFaces[componentIndices[v]].push_back(static_cast<int>(face));
+  }
 
-    Vec<int> vertNew2Old(numVert);
-    const int nVert =
-        copy_if(countAt(0), countAt(numVert), vertNew2Old.begin(),
-                [i, &vertLabel](int v) { return vertLabel[v] == i; }) -
-        vertNew2Old.begin();
+  std::vector<Manifold> meshes;
+  meshes.reserve(numComponents);
+  for (int i = 0; i < numComponents; ++i) {
+    const Vec<int>& vertNew2Old = componentVerts[i];
+    const Vec<int>& faceNew2Old = componentFaces[i];
+    if (faceNew2Old.empty()) continue;
+
+    auto impl = std::make_shared<Impl>();
+    const int nVert = vertNew2Old.size();
     impl->vertPos_.resize(nVert);
     impl->vertNormal_.resize(nVert);
-    vertNew2Old.resize(nVert);
     gather(vertNew2Old.begin(), vertNew2Old.end(), pImpl_->vertPos_.begin(),
            impl->vertPos_.begin());
     gather(vertNew2Old.begin(), vertNew2Old.end(), pImpl_->vertNormal_.begin(),
            impl->vertNormal_.begin());
-
-    Vec<int> faceNew2Old;
-    faceNew2Old.reserve(NumTri());
-    const auto& halfedge = pImpl_->halfedge_;
-    for (size_t face = 0; face < NumTri(); ++face) {
-      if (vertLabel[halfedge.Start(static_cast<int>(3 * face))] == i) {
-        faceNew2Old.push_back(static_cast<int>(face));
-      }
-    }
-
-    if (faceNew2Old.empty()) continue;
 
     impl->GatherFaces(*pImpl_, faceNew2Old);
     impl->ReindexVerts(vertNew2Old, pImpl_->NumVert());
