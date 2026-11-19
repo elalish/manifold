@@ -836,6 +836,42 @@ bool Covers(const FilletInput& input, int x, int y, double radius) {
   return true;
 }
 
+// How many balls pass through the vertices at the ends of two edges: as
+// CountArcArc, but where an edge at one of them is parallel to and faces an
+// edge at the other - the two sides of a channel, the vertices at its mouth -
+// from the number that already says whether the ball fits between those two
+// lines. With `within` what the one vertex is short of the ball's width from
+// the other's line, and `along` how far it is from the other vertex along
+// that line, 4 r^2 - |P - Q|^2 = within (4 r - within) - along^2. Computed
+// from the two points alone, a mouth exactly as wide as the channel could
+// stop a ball that the channel lets through.
+int VertexPairBalls(const FilletInput& input, int first, int second,
+                    double radius) {
+  const vec2 p = EdgeEnd(input, first), q = EdgeEnd(input, second);
+  if (SamePoint(p, q)) return 0;
+  for (const bool swap : {false, true}) {
+    const int lineEdge = swap ? second : first;
+    const int vertexEdge = swap ? first : second;
+    const vec2 from = swap ? q : p, to = swap ? p : q;
+    for (const int line : {lineEdge, NextEdge(input, lineEdge)}) {
+      bool channel = false;
+      for (const int j : {vertexEdge, NextEdge(input, vertexEdge)})
+        channel =
+            channel || (LineCross(input, j, line) == 0 &&
+                        dot(LineNormal(input, j), LineNormal(input, line)) < 0);
+      if (!channel) continue;
+      double within = std::numeric_limits<double>::quiet_NaN();
+      LineVertexBalls(input, line, vertexEdge, radius, &within);
+      if (std::isnan(within)) continue;
+      const vec2 d = LineEnd(input, line) - LineStart(input, line);
+      const double along = dot(to - from, d) / length(d);
+      const double f = within * (4 * radius - within) - along * along;
+      return f < 0 ? 0 : f == 0 ? 1 : 2;
+    }
+  }
+  return CountArcArc(p, q, radius);
+}
+
 RawCandidates FindRawCandidates(const FilletInput& input, int first, int second,
                                 int kind, double radius) {
   const vec2 firstStart = EdgeStart(input, first);
@@ -930,8 +966,9 @@ RawCandidates FindRawCandidates(const FilletInput& input, int first, int second,
   } else {
     if (!TouchableEnd(input, first) || !TouchableEnd(input, second))
       return raws;
-    const IntersectResult vv = IntersectArcArc(
-        firstEnd, secondEnd, radius, CountArcArc(firstEnd, secondEnd, radius));
+    const IntersectResult vv =
+        IntersectArcArc(firstEnd, secondEnd, radius,
+                        VertexPairBalls(input, first, second, radius));
     for (int i = 0; i < vv.count; ++i)
       // The first ball is right of the line from the first vertex to the
       // second.
