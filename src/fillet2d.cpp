@@ -1818,9 +1818,23 @@ bool Blocks(const FilletInput& input, const FilletGeometry& fillet, int c,
   // touches both vertices can be closer together than their centers tell
   // apart - a ball with no room to spare between the three - while along
   // the line the two balls of this vertex are still well apart.
-  if (!IsVertex(g) || !IsVertex(h))
-    return BetweenOnLine(input, into, IsVertex(g) ? fillet.to : fillet.from,
-                         radius) > 0;
+  // Exactly where one of those is, the ball touches this vertex as well as
+  // its own two contacts, and its arc is then two arcs if the vertex is on
+  // it, and whole if it is not.
+  auto onArc = [&]() {
+    const double start = EndAngle(input, fillet.from, fillet.center);
+    const double total = ArcAngle(
+        start, EndAngle(input, fillet.to, fillet.center), input.invert);
+    const double at = ArcAngle(
+        start, NormalizeAngle(ToRad((t <= 0 ? p0 : p1) - fillet.center)),
+        input.invert);
+    return at > 0 && at < total;
+  };
+  if (!IsVertex(g) || !IsVertex(h)) {
+    const int between = BetweenOnLine(
+        input, into, IsVertex(g) ? fillet.to : fillet.from, radius);
+    return between > 0 || (between == 0 && onArc());
+  }
   const int y = VertexFeature(t <= 0 ? c : NextEdge(input, c));
   // Two balls that reach one vertex from different contacts compete for it,
   // and their order around that vertex alone says which of them the other's
