@@ -692,7 +692,7 @@ Manifold Manifold::SetProperties(
     return PropagateStatus(Error::ResultTooLarge);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   const int oldNumProp = NumProp();
-  const Vec<double> oldProperties = pImpl->properties_;
+  const Vec<double> oldProperties = std::move(pImpl->properties_);
 
   if (numProp == 0) {
     pImpl->properties_.clear();

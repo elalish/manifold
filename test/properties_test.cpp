@@ -371,3 +371,59 @@ TEST(Properties, CalculateCurvatureDeterministic) {
           << "run " << i << " property " << j;
   }
 }
+
+TEST(Properties, ReplacementPreservesPropertySeams) {
+  MeshGL64 faceted = Manifold::Cube().CalculateNormals(0, 0).GetMeshGL64();
+  // Keep the per-face property seams without a recorded normals channel.
+  faceted.runFlags.assign(faceted.runFlags.size(), 0);
+  const Manifold input = Manifold(faceted).SetProperties(
+      8, [](double* next, vec3 position, const double* previous) {
+        for (int p = 0; p < 8; ++p)
+          next[p] = p + previous[p % 3] + position[p % 3] / 8;
+      });
+  ASSERT_EQ(input.Status(), Manifold::Error::NoError);
+  ASSERT_GT(input.NumPropVert(), input.NumVert());
+  const MeshGL64 before = input.GetMeshGL64();
+
+  for (int channels : {2, 5, 13}) {
+    SCOPED_TRACE(channels);
+    const Manifold replaced = input.SetProperties(
+        channels, [channels](double* next, vec3, const double* previous) {
+          for (int p = 0; p < channels; ++p) next[p] = previous[7 - p % 8] + p;
+        });
+    ASSERT_EQ(replaced.Status(), Manifold::Error::NoError);
+    const MeshGL64 after = replaced.GetMeshGL64();
+    ASSERT_EQ(after.numProp, channels + 3);
+    ASSERT_EQ(after.NumVert(), before.NumVert());
+    EXPECT_EQ(after.triVerts, before.triVerts);
+    EXPECT_EQ(after.mergeFromVert, before.mergeFromVert);
+    EXPECT_EQ(after.mergeToVert, before.mergeToVert);
+    for (size_t v = 0; v < after.NumVert(); ++v) {
+      for (int p = 0; p < channels; ++p)
+        EXPECT_DOUBLE_EQ(
+            after.vertProperties[v * after.numProp + p + 3],
+            before.vertProperties[v * before.numProp + 10 - p % 8] + p);
+    }
+  }
+
+  const Manifold curved = input.CalculateCurvature(11, 12);
+  ASSERT_EQ(curved.Status(), Manifold::Error::NoError);
+  const MeshGL64 after = curved.GetMeshGL64();
+  ASSERT_EQ(after.numProp, 16);
+  ASSERT_EQ(after.NumVert(), before.NumVert());
+  EXPECT_EQ(after.triVerts, before.triVerts);
+  EXPECT_EQ(after.mergeFromVert, before.mergeFromVert);
+  EXPECT_EQ(after.mergeToVert, before.mergeToVert);
+  for (size_t v = 0; v < after.NumVert(); ++v) {
+    for (int p = 0; p < 11; ++p)
+      EXPECT_DOUBLE_EQ(after.vertProperties[v * after.numProp + p],
+                       before.vertProperties[v * before.numProp + p]);
+    for (int p = 11; p < 14; ++p)
+      EXPECT_DOUBLE_EQ(after.vertProperties[v * after.numProp + p], 0);
+    for (int p = 14; p < 16; ++p) {
+      EXPECT_TRUE(std::isfinite(after.vertProperties[v * after.numProp + p]));
+      EXPECT_GT(after.vertProperties[v * after.numProp + p], 0);
+    }
+  }
+  EXPECT_EQ(input.GetMeshGL64().vertProperties, before.vertProperties);
+}
