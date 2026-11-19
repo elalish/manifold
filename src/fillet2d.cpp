@@ -1684,8 +1684,20 @@ bool Blocks(const FilletInput& input, const FilletGeometry& fillet, int c,
     // For a ball tangent to two lines, the cut by a third is one decision
     // shared by the triple.
     const int g = fillet.from.feature, h = fillet.to.feature;
-    if (!IsVertex(g) && !IsVertex(h))
+    if (!IsVertex(g) && !IsVertex(h)) {
+      // Between two lines that face each other and are nearer parallel than
+      // perpendicular - the two sides of a channel - where along them the
+      // ball tangent to both sits is, for a channel just as wide as the
+      // ball, anywhere: the sign shared by the three lines says nothing
+      // about the place the ball was put (Conform). There the ball as
+      // placed is asked.
+      const vec2 ng = LineNormal(input, FeatureEdge(g));
+      const vec2 nh = LineNormal(input, FeatureEdge(h));
+      if (dot(ng, nh) < 0 &&
+          std::abs(dot(ng, nh)) > std::abs(la::cross(ng, nh)))
+        return s < radius;
       return TripleCut(input, c, FeatureEdge(g), FeatureEdge(h), radius);
+    }
     if (!(s < radius)) return false;
     return (!IsVertex(g) ||
             InArcAround(input, fillet, g, LineFeature(c), radius)) &&
