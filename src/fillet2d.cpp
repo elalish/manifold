@@ -1323,6 +1323,30 @@ bool LineLimit(const FilletInput& input, int g, int line, bool atEnd, int root,
   // No ball between these lines at all, so none for this edge to keep.
   if (!IsVertex(g) && !LinesShareBall(input, FeatureEdge(g), line, radius))
     return false;
+  // Where the ball between two lines is on each edge is one fact, but each
+  // edge reads it from its own numbers: how its distance to the other line
+  // changes out to its own ends. Between an edge and a longer one facing it
+  // across a channel, the longer one's numbers are the rounding of a
+  // distance that hardly changes over its length, and can put beyond its
+  // far end a ball the shorter edge holds well within it - which is then
+  // neither edge's, nor any vertex's. There the shorter edge alone says
+  // where the ball is: every ball tangent to it within its ends touches
+  // this line within the edge's limits (Covers), so the ball is on this
+  // edge wherever it is on that one.
+  // Only for lines nearer parallel than perpendicular, where that holds for
+  // a whole stretch of this edge and not just at a point; only for an edge
+  // on this line's ball side, where its balls do reach the line; and only
+  // if this edge does not say the same of the other, so that one of the two
+  // is still asked.
+  if (!IsVertex(g) && input.kindsReady) {
+    const int m = FeatureEdge(g);
+    const vec2 n = LineNormal(input, line), nm = LineNormal(input, m);
+    if (std::abs(dot(n, nm)) > std::abs(la::cross(n, nm)) &&
+        HeightOverLine(input, line, EdgeStart(input, m)) > 0 &&
+        HeightOverLine(input, line, EdgeEnd(input, m)) > 0 &&
+        Covers(input, line, m, radius) && !Covers(input, m, line, radius))
+      return true;
+  }
   if (kind == kCorner)
     return CornerLimit(input, g, line, atEnd, root, roots, radius);
   // The other edge at this vertex: the ball tangent to both stops short of
