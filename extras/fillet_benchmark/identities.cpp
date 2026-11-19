@@ -32,6 +32,7 @@
 #include <iostream>
 #include <map>
 #include <random>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -82,6 +83,8 @@ Polygons Reorder(const Polygons& in) {
   return out;
 }
 
+void Flag(const std::string& line);
+
 struct Tally {
   // Decades of difference / input area: <=1e-12, <=1e-9, <=1e-6, <=1e-3, more.
   long buckets[5] = {0, 0, 0, 0, 0};
@@ -101,12 +104,16 @@ struct Tally {
                   : !(relative > 1e-3) ? 3
                                        : 4;
     ++buckets[b];
-    if (b >= 2) Keep(relative, what);
+    if (b >= 2) {
+      Keep(relative, what);
+      Flag(what + " diff " + std::to_string(relative));
+    }
   }
   void Mismatch(const std::string& what) {
     ++count;
     ++emptyMismatch;
     Keep(std::numeric_limits<double>::infinity(), what);
+    Flag(what + " one-side-empty");
   }
   void Keep(double value, const std::string& what) {
     worst.push_back({value, what});
@@ -117,10 +124,14 @@ struct Tally {
 };
 
 std::map<std::string, Tally> tallies;
+// Every flagged comparison, for --log.
+std::vector<std::string> flagged;
 // Not a multiple of anything common: an arc of a right angle or a half-turn
 // then never lands exactly on a whole number of segments, where rounding
 // would choose the count.
 int segments = 37;
+
+void Flag(const std::string& line) { flagged.push_back(line); }
 std::string dumpDir;
 long dumped = 0;
 
@@ -175,7 +186,8 @@ void Check(const Case& c, double radius) {
   if (!empty) {
     const double escaped =
         radius > 0 ? (out - input).Area() : (input - out).Area();
-    tallies[Key(c, "contain", radius)].Add(escaped / inArea, Describe(c.name, radius, ""));
+    tallies[Key(c, "contain", radius)].Add(escaped / inArea,
+                                           Describe(c.name, radius, ""));
     if (escaped / inArea > 1e-9) Dump(c, radius, "contain");
   }
 
@@ -188,9 +200,8 @@ void Check(const Case& c, double radius) {
     const vec2 outerSize = size * 3.0 + vec2(16 * r, 16 * r);
     const CrossSection box =
         CrossSection::Square(outerSize).Translate(outerMin);
-    const CrossSection window =
-        CrossSection::Square(size + vec2(4 * r, 4 * r))
-            .Translate(bounds.min - vec2(2 * r, 2 * r));
+    const CrossSection window = CrossSection::Square(size + vec2(4 * r, 4 * r))
+                                    .Translate(bounds.min - vec2(2 * r, 2 * r));
     const CrossSection complement = box - input;
     const auto dualPieces = Run(complement, -radius);
     // "No result" is also what Fillet returns where nothing changes and,
@@ -212,12 +223,13 @@ void Check(const Case& c, double radius) {
     double diff = std::numeric_limits<double>::infinity();
     for (const auto& x : ours)
       for (const auto& y : theirs)
-        diff = std::min(diff, ((x - y) + (y - x))
-                                  .Boolean(window, OpType::Intersect)
-                                  .Area());
+        diff = std::min(
+            diff,
+            ((x - y) + (y - x)).Boolean(window, OpType::Intersect).Area());
     const std::string note =
         empty != dualPieces.empty() ? "one side without result" : "";
-    tallies[Key(c, "dual", radius)].Add(diff / inArea, Describe(c.name, radius, note));
+    tallies[Key(c, "dual", radius)].Add(diff / inArea,
+                                        Describe(c.name, radius, note));
     if (diff / inArea > 1e-6) Dump(c, radius, "dual");
   }
 
@@ -237,12 +249,13 @@ void Check(const Case& c, double radius) {
       return;
     }
     const double diff = std::abs(Area(other) / (scale * scale) - outArea);
-    tallies[Key(c, check, radius)].Add(diff / inArea, Describe(c.name, radius, label));
+    tallies[Key(c, check, radius)].Add(diff / inArea,
+                                       Describe(c.name, radius, label));
     if (diff / inArea > 1e-9) Dump(c, radius, check);
   };
   for (int symmetry = 1; symmetry < 8; ++symmetry)
-    compare("exact", Transform(c.polys, symmetry, 1),
-            1, "symmetry " + std::to_string(symmetry));
+    compare("exact", Transform(c.polys, symmetry, 1), 1,
+            "symmetry " + std::to_string(symmetry));
   compare("exact", Transform(c.polys, 0, 0.125), 0.125, "scale 1/8");
   compare("exact", Transform(c.polys, 0, 32), 32, "scale 32");
   compare("order", Reorder(c.polys), 1, "reordered");
@@ -274,12 +287,23 @@ std::vector<double> CriticalRadii(const Polygons& polys, size_t limit) {
       if (h > 0) radii.push_back(h / 2);
     }
   }
+  // Not the distances between vertices that all but coincide: those are
+  // below what the boolean that prepares the input tells apart, so the
+  // input itself is not the same shape under a symmetry.
+  double extent = 0;
+  for (const vec2 p : points)
+    for (const vec2 q : {points.front(), points.back()})
+      extent = std::max(extent, length(p - q));
+  radii.erase(std::remove_if(radii.begin(), radii.end(),
+                             [&](double r) { return r < 1e-6 * extent; }),
+              radii.end());
   std::sort(radii.begin(), radii.end());
   radii.erase(std::unique(radii.begin(), radii.end()), radii.end());
   // Spread the picks over the range rather than taking only the smallest.
   std::vector<double> picked;
   for (size_t k = 0; k < limit && !radii.empty(); ++k)
-    picked.push_back(radii[k * (radii.size() - 1) / std::max<size_t>(1, limit - 1)]);
+    picked.push_back(
+        radii[k * (radii.size() - 1) / std::max<size_t>(1, limit - 1)]);
   picked.erase(std::unique(picked.begin(), picked.end()), picked.end());
   return picked;
 }
@@ -322,7 +346,8 @@ Case GridCase(uint64_t seed) {
 Case TurnedCase(uint64_t seed) {
   Case c = GridCase(seed);
   std::mt19937_64 rng(seed ^ 0x9e3779b97f4a7c15ull);
-  const double angle = (rng() >> 11) * (1.0 / 9007199254740992.0) * 6.283185307179586;
+  const double angle =
+      (rng() >> 11) * (1.0 / 9007199254740992.0) * 6.283185307179586;
   const double co = std::cos(angle), si = std::sin(angle);
   for (auto& loop : c.polys)
     for (auto& p : loop) p = vec2(co * p.x - si * p.y, si * p.x + co * p.y);
@@ -335,7 +360,7 @@ Case TurnedCase(uint64_t seed) {
 int main(int argc, char** argv) {
   std::vector<std::string> files;
   int generated = 0;
-  std::string only;
+  std::string only, logFile;
   for (int i = 1; i < argc; ++i) {
     const std::string arg = argv[i];
     if (arg == "--generated") {
@@ -346,6 +371,8 @@ int main(int argc, char** argv) {
       only = argv[++i];
     } else if (arg == "--dump") {
       dumpDir = argv[++i];
+    } else if (arg == "--log") {
+      logFile = argv[++i];
     } else {
       files.push_back(arg);
     }
@@ -362,7 +389,8 @@ int main(int argc, char** argv) {
         c.radii.push_back(f * entry.maxCircleRadius);
       for (const double f : {0.5, 1.0, 2.0})
         AddNudged(c.radii, f * entry.maxCircleRadius);
-      for (const double r : CriticalRadii(entry.polys, 6)) AddNudged(c.radii, r);
+      for (const double r : CriticalRadii(entry.polys, 6))
+        AddNudged(c.radii, r);
       cases.push_back(c);
     }
   for (int seed = 1; seed <= generated; ++seed) {
@@ -379,13 +407,18 @@ int main(int argc, char** argv) {
   }
   std::cout << cases.size() << " shapes, " << calls << " shape-radius pairs, "
             << segments << " segments\n";
-  std::cout << "check              comparisons  <=1e-12  <=1e-9  <=1e-6  <=1e-3  larger  "
+  std::cout << "check              comparisons  <=1e-12  <=1e-9  <=1e-6  "
+               "<=1e-3  larger  "
                "one-side-empty\n";
   for (const auto& [name, t] : tallies) {
     std::cout << std::left << std::setw(19) << name << std::right
               << std::setw(11) << t.count;
     for (const long b : t.buckets) std::cout << std::setw(9) << b;
     std::cout << std::setw(10) << t.emptyMismatch << '\n';
+  }
+  if (!logFile.empty()) {
+    std::ofstream log(logFile);
+    for (const auto& line : flagged) log << line << '\n';
   }
   for (const auto& [name, t] : tallies) {
     if (t.worst.empty()) continue;

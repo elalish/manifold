@@ -1722,6 +1722,15 @@ bool Blocks(const FilletInput& input, const FilletGeometry& fillet, int c,
     return BetweenOnLine(input, into, fillet.from, radius) &&
            BetweenOnLine(input, into, fillet.to, radius);
   }
+  // A ball on one line and one vertex is on that line too, and its place
+  // along it between the two balls that touch this vertex decides the same
+  // way. Around the vertex it turns about, the ball and the one that
+  // touches both vertices can be closer together than their centers tell
+  // apart - a ball with no room to spare between the three - while along
+  // the line the two balls of this vertex are still well apart.
+  if (!IsVertex(g) || !IsVertex(h))
+    return BetweenOnLine(input, into, IsVertex(g) ? fillet.to : fillet.from,
+                         radius);
   const int y = VertexFeature(t <= 0 ? c : NextEdge(input, c));
   // Two balls that reach one vertex from different contacts compete for it,
   // and their order around that vertex alone says which of them the other's
