@@ -168,29 +168,22 @@ def test_import_keeps_gil_disabled():
 
 def test_merge_while_others_read_mesh():
     # Normals split the vertices, so the mesh without its merge list is open
-    # and merge() rebuilds the list.
+    # and merge() builds the list.
     full = sponge().calculate_normals(0).to_mesh()
-    verts = np.array(full.vert_properties)
-    tris = np.array(full.tri_verts)
+    mesh = Mesh(np.array(full.vert_properties), np.array(full.tri_verts))
     merged = mesh_key(Manifold(full))
-    before = mesh_key(Manifold(Mesh(verts, tris)))
+    before = mesh_key(Manifold(mesh))
     assert before[0] != merged[0]
 
-    for _ in range(50):
-        mesh = Mesh(verts, tris)
+    def work(i):
+        if i % 2:
+            return mesh_key(Manifold(mesh.merge()))
+        return mesh_key(Manifold(mesh))
 
-        def work(i):
-            if i == 0:
-                assert mesh.merge()
-                return []
-            return [mesh_key(Manifold(mesh)) for _ in range(4)]
-
-        for keys in run_concurrently(work):
-            for key in keys:
-                if key[0] == before[0]:
-                    assert_same_mesh(before, key)
-                else:
-                    assert_same_mesh(merged, key)
+    for _ in range(10):
+        for i, key in enumerate(run_concurrently(work)):
+            assert_same_mesh(merged if i % 2 else before, key)
+    assert len(mesh.merge_from_vert) == 0
 
 
 def test_separate_trees_match_serial():

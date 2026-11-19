@@ -55,9 +55,7 @@ int NumUnique(const std::vector<T>& in) {
 // some without - the exact shape the per-meshID handling in
 // Impl::Transform / Compose / CreateProperties was added to support.
 Manifold MixedNormalsCubePlusSphere(double sphereRadius = 5.0) {
-  MeshGL cubeGL = CubeSTL();
-  cubeGL.Merge();
-  return Manifold(cubeGL).Translate({20, 0, 0}) +
+  return Manifold(CubeSTL().Merge()).Translate({20, 0, 0}) +
          Manifold::Sphere(sphereRadius, 32).CalculateNormals(0);
 }
 
@@ -1617,25 +1615,24 @@ TEST(Manifold, Merge) {
   EXPECT_TRUE(cubeBad.IsEmpty());
   EXPECT_EQ(cubeBad.Status(), Manifold::Error::NotManifold);
 
-  EXPECT_TRUE(cubeSTL.Merge());
-  EXPECT_EQ(cubeSTL.mergeFromVert.size(), 28);
-  CheckCube(cubeSTL);
+  MeshGL merged = cubeSTL.Merge();
+  EXPECT_TRUE(cubeSTL.mergeFromVert.empty());
+  EXPECT_EQ(merged.mergeFromVert.size(), 28);
+  CheckCube(merged);
 
-  EXPECT_FALSE(cubeSTL.Merge());
-  EXPECT_EQ(cubeSTL.mergeFromVert.size(), 28);
-  cubeSTL.mergeFromVert.resize(14);
-  cubeSTL.mergeToVert.resize(14);
+  EXPECT_EQ(merged.Merge().mergeFromVert, merged.mergeFromVert);
+  merged.mergeFromVert.resize(14);
+  merged.mergeToVert.resize(14);
 
-  EXPECT_TRUE(cubeSTL.Merge());
-  EXPECT_EQ(cubeSTL.mergeFromVert.size(), 28);
-  CheckCube(cubeSTL);
+  merged = merged.Merge();
+  EXPECT_EQ(merged.mergeFromVert.size(), 28);
+  CheckCube(merged);
 }
 
 TEST(Manifold, MergeTolerance) {
   MeshGL mesh = CubeSTL();
   mesh.vertProperties[0] += 1e-4f;
-  EXPECT_TRUE(mesh.Merge(1e-3f));
-  EXPECT_EQ(Manifold(mesh).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(Manifold(mesh.Merge(1e-3f)).Status(), Manifold::Error::NoError);
 }
 
 TEST(Manifold, MergeCollapsedEdgeParity) {
@@ -1643,22 +1640,26 @@ TEST(Manifold, MergeCollapsedEdgeParity) {
   mesh.vertProperties = {0, 0, 0,  //
                          0, 0, 0,  //
                          1, 0, 0,  //
-                         3, 0, 0,  //
-                         3, 0, 0,  //
-                         4, 0, 0};
+                         0, 0, 0,  //
+                         0, 0, 0,  //
+                         0, 1, 0};
   mesh.mergeFromVert = {1, 4};
   mesh.mergeToVert = {0, 3};
 
   // These triangles collapse to (0, 0, 2) and (3, 3, 5). Their opposing
   // non-degenerate edges cancel, leaving one self-edge per triangle. Two
-  // copies of each triangle cancel those self-edges as well.
+  // copies of each triangle cancel those self-edges as well. All four
+  // collapsed verts share a position, so any vert found open merges across the
+  // two pairs.
   mesh.triVerts = {0, 1, 2, 0, 1, 2, 3, 4, 5, 3, 4, 5};
-  EXPECT_FALSE(mesh.Merge());
+  MeshGL merged = mesh.Merge();
+  EXPECT_EQ(merged.mergeFromVert, (std::vector<uint32_t>{1, 4}));
+  EXPECT_EQ(merged.mergeToVert, (std::vector<uint32_t>{0, 3}));
 
   mesh.triVerts = {0, 1, 2, 3, 4, 5};
-  EXPECT_TRUE(mesh.Merge());
-  EXPECT_EQ(mesh.mergeFromVert, (std::vector<uint32_t>{1, 4}));
-  EXPECT_EQ(mesh.mergeToVert, (std::vector<uint32_t>{0, 3}));
+  merged = mesh.Merge();
+  EXPECT_EQ(merged.mergeFromVert, (std::vector<uint32_t>{1, 3, 4}));
+  EXPECT_EQ(merged.mergeToVert, (std::vector<uint32_t>{0, 0, 0}));
 }
 
 TEST(Manifold, MergeEmpty) {
@@ -1703,8 +1704,7 @@ TEST(Manifold, MergeEmpty) {
                           -0.0, 0.5,  -0.43450000882149, 0.0, 0.0, 1.0, 1.0,
                           0.0,  -0.5, -0.43450000882149, 0.0, 0.0, 0.0, 0.0,
                           -0.0, -0.5, -0.43450000882149, 0.0, 0.0, 1.0, 0.0};
-  EXPECT_TRUE(shape.Merge());
-  Manifold man(shape);
+  Manifold man(shape.Merge());
   EXPECT_EQ(man.Status(), Manifold::Error::NoError);
   man = man.Simplify();
   EXPECT_TRUE(man.IsEmpty());
@@ -1818,7 +1818,8 @@ TEST(Manifold, MergeDegenerates) {
   std::rotate(squash.triVerts.begin(), squash.triVerts.begin() + 3 * 5,
               squash.triVerts.end());
   // Merge should remove the now duplicate vertex.
-  EXPECT_TRUE(squash.Merge());
+  squash = squash.Merge();
+  EXPECT_FALSE(squash.mergeFromVert.empty());
   // Manifold should remove the triangle with two references to the same vert.
   Manifold squashed = Manifold(squash);
   EXPECT_FALSE(squashed.IsEmpty());
@@ -2094,8 +2095,7 @@ TEST(Manifold, MergeRefine) {
       9,   260, 248, 9,   248, 247, 9,   247, 253, 9,   253, 268, 268, 10,  9,
       256, 4,   259, 3,   2,   258, 272, 0,   10,  272, 10,  268, 268, 267, 272,
       7,   276, 275, 274, 6,   5,   5,   270, 274, 0,   266, 1,   277, 24,  23};
-  mesh.Merge(1e-5);
-  Manifold manifold(mesh);
+  Manifold manifold(mesh.Merge(1e-5));
   manifold = manifold.RefineToLength(1.0);
   EXPECT_NEAR(manifold.Volume(), 31.21, 0.01);
 }

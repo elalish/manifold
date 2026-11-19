@@ -245,9 +245,9 @@ NB_MODULE(manifold3d, m) {
 
   nb::class_<Manifold>(m, "Manifold")
       .def(nb::init<>(), manifold__manifold)
-      .def(nb::init<const MeshGL&>(), nb::arg("mesh").lock(),
+      .def(nb::init<const MeshGL&>(), nb::arg("mesh"),
            manifold__manifold__mesh_gl)
-      .def(nb::init<const MeshGL64&>(), nb::arg("mesh").lock(),
+      .def(nb::init<const MeshGL64&>(), nb::arg("mesh"),
            manifold__manifold__mesh_gl64)
       .def(nb::self + nb::self, manifold__operator_plus__q)
       .def(nb::self - nb::self, manifold__operator_minus__q)
@@ -601,16 +601,16 @@ NB_MODULE(manifold3d, m) {
                 {self.halfedgeTangent.size() / 12, 3, 4}, nb::handle());
           },
           nb::rv_policy::reference_internal)
-      .def_ro("merge_from_vert", &MeshGL::mergeFromVert, nb::lock_self())
-      .def_ro("merge_to_vert", &MeshGL::mergeToVert, nb::lock_self())
+      .def_ro("merge_from_vert", &MeshGL::mergeFromVert)
+      .def_ro("merge_to_vert", &MeshGL::mergeToVert)
       .def_ro("run_index", &MeshGL::runIndex)
       .def_ro("run_original_id", &MeshGL::runOriginalID)
       .def_ro("run_flags", &MeshGL::runFlags)
       .def_ro("face_id", &MeshGL::faceID)
       .def("backside", &MeshGL::Backside, nb::arg("run"))
       .def("has_normals", &MeshGL::HasNormals, nb::arg("run"))
-      .def("merge", &MeshGL::Merge, nb::lock_self(),
-           nb::arg("tolerance") = 0.0f, mesh_gl__merge__tolerance);
+      .def("merge", &MeshGL::Merge, nb::arg("tolerance") = 0.0f,
+           mesh_gl__merge__tolerance);
 
   nb::class_<MeshGL64>(m, "Mesh64")
       .def(
@@ -718,17 +718,16 @@ NB_MODULE(manifold3d, m) {
                 {self.halfedgeTangent.size() / 12, 3, 4}, nb::handle());
           },
           nb::rv_policy::reference_internal)
-      .def_ro("merge_from_vert", &MeshGL64::mergeFromVert, nb::lock_self())
-      .def_ro("merge_to_vert", &MeshGL64::mergeToVert, nb::lock_self())
+      .def_ro("merge_from_vert", &MeshGL64::mergeFromVert)
+      .def_ro("merge_to_vert", &MeshGL64::mergeToVert)
       .def_ro("run_index", &MeshGL64::runIndex)
       .def_ro("run_original_id", &MeshGL64::runOriginalID)
       .def_ro("run_flags", &MeshGL64::runFlags)
       .def_ro("face_id", &MeshGL64::faceID)
       .def("backside", &MeshGL64::Backside, nb::arg("run"))
       .def("has_normals", &MeshGL64::HasNormals, nb::arg("run"))
-      .def("merge", &MeshGL64::Merge, nb::lock_self(),
-           nb::arg("tolerance") = 0.0,
-           "Merge open-edge vertices within tolerance.");
+      .def("merge", &MeshGL64::Merge, nb::arg("tolerance") = 0.0,
+           "Return a copy with open-edge vertices merged within tolerance.");
 
   nb::class_<RayHit>(m, "RayHit")
       .def_ro("face_id", &RayHit::faceID)
@@ -754,23 +753,19 @@ NB_MODULE(manifold3d, m) {
       .def(
           "from_mesh",
           [](ExecutionContext& ctx, const MeshGL& mesh) {
-            // Copied while mesh is locked, since Mesh.merge() can modify it.
-            const MeshGL copy = mesh;
             nb::gil_scoped_release release;
-            return ctx.FromMeshGL(copy);
+            return ctx.FromMeshGL(mesh);
           },
-          nb::arg("mesh").lock(),
+          nb::arg("mesh"),
           "Ingest a MeshGL into a Manifold under this context, so the ingest "
           "reports progress and observes cancellation.")
       .def(
           "from_mesh",
           [](ExecutionContext& ctx, const MeshGL64& mesh) {
-            // Copied while mesh is locked, since Mesh.merge() can modify it.
-            const MeshGL64 copy = mesh;
             nb::gil_scoped_release release;
-            return ctx.FromMeshGL(copy);
+            return ctx.FromMeshGL(mesh);
           },
-          nb::arg("mesh").lock(),
+          nb::arg("mesh"),
           "Ingest a MeshGL64 into a Manifold under this context, so the ingest "
           "reports progress and observes cancellation.")
       .def(

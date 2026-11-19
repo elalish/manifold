@@ -94,12 +94,7 @@ val GetMeshJS(const Manifold& manifold, int normalIdx) {
 }
 
 val Merge(const val& mesh, float tolerance) {
-  val out = val::object();
-  MeshGL meshGL = MeshJS2GL(mesh);
-  bool changed = meshGL.Merge(tolerance);
-  out.set("changed", changed);
-  out.set("mesh", changed ? MeshGL2JS(meshGL) : mesh);
-  return out;
+  return MeshGL2JS(MeshJS2GL(mesh).Merge(tolerance));
 }
 
 }  // namespace js
