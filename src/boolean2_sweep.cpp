@@ -24,8 +24,10 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <functional>
 #include <limits>
 #include <map>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -626,6 +628,13 @@ PolySet2 CollectThenMeasure(PolySet2 arr, WindRule rule) {
   return std::move(measure.Out());
 }
 
+struct PointHash {
+  size_t operator()(const vec2& p) const {
+    const std::hash<double> hash;
+    return hash64bit(hash(p.x) ^ hash64bit(hash(p.y)));
+  }
+};
+
 }  // namespace
 
 // Arranges `edges` (referencing `verts`) and returns the retained boundary as
@@ -633,17 +642,14 @@ PolySet2 CollectThenMeasure(PolySet2 arr, WindRule rule) {
 // vertices the returned edges reference are appended to it.
 std::vector<OutEdge> SweepWinding(const std::vector<EdgeM>& edges,
                                   std::vector<vec2>& verts, WindRule rule) {
-  std::map<std::pair<double, double>, int> vertId;
+  std::unordered_map<vec2, int, PointHash> vertId;
+  vertId.reserve(verts.size());
   for (int v = 0; v < static_cast<int>(verts.size()); ++v)
-    vertId.emplace(std::make_pair(verts[v].x, verts[v].y), v);
+    vertId.emplace(verts[v], v);
   auto getId = [&](const vec2& p) -> int {
-    const auto key = std::make_pair(p.x, p.y);
-    auto it = vertId.find(key);
-    if (it != vertId.end()) return it->second;
-    const int id = static_cast<int>(verts.size());
-    verts.push_back(p);
-    vertId.emplace(key, id);
-    return id;
+    auto [it, inserted] = vertId.try_emplace(p, static_cast<int>(verts.size()));
+    if (inserted) verts.push_back(p);
+    return it->second;
   };
 
   // Seed the sweep from the input edges as a lex-normalized signed-multiplicity
