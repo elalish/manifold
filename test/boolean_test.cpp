@@ -985,6 +985,60 @@ TEST(Boolean, MinkowskiSumTranslatedComponents) {
   }
 }
 
+TEST(Boolean, MinkowskiDifferenceEnclosingNonConvexCutter) {
+  const Manifold smallBase =
+      Manifold::Cube(vec3(1.0), true) +
+      Manifold::Cube(vec3(0.5)).Translate({0.25, 0.25, 0.25});
+  const Manifold cutter =
+      (Manifold::Cube({4, 1, 1}, true) + Manifold::Cube({1, 2, 1}, true))
+          .Scale(vec3(3.0));
+  // The cutter cannot fit in either component, although the disconnected
+  // base's overall bounding box is larger than the cutter in every axis.
+  const Manifold disconnected =
+      smallBase.Translate(vec3(-10.0)) + smallBase.Translate(vec3(10.0));
+  for (const Manifold& base : {smallBase, disconnected}) {
+    for (const vec3 offset : {vec3(0.0), vec3(12, -7, 3)}) {
+      const Manifold input = base.Translate(offset);
+      const Manifold result = input.MinkowskiDifference(cutter);
+      ASSERT_EQ(result.Status(), Manifold::Error::NoError);
+      EXPECT_TRUE(result.IsEmpty());
+      EXPECT_DOUBLE_EQ(result.Volume(), 0.0);
+      EXPECT_NEAR(input.Volume(), base.Volume(), 1e-12);
+    }
+  }
+}
+
+TEST(Boolean, MinkowskiDifferenceDistributesOverCutterUnion) {
+  const Manifold first = Manifold::Cube({1, 0.25, 0.25}, true);
+  const Manifold second = Manifold::Cube({0.25, 0.5, 0.25}, true);
+  const Manifold solid = Manifold::Cube(vec3(4.0), true) +
+                         Manifold::Cube(vec3(2.0), true).Translate(vec3(2.0));
+  const Manifold hollow =
+      Manifold::Cube(vec3(6.0), true) - Manifold::Cube(vec3(2.0), true);
+  for (const Manifold& shape : {solid, hollow}) {
+    const Manifold base = shape.SetProperties(2, nullptr);
+    for (const vec3 offset : {vec3(0.0), vec3(0.125, -0.0625, 0.03125)}) {
+      const Manifold cutter =
+          (first + second).Translate(offset).SetProperties(5, nullptr);
+      // Sweeping a union of cutters is the union of their sweeps. Convex
+      // cutter calls use the separate per-face/all-vertices hull path.
+      const Manifold expected =
+          base.MinkowskiDifference(first.Translate(offset)) ^
+          base.MinkowskiDifference(second.Translate(offset));
+      const Manifold actual = base.MinkowskiDifference(cutter);
+      ASSERT_EQ(expected.Status(), Manifold::Error::NoError);
+      ASSERT_EQ(actual.Status(), Manifold::Error::NoError);
+      ASSERT_FALSE(expected.IsEmpty());
+      EXPECT_NEAR(actual.Volume(), expected.Volume(), 1e-8);
+      EXPECT_TRUE((actual - expected).IsEmpty());
+      EXPECT_TRUE((expected - actual).IsEmpty());
+      EXPECT_EQ(actual.NumProp(), expected.NumProp());
+      EXPECT_EQ(actual.NumProp(), 2);
+      EXPECT_EQ(cutter.NumProp(), 5);
+    }
+  }
+}
+
 TEST(Boolean, MinkowskiDifferenceEmptyBase) {
   const Manifold cube = Manifold::Cube();
   const Manifold cross =
