@@ -102,7 +102,7 @@ ManifoldManifold* manifold_level_set_seq(ManifoldSdf sdf,
 
 // Manifold Vectors
 
-ManifoldManifoldVec* manifold_manifold_empty_vec();
+ManifoldManifoldVec* manifold_manifold_empty_vec(void);
 ManifoldManifoldVec* manifold_manifold_vec(size_t sz);
 void manifold_manifold_vec_reserve(ManifoldManifoldVec* ms, size_t sz);
 size_t manifold_manifold_vec_length(const ManifoldManifoldVec* ms);
@@ -180,9 +180,9 @@ ManifoldManifold* manifold_simplify(const ManifoldManifold* m,
 
 // Manifold Shapes / Constructors
 
-ManifoldManifold* manifold_empty();
+ManifoldManifold* manifold_empty(void);
 ManifoldManifold* manifold_copy(const ManifoldManifold* m);
-ManifoldManifold* manifold_tetrahedron();
+ManifoldManifold* manifold_tetrahedron(void);
 ManifoldManifold* manifold_cube(double x, double y, double z, int center);
 ManifoldManifold* manifold_cylinder(double height, double radius_low,
                                     double radius_high, int circular_segments,
@@ -257,7 +257,7 @@ int manifold_winding_number(const ManifoldManifold* m, double x, double y,
 // the context. Safe to read/write from any thread. See the ExecutionContext
 // class in common.h for full semantics (sticky cancel, per-boolean
 // granularity).
-ManifoldExecutionContext* manifold_execution_context();
+ManifoldExecutionContext* manifold_execution_context(void);
 void manifold_execution_context_cancel(ManifoldExecutionContext* ctx);
 int manifold_execution_context_cancelled(const ManifoldExecutionContext* ctx);
 double manifold_execution_context_progress(const ManifoldExecutionContext* ctx);
@@ -279,7 +279,7 @@ ManifoldManifold* manifold_execution_context_of_meshgl64(
     ManifoldExecutionContext* ec, const ManifoldMeshGL64* mesh);
 
 // CrossSection Shapes/Constructors
-ManifoldCrossSection* manifold_cross_section_empty();
+ManifoldCrossSection* manifold_cross_section_empty(void);
 ManifoldCrossSection* manifold_cross_section_copy(
     const ManifoldCrossSection* cs);
 ManifoldCrossSection* manifold_cross_section_of_simple_polygon(
@@ -303,7 +303,7 @@ ManifoldCrossSectionVec* manifold_cross_section_decompose(
 
 // CrossSection Vectors
 
-ManifoldCrossSectionVec* manifold_cross_section_empty_vec();
+ManifoldCrossSectionVec* manifold_cross_section_empty_vec(void);
 ManifoldCrossSectionVec* manifold_cross_section_vec(size_t sz);
 void manifold_cross_section_vec_reserve(ManifoldCrossSectionVec* csv,
                                         size_t sz);
@@ -429,11 +429,11 @@ void manifold_version(int version[3]);
 // Static Quality Globals
 
 void manifold_set_relative_precision(double precision);
-double manifold_get_relative_precision();
+double manifold_get_relative_precision(void);
 void manifold_set_min_circular_angle(double degrees);
 void manifold_set_min_circular_edge_length(double length);
 void manifold_set_circular_segments(int number);
-void manifold_reset_to_circular_defaults();
+void manifold_reset_to_circular_defaults(void);
 
 // Manifold Mesh Extraction
 
