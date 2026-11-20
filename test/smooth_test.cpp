@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
 
 #include "gtest/gtest.h"
 #include "manifold/cross_section.h"
@@ -557,4 +559,68 @@ TEST(Smooth, SDF) {
   EXPECT_NEAR(GetMaxProperty(interpolated.GetMeshGL(), 3), 0, 0.083);
 
   if (options.exportModels) WriteTestOBJ("smoothGyroid.obj", smoothed);
+}
+
+TEST(Smooth, RefineInvalid) {
+  const Manifold cube = Manifold::Cube();
+  for (const double length : {0.0, -0.0, std::nan("")}) {
+    EXPECT_EQ(cube.RefineToLength(length).Status(),
+              Manifold::Error::InvalidConstruction);
+  }
+  EXPECT_EQ(
+      cube.RefineToLength(std::numeric_limits<double>::infinity()).NumTri(),
+      cube.NumTri());
+
+  const Manifold smooth = cube.CalculateNormals(0, 30).SmoothByNormals(0);
+  for (const double tolerance : {0.0, -0.0, std::nan("")}) {
+    EXPECT_EQ(smooth.RefineToTolerance(tolerance).Status(),
+              Manifold::Error::InvalidConstruction);
+  }
+  EXPECT_EQ(smooth.RefineToTolerance(std::numeric_limits<double>::infinity())
+                .NumTri(),
+            smooth.NumTri());
+}
+
+TEST(Smooth, RefineTooLarge) {
+  const Manifold cube = Manifold::Cube();
+  EXPECT_EQ(cube.RefineToLength(1e-9).Status(),
+            Manifold::Error::ResultTooLarge);
+  EXPECT_EQ(cube.RefineToLength(1e-300).Status(),
+            Manifold::Error::ResultTooLarge);
+  EXPECT_EQ(cube.Refine(1 << 20).Status(), Manifold::Error::ResultTooLarge);
+  const Manifold smooth =
+      Manifold::Cylinder(1, 1, 1, 8).CalculateNormals().SmoothByNormals();
+  ASSERT_GT(smooth.RefineToTolerance(0.01).NumTri(), smooth.NumTri());
+  EXPECT_EQ(smooth.RefineToTolerance(1e-30).Status(),
+            Manifold::Error::ResultTooLarge);
+}
+
+TEST(Smooth, RefinePropertiesTooLarge) {
+  const Manifold props =
+      Manifold::Cube().SetProperties(1000, [](double*, vec3, const double*) {});
+  EXPECT_EQ(props.Refine(1000).Status(), Manifold::Error::ResultTooLarge);
+}
+
+TEST(Smooth, SphereTooLarge) {
+  EXPECT_EQ(Manifold::Sphere(1, 1 << 20).Status(),
+            Manifold::Error::ResultTooLarge);
+}
+
+TEST(Smooth, RefineFlatTriangles) {
+  // The wedge's caps are long, nearly flat triangles.
+  const Manifold wedge = Manifold::Extrude({{{0, 0}, {2, 0}, {1, 1e-3}}}, 1e-3);
+  const Manifold refined = wedge.RefineToLength(7e-5);
+  EXPECT_EQ(refined.Status(), Manifold::Error::NoError);
+  EXPECT_GT(refined.NumTri(), 1000000);
+}
+
+TEST(Smooth, RefineLongEdges) {
+  // 46342 divisions per long edge, where squaring an int division count
+  // overflows.
+  const Manifold refined =
+      Manifold::Cube({46342, 1, 1}, true).RefineToLength(1);
+  EXPECT_EQ(refined.Status(), Manifold::Error::NoError);
+  EXPECT_NEAR(refined.Volume(), 46342, 1e-6);
+  EXPECT_EQ(refined.Genus(), 0);
+  EXPECT_GT(refined.NumTri(), 1112208);
 }

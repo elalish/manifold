@@ -45,6 +45,14 @@ bool PropertiesTooLarge(int64_t numProp, size_t numPropVert) {
   return numProp * static_cast<int64_t>(numPropVert) >
          std::numeric_limits<int>::max();
 }
+
+// Converts a requested division count to int. Counts this large are rejected
+// by Subdivide, so clamping only keeps the conversion defined.
+int ToDivisions(double divisions) {
+  return divisions < std::numeric_limits<int>::max()
+             ? static_cast<int>(divisions)
+             : std::numeric_limits<int>::max();
+}
 }  // namespace
 
 namespace manifold {
@@ -331,7 +339,7 @@ MeshGL64 Manifold::GetMeshGL64(int normalIdx) const {
 bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
 /**
  * Returns the reason for an input Mesh producing an empty Manifold. This Status
- * will carry on through operations like NaN propogation, ensuring an errored
+ * will carry on through operations like NaN propagation, ensuring an errored
  * mesh doesn't get mysteriously lost. Empty meshes may still show
  * NoError, for instance the intersection of non-overlapping meshes.
  */
@@ -390,11 +398,11 @@ double Manifold::GetEpsilon() const {
 }
 
 /**
- * Return a copy of the manifold simplified to the given tolerance, but with its
- * actual tolerance value unchanged. If the tolerance is not given or is less
- * than the current tolerance, the current tolerance is used for simplification.
- * The result will contain a subset of the original verts and all surfaces will
- * have moved by less than tolerance.
+ * Return a simplified copy of the manifold. The tolerance controls the local
+ * error when collapsing edges, measured relative to nearby face planes.
+ * Simplification tends to remove features thinner than the tolerance.
+ * @param tolerance Simplification tolerance, lower-bounded by the manifold's
+ * epsilon.
  */
 Manifold Manifold::Simplify(double tolerance) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
@@ -439,7 +447,8 @@ double Manifold::SurfaceArea() const {
 }
 
 /**
- * Returns the volume of the manifold.
+ * Returns the volume of the manifold. Negative volume is considered a class of
+ * overlapped geometry and should be avoided as much as self-intersection.
  */
 double Manifold::Volume() const {
   return GetCsgLeafNode().GetImpl()->GetProperty(Impl::Property::Volume);
@@ -841,7 +850,8 @@ Manifold Manifold::Refine(int n) const {
  * `CalculateNormals()` is preserved; the new verts get linearly-interpolated
  * normals, which are less precise than recomputed ones but still meaningful.
  *
- * @param length The length that edges will be broken down to.
+ * @param length The length that edges will be broken down to. Its sign is
+ * ignored, and zero or NaN is an error.
  */
 Manifold Manifold::RefineToLength(double length) const {
   length = std::abs(length);
@@ -849,10 +859,11 @@ Manifold Manifold::RefineToLength(double length) const {
   auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
+  if (!(length > 0)) return Invalid();
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   pImpl->Refine(
       [length](vec3 edge, vec4, vec4) {
-        return static_cast<int>(la::length(edge) / length);
+        return ToDivisions(la::length(edge) / length);
       },
       false, ctx.get());
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
@@ -870,7 +881,8 @@ Manifold Manifold::RefineToLength(double length) const {
  *
  * @param tolerance The desired maximum distance between the faceted mesh
  * produced and the exact smoothly curving surface. All vertices are exactly on
- * the surface, within rounding error.
+ * the surface, within rounding error. Its sign is ignored, and zero or NaN is
+ * an error.
  */
 Manifold Manifold::RefineToTolerance(double tolerance) const {
   tolerance = std::abs(tolerance);
@@ -878,6 +890,7 @@ Manifold Manifold::RefineToTolerance(double tolerance) const {
   auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
+  if (!(tolerance > 0)) return Invalid();
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (!pImpl->halfedgeTangent_.empty()) {
     pImpl->Refine(
@@ -892,7 +905,7 @@ Manifold Manifold::RefineToTolerance(double tolerance) const {
           // Circular arc result plus heuristic term for non-circular curves
           const double d = 0.5 * (la::length(start) + la::length(end)) +
                            la::length(start - end);
-          return static_cast<int>(std::sqrt(3 * d / (4 * tolerance)));
+          return ToDivisions(std::sqrt(3 * d / (4 * tolerance)));
         },
         true, ctx.get());
   }
@@ -1153,11 +1166,23 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
  * @param searchLength The maximum distance to search for a minimum gap.
  */
 double Manifold::MinGap(const Manifold& other, double searchLength) const {
+  const auto impl = GetCsgLeafNode().GetImpl();
+  const auto otherImpl = other.GetCsgLeafNode().GetImpl();
+  // The mesh bounds give a lower bound on the gap. If they are already beyond
+  // a positive search limit, even the solid intersection check is unnecessary.
+  const vec3 gap =
+      la::max(vec3(0.0), la::max(impl->bBox_.min - otherImpl->bBox_.max,
+                                 otherImpl->bBox_.min - impl->bBox_.max));
+  const double gapSquared = la::length2(gap);
+  if (searchLength > 0 && gapSquared > 0 &&
+      gapSquared >= searchLength * searchLength) {
+    return searchLength;
+  }
+
   auto intersect = *this ^ other;
   if (!intersect.IsEmpty()) return 0.0;
 
-  return GetCsgLeafNode().GetImpl()->MinGap(*other.GetCsgLeafNode().GetImpl(),
-                                            searchLength);
+  return impl->MinGap(*otherImpl, searchLength);
 }
 
 /**
@@ -1174,9 +1199,9 @@ std::vector<RayHit> Manifold::RayCast(vec3 origin, vec3 endpoint) const {
 
 /**
  * Returns the winding number of this manifold around each of the given points.
- * Returns 0 for points outside, and a non-zero value (typically ±1) for points
- * inside a simple closed surface. For manifolds with overlapping regions the
- * magnitude may exceed 1.
+ * Returns 0 for points outside, and 1 for points
+ * inside a non-overlapped manifold. Any other values indicate overlapping
+ * regions, e.g. -1 for inverted regions, 2 for double-enclosed regions.
  *
  * @param points The 3D query points.
  */

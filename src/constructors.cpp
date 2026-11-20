@@ -190,6 +190,7 @@ Manifold Manifold::Sphere(double radius, int circularSegments) {
                                : Quality::GetCircularSegments(radius) / 4;
   auto pImpl_ = std::make_shared<Impl>(Impl::Shape::Octahedron);
   pImpl_->Subdivide([n](vec3, vec4, vec4) { return n - 1; });
+  if (pImpl_->status_ != Error::NoError) return Manifold(pImpl_);
   for_each_n(autoPolicy(pImpl_->NumVert(), 1e5), pImpl_->vertPos_.begin(),
              pImpl_->NumVert(), [radius](vec3& v) {
                v = vec3(la::cos(kHalfPi * (1.0 - v.x)),
@@ -329,6 +330,8 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
 
   const double dPhi = revolveDegrees / nDivisions;
   // first and last slice are distinguished if not a full revolution.
+  if (!isFullRevolution && nDivisions == std::numeric_limits<int>::max())
+    return PropagateStatus(Error::ResultTooLarge);
   const int nSlices = isFullRevolution ? nDivisions : nDivisions + 1;
 
   for (const auto& poly : polygons) {
@@ -426,9 +429,11 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
 }
 
 /**
- * This operation returns a vector of Manifolds that are topologically
- * disconnected. If everything is connected, the vector is length one,
- * containing a copy of the original. It is the inverse operation of Compose().
+ * This operation returns a vector of topologically disconnected Manifolds,
+ * keeping enclosed negative-volume shells with their enclosing
+ * positive-volume shell. If everything is connected, the vector is length
+ * one, containing a copy of the original. It is the inverse operation of
+ * Compose().
  */
 std::vector<Manifold> Manifold::Decompose() const {
   ZoneScoped;
@@ -450,6 +455,7 @@ std::vector<Manifold> Manifold::Decompose() const {
     meshes[0] = *this;
     return meshes;
   }
+  const auto& vertLabel = componentIndices;
   const int numVert = NumVert();
   const size_t numTri = pImpl_->NumTri();
   std::vector<Vec<int>> componentVerts(numComponents);
@@ -462,9 +468,10 @@ std::vector<Manifold> Manifold::Decompose() const {
     const int v = halfedge.Start(static_cast<int>(3 * face));
     componentFaces[componentIndices[v]].push_back(static_cast<int>(face));
   }
-
-  std::vector<Manifold> meshes;
-  meshes.reserve(numComponents);
+  std::vector<std::shared_ptr<Impl>> components;
+  std::vector<int> componentLabels;
+  components.reserve(numComponents);
+  componentLabels.reserve(numComponents);
   for (int i = 0; i < numComponents; ++i) {
     const Vec<int>& vertNew2Old = componentVerts[i];
     const Vec<int>& faceNew2Old = componentFaces[i];
@@ -484,6 +491,117 @@ std::vector<Manifold> Manifold::Decompose() const {
     impl->CalculateBBox();
     impl->SortGeometry();
 
+    components.push_back(std::move(impl));
+    componentLabels.push_back(i);
+  }
+
+  const int numMeshes = static_cast<int>(components.size());
+  std::vector<bool> isVug(numMeshes);
+  bool hasVug = false;
+  for (int i = 0; i < numMeshes; ++i) {
+    isVug[i] = components[i]->IsVug();
+    hasVug |= isVug[i];
+  }
+  if (!hasVug) {
+    std::vector<Manifold> meshes;
+    meshes.reserve(numMeshes);
+    for (auto& component : components) meshes.push_back(Manifold(component));
+    return meshes;
+  }
+
+  std::vector<int> parent(numMeshes, -1);
+  for (int i = 0; i < numMeshes; ++i) {
+    if (!isVug[i]) continue;
+    const auto& childVerts = components[i]->vertPos_;
+    Box parentBox;
+    for (int j = 0; j < numMeshes; ++j) {
+      if (i == j || isVug[j]) continue;
+      const Box& childBox = components[i]->bBox_;
+      const Box& currentBox = components[j]->bBox_;
+      const vec3 eps(components[j]->epsilon_);
+      const Box expandedBox(currentBox.min - eps, currentBox.max + eps);
+      if (!expandedBox.Contains(childBox)) continue;
+
+      if (parent[i] >= 0) {
+        if (!parentBox.Contains(currentBox) ||
+            components[parent[i]]->PointWinding(VecView<const vec3>(
+                components[j]->vertPos_.data(), 1))[0] != 1) {
+          continue;
+        }
+      }
+      if (components[j]->PointWinding(
+              VecView<const vec3>(childVerts.data(), 1))[0] == 1) {
+        parent[i] = j;
+        parentBox = expandedBox;
+      }
+    }
+  }
+
+  std::vector<int> outputByComponent(numComponents, -1);
+  std::vector<int> outputRoot;
+  std::vector<int> outputComponentCount;
+  int numOutputs = 0;
+  for (int i = 0; i < numMeshes; ++i) {
+    if (!isVug[i]) {
+      outputByComponent[componentLabels[i]] = numOutputs++;
+      outputRoot.push_back(i);
+      outputComponentCount.push_back(1);
+    }
+  }
+  for (int i = 0; i < numMeshes; ++i) {
+    if (!isVug[i]) continue;
+    if (parent[i] >= 0) {
+      const int output = outputByComponent[componentLabels[parent[i]]];
+      outputByComponent[componentLabels[i]] = output;
+      ++outputComponentCount[output];
+    } else {
+      outputByComponent[componentLabels[i]] = numOutputs++;
+      outputRoot.push_back(i);
+      outputComponentCount.push_back(1);
+    }
+  }
+
+  std::vector<Manifold> meshes;
+  meshes.reserve(numOutputs);
+  for (int i = 0; i < numOutputs; ++i) {
+    if (outputComponentCount[i] == 1) {
+      meshes.push_back(Manifold(components[outputRoot[i]]));
+      continue;
+    }
+
+    auto impl = std::make_shared<Impl>();
+
+    Vec<int> vertNew2Old(numVert);
+    const int nVert = copy_if(countAt(0), countAt(numVert), vertNew2Old.begin(),
+                              [i, &vertLabel, &outputByComponent](int v) {
+                                return outputByComponent[vertLabel[v]] == i;
+                              }) -
+                      vertNew2Old.begin();
+    impl->vertPos_.resize(nVert);
+    impl->vertNormal_.resize(nVert);
+    vertNew2Old.resize(nVert);
+    gather(vertNew2Old.begin(), vertNew2Old.end(), pImpl_->vertPos_.begin(),
+           impl->vertPos_.begin());
+    gather(vertNew2Old.begin(), vertNew2Old.end(), pImpl_->vertNormal_.begin(),
+           impl->vertNormal_.begin());
+
+    Vec<int> faceNew2Old;
+    faceNew2Old.reserve(NumTri());
+    const auto& halfedge = pImpl_->halfedge_;
+    for (size_t face = 0; face < NumTri(); ++face) {
+      const int component =
+          vertLabel[halfedge.Start(static_cast<int>(3 * face))];
+      if (outputByComponent[component] == i) {
+        faceNew2Old.push_back(static_cast<int>(face));
+      }
+    }
+
+    if (faceNew2Old.empty()) continue;
+
+    impl->GatherFaces(*pImpl_, faceNew2Old);
+    impl->ReindexVerts(vertNew2Old, pImpl_->NumVert());
+    impl->CalculateBBox();
+    impl->SortGeometry();
     meshes.push_back(Manifold(impl));
   }
   return meshes;

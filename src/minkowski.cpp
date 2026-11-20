@@ -89,11 +89,13 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
     // A translated by any point of B belongs to A + B; unshifted A may not.
     Manifold a(std::make_shared<Impl>(*aImpl));
     composedHulls.push_back(a.Translate(bImpl->vertPos_[0]));
-  } else if (!aConvex && !bConvex) {
+  }
+  if (!aConvex && !bConvex) {
     // Face-pair sweeps do not fill components contained inside the other
-    // operand. Seed both directions at a vertex of each boundary component,
-    // including cavity surfaces, without adding anything outside A + B.
-    auto addSeeds = [&composedHulls](const Impl& source, const Impl& shape) {
+    // operand. Seed at a vertex of each boundary component, including cavity
+    // surfaces, so the sweep contains the initial volume as well as its walls.
+    auto addSeeds = [&composedHulls, inset](const Impl& source,
+                                            const Impl& shape) {
       DisjointSets components(source.NumVert());
       for (size_t edge = 0; edge < source.halfedge_.size(); ++edge) {
         if (source.halfedge_.IsForward(edge)) {
@@ -102,13 +104,16 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
         }
       }
       Manifold base(std::make_shared<Impl>(shape));
+      // Like the cutting hulls, erosion seeds must not add cutter properties.
+      if (inset && base.NumProp() > 0) base = base.SetProperties(0, nullptr);
       for (size_t vert = 0; vert < source.NumVert(); ++vert) {
         if (components.find(vert) == vert) {
           composedHulls.push_back(base.Translate(source.vertPos_[vert]));
         }
       }
     };
-    addSeeds(*bImpl, *aImpl);
+    // Erosion sweeps B over A's boundary; only the sum is symmetric.
+    if (!inset) addSeeds(*bImpl, *aImpl);
     addSeeds(*aImpl, *bImpl);
   }
 

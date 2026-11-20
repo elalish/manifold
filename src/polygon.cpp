@@ -345,6 +345,8 @@ class EarClip {
   // two points and terminates.
   struct Vert {
     int mesh_idx;
+    // Assigned after key-holing; degenerate clipping happens before the tree.
+    int collider_idx;
     double cost;
     qItr ear;
     vec2 pos, rightDir;
@@ -530,8 +532,7 @@ class EarClip {
       const int rid = right->mesh_idx;
       QueryTwoDTree(collider.points, earBox, [&](PolyVert point) {
         const VertItr test = collider.itr[point.idx];
-        if (!Clipped(test) && test->mesh_idx != mesh_idx &&
-            test->mesh_idx != lid &&
+        if (test->mesh_idx != mesh_idx && test->mesh_idx != lid &&
             test->mesh_idx != rid) {  // Skip duplicated verts
           double cost = Cost(test, openSide, epsilon);
           if (cost < -epsilon) {
@@ -619,6 +620,7 @@ class EarClip {
   // triangle.
   void ClipEar(VertItrC ear) {
     Link(ear->left, ear->right);
+    if (ear->collider_idx >= 0) collider_.points[ear->collider_idx].idx = -1;
     if (ear->left->mesh_idx != ear->mesh_idx &&
         ear->mesh_idx != ear->right->mesh_idx &&
         ear->right->mesh_idx != ear->left->mesh_idx) {
@@ -657,6 +659,7 @@ class EarClip {
     for (const SimplePolygonIdx& poly : polys) {
       auto vert = poly.begin();
       polygon_.push_back({vert->idx,
+                          -1,
                           0.0,
                           earsQueue_.end(),
                           vert->pos,
@@ -675,6 +678,7 @@ class EarClip {
         bBox_.Union(vert->pos);
 
         polygon_.push_back({vert->idx,
+                            -1,
                             0.0,
                             earsQueue_.end(),
                             vert->pos,
@@ -878,6 +882,9 @@ class EarClip {
     });
 
     BuildTwoDTree(collider_.points);
+    for (size_t i = 0; i < collider_.points.size(); ++i)
+      collider_.itr[collider_.points[i].idx]->collider_idx =
+          static_cast<int>(i);
   }
 
   // The main ear-clipping loop. This is called once for each simple polygon -

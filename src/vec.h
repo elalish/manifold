@@ -31,6 +31,8 @@
 #define ZoneScoped
 #define ZoneScopedN(name)
 #endif
+#include <cstdlib>
+#include <limits>
 #include <vector>
 
 #include "manifold/vec_view.h"
@@ -126,8 +128,7 @@ class Vec : public VecView<T> {
     this->capacity_ = this->size_;
     auto policy = autoPolicy(this->size_);
     if (this->size_ != 0) {
-      this->ptr_ = reinterpret_cast<T*>(malloc(this->size_ * sizeof(T)));
-      ASSERT(this->ptr_ != nullptr, std::bad_alloc());
+      this->ptr_ = Allocate(this->size_);
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       copy(policy, vec.begin(), vec.end(), this->ptr_);
     }
@@ -160,8 +161,7 @@ class Vec : public VecView<T> {
     this->size_ = other.size_;
     this->capacity_ = other.size_;
     if (this->size_ != 0) {
-      this->ptr_ = reinterpret_cast<T*>(malloc(this->size_ * sizeof(T)));
-      ASSERT(this->ptr_ != nullptr, std::bad_alloc());
+      this->ptr_ = Allocate(this->size_);
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       manifold::copy(other.begin(), other.end(), this->ptr_);
     }
@@ -175,8 +175,7 @@ class Vec : public VecView<T> {
     this->size_ = other.size_;
     this->capacity_ = other.size_;
     if (this->size_ != 0) {
-      this->ptr_ = reinterpret_cast<T*>(malloc(this->size_ * sizeof(T)));
-      ASSERT(this->ptr_ != nullptr, std::bad_alloc());
+      this->ptr_ = Allocate(this->size_);
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       manifold::copy(other.begin(), other.end(), this->ptr_);
     }
@@ -236,8 +235,7 @@ class Vec : public VecView<T> {
   void reserve(size_t n) {
     AssertUnique();
     if (n > capacity_) {
-      T* newBuffer = reinterpret_cast<T*>(malloc(n * sizeof(T)));
-      ASSERT(newBuffer != nullptr, std::bad_alloc());
+      T* newBuffer = Allocate(n);
       TracyAllocS(newBuffer, n * sizeof(T), 3);
       if (this->size_ > 0)
         manifold::copy(autoPolicy(this->size_), this->ptr_,
@@ -286,8 +284,7 @@ class Vec : public VecView<T> {
     AssertUnique();
     T* newBuffer = nullptr;
     if (this->size_ > 0) {
-      newBuffer = reinterpret_cast<T*>(malloc(this->size_ * sizeof(T)));
-      ASSERT(newBuffer != nullptr, std::bad_alloc());
+      newBuffer = Allocate(this->size_);
       TracyAllocS(newBuffer, this->size_ * sizeof(T), 3);
       manifold::copy(this->ptr_, this->ptr_ + this->size_, newBuffer);
     }
@@ -326,6 +323,18 @@ class Vec : public VecView<T> {
     if constexpr (shared) {
       ASSERT(count_->load() == 1, logicErr("can only mutate unique vector"));
     }
+  }
+
+  // Out of memory is fatal. Never return null: writing through it is silent
+  // memory corruption under WASM, where address 0 is valid.
+  static T* Allocate(size_t n) {
+    // An overflowing size saturates, so malloc fails instead of wrapping.
+    const size_t bytes = n > std::numeric_limits<size_t>::max() / sizeof(T)
+                             ? std::numeric_limits<size_t>::max()
+                             : n * sizeof(T);
+    T* p = reinterpret_cast<T*>(malloc(bytes));
+    if (p == nullptr) std::abort();
+    return p;
   }
 
   inline void dealloc() {

@@ -18,6 +18,8 @@
 //   - `DistanceTriangleTriangleSquared` (the per-triangle primitive
 //     MinGap is built on)
 
+#include <limits>
+
 #include "../src/tri_dist.h"
 #include "gtest/gtest.h"
 #include "manifold/manifold.h"
@@ -242,6 +244,81 @@ TEST(Measurement, MinGapSphereSphereOutOfBounds) {
   float distance = a.MinGap(b, 0.8);
 
   EXPECT_FLOAT_EQ(distance, 0.8);
+}
+
+TEST(Measurement, MinGapBoundingBoxClearance) {
+  const auto a = Manifold::Cube(vec3(1), true);
+  const auto b = a.Translate({4, 5, 0});
+  // The boxes have axis separations 3 and 4: their closest corners are 5 apart.
+  // Check both sides of the bound as well as a diagonal gap whose individual
+  // axis separations are less than the search distance.
+  for (double limit : {0.25, 4.5, std::nextafter(5.0, 0.0), 5.0,
+                       std::nextafter(5.0, 6.0), 6.0}) {
+    const double expected = std::min(5.0, limit);
+    EXPECT_DOUBLE_EQ(a.MinGap(b, limit), expected);
+    EXPECT_DOUBLE_EQ(b.MinGap(a, limit), expected);
+  }
+
+  // Intersecting bounding boxes do not imply intersecting solids.
+  const auto sphere = Manifold::Sphere(1, 32);
+  const auto diagonal = sphere.Translate({2, 2, 0});
+  EXPECT_DOUBLE_EQ(sphere.MinGap(diagonal, 0.5), 0.5);
+  EXPECT_NEAR(sphere.MinGap(diagonal, 1), 2 * std::sqrt(2) - 2, 1e-12);
+  EXPECT_DOUBLE_EQ(a.MinGap(a.Translate({0.5, 0, 0}), 0.25), 0);
+}
+
+TEST(Measurement, MinGapBoundingBoxEmptyAndNonpositiveLimits) {
+  const auto cube = Manifold::Cube();
+  const auto far = cube.Translate({10, 0, 0});
+  EXPECT_DOUBLE_EQ(Manifold().MinGap(cube, 0.25), 0.25);
+  EXPECT_DOUBLE_EQ(cube.MinGap(Manifold(), 0.25), 0.25);
+  // Keep the existing nonpositive-limit behavior outside the positive-clearance
+  // shortcut, including the absolute value returned for a negative limit.
+  for (double limit : {0.0, -0.25}) {
+    EXPECT_DOUBLE_EQ(cube.MinGap(far, limit), std::abs(limit));
+    EXPECT_DOUBLE_EQ(cube.MinGap(cube, limit), 0);
+  }
+}
+
+TEST(Measurement, MinGapBoundingBoxPendingCSG) {
+  auto make = []() {
+    return (Manifold::Cube() + Manifold::Cube().Translate({1, 0, 0}))
+        .Rotate(0, 0, 90)
+        .Translate({3, 4, 5});
+  };
+  for (double limit : {0.25, 7.0, 8.0}) {
+    for (bool reverse : {false, true}) {
+      // Leave both the Boolean and transforms unevaluated until MinGap.
+      const auto a = make();
+      const auto b = make().Translate({8, 0, 0});
+      const double expected = std::min(7.0, limit);
+      EXPECT_DOUBLE_EQ(reverse ? b.MinGap(a, limit) : a.MinGap(b, limit),
+                       expected);
+    }
+  }
+}
+
+TEST(Measurement, MinGapBoundingBoxTouchingAndContained) {
+  const auto outer = Manifold::Cube(vec3(10), true);
+  const auto inner = Manifold::Cube(vec3(1), true).Rotate(15, 30, 45);
+  // Separated surfaces of nested solids still have zero solid clearance.
+  EXPECT_DOUBLE_EQ(outer.MinGap(inner, 0.25), 0);
+  EXPECT_DOUBLE_EQ(inner.MinGap(outer, 0.25), 0);
+
+  // Squaring a positive search cap can underflow to zero. A zero box gap
+  // must still reach the solid-intersection check instead of returning the cap.
+  const double tinyLimit = std::numeric_limits<double>::min();
+  EXPECT_DOUBLE_EQ(outer.MinGap(inner, tinyLimit), 0);
+  EXPECT_DOUBLE_EQ(inner.MinGap(outer, tinyLimit), 0);
+
+  const auto cube = Manifold::Cube();
+  EXPECT_DOUBLE_EQ(cube.MinGap(cube.Translate({1, 0, 0}), 0.25), 0);
+  EXPECT_DOUBLE_EQ(cube.MinGap(cube.Translate({2, 0, 0}), tinyLimit),
+                   tinyLimit);
+  // Preserve the cap even for a positive gap below Boolean's tie tolerance.
+  const double offset = std::nextafter(1.0, 2.0);
+  const double limit = (offset - 1.0) / 2;
+  EXPECT_DOUBLE_EQ(cube.MinGap(cube.Translate({offset, 0, 0}), limit), limit);
 }
 
 TEST(Measurement, MinGapClosestPointOnEdge) {

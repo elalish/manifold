@@ -760,7 +760,8 @@ export class Manifold {
    * moved to the interpolated surface according to their barycentric
    * coordinates.
    *
-   * @param length The length that edges will be broken down to.
+   * @param length The length that edges will be broken down to. Its sign is
+   * ignored, and zero or NaN is an error.
    * @group Smoothing
    */
   refineToLength(length: number): Manifold;
@@ -775,7 +776,8 @@ export class Manifold {
    *
    * @param tolerance The desired maximum distance between the faceted mesh
    * produced and the exact smoothly curving surface. All vertices are exactly
-   * on the surface, within rounding error.
+   * on the surface, within rounding error. Its sign is ignored, and zero or NaN
+   * is an error.
    * @group Smoothing
    */
   refineToTolerance(tolerance: number): Manifold;
@@ -1065,13 +1067,12 @@ export class Manifold {
   boundingBox(): Box;
 
   /**
-   * Return a copy of the manifold simplified to the given tolerance, but with
-   * its actual tolerance value unchanged. The result will contain a subset of
-   * the original verts and all surfaces will have moved by less than tolerance.
+   * Return a simplified copy of the manifold. The tolerance controls the local
+   * error when collapsing edges, measured relative to nearby face planes.
+   * Simplification tends to remove features thinner than the tolerance.
    *
-   * @param tolerance The maximum distance between the original and simplified
-   *     meshes. If not given or is less than the current tolerance, the current
-   *     tolerance is used.
+   * @param tolerance Simplification tolerance, lower-bounded by the manifold's
+   *     epsilon.
    * @group Transformations
    */
   simplify(tolerance?: number): Manifold;
@@ -1092,7 +1093,8 @@ export class Manifold {
   surfaceArea(): number;
 
   /**
-   * Returns the volume of the manifold.
+   * Returns the volume of the manifold. Negative volume is considered a class
+   * of overlapped geometry and should be avoided as much as self-intersection.
    *
    * @group Measurement
    */
@@ -1119,9 +1121,9 @@ export class Manifold {
 
   /**
    * Returns the winding number of this manifold around each of the given
-   * points. Returns 0 for points outside and a non-zero value (typically ±1)
-   * for points inside a simple closed surface. May exceed ±1 in magnitude for
-   * manifolds with overlapping regions.
+   * points. Returns 0 for points outside and 1 for points
+   * inside a non-overlapped manifold. Any other values indicate overlapping
+   * regions, e.g. -1 for inverted regions, 2 for double-enclosed regions.
    *
    * @param points The 3D query points.
    *

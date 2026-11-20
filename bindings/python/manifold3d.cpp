@@ -165,17 +165,13 @@ struct nb::detail::type_caster<std::vector<la::vec<T, N>>> {
   }
   static handle from_cpp(Value vec, rv_policy policy,
                          cleanup_list* cleanup) noexcept {
-    size_t num_vec = vec.size();
-    T* buffer = new T[num_vec * N];
-    nb::capsule mem_mgr(buffer, [](void* p) noexcept { delete[] (T*)p; });
-    for (size_t i = 0; i < num_vec; i++) {
-      for (int j = 0; j < N; j++) {
-        buffer[i * N + j] = vec[i][j];
-      }
-    }
-    numpy_type arr{buffer, {num_vec, N}, std::move(mem_mgr)};
-    // we can just do a move because we already did the copying
-    return make_caster<numpy_type>::from_cpp(arr, rv_policy::move, cleanup);
+    static_assert(sizeof(la_type) == N * sizeof(T),
+                  "vector -> numpy requires packed structs");
+    numpy_type arr{vec.data(), {vec.size(), N}, nb::handle()};
+    // vec stays alive through the copy. An intermediate scalar buffer would
+    // add another full copy: ndarray's move policy copies too. Keep NumPy's
+    // ownership of the result, including its writeability and resize support.
+    return make_caster<numpy_type>::from_cpp(arr, rv_policy::copy, cleanup);
   }
 };
 
@@ -727,7 +723,7 @@ NB_MODULE(manifold3d, m) {
       .def("backside", &MeshGL64::Backside, nb::arg("run"))
       .def("has_normals", &MeshGL64::HasNormals, nb::arg("run"))
       .def("merge", &MeshGL64::Merge, nb::arg("tolerance") = 0.0,
-           "Return a copy with open-edge vertices merged within tolerance.");
+           mesh_gl__merge__tolerance);
 
   nb::class_<RayHit>(m, "RayHit")
       .def_ro("face_id", &RayHit::faceID)

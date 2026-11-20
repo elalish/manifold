@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cmath>
 #include <limits>
 
 #if MANIFOLD_PAR == 1
@@ -293,6 +294,16 @@ bool Manifold::Impl::IsConvex() const {
         linalg::dot(edgeVec, linalg::cross(normal0, normal1)) > 0;
     return convex;
   });
+}
+
+/**
+ * Returns true if the Manifold has negative volume, not including manifolds
+ * less than tolerance thick on average (indeterminate volume).
+ */
+bool Manifold::Impl::IsVug() const {
+  const double volume = GetProperty(Property::Volume);
+  const double area = GetProperty(Property::SurfaceArea);
+  return volume < -area * bBox_.Scale() * Quality::GetRelativePrecision();
 }
 
 double Manifold::Impl::GetProperty(Property prop) const {
