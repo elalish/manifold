@@ -66,6 +66,19 @@ export function setMinCircularAngle(angle: number): void;
 export function setMinCircularEdgeLength(length: number): void;
 
 /**
+ * Returns the configured minimum angle in degrees between circular segments.
+ * This is the angle constraint, even when {@link setCircularSegments} overrides
+ * it.
+ */
+export function getMinCircularAngle(): number;
+
+/**
+ * Returns the configured minimum length of circular segments. This is the
+ * length constraint, even when {@link setCircularSegments} overrides it.
+ */
+export function getMinCircularEdgeLength(): number;
+
+/**
  * Sets the default number of circular segments for the
  * {@link CrossSection.circle}, {@link Manifold.cylinder}, {@link
  * Manifold.sphere}, and

@@ -674,6 +674,8 @@ class Quality {
   static void SetMinCircularEdgeLength(double length);
   static void SetCircularSegments(int number);
   static double GetRelativePrecision();
+  static double GetMinCircularAngle();
+  static double GetMinCircularEdgeLength();
   static int GetCircularSegments(double radius);
   static void ResetToDefaults();
 };

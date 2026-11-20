@@ -928,6 +928,14 @@ void manifold_set_min_circular_edge_length(double length) {
   Quality::SetMinCircularEdgeLength(length);
 }
 
+double manifold_get_min_circular_angle() {
+  return Quality::GetMinCircularAngle();
+}
+
+double manifold_get_min_circular_edge_length() {
+  return Quality::GetMinCircularEdgeLength();
+}
+
 void manifold_set_circular_segments(int number) {
   Quality::SetCircularSegments(number);
 }

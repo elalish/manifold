@@ -96,6 +96,12 @@ void Quality::SetMinCircularAngle(double angle) {
 }
 
 /**
+ * Returns the configured minimum angle in degrees between circular segments.
+ * This is the angle constraint, even when SetCircularSegments() overrides it.
+ */
+double Quality::GetMinCircularAngle() { return circularAngle_; }
+
+/**
  * Sets a length constraint the default number of circular segments for the
  * CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and
  * Manifold::Revolve() constructors. The number of segments will be rounded up
@@ -108,6 +114,12 @@ void Quality::SetMinCircularEdgeLength(double length) {
   if (!(length > 0)) return;  // also rejects NaN
   circularEdgeLength_ = length;
 }
+
+/**
+ * Returns the configured minimum length of circular segments. This is the
+ * length constraint, even when SetCircularSegments() overrides it.
+ */
+double Quality::GetMinCircularEdgeLength() { return circularEdgeLength_; }
 
 /**
  * Sets the default number of circular segments for the
