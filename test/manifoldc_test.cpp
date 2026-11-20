@@ -98,21 +98,6 @@ TEST(CBIND, meshgl_options) {
   ASSERT_NE(larger, nullptr);
   EXPECT_EQ(manifold_meshgl_face_id_length(larger), 4);
 
-#ifdef GTEST_FLAG_SET
-  GTEST_FLAG_SET(death_test_style, "threadsafe");
-#else
-  testing::GTEST_FLAG(death_test_style) = "threadsafe";
-#endif
-  ManifoldMeshGLOptions shortOptions = manifold_meshgl_options_init();
-  shortOptions.struct_size = sizeof(shortOptions) - 1;
-  EXPECT_DEATH(
-      manifold_meshgl_w_options(vertProps, 4, 6, triVerts, 4, &shortOptions),
-      "struct_size");
-  shortOptions.struct_size = 0;
-  EXPECT_DEATH(
-      manifold_meshgl_w_options(vertProps, 4, 6, triVerts, 4, &shortOptions),
-      "struct_size");
-
   manifold_delete_meshgl(larger);
   manifold_delete_meshgl(plain);
   manifold_delete_meshgl(mesh);
@@ -254,24 +239,42 @@ TEST(CBIND, meshgl64_options) {
   ASSERT_NE(larger, nullptr);
   EXPECT_EQ(manifold_meshgl64_face_id_length(larger), 4);
 
+  manifold_delete_meshgl64(larger);
+  manifold_delete_meshgl64(plain);
+  manifold_delete_meshgl64(mesh);
+}
+
+#ifndef __EMSCRIPTEN__
+TEST(CBIND, meshgl_options_short_size_aborts) {
 #ifdef GTEST_FLAG_SET
   GTEST_FLAG_SET(death_test_style, "threadsafe");
 #else
   testing::GTEST_FLAG(death_test_style) = "threadsafe";
 #endif
-  ManifoldMeshGL64Options shortOptions = manifold_meshgl64_options_init();
+  const float vertProps[] = {0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1};
+  const uint32_t triVerts[] = {0, 2, 1, 0, 1, 3, 1, 2, 3, 2, 0, 3};
+  const double vertProps64[] = {0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1};
+  const uint64_t triVerts64[] = {0, 2, 1, 0, 1, 3, 1, 2, 3, 2, 0, 3};
+  ManifoldMeshGLOptions shortOptions = manifold_meshgl_options_init();
   shortOptions.struct_size = sizeof(shortOptions) - 1;
   EXPECT_DEATH(
-      manifold_meshgl64_w_options(vertProps, 4, 6, triVerts, 4, &shortOptions),
+      manifold_meshgl_w_options(vertProps, 4, 3, triVerts, 4, &shortOptions),
       "struct_size");
   shortOptions.struct_size = 0;
   EXPECT_DEATH(
-      manifold_meshgl64_w_options(vertProps, 4, 6, triVerts, 4, &shortOptions),
+      manifold_meshgl_w_options(vertProps, 4, 3, triVerts, 4, &shortOptions),
       "struct_size");
-  manifold_delete_meshgl64(larger);
-  manifold_delete_meshgl64(plain);
-  manifold_delete_meshgl64(mesh);
+  ManifoldMeshGL64Options shortOptions64 = manifold_meshgl64_options_init();
+  shortOptions64.struct_size = sizeof(shortOptions64) - 1;
+  EXPECT_DEATH(manifold_meshgl64_w_options(vertProps64, 4, 3, triVerts64, 4,
+                                           &shortOptions64),
+               "struct_size");
+  shortOptions64.struct_size = 0;
+  EXPECT_DEATH(manifold_meshgl64_w_options(vertProps64, 4, 3, triVerts64, 4,
+                                           &shortOptions64),
+               "struct_size");
 }
+#endif
 
 TEST(CBIND, sphere) {
   int n = 25;
