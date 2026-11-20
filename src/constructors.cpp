@@ -330,6 +330,8 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
 
   const double dPhi = revolveDegrees / nDivisions;
   // first and last slice are distinguished if not a full revolution.
+  if (!isFullRevolution && nDivisions == std::numeric_limits<int>::max())
+    return PropagateStatus(Error::ResultTooLarge);
   const int nSlices = isFullRevolution ? nDivisions : nDivisions + 1;
 
   for (const auto& poly : polygons) {

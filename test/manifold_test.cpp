@@ -1301,6 +1301,15 @@ TEST(Manifold, RevolveInvalidAngle) {
   }
 }
 
+TEST(Manifold, RevolveSliceCountOverflow) {
+  const SimplePolygon profile = {{1, 0}, {2, 0}, {2, 1}, {1, 1}};
+  const int maxInt = std::numeric_limits<int>::max();
+  for (double degrees : {180.0, -180.0}) {
+    EXPECT_EQ(Manifold::Revolve({profile}, maxInt, degrees).Status(),
+              Manifold::Error::ResultTooLarge);
+  }
+}
+
 TEST(Manifold, RevolveNegativeAngle) {
   // One profile away from the axis and one touching it.
   for (const vec2 offset : {vec2(1, 0), vec2(0, 0)}) {
