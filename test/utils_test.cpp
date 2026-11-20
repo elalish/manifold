@@ -21,9 +21,52 @@
 #include "../src/atomic_compat.h"
 #include "../src/collider.h"
 #include "../src/shared.h"
+#include "../src/tree2d.h"
 #include "gtest/gtest.h"
 
 using namespace manifold;
+
+TEST(Utils, TwoDTreeSkipsDisabledPoints) {
+  const std::vector<Rect> queries = {
+      Rect(vec2(-10.0), vec2(10.0)),   Rect(vec2(-3, -4), vec2(4, 5)),
+      Rect(vec2(0, -10), vec2(0, 10)), Rect(vec2(-10, 0), vec2(10, 0)),
+      Rect(vec2(0.0), vec2(0.0)),      Rect(vec2(20.0), vec2(30.0)),
+  };
+  for (const int count : {0, 1, 8, 9, 17, 64, 257}) {
+    SCOPED_TRACE(count);
+    Vec<PolyVert> points;
+    std::vector<vec2> original;
+    for (int i = 0; i < count; ++i) {
+      const vec2 position((i * 11) % 13 - 6, (i * 7) % 17 - 8);
+      points.push_back({position, i});
+      original.push_back(position);
+    }
+    BuildTwoDTree(points);
+    for (const int phase : {0, 1, 2}) {
+      SCOPED_TRACE(phase);
+      // Disable internal pivots as well as leaves without changing the split
+      // coordinates or rebuilding the tree.
+      for (auto& point : points) {
+        if (phase == 2 || (phase == 1 && point.idx % 3 == 0)) point.idx = -1;
+      }
+      for (const Rect& query : queries) {
+        std::vector<int> expected;
+        for (int i = 0; i < count; ++i) {
+          const vec2 position = original[i];
+          if (phase != 2 && !(phase == 1 && i % 3 == 0) &&
+              position.x >= query.min.x && position.x <= query.max.x &&
+              position.y >= query.min.y && position.y <= query.max.y)
+            expected.push_back(i);
+        }
+        std::vector<int> actual;
+        QueryTwoDTree(points, query,
+                      [&](PolyVert point) { actual.push_back(point.idx); });
+        std::sort(actual.begin(), actual.end());
+        EXPECT_EQ(actual, expected);
+      }
+    }
+  }
+}
 
 TEST(Utils, SegmentQueryPrunesOffRayLeaves) {
   // The diagonal crosses 16 cells, but its AABB covers all 256. Count leaf
