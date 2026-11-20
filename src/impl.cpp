@@ -474,7 +474,9 @@ void Manifold::Impl::CreateHalfedges(const Vec<ivec3>& triProp,
     consecutiveStart = body(i, consecutiveStart, numEdge);
 #endif
 
-  halfedge_.clear(true);
+  // None of the old topology is reused. Replace its storage directly so a
+  // shared input (e.g. during refinement) does not need a throwaway copy.
+  halfedge_ = Halfedges();
   halfedge_.resize_nofill(numHalfedge);
   // With an odd number of halfedges (e.g. after degenerate triangles were
   // dropped from the input) the pairing below leaves the last sorted one

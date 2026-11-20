@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <optional>
+
 #include "execution_impl.h"
 #include "impl.h"
 #include "parallel.h"
@@ -835,8 +837,9 @@ void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
     return;
   }
 
-  Manifold::Impl old = *this;
-  halfedge_.MakeUnique();
+  // Only curved interpolation reads the original mesh after subdivision.
+  std::optional<Manifold::Impl> old;
+  if (halfedgeTangent_.size() == halfedge_.size()) old.emplace(*this);
   Vec<Barycentric> vertBary = Subdivide(edgeDivisions, keepInterior);
   // Cancel observed AFTER Subdivide (which is currently cancel-blind) but
   // BEFORE the no-op early-return: the user requested cancel, so honour it
@@ -847,13 +850,13 @@ void Manifold::Impl::Refine(std::function<int(vec3, vec4, vec4)> edgeDivisions,
   }
   if (vertBary.size() == 0) return;
 
-  if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
+  if (old) {
     for_each_n(autoPolicy(NumTri(), 1e4), countAt(0), NumVert(),
-               InterpTri({vertPos_, vertBary, &old}));
+               InterpTri({vertPos_, vertBary, &*old}));
   }
 
   halfedgeTangent_.clear();
-  if (old.halfedgeTangent_.size() == old.halfedge_.size()) {
+  if (old) {
     SetFaceAndVertNormals();
     CalculateBBox();
   } else {

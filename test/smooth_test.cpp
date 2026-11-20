@@ -198,6 +198,31 @@ TEST(Smooth, FacetedNormals) {
   EXPECT_FLOAT_EQ(rotated.SurfaceArea(), facetedRot.SurfaceArea());
 }
 
+TEST(Smooth, RefinePreservesSharedInput) {
+  for (bool smooth : {false, true}) {
+    Manifold source = Manifold::Cube().CalculateNormals(0, 0);
+    if (smooth) source = source.SmoothByNormals(0);
+    const Manifold alias = source;
+    const MeshGL64 before = source.GetMeshGL64();
+
+    for (const Manifold& refined :
+         {source.Refine(3), source.RefineToLength(0.3),
+          source.RefineToTolerance(0.1)}) {
+      EXPECT_EQ(refined.Status(), Manifold::Error::NoError);
+      EXPECT_NEAR(refined.Volume(), 1, 1e-12);
+      EXPECT_NEAR(refined.SurfaceArea(), 6, 1e-12);
+      CheckGL(refined, false);
+
+      const MeshGL64 after = alias.GetMeshGL64();
+      EXPECT_EQ(after.triVerts, before.triVerts);
+      EXPECT_EQ(after.vertProperties, before.vertProperties);
+      EXPECT_EQ(after.halfedgeTangent, before.halfedgeTangent);
+      EXPECT_EQ(after.faceID, before.faceID);
+      EXPECT_EQ(after.runIndex, before.runIndex);
+    }
+  }
+}
+
 TEST(Smooth, NormalTransform) {
   Manifold cube1 = Manifold::Cube().Rotate(30).CalculateNormals(0);
   Manifold cube2 =
