@@ -430,7 +430,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>This operation returns a vector of Manifolds that are topologically disconnected. If everything is connected, the vector is length one, containing a copy of the original. It is the inverse operation of <a class="el" href="#a96a1b20e25443713304db55196573e3d">Compose()</a>. </p>
+<p>This operation returns a vector of topologically disconnected Manifolds, keeping enclosed negative-volume shells with their enclosing positive-volume shell. If everything is connected, the vector is length one, containing a copy of the original. It is the inverse operation of <a class="el" href="#a96a1b20e25443713304db55196573e3d">Compose()</a>. </p>
 
 </div>
 </div>
@@ -831,7 +831,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Returns the reason for an input Mesh producing an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>. This Status will carry on through operations like NaN propogation, ensuring an errored mesh doesn't get mysteriously lost. Empty meshes may still show NoError, for instance the intersection of non-overlapping meshes. </p>
+<p>Returns the reason for an input Mesh producing an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>. This Status will carry on through operations like NaN propagation, ensuring an errored mesh doesn't get mysteriously lost. Empty meshes may still show NoError, for instance the intersection of non-overlapping meshes. </p>
 
 </div>
 </div>
@@ -1035,7 +1035,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Returns the volume of the manifold. </p>
+<p>Returns the volume of the manifold. Negative volume is considered a class of overlapped geometry and should be avoided as much as self-intersection. </p>
 
 </div>
 </div>
@@ -1112,7 +1112,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Returns the winding number of this manifold around each of the given points. Returns 0 for points outside, and a non-zero value (typically ±1) for points inside a simple closed surface. For manifolds with overlapping regions the magnitude may exceed 1.</p>
+<p>Returns the winding number of this manifold around each of the given points. Returns 0 for points outside, and 1 for points inside a non-overlapped manifold. Any other values indicate overlapping regions, e.g. -1 for inverted regions, 2 for double-enclosed regions.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">points</td><td>The 3D query points. </td></tr>
