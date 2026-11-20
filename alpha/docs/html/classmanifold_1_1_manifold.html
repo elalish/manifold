@@ -1389,7 +1389,12 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Return a copy of the manifold simplified to the given tolerance, but with its actual tolerance value unchanged. If the tolerance is not given or is less than the current tolerance, the current tolerance is used for simplification. The result will contain a subset of the original verts and all surfaces will have moved by less than tolerance. </p>
+<p>Return a simplified copy of the manifold. The tolerance controls the local error when collapsing edges, measured relative to nearby face planes. Simplification tends to remove features thinner than the tolerance. </p><dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">tolerance</td><td>Simplification tolerance, lower-bounded by the manifold's epsilon. </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>
