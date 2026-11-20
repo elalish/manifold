@@ -434,17 +434,17 @@ Polygons Manifold::Impl::Slice(double height) const {
 
 Polygons Manifold::Impl::Project() const {
   const mat2x3 projection = GetAxisAlignedProjection({0, 0, 1});
-  Vec<Halfedge> cusps(NumEdge());
-  size_t numCusps = 0;
+  // A mesh's silhouette usually contains far fewer edges than the mesh itself.
+  Vec<Halfedge> cusps;
+  // Vec::push_back starts at 128 elements; reserve less for smaller meshes.
+  cusps.reserve(std::min(NumEdge(), size_t{128}));
   for (size_t i = 0; i < halfedge_.size(); ++i) {
     const int pair = halfedge_.Pair(i);
     if (faceNormal_[halfedge_.Pair(pair) / 3].z >= 0 &&
         faceNormal_[pair / 3].z < 0) {
-      cusps[numCusps++] = halfedge_.Get(i);
+      cusps.push_back(halfedge_.Get(i));
     }
   }
-  cusps.resize(numCusps);
-
   PolygonsIdx polysIndexed =
       ProjectPolygons(AssembleHalfedges(cusps.cbegin(), cusps.cend(), 0), cusps,
                       vertPos_, projection);

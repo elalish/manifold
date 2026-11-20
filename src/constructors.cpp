@@ -190,6 +190,7 @@ Manifold Manifold::Sphere(double radius, int circularSegments) {
                                : Quality::GetCircularSegments(radius) / 4;
   auto pImpl_ = std::make_shared<Impl>(Impl::Shape::Octahedron);
   pImpl_->Subdivide([n](vec3, vec4, vec4) { return n - 1; });
+  if (pImpl_->status_ != Error::NoError) return Manifold(pImpl_);
   for_each_n(autoPolicy(pImpl_->NumVert(), 1e5), pImpl_->vertPos_.begin(),
              pImpl_->NumVert(), [radius](vec3& v) {
                v = vec3(la::cos(kHalfPi * (1.0 - v.x)),

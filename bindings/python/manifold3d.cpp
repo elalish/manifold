@@ -753,10 +753,8 @@ NB_MODULE(manifold3d, m) {
       .def(
           "from_mesh",
           [](ExecutionContext& ctx, const MeshGL& mesh) {
-            // Copied while holding the GIL, since Mesh.merge() can modify mesh.
-            const MeshGL copy = mesh;
             nb::gil_scoped_release release;
-            return ctx.FromMeshGL(copy);
+            return ctx.FromMeshGL(mesh);
           },
           nb::arg("mesh"),
           "Ingest a MeshGL into a Manifold under this context, so the ingest "
@@ -764,10 +762,8 @@ NB_MODULE(manifold3d, m) {
       .def(
           "from_mesh",
           [](ExecutionContext& ctx, const MeshGL64& mesh) {
-            // Copied while holding the GIL, since Mesh.merge() can modify mesh.
-            const MeshGL64 copy = mesh;
             nb::gil_scoped_release release;
-            return ctx.FromMeshGL(copy);
+            return ctx.FromMeshGL(mesh);
           },
           nb::arg("mesh"),
           "Ingest a MeshGL64 into a Manifold under this context, so the ingest "

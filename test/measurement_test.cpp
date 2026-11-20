@@ -181,6 +181,24 @@ TEST(Measurement, RayCastTiesSortedByFaceID) {
   EXPECT_GT(ties, 0);
 }
 
+TEST(Measurement, RayCastDistantObliqueGrazing) {
+  const Manifold cube = Manifold::Cube(vec3(1.0), true)
+                            .Rotate(30, 40, 50)
+                            .Translate({1234, -3210, 2470});
+  // The two crossings of this grazing segment round to the same parameter.
+  // Unrounded slab intervals reject one of the faces: padding by the mesh
+  // epsilon is lost when subtracting these much larger endpoint coordinates.
+  const vec3 origin(0x1.3496918842dffp+10, -0x1.481e7a5cad4fcp+41,
+                    -0x1.481e7a431b114p+39);
+  const vec3 endpoint(0x1.3496918842dffp+10, 0x1.16e6b4c64f54dp+42,
+                      0x1.16e6b4d318742p+40);
+  const std::vector<RayHit> hits = cube.RayCast(origin, endpoint);
+  ASSERT_EQ(hits.size(), 2);
+  EXPECT_EQ(hits[0].crossing + hits[1].crossing, 0);
+  EXPECT_DOUBLE_EQ(hits[0].distance, hits[1].distance);
+  EXPECT_LT(hits[0].faceID, hits[1].faceID);
+}
+
 TEST(Measurement, MinGapCubeCube) {
   auto a = Manifold::Cube();
   auto b = Manifold::Cube().Translate({2, 2, 0});

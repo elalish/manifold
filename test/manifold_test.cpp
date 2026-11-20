@@ -18,7 +18,9 @@
 #include <atomic>
 #include <chrono>
 #include <limits>
+#include <stdexcept>
 #include <thread>
+#include <tuple>
 #include <vector>
 
 #include "../src/execution_impl.h"
@@ -29,6 +31,15 @@
 namespace {
 
 using namespace manifold;
+
+bool SameMeshPayload(const MeshGL64& a, const MeshGL64& b) {
+  return std::tie(a.numProp, a.vertProperties, a.triVerts, a.mergeFromVert,
+                  a.mergeToVert, a.runIndex, a.runOriginalID, a.runTransform,
+                  a.runFlags, a.faceID, a.halfedgeTangent) ==
+         std::tie(b.numProp, b.vertProperties, b.triVerts, b.mergeFromVert,
+                  b.mergeToVert, b.runIndex, b.runOriginalID, b.runTransform,
+                  b.runFlags, b.faceID, b.halfedgeTangent);
+}
 
 template <typename T>
 int NumUnique(const std::vector<T>& in) {
@@ -44,9 +55,7 @@ int NumUnique(const std::vector<T>& in) {
 // some without - the exact shape the per-meshID handling in
 // Impl::Transform / Compose / CreateProperties was added to support.
 Manifold MixedNormalsCubePlusSphere(double sphereRadius = 5.0) {
-  MeshGL cubeGL = CubeSTL();
-  cubeGL.Merge();
-  return Manifold(cubeGL).Translate({20, 0, 0}) +
+  return Manifold(CubeSTL().Merge()).Translate({20, 0, 0}) +
          Manifold::Sphere(sphereRadius, 32).CalculateNormals(0);
 }
 
@@ -87,6 +96,125 @@ TEST(Manifold, GetMeshGL) {
   Manifold manifold2(mesh_out);
   auto mesh_out2 = manifold2.GetMeshGL();
   Identical(mesh_out, mesh_out2);
+}
+
+TEST(Manifold, SharedTopologyCopyIsolation) {
+  const Manifold sphere =
+      Manifold::Sphere(1, 16).CalculateNormals(0, 180).SmoothByNormals();
+  const Manifold cube = Manifold::Cube().Refine(2).CalculateNormals(0, 30);
+  for (const Manifold& source : {sphere, cube}) {
+    const MeshGL64 original = source.GetMeshGL64();
+    const std::vector<std::function<Manifold(const Manifold&)>> operations = {
+        [](const Manifold& m) { return m.CalculateNormals(0, 30); },
+        [](const Manifold& m) { return m.Refine(2); },
+        [](const Manifold& m) { return m.Simplify(0.02); },
+        [](const Manifold& m) { return m.RemoveDegenerates(); },
+        [](const Manifold& m) { return m.Mirror({1, 2, 3}); },
+        [](const Manifold& m) { return m.AsOriginal(); },
+        [](const Manifold& m) { return m.CalculateCurvature(3, 4); },
+        [](const Manifold& m) { return m.SetProperties(1, nullptr); },
+        [](const Manifold& m) { return m.SmoothByNormals(); },
+        [](const Manifold& m) {
+          return m.Warp([](vec3& p) { p.x += 0.1 * p.z * p.z; });
+        },
+        [](const Manifold& m) {
+          return m.WarpBatch([](VecView<vec3> points) {
+            for (vec3& p : points) p.y += 0.1 * p.x * p.x;
+          });
+        },
+        [](const Manifold& m) {
+          return m - Manifold::Cube({0.5, 0.5, 0.5}, true);
+        }};
+    for (size_t i = 0; i < operations.size(); ++i) {
+      SCOPED_TRACE(i);
+      const Manifold result = operations[i](source);
+      EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+      EXPECT_TRUE(SameMeshPayload(source.GetMeshGL64(), original));
+    }
+    const Manifold invalid = source.WarpBatch([](VecView<vec3> points) {
+      points[0].x = std::numeric_limits<double>::quiet_NaN();
+    });
+    EXPECT_EQ(invalid.Status(), Manifold::Error::NonFiniteVertex);
+    EXPECT_TRUE(SameMeshPayload(source.GetMeshGL64(), original));
+  }
+}
+
+#if (defined(__cpp_exceptions) || defined(_CPPUNWIND)) && \
+    !defined(__EMSCRIPTEN__)
+TEST(Manifold, SharedTopologyThrowingCallbacks) {
+  const Manifold source = Manifold::Cube().CalculateNormals(0, 30);
+  const MeshGL64 original = source.GetMeshGL64();
+  EXPECT_THROW(source.WarpBatch([](VecView<vec3> points) {
+    points[0].x += 1;
+    throw std::runtime_error("warp callback");
+  }),
+               std::runtime_error);
+  EXPECT_TRUE(SameMeshPayload(source.GetMeshGL64(), original));
+  EXPECT_THROW(
+      source.SetProperties(3,
+                           [](double* prop, vec3, const double*) {
+                             prop[0] = 42;
+                             throw std::runtime_error("property callback");
+                           }),
+      std::runtime_error);
+  EXPECT_TRUE(SameMeshPayload(source.GetMeshGL64(), original));
+}
+#endif
+
+#ifndef __EMSCRIPTEN__
+TEST(Manifold, SharedTopologyConcurrentCopies) {
+  const Manifold source = Manifold::Sphere(1, 16).CalculateNormals(0, 180);
+  const MeshGL64 original = source.GetMeshGL64();
+  std::atomic<bool> intact = true;
+  std::vector<std::thread> threads;
+  for (int i = 0; i < 4; ++i) {
+    threads.emplace_back([&] {
+      for (int iteration = 0; iteration < 10; ++iteration) {
+        const Manifold result = source.CalculateNormals(0, 30)
+                                    .Refine(2)
+                                    .Mirror({1, 2, 3})
+                                    .SetProperties(1, nullptr);
+        if (result.Status() != Manifold::Error::NoError ||
+            !SameMeshPayload(source.GetMeshGL64(), original)) {
+          intact = false;
+        }
+      }
+    });
+  }
+  for (auto& thread : threads) thread.join();
+  EXPECT_TRUE(intact);
+  EXPECT_TRUE(SameMeshPayload(source.GetMeshGL64(), original));
+}
+#endif
+
+TEST(Manifold, WarpNonFiniteResults) {
+  const Manifold cube = Manifold::Cube();
+  const double inf = std::numeric_limits<double>::infinity();
+  for (const double value :
+       {inf, -inf, std::numeric_limits<double>::quiet_NaN()}) {
+    for (int axis : {0, 1, 2}) {
+      SCOPED_TRACE(testing::Message()
+                   << "value " << value << ", axis " << axis);
+      const Manifold warped = cube.Warp([=](vec3& p) { p[axis] = value; });
+      EXPECT_EQ(warped.Status(), Manifold::Error::NonFiniteVertex);
+      for (bool all : {false, true}) {
+        SCOPED_TRACE(all);
+        const Manifold batch = cube.WarpBatch([=](VecView<vec3> points) {
+          for (size_t i = 0; i < (all ? points.size() : 1); ++i)
+            points[i][axis] = value;
+        });
+        EXPECT_EQ(batch.Status(), Manifold::Error::NonFiniteVertex);
+      }
+    }
+  }
+  const Manifold finite = cube.Warp([](vec3& p) { p *= 2.0; });
+  EXPECT_EQ(finite.Status(), Manifold::Error::NoError);
+  EXPECT_NEAR(finite.Volume(), 8, 1e-12);
+  EXPECT_EQ(cube.Status(), Manifold::Error::NoError);
+  EXPECT_NEAR(cube.Volume(), 1, 1e-12);
+  const Manifold empty = Manifold().WarpBatch([](VecView<vec3>) {});
+  EXPECT_TRUE(empty.IsEmpty());
+  EXPECT_EQ(empty.Status(), Manifold::Error::NoError);
 }
 
 TEST(Manifold, MeshDeterminism) {
@@ -212,6 +340,35 @@ TEST(Manifold, InvalidInput6) {
   Manifold tet(tetGL);
   EXPECT_TRUE(tet.IsEmpty());
   EXPECT_EQ(tet.Status(), Manifold::Error::VertexOutOfBounds);
+}
+
+TEST(Manifold, InvalidInput64BitIndex) {
+  // Indices past 2^32 must not wrap around to a valid 32-bit index.
+  const MeshGL tetGL = TetGL();
+  MeshGL64 tet;
+  tet.numProp = tetGL.numProp;
+  tet.vertProperties.assign(tetGL.vertProperties.begin(),
+                            tetGL.vertProperties.end());
+  tet.triVerts.assign(tetGL.triVerts.begin(), tetGL.triVerts.end());
+  tet.mergeFromVert.assign(tetGL.mergeFromVert.begin(),
+                           tetGL.mergeFromVert.end());
+  tet.mergeToVert.assign(tetGL.mergeToVert.begin(), tetGL.mergeToVert.end());
+  ASSERT_EQ(Manifold(tet).Status(), Manifold::Error::NoError);
+
+  const uint64_t wrap = uint64_t(1) << 32;
+  MeshGL64 badTri = tet;
+  badTri.triVerts[1] += wrap;
+  EXPECT_EQ(Manifold(badTri).Status(), Manifold::Error::VertexOutOfBounds);
+
+  MeshGL64 badMergeTo = tet;
+  badMergeTo.mergeToVert[0] += wrap;
+  EXPECT_EQ(Manifold(badMergeTo).Status(),
+            Manifold::Error::MergeIndexOutOfBounds);
+
+  MeshGL64 badMergeFrom = tet;
+  badMergeFrom.mergeFromVert[0] += wrap;
+  EXPECT_EQ(Manifold(badMergeFrom).Status(),
+            Manifold::Error::MergeIndexOutOfBounds);
 }
 
 TEST(Manifold, InvalidInput7) {
@@ -435,6 +592,21 @@ TEST(Manifold, NormalsNonStandardSlotNotRecorded) {
   MeshGL mesh = Manifold::Sphere(10.0, 32).CalculateNormals(3).GetMeshGL();
   ASSERT_GT(mesh.NumRun(), 0u);
   EXPECT_FALSE(mesh.HasNormals(0));
+}
+
+TEST(Manifold, NormalsDroppedWithChannels) {
+  // With fewer than three properties left, the recorded normals no longer
+  // exist, so export must not write them into the next vertex.
+  const Manifold m = (Manifold::Cube(vec3(2), true) + Manifold::Sphere(5, 8))
+                         .CalculateNormals(0)
+                         .SetProperties(1, nullptr);
+  const MeshGL64 mesh = m.GetMeshGL64();
+  ASSERT_EQ(mesh.numProp, 4);
+  for (size_t run = 0; run < mesh.runOriginalID.size(); ++run)
+    EXPECT_FALSE(mesh.HasNormals(run));
+  for (size_t v = 0; v < mesh.NumVert(); ++v)
+    EXPECT_EQ(mesh.vertProperties[4 * v + 3], 0) << v;
+  EXPECT_NEAR(Manifold(mesh).Volume(), m.Volume(), 1e-9);
 }
 
 TEST(Manifold, NormalsSharedPropVertMixedFlagsUndefined) {
@@ -701,6 +873,30 @@ TEST(Manifold, ObjRoundTrip) {
   EXPECT_EQ(m2.Status(), Manifold::Error::NoError);
   EXPECT_EQ(m2.Volume(), 1);
 }
+
+// A unit tetrahedron, missing its last face line.
+constexpr char kTetOBJ[] =
+    "v 0 0 0\nv 1 0 0\nv 0 1 0\nv 0 0 1\nf 1 3 2\nf 1 2 4\nf 1 4 3\n";
+
+TEST(Manifold, ObjNoTrailingNewline) {
+  // The final line used to pick up the EOF value as an extra character. Put a
+  // vertex last, since the face pattern happened to tolerate it.
+  std::istringstream ss(
+      "f 1 3 2\nf 1 2 4\nf 1 4 3\nf 2 3 4\nv 0 0 0\nv 1 0 0\nv 0 1 0\nv 0 0 1");
+  const Manifold m = Manifold::ReadOBJ(ss);
+  EXPECT_EQ(m.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(m.NumVert(), 4);
+}
+
+TEST(Manifold, ObjHugeFaceIndex) {
+  // Indices too large for int, or for any integer type, must not throw.
+  for (const char* index :
+       {"2147483648", "4294967298", "99999999999999999999999"}) {
+    std::istringstream ss(std::string(kTetOBJ) + "f 2 3 " + index + "\n");
+    const Manifold m = Manifold::ReadOBJ(ss);
+    EXPECT_EQ(m.Status(), Manifold::Error::VertexOutOfBounds) << index;
+  }
+}
 #endif
 
 TEST(Manifold, OppositeFace) {
@@ -895,6 +1091,41 @@ TEST(Manifold, CircularSegmentsWhileReset) {
   EXPECT_EQ(wrong.load(), 0);
 }
 #endif
+
+TEST(Manifold, CircularSegmentsTinyAngle) {
+  // 360 / angle doesn't fit in an int here, so the edge length should decide.
+  Quality::SetMinCircularAngle(1e-9);
+  const int small = Quality::GetCircularSegments(1.0);
+  const int large = Quality::GetCircularSegments(100.0);
+  const int huge = Quality::GetCircularSegments(1e300);
+  Quality::ResetToDefaults();
+  Quality::SetMinCircularAngle(NAN);
+  Quality::SetMinCircularEdgeLength(NAN);
+  const int nan = Quality::GetCircularSegments(1.0);
+  Quality::ResetToDefaults();
+  EXPECT_EQ(nan, 8);
+  EXPECT_EQ(small, 8);
+  EXPECT_EQ(large, 628);
+  EXPECT_GT(huge, 1000000);
+}
+
+TEST(Manifold, AssignToMovedFrom) {
+  Manifold a = Manifold::Cube();
+  const Manifold b = std::move(a);
+  a = b;
+  EXPECT_EQ(a.Volume(), 1);
+
+  Manifold c = Manifold::Cube();
+  const Manifold d = std::move(c);
+  Manifold e(c);
+  e = d;
+  EXPECT_EQ(e.Volume(), 1);
+
+  Manifold f = Manifold::Sphere(1);
+  f = c;
+  f = d;
+  EXPECT_EQ(f.Volume(), 1);
+}
 
 TEST(Manifold, Cylinder) {
   int n = 10000;
@@ -1303,6 +1534,60 @@ TEST(Manifold, Project) {
  * Testing more advanced Manifold operations.
  */
 
+TEST(Manifold, ProjectRefinedSphereContours) {
+  // Cross the silhouette buffer's growth boundaries with regular polygons of
+  // known area. Mirroring must preserve the winding of the projected solid.
+  for (int segments : {128, 132, 256, 260}) {
+    SCOPED_TRACE(segments);
+    const Manifold sphere = Manifold::Sphere(1, segments);
+    const double area = 0.5 * segments * sind(360.0 / segments);
+    for (const vec3 scale : {vec3(1), vec3(-2, 3, -1)}) {
+      const Polygons projected = sphere.Scale(scale).Project();
+      ASSERT_EQ(projected.size(), 1);
+      ASSERT_EQ(projected.front().size(), segments);
+      for (const vec2 point : projected.front()) {
+        EXPECT_NEAR(point.x * point.x / (scale.x * scale.x) +
+                        point.y * point.y / (scale.y * scale.y),
+                    1, 1e-12);
+      }
+      EXPECT_NEAR(CrossSection(projected).Area(),
+                  area * std::abs(scale.x * scale.y), 1e-10);
+    }
+  }
+}
+
+TEST(Manifold, ProjectGrowingContoursAndHoles) {
+  EXPECT_TRUE(Manifold().Project().empty());
+  const CrossSection section =
+      CrossSection::Circle(3, 132) - CrossSection::Circle(1, 132) +
+      CrossSection::Circle(0.5, 260).Translate({10, 0});
+  const Manifold prism =
+      Manifold::Extrude(section.ToPolygons(), 2, 4).Refine(2);
+  ASSERT_EQ(prism.Status(), Manifold::Error::NoError);
+  for (const vec3 scale : {vec3(1), vec3(-2, 3, -1)}) {
+    const CrossSection projected(prism.Scale(scale).Project());
+    const CrossSection expected = section.Scale({scale.x, scale.y});
+    EXPECT_EQ(projected.NumContour(), 3);
+    EXPECT_NEAR(projected.Area(), expected.Area(), 1e-9);
+    EXPECT_LT((projected - expected).Area() + (expected - projected).Area(),
+              1e-9);
+  }
+
+  // Many small components exercise a much denser set of cusp edges.
+  std::vector<Manifold> parts;
+  for (int i = 0; i < 129; ++i) {
+    parts.push_back(
+        Manifold::Tetrahedron().Translate({4.0 * (i % 16), 4.0 * (i / 16), 0}));
+  }
+  const Polygons projected =
+      Manifold::BatchBoolean(parts, OpType::Add).Project();
+  ASSERT_EQ(projected.size(), parts.size());
+  for (const SimplePolygon& contour : projected) {
+    EXPECT_EQ(contour.size(), 4);
+    EXPECT_NEAR(CrossSection(contour).Area(), 4, 1e-12);
+  }
+}
+
 TEST(Manifold, Transform) {
   Manifold cube = Manifold::Cube({1, 2, 3});
   Manifold cube2 = cube;
@@ -1440,25 +1725,24 @@ TEST(Manifold, Merge) {
   EXPECT_TRUE(cubeBad.IsEmpty());
   EXPECT_EQ(cubeBad.Status(), Manifold::Error::NotManifold);
 
-  EXPECT_TRUE(cubeSTL.Merge());
-  EXPECT_EQ(cubeSTL.mergeFromVert.size(), 28);
-  CheckCube(cubeSTL);
+  MeshGL merged = cubeSTL.Merge();
+  EXPECT_TRUE(cubeSTL.mergeFromVert.empty());
+  EXPECT_EQ(merged.mergeFromVert.size(), 28);
+  CheckCube(merged);
 
-  EXPECT_FALSE(cubeSTL.Merge());
-  EXPECT_EQ(cubeSTL.mergeFromVert.size(), 28);
-  cubeSTL.mergeFromVert.resize(14);
-  cubeSTL.mergeToVert.resize(14);
+  EXPECT_EQ(merged.Merge().mergeFromVert, merged.mergeFromVert);
+  merged.mergeFromVert.resize(14);
+  merged.mergeToVert.resize(14);
 
-  EXPECT_TRUE(cubeSTL.Merge());
-  EXPECT_EQ(cubeSTL.mergeFromVert.size(), 28);
-  CheckCube(cubeSTL);
+  merged = merged.Merge();
+  EXPECT_EQ(merged.mergeFromVert.size(), 28);
+  CheckCube(merged);
 }
 
 TEST(Manifold, MergeTolerance) {
   MeshGL mesh = CubeSTL();
   mesh.vertProperties[0] += 1e-4f;
-  EXPECT_TRUE(mesh.Merge(1e-3f));
-  EXPECT_EQ(Manifold(mesh).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(Manifold(mesh.Merge(1e-3f)).Status(), Manifold::Error::NoError);
 }
 
 TEST(Manifold, MergeCollapsedEdgeParity) {
@@ -1466,22 +1750,26 @@ TEST(Manifold, MergeCollapsedEdgeParity) {
   mesh.vertProperties = {0, 0, 0,  //
                          0, 0, 0,  //
                          1, 0, 0,  //
-                         3, 0, 0,  //
-                         3, 0, 0,  //
-                         4, 0, 0};
+                         0, 0, 0,  //
+                         0, 0, 0,  //
+                         0, 1, 0};
   mesh.mergeFromVert = {1, 4};
   mesh.mergeToVert = {0, 3};
 
   // These triangles collapse to (0, 0, 2) and (3, 3, 5). Their opposing
   // non-degenerate edges cancel, leaving one self-edge per triangle. Two
-  // copies of each triangle cancel those self-edges as well.
+  // copies of each triangle cancel those self-edges as well. All four
+  // collapsed verts share a position, so any vert found open merges across the
+  // two pairs.
   mesh.triVerts = {0, 1, 2, 0, 1, 2, 3, 4, 5, 3, 4, 5};
-  EXPECT_FALSE(mesh.Merge());
+  MeshGL merged = mesh.Merge();
+  EXPECT_EQ(merged.mergeFromVert, (std::vector<uint32_t>{1, 4}));
+  EXPECT_EQ(merged.mergeToVert, (std::vector<uint32_t>{0, 3}));
 
   mesh.triVerts = {0, 1, 2, 3, 4, 5};
-  EXPECT_TRUE(mesh.Merge());
-  EXPECT_EQ(mesh.mergeFromVert, (std::vector<uint32_t>{1, 4}));
-  EXPECT_EQ(mesh.mergeToVert, (std::vector<uint32_t>{0, 3}));
+  merged = mesh.Merge();
+  EXPECT_EQ(merged.mergeFromVert, (std::vector<uint32_t>{1, 3, 4}));
+  EXPECT_EQ(merged.mergeToVert, (std::vector<uint32_t>{0, 0, 0}));
 }
 
 TEST(Manifold, MergeEmpty) {
@@ -1526,8 +1814,7 @@ TEST(Manifold, MergeEmpty) {
                           -0.0, 0.5,  -0.43450000882149, 0.0, 0.0, 1.0, 1.0,
                           0.0,  -0.5, -0.43450000882149, 0.0, 0.0, 0.0, 0.0,
                           -0.0, -0.5, -0.43450000882149, 0.0, 0.0, 1.0, 0.0};
-  EXPECT_TRUE(shape.Merge());
-  Manifold man(shape);
+  Manifold man(shape.Merge());
   EXPECT_EQ(man.Status(), Manifold::Error::NoError);
   man = man.Simplify();
   EXPECT_TRUE(man.IsEmpty());
@@ -1641,7 +1928,8 @@ TEST(Manifold, MergeDegenerates) {
   std::rotate(squash.triVerts.begin(), squash.triVerts.begin() + 3 * 5,
               squash.triVerts.end());
   // Merge should remove the now duplicate vertex.
-  EXPECT_TRUE(squash.Merge());
+  squash = squash.Merge();
+  EXPECT_FALSE(squash.mergeFromVert.empty());
   // Manifold should remove the triangle with two references to the same vert.
   Manifold squashed = Manifold(squash);
   EXPECT_FALSE(squashed.IsEmpty());
@@ -1917,8 +2205,7 @@ TEST(Manifold, MergeRefine) {
       9,   260, 248, 9,   248, 247, 9,   247, 253, 9,   253, 268, 268, 10,  9,
       256, 4,   259, 3,   2,   258, 272, 0,   10,  272, 10,  268, 268, 267, 272,
       7,   276, 275, 274, 6,   5,   5,   270, 274, 0,   266, 1,   277, 24,  23};
-  mesh.Merge(1e-5);
-  Manifold manifold(mesh);
+  Manifold manifold(mesh.Merge(1e-5));
   manifold = manifold.RefineToLength(1.0);
   EXPECT_NEAR(manifold.Volume(), 31.21, 0.01);
 }

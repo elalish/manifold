@@ -383,8 +383,8 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
     prop2vert.resize(numVert);
     std::iota(prop2vert.begin(), prop2vert.end(), 0);
     for (size_t i = 0; i < meshGL.mergeFromVert.size(); ++i) {
-      const uint32_t from = meshGL.mergeFromVert[i];
-      const uint32_t to = meshGL.mergeToVert[i];
+      const auto from = meshGL.mergeFromVert[i];
+      const auto to = meshGL.mergeToVert[i];
       if (from >= numVert || to >= numVert) {
         MakeEmpty(Error::MergeIndexOutOfBounds);
         return;
@@ -479,7 +479,7 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   for (size_t i = 0; i < numTri; ++i) {
     ivec3 triP, triV;
     for (const size_t j : {0, 1, 2}) {
-      uint32_t vert = (uint32_t)meshGL.triVerts[3 * i + j];
+      const auto vert = meshGL.triVerts[3 * i + j];
       if (vert >= numVert) {
         MakeEmpty(Error::VertexOutOfBounds);
         return;
@@ -555,13 +555,6 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
 
   const int numHalfedge = impl.halfedgeTangent_.size();
   out.halfedgeTangent.resize(4 * numHalfedge);
-  for (int i = 0; i < numHalfedge; ++i) {
-    const vec4 t = impl.halfedgeTangent_[i];
-    out.halfedgeTangent[4 * i] = t.x;
-    out.halfedgeTangent[4 * i + 1] = t.y;
-    out.halfedgeTangent[4 * i + 2] = t.z;
-    out.halfedgeTangent[4 * i + 3] = t.w;
-  }
   // Sort the triangles into runs
   std::vector<int> triNew2Old(numTri);
   std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
@@ -612,8 +605,17 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     if (!out.faceID.empty()) {
       out.faceID[tri] = std::max(ref.faceID, 0);
     }
-    for (const int i : {0, 1, 2})
+    for (const int i : {0, 1, 2}) {
       out.triVerts[3 * tri + i] = impl.halfedge_.Start(3 * oldTri + i);
+      if (numHalfedge > 0) {
+        // Tangents belong to halfedges, so follow the same run ordering as
+        // the triangle corners they describe.
+        const vec4 tangent = impl.halfedgeTangent_[3 * oldTri + i];
+        for (const int j : {0, 1, 2, 3}) {
+          out.halfedgeTangent[4 * (3 * tri + i) + j] = tangent[j];
+        }
+      }
+    }
 
     if (meshID != lastID) {
       manifold::Manifold::Impl::Relation rel;
@@ -643,7 +645,12 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
   }
   // Duplicate verts with different props
   std::vector<int> vert2idx(impl.NumVert(), -1);
-  std::vector<std::vector<ivec2>> vertPropPair(impl.NumVert());
+  std::vector<int> vertPropHead(impl.NumVert(), -1);
+  // One entry per output vertex: property index and the next output vertex
+  // sharing its geometric vertex. Keep the bins in contiguous storage rather
+  // than allocating a separate vector for every geometric vertex.
+  std::vector<ivec2> vertPropPair;
+  vertPropPair.reserve(numVert);
   out.vertProperties.reserve(numVert * static_cast<size_t>(out.numProp));
 
   for (size_t run = 0; run < out.runOriginalID.size(); ++run) {
@@ -653,19 +660,18 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
         const int prop = impl.halfedge_.Prop(3 * triNew2Old[tri] + i);
         const int vert = out.triVerts[3 * tri + i];
 
-        auto& bin = vertPropPair[vert];
-        bool bFound = false;
-        for (const auto& b : bin) {
-          if (b.x == prop) {
-            bFound = true;
-            out.triVerts[3 * tri + i] = b.y;
-            break;
-          }
+        int found = vertPropHead[vert];
+        while (found >= 0 && vertPropPair[found].x != prop) {
+          found = vertPropPair[found].y;
         }
-        if (bFound) continue;
+        if (found >= 0) {
+          out.triVerts[3 * tri + i] = found;
+          continue;
+        }
         const int idx = out.vertProperties.size() / out.numProp;
         out.triVerts[3 * tri + i] = idx;
-        bin.push_back({prop, idx});
+        vertPropPair.push_back({prop, vertPropHead[vert]});
+        vertPropHead[vert] = idx;
 
         for (int p : {0, 1, 2}) {
           out.vertProperties.push_back(impl.vertPos_[vert][p]);

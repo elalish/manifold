@@ -24,6 +24,7 @@
 #endif
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <iostream>
 #include <limits>
 #include <thread>
@@ -2739,6 +2740,34 @@ TEST(CrossSection, Rect) {
   EXPECT_TRUE(Rect().IsEmpty());
 }
 
+TEST(CrossSection, RectAxisAlignedTransform) {
+  const Rect original({1, 2}, {4, 6});
+  const struct {
+    const char* name;
+    mat2x3 transform;
+    Rect expected;
+  } cases[] = {
+      {"translate", {{1, 0}, {0, 1}, {10, 20}}, {{11, 22}, {14, 26}}},
+      {"mirror x", {{-1, 0}, {0, 1}, {10, 20}}, {{6, 22}, {9, 26}}},
+      {"mirror y", {{1, 0}, {0, -1}, {10, 20}}, {{11, 14}, {14, 18}}},
+      {"rotate 90", {{0, 1}, {-1, 0}, {10, 20}}, {{4, 21}, {8, 24}}},
+      {"rotate 180", {{-1, 0}, {0, -1}, {10, 20}}, {{6, 14}, {9, 18}}},
+      {"rotate 270", {{0, -1}, {1, 0}, {10, 20}}, {{12, 16}, {16, 19}}},
+      {"scale", {{-2, 0}, {0, 3}, {10, 20}}, {{2, 26}, {8, 38}}},
+  };
+  for (const auto& test : cases) {
+    SCOPED_TRACE(test.name);
+    const Rect transformed = original.Transform(test.transform);
+    EXPECT_DOUBLE_EQ(transformed.min.x, test.expected.min.x);
+    EXPECT_DOUBLE_EQ(transformed.min.y, test.expected.min.y);
+    EXPECT_DOUBLE_EQ(transformed.max.x, test.expected.max.x);
+    EXPECT_DOUBLE_EQ(transformed.max.y, test.expected.max.y);
+    EXPECT_DOUBLE_EQ(transformed.Area(), test.expected.Area());
+    EXPECT_FALSE(transformed.IsEmpty());
+    EXPECT_TRUE(transformed.Contains(test.expected.Center()));
+  }
+}
+
 TEST(CrossSection, LargeRotationsPreserveArea) {
   const CrossSection rectangle = CrossSection::Square({2, 3});
   for (const double angle : {1e18, -1e18, 1e20, -1e20}) {
@@ -2845,6 +2874,53 @@ TEST(CrossSection, ShearTransformPreservesArea) {
   EXPECT_NEAR(sheared.Area(), warped.Area(), 1e-6);
 }
 
+TEST(CrossSection, InformationPreservesDeferredTransforms) {
+  const CrossSection source = CrossSection::Square({1, 1});
+  const Polygons expected = source.ToPolygons();
+  // At this magnitude, applying the translation to individual vertices loses
+  // the unit square. Information queries should leave the two translations
+  // available for cancellation before any vertex coordinates are evaluated.
+  const double offset = std::ldexp(1.0, 54);
+  for (int query = 0; query < 3; ++query) {
+    SCOPED_TRACE(query);
+    CrossSection translated = source.Translate({offset, offset});
+    if (query == 0) {
+      EXPECT_EQ(translated.NumVert(), 4u);
+    } else if (query == 1) {
+      EXPECT_EQ(translated.NumContour(), 1u);
+    } else {
+      EXPECT_FALSE(translated.IsEmpty());
+    }
+    const CrossSection restored = translated.Translate({-offset, -offset});
+    EXPECT_EQ(restored.ToPolygons(), expected);
+    EXPECT_DOUBLE_EQ(restored.Area(), 1.0);
+  }
+}
+
+TEST(CrossSection, InformationMatchesTransformedContours) {
+  const std::vector<CrossSection> sources{
+      CrossSection(), CrossSection::Square({1, 1}),
+      CrossSection::Square({4, 4}, true) - CrossSection::Square({2, 2}, true),
+      CrossSection::Square({1, 1}) +
+          CrossSection::Square({1, 1}).Translate({3, 0})};
+  const std::vector<mat2x3> transforms{
+      mat2x3(la::identity), mat2x3({-2, 0}, {0, 3}, {5, -7}),
+      mat2x3({1, 0}, {0.5, 1}, {-3, 2}), mat2x3({0, 0}, {0, 3}, {5, -7}),
+      mat2x3({0, 0}, {0, 0}, {5, -7})};
+  for (const CrossSection& source : sources) {
+    for (const mat2x3& transform : transforms) {
+      const CrossSection section = source.Transform(transform);
+      const Polygons expected = source.Transform(transform).ToPolygons();
+      size_t vertices = 0;
+      for (const SimplePolygon& contour : expected) vertices += contour.size();
+      EXPECT_EQ(section.NumVert(), vertices);
+      EXPECT_EQ(section.NumContour(), expected.size());
+      EXPECT_EQ(section.IsEmpty(), expected.empty());
+      EXPECT_EQ(section.ToPolygons(), expected);
+    }
+  }
+}
+
 // Native-only: the WASM build is single-threaded (no pthread), so std::thread
 // construction throws, which aborts under -fno-exceptions.
 #ifndef __EMSCRIPTEN__
@@ -2860,6 +2936,37 @@ TEST(CrossSection, ConcurrentConstAccessorsAreRaceFree) {
   }
   for (auto& t : threads) t.join();
   for (double r : results) EXPECT_EQ(r, results[0]);
+}
+
+TEST(CrossSection, ConcurrentInformationAndMaterialization) {
+  const CrossSection cs =
+      CrossSection::Circle(10, 1024).Scale({-2, 3}).Translate({5, -7});
+  std::array<size_t, 16> results{};
+  std::vector<std::thread> threads;
+  std::atomic<bool> start{false};
+  for (int i = 0; i < 16; ++i) {
+    threads.emplace_back([&, i] {
+      while (!start.load(std::memory_order_acquire)) std::this_thread::yield();
+      if (i % 4 == 0) {
+        results[i] = cs.NumVert();
+      } else if (i % 4 == 1) {
+        results[i] = cs.NumContour();
+      } else if (i % 4 == 2) {
+        results[i] = cs.IsEmpty();
+      } else {
+        results[i] = cs.ToPolygons().front().size();
+      }
+    });
+  }
+  start.store(true, std::memory_order_release);
+  for (auto& thread : threads) thread.join();
+  for (int i = 0; i < 16; ++i) {
+    const size_t expected = i % 4 == 1 ? 1 : i % 4 == 2 ? 0 : 1024;
+    EXPECT_EQ(results[i], expected);
+  }
+  const Rect bounds = cs.Bounds();
+  EXPECT_EQ(bounds.min, vec2(-15, -37));
+  EXPECT_EQ(bounds.max, vec2(25, 23));
 }
 #endif
 

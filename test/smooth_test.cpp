@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
 
 #include "gtest/gtest.h"
 #include "manifold/cross_section.h"
@@ -343,6 +345,48 @@ TEST(Smooth, Manual) {
   }
 }
 
+TEST(Smooth, ExportTangentsFollowTriangleRuns) {
+  const Manifold sphere =
+      Manifold::Sphere(1, 12).CalculateNormals(0, 180).SmoothByNormals();
+  const Manifold ellipsoid = sphere.Scale({1, 2, 3}).Translate({6, 0, 0});
+  const Manifold tetrahedron = Manifold::Tetrahedron()
+                                   .CalculateNormals(0, 180)
+                                   .SmoothByNormals()
+                                   .Translate({-6, 0, 0});
+  const std::vector<Manifold> cases = {
+      sphere,
+      ellipsoid,
+      Manifold::BatchBoolean({sphere, ellipsoid}, OpType::Add),
+      Manifold::BatchBoolean({ellipsoid, sphere}, OpType::Add),
+      Manifold::BatchBoolean({ellipsoid, tetrahedron, sphere}, OpType::Add),
+      Manifold::BatchBoolean(
+          {ellipsoid, Manifold::Cube().Translate({-5, 0, 0})}, OpType::Add)};
+
+  for (size_t i = 0; i < cases.size(); ++i) {
+    SCOPED_TRACE(i);
+    const Manifold& source = cases[i];
+    const Manifold expected = source.Refine(3);
+    ASSERT_EQ(expected.Status(), Manifold::Error::NoError);
+    const auto check = [&](const auto& mesh, double tolerance) {
+      const Manifold restored(mesh);
+      ASSERT_EQ(restored.Status(), Manifold::Error::NoError);
+      const Manifold actual = restored.Refine(3);
+      ASSERT_EQ(actual.Status(), Manifold::Error::NoError);
+      EXPECT_EQ(actual.NumTri(), expected.NumTri());
+      EXPECT_NEAR(actual.Volume(), expected.Volume(), tolerance);
+      EXPECT_NEAR(actual.SurfaceArea(), expected.SurfaceArea(), tolerance);
+      const Manifold extra = actual - expected;
+      const Manifold missing = expected - actual;
+      ASSERT_EQ(extra.Status(), Manifold::Error::NoError);
+      ASSERT_EQ(missing.Status(), Manifold::Error::NoError);
+      EXPECT_NEAR(extra.Volume(), 0, tolerance);
+      EXPECT_NEAR(missing.Volume(), 0, tolerance);
+    };
+    check(source.GetMeshGL(), 1e-4);
+    check(source.GetMeshGL64(), 1e-9);
+  }
+}
+
 TEST(Smooth, InvalidTangents) {
   Manifold cube = Manifold::Cube().CalculateNormals(0, 180).SmoothByNormals();
   MeshGL withTangents = cube.GetMeshGL();
@@ -515,4 +559,68 @@ TEST(Smooth, SDF) {
   EXPECT_NEAR(GetMaxProperty(interpolated.GetMeshGL(), 3), 0, 0.083);
 
   if (options.exportModels) WriteTestOBJ("smoothGyroid.obj", smoothed);
+}
+
+TEST(Smooth, RefineInvalid) {
+  const Manifold cube = Manifold::Cube();
+  for (const double length : {0.0, -0.0, std::nan("")}) {
+    EXPECT_EQ(cube.RefineToLength(length).Status(),
+              Manifold::Error::InvalidConstruction);
+  }
+  EXPECT_EQ(
+      cube.RefineToLength(std::numeric_limits<double>::infinity()).NumTri(),
+      cube.NumTri());
+
+  const Manifold smooth = cube.CalculateNormals(0, 30).SmoothByNormals(0);
+  for (const double tolerance : {0.0, -0.0, std::nan("")}) {
+    EXPECT_EQ(smooth.RefineToTolerance(tolerance).Status(),
+              Manifold::Error::InvalidConstruction);
+  }
+  EXPECT_EQ(smooth.RefineToTolerance(std::numeric_limits<double>::infinity())
+                .NumTri(),
+            smooth.NumTri());
+}
+
+TEST(Smooth, RefineTooLarge) {
+  const Manifold cube = Manifold::Cube();
+  EXPECT_EQ(cube.RefineToLength(1e-9).Status(),
+            Manifold::Error::ResultTooLarge);
+  EXPECT_EQ(cube.RefineToLength(1e-300).Status(),
+            Manifold::Error::ResultTooLarge);
+  EXPECT_EQ(cube.Refine(1 << 20).Status(), Manifold::Error::ResultTooLarge);
+  const Manifold smooth =
+      Manifold::Cylinder(1, 1, 1, 8).CalculateNormals().SmoothByNormals();
+  ASSERT_GT(smooth.RefineToTolerance(0.01).NumTri(), smooth.NumTri());
+  EXPECT_EQ(smooth.RefineToTolerance(1e-30).Status(),
+            Manifold::Error::ResultTooLarge);
+}
+
+TEST(Smooth, RefinePropertiesTooLarge) {
+  const Manifold props =
+      Manifold::Cube().SetProperties(1000, [](double*, vec3, const double*) {});
+  EXPECT_EQ(props.Refine(1000).Status(), Manifold::Error::ResultTooLarge);
+}
+
+TEST(Smooth, SphereTooLarge) {
+  EXPECT_EQ(Manifold::Sphere(1, 1 << 20).Status(),
+            Manifold::Error::ResultTooLarge);
+}
+
+TEST(Smooth, RefineFlatTriangles) {
+  // The wedge's caps are long, nearly flat triangles.
+  const Manifold wedge = Manifold::Extrude({{{0, 0}, {2, 0}, {1, 1e-3}}}, 1e-3);
+  const Manifold refined = wedge.RefineToLength(7e-5);
+  EXPECT_EQ(refined.Status(), Manifold::Error::NoError);
+  EXPECT_GT(refined.NumTri(), 1000000);
+}
+
+TEST(Smooth, RefineLongEdges) {
+  // 46342 divisions per long edge, where squaring an int division count
+  // overflows.
+  const Manifold refined =
+      Manifold::Cube({46342, 1, 1}, true).RefineToLength(1);
+  EXPECT_EQ(refined.Status(), Manifold::Error::NoError);
+  EXPECT_NEAR(refined.Volume(), 46342, 1e-6);
+  EXPECT_EQ(refined.Genus(), 0);
+  EXPECT_GT(refined.NumTri(), 1112208);
 }

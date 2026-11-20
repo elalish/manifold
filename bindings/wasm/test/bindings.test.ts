@@ -80,6 +80,23 @@ suite('Manifold Bindings', () => {
     expect(manifold.volume()).toBeGreaterThan(0);
   });
 
+  test('merge returns a new mesh', () => {
+    const {Manifold, Mesh} = manifoldModule;
+    // Normals split the vertices, so the mesh without its merge vectors is
+    // open and merge() builds them.
+    const cube = Manifold.cube().calculateNormals(0).getMesh();
+    const open = new Mesh({
+      numProp: cube.numProp,
+      vertProperties: cube.vertProperties,
+      triVerts: cube.triVerts
+    });
+    const merged = open.merge();
+    expect(merged).not.toBe(open);
+    expect(open.mergeFromVert).toBeUndefined();
+    expect(merged.mergeFromVert.length).toBeGreaterThan(0);
+    expect(new Manifold(merged).volume()).toBeCloseTo(1);
+  });
+
   test('rayCast returns hits through cube', () => {
     const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
     const hits = cube.rayCast([0, 0, -5], [0, 0, 5]);

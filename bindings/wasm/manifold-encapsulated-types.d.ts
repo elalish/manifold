@@ -760,7 +760,8 @@ export class Manifold {
    * moved to the interpolated surface according to their barycentric
    * coordinates.
    *
-   * @param length The length that edges will be broken down to.
+   * @param length The length that edges will be broken down to. Its sign is
+   * ignored, and zero or NaN is an error.
    * @group Smoothing
    */
   refineToLength(length: number): Manifold;
@@ -775,7 +776,8 @@ export class Manifold {
    *
    * @param tolerance The desired maximum distance between the faceted mesh
    * produced and the exact smoothly curving surface. All vertices are exactly
-   * on the surface, within rounding error.
+   * on the surface, within rounding error. Its sign is ignored, and zero or NaN
+   * is an error.
    * @group Smoothing
    */
   refineToTolerance(tolerance: number): Manifold;
@@ -1350,12 +1352,11 @@ export class Mesh {
   get numRun(): number;
 
   /**
-   * Updates the mergeFromVert and mergeToVert vectors in order to create a
-   * manifold solid. If the MeshGL is already manifold, no change will occur and
-   * the function will return false. Otherwise, this will merge verts along open
-   * edges within tolerance (the maximum of the specified tolerance and the
-   * baseline bounding-box tolerance), keeping any from the existing merge
-   * vectors.
+   * Returns a copy with mergeFromVert and mergeToVert vectors updated in order
+   * to create a manifold solid. If the MeshGL is already manifold, the merge
+   * vectors are unchanged. Otherwise, verts along open edges are merged within
+   * tolerance (the maximum of the specified tolerance and the baseline
+   * bounding-box tolerance), keeping any from the existing merge vectors.
    *
    * There is no guarantee the result will be manifold - this is a best-effort
    * helper function designed primarily to aid in the case where a manifold
@@ -1365,7 +1366,7 @@ export class Mesh {
    *
    * @param tolerance Default 0, with a bounding-box and precision-based floor.
    */
-  merge(tolerance?: number): boolean;
+  merge(tolerance?: number): Mesh;
 
   /**
    * Gets the three vertex indices of this triangle in CCW order.

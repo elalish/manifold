@@ -53,7 +53,7 @@ jobs:
       run: |
         # FIXME: why doesn't scikit_build_core automatically download ninja?
         sudo apt-get update
-        sudo apt-get install ninja-build libtbb-dev
+        sudo apt-get install ninja-build
         pip wheel dist/*.tar.gz
     - uses: actions/upload-artifact@v7
       with:

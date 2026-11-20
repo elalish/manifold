@@ -160,13 +160,13 @@ struct MeshGLP {
   MeshGLP() = default;
 
   /**
-   * Updates the mergeFromVert and mergeToVert vectors in order to create a
-   * manifold solid. If the MeshGL is already manifold, or is invalid (fewer
-   * than 3 properties, merge vectors of different lengths, or out-of-range
-   * indices), no change will occur and the function will return false.
-   * Otherwise, this will merge verts along open edges within tolerance (the
-   * maximum of the specified tolerance and the baseline bounding-box
-   * tolerance), keeping any from the existing merge vectors, and return true.
+   * Returns a copy with mergeFromVert and mergeToVert vectors updated in order
+   * to create a manifold solid. If the MeshGL is already manifold, or is
+   * invalid (fewer than 3 properties, merge vectors of different lengths, or
+   * out-of-range indices), the copy is unchanged. Otherwise, verts along open
+   * edges are merged within tolerance (the maximum of the specified tolerance
+   * and the baseline bounding-box tolerance), keeping any from the existing
+   * merge vectors.
    *
    * There is no guarantee the result will be manifold - this is a
    * best-effort helper function designed primarily to aid in the case where
@@ -177,7 +177,7 @@ struct MeshGLP {
    *
    * @param tolerance Merge open-edge verts closer than this.
    */
-  bool Merge(Precision tolerance = 0);
+  [[nodiscard]] MeshGLP Merge(Precision tolerance = 0) const;
 
   /**
    * Returns the x, y, z position of the ith vertex.

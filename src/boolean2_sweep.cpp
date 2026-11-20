@@ -24,9 +24,10 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <functional>
 #include <limits>
 #include <map>
-#include <set>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -218,21 +219,18 @@ class SweepPass {
 
   void Seed(vec2 a, vec2 b, int64_t m) { PendingAdd(a, b, m); }
 
+  // PolySet2 iterates in (a, b) order, so appending keeps each list sorted.
   void SeedFromPolySet(const PolySet2& ps) {
-    auto pendingHint = pending_.end();
+    auto hint = events_.end();
     for (const auto& kv : ps) {
       const vec2& a = kv.first.first;
       const vec2& b = kv.first.second;
       const int64_t m = kv.second;
       if (a == b || m == 0) continue;
-      if (pendingHint != pending_.end() && pendingHint->first == a) {
-        pendingHint->second.emplace_hint(pendingHint->second.end(), b, m);
-      } else {
-        pendingHint = pending_.try_emplace(pending_.end(), a);
-        pendingHint->second.emplace_hint(pendingHint->second.end(), b, m);
-        events_.insert(events_.end(), a);
-      }
-      events_.insert(b);
+      if (hint == events_.end() || hint->first != a)
+        hint = events_.try_emplace(events_.end(), a);
+      hint->second.push_back({b, m});
+      events_.try_emplace(b);
     }
   }
 
@@ -243,11 +241,16 @@ class SweepPass {
   // the already-resolved boundary and skips it.
   void Run(bool mergeVerticalOutput = true) {
     while (!events_.empty()) {
-      const vec2 p = *events_.begin();
-      events_.erase(events_.begin());
-      ProcessEvent(p);
+      // Erase the event before processing it. Processing can requeue a
+      // remainder at p, which needs a new event; if this entry were still
+      // here, the remainder would land in it and be erased unprocessed.
+      auto event = events_.begin();
+      const vec2 p = event->first;
+      auto pending = std::move(event->second);
+      events_.erase(event);
+      ProcessEvent(p, &pending);
     }
-    DEBUG_ASSERT(status_.empty() && pending_.empty(), logicErr,
+    DEBUG_ASSERT(status_.empty(), logicErr,
                  "Boolean2 sweep left live edges after draining");
     if (mergeVerticalOutput) MergeVerticals1D(out_);
   }
@@ -273,6 +276,11 @@ class SweepPass {
   PolySet2& Out() { return out_; }
 
  private:
+  struct PendingEdge {
+    vec2 r;
+    int64_t m;
+  };
+
   int64_t LexMultiplicity(const SweepEdge& e) const {
     return kLexLess(e.l, e.r) ? e.m : -e.m;
   }
@@ -283,15 +291,16 @@ class SweepPass {
       std::swap(a, b);
       m = -m;
     }
-    auto& inner = pending_[a];
-    auto it = inner.find(b);
-    if (it == inner.end())
-      inner.emplace(b, m);
-    else if ((it->second += m) == 0)
-      inner.erase(it);
-    if (inner.empty()) pending_.erase(a);
-    events_.insert(a);
-    events_.insert(b);
+    auto& pending = events_[a];
+    auto it = std::lower_bound(pending.begin(), pending.end(), b,
+                               [](const PendingEdge& edge, const vec2& end) {
+                                 return kLexLess(edge.r, end);
+                               });
+    if (it == pending.end() || kLexLess(b, it->r))
+      pending.insert(it, {b, m});
+    else if ((it->m += m) == 0)
+      pending.erase(it);
+    events_.try_emplace(b);
   }
 
   Side Classify(const SweepEdge& e, const vec2& p) const {
@@ -525,7 +534,8 @@ class SweepPass {
   // the last strictly-under edge to the first strictly-over edge), split each
   // bracketed edge through p, and re-enter the remainders sorted by gradient.
   // In arrangement mode, test the newly-adjacent pairs for crossings.
-  void ProcessEvent(const vec2& p) {
+  void ProcessEvent(const vec2& p,
+                    const std::vector<PendingEdge>* pending = nullptr) {
     const auto [lo, hi, windingBelow] = FindEventRange(p);
     int64_t w = windingBelow;
     reinsert_.clear();
@@ -547,11 +557,9 @@ class SweepPass {
            ++staticNext_)
         reinsert_.push_back(MakeSweepEdge(p, staticNext_->first.second,
                                           staticNext_->second, seqCounter_++));
-    } else if (auto pit = pending_.find(p); pit != pending_.end()) {
-      for (const auto& kv : pit->second)
-        reinsert_.push_back(
-            MakeSweepEdge(p, kv.first, kv.second, seqCounter_++));
-      pending_.erase(pit);
+    } else if (pending) {
+      for (const auto& edge : *pending)
+        reinsert_.push_back(MakeSweepEdge(p, edge.r, edge.m, seqCounter_++));
     }
     const size_t k = reinsert_.size();
     if (k == 2) {
@@ -583,8 +591,11 @@ class SweepPass {
 
   WindRule rule_;
   SweepMode mode_;
-  std::set<vec2, LexLess> events_;
-  std::map<vec2, std::map<vec2, int64_t, LexLess>, LexLess> pending_;
+  // Event points, each with the pending edges that start there. Each list stays
+  // sorted by r so that a repeated edge merges with the earlier one, and so
+  // the order, which sets the seq that breaks GradientLess ties, doesn't
+  // depend on the order edges were queued.
+  std::map<vec2, std::vector<PendingEdge>, LexLess> events_;
   std::vector<SweepEdge> status_;
   std::vector<StatusBlock> blocks_;
   std::vector<SweepEdge> reinsert_;
@@ -617,6 +628,13 @@ PolySet2 CollectThenMeasure(PolySet2 arr, WindRule rule) {
   return std::move(measure.Out());
 }
 
+struct PointHash {
+  size_t operator()(const vec2& p) const {
+    const std::hash<double> hash;
+    return hash64bit(hash(p.x) ^ hash64bit(hash(p.y)));
+  }
+};
+
 }  // namespace
 
 // Arranges `edges` (referencing `verts`) and returns the retained boundary as
@@ -624,17 +642,14 @@ PolySet2 CollectThenMeasure(PolySet2 arr, WindRule rule) {
 // vertices the returned edges reference are appended to it.
 std::vector<OutEdge> SweepWinding(const std::vector<EdgeM>& edges,
                                   std::vector<vec2>& verts, WindRule rule) {
-  std::map<std::pair<double, double>, int> vertId;
+  std::unordered_map<vec2, int, PointHash> vertId;
+  vertId.reserve(verts.size());
   for (int v = 0; v < static_cast<int>(verts.size()); ++v)
-    vertId.emplace(std::make_pair(verts[v].x, verts[v].y), v);
+    vertId.emplace(verts[v], v);
   auto getId = [&](const vec2& p) -> int {
-    const auto key = std::make_pair(p.x, p.y);
-    auto it = vertId.find(key);
-    if (it != vertId.end()) return it->second;
-    const int id = static_cast<int>(verts.size());
-    verts.push_back(p);
-    vertId.emplace(key, id);
-    return id;
+    auto [it, inserted] = vertId.try_emplace(p, static_cast<int>(verts.size()));
+    if (inserted) verts.push_back(p);
+    return it->second;
   };
 
   // Seed the sweep from the input edges as a lex-normalized signed-multiplicity

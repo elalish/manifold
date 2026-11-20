@@ -844,8 +844,18 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
     }
   };
   auto recorder = MakeSimpleRecorder(recorderf);
-  auto f = [&rayBox](int) { return rayBox; };
-  collider_.Collisions<false>(recorder, f, 1, false);
+  // For an axis-aligned segment the box already gives an exact traversal.
+  // Other finite directions use a segment test to prune the wide box of an
+  // oblique ray. Kernel12 still determines every hit and its tie-breaking.
+  const int movingAxes = (dir.x != 0.0) + (dir.y != 0.0) + (dir.z != 0.0);
+  if (movingAxes <= 1 || !la::all(la::isfinite(dir))) {
+    auto f = [&rayBox](int) { return rayBox; };
+    collider_.Collisions<false>(recorder, f, 1, false);
+  } else {
+    const collider_internal::SegmentQuery query{rayBox, origin, dir, epsilon_};
+    auto f = [&query](int) { return query; };
+    collider_.Collisions<false>(recorder, f, 1, false);
+  }
 
   // Break distance ties by faceID so the order doesn't depend on the
   // std::sort implementation, e.g. for canceling hits at a grazed vertex.

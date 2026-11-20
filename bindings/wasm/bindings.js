@@ -428,9 +428,7 @@ Module.setup = function() {
     }
 
     merge(tolerance = 0) {
-      const {changed, mesh} = Module._Merge(this, tolerance);
-      Object.assign(this, {...mesh});
-      return changed;
+      return new Mesh(Module._Merge(this, tolerance));
     }
 
     verts(tri) {

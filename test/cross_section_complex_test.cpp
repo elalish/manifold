@@ -1659,6 +1659,73 @@ TEST(CrossSectionComplex, SignedZeroReducerPreservesPublicCoordinateBits) {
           << "vertex " << i << " axis " << axis;
 }
 
+TEST(CrossSectionComplex, SweepRequeuedRemaindersExactOutput) {
+  // When the arrangement sweep splits an edge, it requeues the remainder as a
+  // pending edge. Inputs whose crossings are exact rarely reach the cases
+  // below; in these, crossings round to points about an ulp apart. The
+  // expected output keeps the resulting ulp-scale features, such as the
+  // near-duplicate vertices at (2, 8/3). The first two cases reach the merge
+  // of equal pending edges but don't depend on it: unmerged, the equal edges
+  // are emitted separately and their multiplicities sum in the output.
+  // SweepOppositeOverlappingRemainders does depend on it. The third case
+  // depends on the sweep erasing an event before processing it.
+  struct Case {
+    const char* name;
+    Polygons input;
+    Polygons expected;
+  };
+  const Case cases[] = {
+      {"two opposite remainders cancel",
+       {{{1, 3}, {4, 3}, {0, 0}},
+        {{1, 1}, {3, 0}, {4, 0}},
+        {{1, 0}, {2, 4}, {3, 3}}},
+       {{{0x1.3333333333333p0, 0x1.ccccccccccccdp-1},
+         {0x1.38e38e38e38e4p0, 0x1.c71c71c71c71cp-1},
+         {0x1.3b13b13b13b14p0, 0x1.d89d89d89d89dp-1}},
+        {{0x1.8ba2e8ba2e8bap0, 0x1.a2e8ba2e8ba2ep-1},
+         {0x1.8p0, 0x1.8p-1},
+         {3, 0},
+         {4, 0}}}},
+      {"a remainder adds to a pending edge",
+       {{{3, 3}, {0, 2}, {3, 1}, {1, 4}, {4, 0}}, {{1, 3}, {4, 3}, {4, 2}}},
+       {{{0x1.e8ba2e8ba2e8bp0, 0x1.51745d1745d18p1}, {0, 2}, {3, 1}},
+        {{2, 0x1.5555555555556p1},
+         {0x1.ffffffffffffep0, 0x1.5555555555556p1},
+         {4, 0},
+         {0x1.ap1, 0x1.2p1}}}},
+      {"a remainder starts at the current event",
+       {{{1, 1}, {0, 2}, {3, 1}},
+        {{2, 2}, {1, 4}, {4, 1}},
+        {{1, 0}, {4, 3}, {0, 0}},
+        {{3, 3}, {4, 1}, {2, 1}}},
+       {{{0, 0}, {1, 0}, {2, 1}, {0x1.5555555555555p0, 1}},
+        {{0x1.d89d89d89d89ep0, 0x1.6276276276276p0},
+         {0x1.1249249249249p1, 0x1.4924924924924p0},
+         {0x1.3333333333333p1, 0x1.ccccccccccccdp0}},
+        {{0x1.a2e8ba2e8ba2ep1, 0x1.3a2e8ba2e8ba3p1},
+         {0x1.aaaaaaaaaaaaap1, 0x1.2aaaaaaaaaaaap1},
+         {4, 3}}}},
+      {"a remainder starts an ulp before the current event",
+       {{{3, 2}, {2, 4}, {2, 3}, {3, 3}},
+        {{2, 3}, {1, 2}, {2, 2}},
+        {{4, 4}, {4, 3}, {1, 2}}},
+       {{{1, 2}, {2, 2}, {2, 0x1.2aaaaaaaaaaabp1}},
+        {{2, 3}, {0x1.4p1, 3}, {2, 4}},
+        {{1, 2}, {2, 0x1.5555555555555p1}, {2, 3}}}},
+  };
+  for (const Case& c : cases) {
+    SCOPED_TRACE(c.name);
+    const Polygons actual = CrossSection(c.input).ToPolygons();
+    ASSERT_EQ(actual.size(), c.expected.size());
+    for (size_t i = 0; i < actual.size(); ++i) {
+      ASSERT_EQ(actual[i].size(), c.expected[i].size());
+      for (size_t j = 0; j < actual[i].size(); ++j)
+        EXPECT_EQ(actual[i][j], c.expected[i][j])
+            << "polygon " << i << " vertex " << j;
+    }
+  }
+}
+
 namespace {
 
 // Fixed repetitions provide a timing signal for the weekly benchmark suite.
@@ -1747,6 +1814,93 @@ TEST(CrossSectionComplex, OffsetRoundMergingContours) {
       const auto bounds = result.Bounds();
       EXPECT_EQ(bounds.min, vec2(-delta));
       EXPECT_EQ(bounds.max, vec2(3 * (side - 1) + 1 + delta));
+    }
+  }
+}
+
+TEST(CrossSectionComplex, OffsetMiterWavyRing) {
+  // Timed: a detailed contour whose offset edges cross one another in every
+  // wave, since the offset distance exceeds the waves' radius of curvature.
+  constexpr int n = 4096;
+  SimplePolygon ring;
+  for (int i = 0; i < n; ++i) {
+    const double a = 2 * kPi * i / n;
+    const double r = 50 + 0.5 * std::sin(256 * a);
+    ring.push_back({r * std::cos(a), r * std::sin(a)});
+  }
+  const CrossSection input(ring);
+  // The input lies between circles of radius 49.5 (less a margin for chords)
+  // and 50.5. With the default miter limit of 2, an outward offset reaches at
+  // most 2 * delta past the larger circle.
+  const double inner = 49.49;
+  const double outer = 50.5;
+  for (int i = 0; i < 2; ++i) {
+    for (double delta : {1.0, -1.0}) {
+      SCOPED_TRACE(delta);
+      const auto result = input.Offset(delta, CrossSection::JoinType::Miter);
+      ASSERT_EQ(result.NumContour(), 1);
+      const double reach = delta > 0 ? 2 * delta : delta;
+      EXPECT_GT(result.Area(), kPi * (inner + delta) * (inner + delta));
+      EXPECT_LT(result.Area(), kPi * (outer + reach) * (outer + reach));
+    }
+  }
+}
+
+TEST(CrossSectionComplex, DifferenceManyContoursFewCrossings) {
+  // Timed: 1600 small rings minus 16 large circles. Few edges cross, so this
+  // measures the cost per edge rather than per crossing.
+  constexpr int side = 40;
+  constexpr int segments = 32;
+  constexpr double ringRadius = 0.4;
+  constexpr double holeRadius = 2.5;
+  Polygons rings;
+  for (int y = 0; y < side; ++y) {
+    for (int x = 0; x < side; ++x) {
+      SimplePolygon ring;
+      for (int k = 0; k < segments; ++k) {
+        const double a = 2 * kPi * k / segments;
+        ring.push_back(
+            {x + ringRadius * std::cos(a), y + ringRadius * std::sin(a)});
+      }
+      rings.push_back(ring);
+    }
+  }
+  std::vector<CrossSection> operands = {CrossSection(rings)};
+  std::vector<vec2> holeCenters;
+  for (int j = 0; j < 4; ++j) {
+    for (int i = 0; i < 4; ++i) {
+      holeCenters.push_back({5.3 + 10 * i, 5.3 + 10 * j});
+      operands.push_back(CrossSection::Circle(holeRadius, segments)
+                             .Translate(holeCenters.back()));
+    }
+  }
+  // A ring inside a hole's inscribed circle is removed. Any other ring that
+  // reaches inside the hole's circumscribed circle may be cut; counting those
+  // bounds the area from below.
+  const double inscribed = holeRadius * std::cos(kPi / segments);
+  int removed = 0, cut = 0;
+  for (int y = 0; y < side; ++y) {
+    for (int x = 0; x < side; ++x) {
+      for (const vec2& c : holeCenters) {
+        const double d = la::length(vec2(x, y) - c);
+        if (d + ringRadius <= inscribed) {
+          ++removed;
+        } else if (d - ringRadius < holeRadius) {
+          ++cut;
+        }
+      }
+    }
+  }
+  const double ringArea =
+      segments * ringRadius * ringRadius * std::sin(2 * kPi / segments) / 2;
+  const double maxArea = (side * side - removed) * ringArea;
+  for (int i = 0; i < 2; ++i) {
+    const auto result = CrossSection::BatchBoolean(operands, OpType::Subtract);
+    ASSERT_EQ(result.NumContour(), side * side - removed);
+    if (i == 0) {
+      EXPECT_LE(result.Area(), maxArea + 1e-9);
+      EXPECT_GE(result.Area(), maxArea - cut * ringArea);
+      EXPECT_GT(cut, 0);
     }
   }
 }

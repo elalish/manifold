@@ -487,16 +487,17 @@ function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
   const manifolds = [];
   for (const mesh of meshes) {
     let manifold = tryToMakeManifold(mesh);
+    let merged = mesh;
     if (!manifold) {
       // That didn't work.  Do we need to merge primitives?
-      mesh.merge();
-      manifold = tryToMakeManifold(mesh);
+      merged = merged.merge();
+      manifold = tryToMakeManifold(merged);
     }
     if (!manifold && tolerance) {
       // That didn't work either.
       // Can we adjust the model within tolerance?
-      mesh.merge(tolerance);
-      manifold = tryToMakeManifold(mesh);
+      merged = merged.merge(tolerance);
+      manifold = tryToMakeManifold(merged);
     }
     if (!manifold) continue;
 

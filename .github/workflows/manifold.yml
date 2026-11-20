@@ -25,7 +25,7 @@ jobs:
     runs-on: windows-2025
     steps:
     - uses: actions/checkout@v7
-    - uses: lukka/get-cmake@v4.4.5
+    - uses: lukka/get-cmake@v4.5.0
       with:
         cmakeVersion: 4.3.3
     - &clone-tbb
@@ -127,6 +127,13 @@ jobs:
             parallelization: ON
             os: ubuntu-24.04
             std: 20
+          # Runs the Python tests without the GIL.
+          - name: GCC 14 (TBB:ON, Python 3.14t)
+            gcc: 14
+            parallelization: ON
+            os: ubuntu-24.04
+            std: 17
+            python: '3.14t'
     runs-on: ${{ matrix.os }}
     env:
       CC: gcc-${{ matrix.gcc }}
@@ -136,7 +143,7 @@ jobs:
     - &setup-python
       uses: actions/setup-python@v7
       with:
-        python-version: '3.x'
+        python-version: ${{ matrix.python || '3.x' }}
         cache: 'pip'
     - run: pip install -U trimesh pytest
     - name: Install apt packages

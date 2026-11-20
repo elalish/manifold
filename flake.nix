@@ -89,6 +89,7 @@
             src = self;
             propagatedBuildInputs = [ numpy ];
             buildInputs = with pkgs; [ onetbb ];
+            SKBUILD_CMAKE_DEFINE = "MANIFOLD_USE_BUILTIN_TBB=OFF";
             nativeBuildInputs = with pkgs; [
               cmake
               ninja

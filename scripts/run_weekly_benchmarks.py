@@ -30,6 +30,8 @@ DEFAULT_GTEST_FILTER = ":".join(
         "CrossSectionComplex.SweepManySeparatedContoursRotated90",
         "CrossSectionComplex.SweepCrossingContours",
         "CrossSectionComplex.OffsetRoundMergingContours",
+        "CrossSectionComplex.OffsetMiterWavyRing",
+        "CrossSectionComplex.DifferenceManyContoursFewCrossings",
         "Polygon.Sponge4",
         "Polygon.Zebra1",
         "Polygon.Zebra3",

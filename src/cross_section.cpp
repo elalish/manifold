@@ -80,6 +80,13 @@ std::shared_ptr<const PathImpl> shared_paths(Polygons paths) {
   return std::make_shared<const PathImpl>(std::move(paths));
 }
 
+std::shared_ptr<const PathImpl> shared_path(SimplePolygon path) {
+  Polygons paths;
+  // An initializer_list would make its element const and copy the vertices.
+  paths.push_back(std::move(path));
+  return shared_paths(std::move(paths));
+}
+
 void HullBacktrack(const vec2& point, std::vector<vec2>& stack) {
   size_t size = stack.size();
   while (size >= 2 &&
@@ -386,8 +393,7 @@ CrossSection CrossSection::Circle(double radius, int circularSegments) {
   const double dPhi = 360.0 / n;
   for (int i = 0; i < n; ++i)
     circle[i] = {radius * cosd(dPhi * i), radius * sind(dPhi * i)};
-  const double tol = InferEps({circle}, {});
-  return CrossSection(shared_paths({std::move(circle)}));
+  return CrossSection(shared_path(std::move(circle)));
 }
 
 /**
@@ -694,7 +700,7 @@ CrossSection CrossSection::Hull(
 
   SimplePolygon hull = HullImpl(points);
   if (hull.size() < 3) return CrossSection();
-  return CrossSection(shared_paths({std::move(hull)}));
+  return CrossSection(shared_path(std::move(hull)));
 }
 
 /**
@@ -713,7 +719,7 @@ CrossSection CrossSection::Hull(const SimplePolygon& pts) {
   SimplePolygon points = pts;  // HullImpl sorts in place
   SimplePolygon hull = HullImpl(points);
   if (hull.size() < 3) return CrossSection();
-  return CrossSection(shared_paths({std::move(hull)}));
+  return CrossSection(shared_path(std::move(hull)));
 }
 
 /**
@@ -742,8 +748,11 @@ double CrossSection::Area() const {
  * Return the number of vertices in the CrossSection.
  */
 size_t CrossSection::NumVert() const {
+  // Affine transforms preserve contour sizes. Keep them deferred when only
+  // the topology is requested, without copying or rounding vertex positions.
+  std::lock_guard<std::mutex> lock(pathsMutex_);
   size_t numVert = 0;
-  for (const auto& path : GetPaths()->paths_) numVert += path.size();
+  for (const auto& path : paths_->paths_) numVert += path.size();
   return numVert;
 }
 
@@ -751,12 +760,18 @@ size_t CrossSection::NumVert() const {
  * Return the number of contours (both outer and inner paths) in the
  * CrossSection.
  */
-size_t CrossSection::NumContour() const { return GetPaths()->paths_.size(); }
+size_t CrossSection::NumContour() const {
+  std::lock_guard<std::mutex> lock(pathsMutex_);
+  return paths_->paths_.size();
+}
 
 /**
  * Does the CrossSection contain any contours?
  */
-bool CrossSection::IsEmpty() const { return GetPaths()->paths_.empty(); }
+bool CrossSection::IsEmpty() const {
+  std::lock_guard<std::mutex> lock(pathsMutex_);
+  return paths_->paths_.empty();
+}
 
 /**
  * Returns the axis-aligned bounding rectangle of all the CrossSections'
