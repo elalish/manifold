@@ -751,16 +751,15 @@ Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
     if (tolBox.Contains(points[i])) query2input.push_back(static_cast<int>(i));
   if (query2input.empty()) return winding;
 
-  // Build a minimal Impl for the query points. Kernel02 only reads vertPos_
-  // and vertNormal_ from inA; halfedges and faces are not accessed.
+  // Build a minimal Impl for the query points. Kernel02 reads only vertPos_
+  // from inA; Moved::Still does not need query normals.
   Impl pointImpl;
   pointImpl.epsilon_ = epsilon_;  // same tie tolerance as the booleans
   pointImpl.vertPos_.resize(query2input.size());
-  pointImpl.vertNormal_.resize(query2input.size(), vec3(0.0));
   for (size_t i = 0; i < query2input.size(); ++i)
     pointImpl.vertPos_[i] = points[query2input[i]];
 
-  // expandP=false: no symbolic perturbation from the query side (zero normals).
+  // expandP=false: Moved::Still leaves the query side unperturbed.
   // forward=true: project along +Z to count signed face crossings above each
   // point. The query box spans all Z and is widened by epsilon_ in XY,
   // so all faces with XY overlap within tolerance are returned regardless of Z.
@@ -793,26 +792,21 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
   // Kernel12 treats inA as an edge mesh. Halfedges derives endVert from the
   // next edge in a triangle, so this helper uses a padded degenerate face:
   // edge 0 is the forward ray, edge 1 is its reverse, and edge 2 only closes
-  // the local storage loop. Zero vertex normals and face normal mean the ray
-  // contributes nothing to perturbation tiebreakers; consistency at shared
-  // edges/vertices depends entirely on the mesh's own normals.
+  // the local storage loop. Moved::Still leaves the ray unperturbed, so no
+  // query normals are needed; consistency at shared edges/vertices depends
+  // entirely on the mesh's own normals.
   Impl rayImpl;
   rayImpl.epsilon_ = epsilon_;  // same tie tolerance as the booleans
   rayImpl.vertPos_.resize(2);
   rayImpl.vertPos_[0] = origin;
   rayImpl.vertPos_[1] = endpoint;
-  rayImpl.vertNormal_.resize(2);
-  rayImpl.vertNormal_[0] = vec3(0.0);
-  rayImpl.vertNormal_[1] = vec3(0.0);
   rayImpl.halfedge_.resize(3);
   rayImpl.halfedge_.Set(0, 0, 1, 0);  // forward: vert 0 → 1
   rayImpl.halfedge_.Set(1, 1, 0, 0);  // backward: vert 1 → 0
   rayImpl.halfedge_.Set(2, -1, -1, 0);
-  rayImpl.faceNormal_.resize(1);
-  rayImpl.faceNormal_[0] = vec3(0.0);
 
-  // expandP=false with zero vertNormal means the ray-side perturbation is
-  // zero. forward=true means we project along +Z for the lower-dimensional
+  // expandP=false and Moved::Still keep the ray-side perturbation zero.
+  // forward=true means we project along +Z for the lower-dimensional
   // kernel cascade (Shadow01 → Kernel02 → Kernel11 → Kernel12).
   const Moved still = Moved::Still(rayImpl);
   const Moved moved = Moved::Queried(*this, epsilon_);
