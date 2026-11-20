@@ -193,7 +193,7 @@ ManifoldCrossSection* manifold_cross_section_transform(
   return to_c(new CrossSection(transformed));
 }
 
-ManifoldCrossSection* manifold_cross_section_warp_context(
+ManifoldCrossSection* manifold_cross_section_warp(
     const ManifoldCrossSection* cs, ManifoldVec2 (*fun)(double, double, void*),
     void* ctx) {
   // Bind function with context argument to one without

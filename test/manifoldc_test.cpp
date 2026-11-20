@@ -905,6 +905,29 @@ TEST(CBIND, cross_section_non_zero) {
   manifold_delete_simple_polygon(ring);
 }
 
+TEST(CBIND, cross_section_warp) {
+  ManifoldVec2 pts[] = {{0, 0}, {0, 2}, {2, 2}, {2, 0}};
+  ManifoldSimplePolygon* polygon = manifold_simple_polygon(pts, 4);
+  ManifoldCrossSection* cross_section =
+      manifold_cross_section_non_zero_simple_polygon(polygon);
+  double dx = 1.0;
+  ManifoldCrossSection* warped = manifold_cross_section_warp(
+      cross_section,
+      [](double x, double y, void* ctx) {
+        return ManifoldVec2{x + *static_cast<double*>(ctx), y};
+      },
+      &dx);
+  ManifoldRect* bounds = manifold_cross_section_bounds(warped);
+  EXPECT_DOUBLE_EQ(manifold_rect_min(bounds).x, 1.0);
+  EXPECT_DOUBLE_EQ(manifold_rect_max(bounds).x, 3.0);
+  EXPECT_DOUBLE_EQ(manifold_rect_min(bounds).y, 0.0);
+  EXPECT_DOUBLE_EQ(manifold_rect_max(bounds).y, 2.0);
+  manifold_delete_rect(bounds);
+  manifold_delete_cross_section(warped);
+  manifold_delete_cross_section(cross_section);
+  manifold_delete_simple_polygon(polygon);
+}
+
 TEST(CBIND, cross_section_even_odd) {
   // Two same-direction squares, one nested in the other: positive fill leaves
   // the pair solid, even-odd cuts the inner square out.

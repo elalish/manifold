@@ -353,7 +353,7 @@ ManifoldCrossSection* manifold_cross_section_mirror(
 ManifoldCrossSection* manifold_cross_section_transform(
     const ManifoldCrossSection* cs, double x1, double y1, double x2, double y2,
     double x3, double y3);
-ManifoldCrossSection* manifold_cross_section_warp_context(
+ManifoldCrossSection* manifold_cross_section_warp(
     const ManifoldCrossSection* cs, ManifoldVec2 (*fun)(double, double, void*),
     void* ctx);
 ManifoldCrossSection* manifold_cross_section_simplify(
