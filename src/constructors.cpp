@@ -115,14 +115,16 @@ Manifold Manifold::Tetrahedron() {
 
 /**
  * Constructs a unit cube (edge lengths all one), by default in the first
- * octant, touching the origin. If any dimensions in size are negative, or if
- * all are zero, an empty Manifold will be returned.
+ * octant, touching the origin. If any dimensions in size are negative or
+ * non-finite, or if all are zero, an empty Manifold with InvalidConstruction
+ * status will be returned.
  *
  * @param size The X, Y, and Z dimensions of the box.
  * @param center Set to true to shift the center to the origin.
  */
 Manifold Manifold::Cube(vec3 size, bool center) {
-  if (size.x < 0.0 || size.y < 0.0 || size.z < 0.0 || la::length(size) == 0.) {
+  if (!la::all(la::isfinite(size)) || size.x < 0.0 || size.y < 0.0 ||
+      size.z < 0.0 || la::length(size) == 0.) {
     return Invalid();
   }
   mat3x4 m({{size.x, 0.0, 0.0}, {0.0, size.y, 0.0}, {0.0, 0.0, size.z}},
@@ -134,11 +136,15 @@ Manifold Manifold::Cube(vec3 size, bool center) {
  * A convenience constructor for the common case of extruding a circle. Can also
  * form cones if both radii are specified.
  *
- * @param height Z-extent
- * @param radiusLow Radius of bottom circle. Must be non-negative. If zero,
- * radiusHigh must be positive and a cone with apex at the bottom is created.
- * @param radiusHigh Radius of top circle. Can equal zero. Default is equal to
- * radiusLow.
+ * Non-finite dimensions return an empty Manifold with InvalidConstruction
+ * status.
+ *
+ * @param height Z-extent. Must be positive and finite.
+ * @param radiusLow Radius of bottom circle. Must be non-negative and finite. If
+ * zero, radiusHigh must be positive and a cone with apex at the bottom is
+ * created.
+ * @param radiusHigh Radius of top circle. Must be finite and can equal zero.
+ * Negative values, including the default, use radiusLow.
  * @param circularSegments How many line segments to use around the circle.
  * Default is calculated by the static Defaults.
  * @param center Set to true to shift the center to the origin. Default is
@@ -146,7 +152,8 @@ Manifold Manifold::Cube(vec3 size, bool center) {
  */
 Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
                             int circularSegments, bool center) {
-  if (height <= 0.0 || radiusLow < 0.0) {
+  if (!std::isfinite(height) || !std::isfinite(radiusLow) ||
+      !std::isfinite(radiusHigh) || height <= 0.0 || radiusLow < 0.0) {
     return Invalid();
   }
   const bool flip = radiusLow == 0.0;
@@ -175,7 +182,8 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
 /**
  * Constructs a geodesic sphere of a given radius.
  *
- * @param radius Radius of the sphere. Must be positive.
+ * @param radius Radius of the sphere. Must be positive and finite; otherwise
+ * returns an empty Manifold with InvalidConstruction status.
  * @param circularSegments Number of segments along its
  * diameter. This number will always be rounded up to the nearest factor of
  * four, as this sphere is constructed by refining an octahedron. This means
@@ -183,7 +191,7 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
  * calculated by the static Defaults.
  */
 Manifold Manifold::Sphere(double radius, int circularSegments) {
-  if (radius <= 0.0) {
+  if (radius <= 0.0 || !std::isfinite(radius)) {
     return Invalid();
   }
   int n = circularSegments > 0 ? (circularSegments + 3) / 4

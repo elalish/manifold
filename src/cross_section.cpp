@@ -329,11 +329,12 @@ CrossSection CrossSection::NonZero(const Polygons& contours) {
 
 /**
  * Create a 2d cross-section from an axis-aligned rectangle (bounding box).
+ * Empty or non-finite bounds produce an empty CrossSection.
  *
  * @param rect An axis-aligned rectangular bounding box.
  */
 CrossSection::CrossSection(const Rect& rect) {
-  if (rect.IsEmpty()) {
+  if (rect.IsEmpty() || !rect.IsFinite()) {
     paths_ = shared_paths({});
     return;
   }
@@ -354,7 +355,8 @@ std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
 /**
  * Constructs a square with the given XY dimensions. By default it is
  * positioned in the first quadrant, touching the origin. If any dimensions in
- * size are negative, or if all are zero, an empty Manifold will be returned.
+ * size are negative or non-finite, or if all are zero, an empty CrossSection
+ * will be returned.
  *
  * @param size The X, and Y dimensions of the square.
  * @param center Set to true to shift the center to the origin.
@@ -371,12 +373,13 @@ CrossSection CrossSection::Square(const vec2 size, bool center) {
 /**
  * Constructs a circle of a given radius.
  *
- * @param radius Radius of the circle. Must be positive.
+ * @param radius Radius of the circle. Must be positive and finite; otherwise
+ * returns an empty CrossSection.
  * @param circularSegments Number of segments along its diameter. Default is
  * calculated by the static Quality defaults according to the radius.
  */
 CrossSection CrossSection::Circle(double radius, int circularSegments) {
-  if (radius <= 0.0) return CrossSection();
+  if (radius <= 0.0 || !std::isfinite(radius)) return CrossSection();
   const int n = circularSegments > 2 ? circularSegments
                                      : Quality::GetCircularSegments(radius);
   SimplePolygon circle(n);

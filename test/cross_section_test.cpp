@@ -2655,6 +2655,64 @@ TEST(CrossSection, NonFiniteInputReturnsEmpty) {
   EXPECT_TRUE(constructed.IsEmpty());
 }
 
+TEST(CrossSection, NonFiniteCircleIsEmpty) {
+  const double inf = std::numeric_limits<double>::infinity();
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const CrossSection valid = CrossSection::Square({2, 3});
+  for (double radius : {nan, inf, -inf}) {
+    for (int segments : {0, 8}) {
+      SCOPED_TRACE(testing::Message() << radius << ", segments=" << segments);
+      const CrossSection circle = CrossSection::Circle(radius, segments);
+      EXPECT_TRUE(circle.IsEmpty());
+      EXPECT_EQ(circle.NumVert(), 0);
+      EXPECT_DOUBLE_EQ(circle.Area(), 0);
+      EXPECT_DOUBLE_EQ((valid + circle).Area(), 6);
+    }
+  }
+}
+
+TEST(CrossSection, NonFiniteSquareIsEmpty) {
+  const double inf = std::numeric_limits<double>::infinity();
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const CrossSection valid = CrossSection::Square({2, 3});
+  for (double value : {nan, inf, -inf}) {
+    for (int axis = 0; axis < 2; ++axis) {
+      for (bool center : {false, true}) {
+        SCOPED_TRACE(testing::Message()
+                     << value << ", axis=" << axis << ", center=" << center);
+        vec2 size(1);
+        size[axis] = value;
+        const CrossSection square = CrossSection::Square(size, center);
+        EXPECT_TRUE(square.IsEmpty());
+        EXPECT_EQ(square.NumVert(), 0);
+        EXPECT_DOUBLE_EQ(square.Area(), 0);
+        EXPECT_DOUBLE_EQ((valid + square).Area(), 6);
+      }
+    }
+  }
+}
+
+TEST(CrossSection, NonFiniteRectangleIsEmpty) {
+  const double inf = std::numeric_limits<double>::infinity();
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const CrossSection valid = CrossSection::Square({2, 3});
+  for (double value : {nan, inf, -inf}) {
+    for (int axis = 0; axis < 2; ++axis) {
+      for (bool upper : {false, true}) {
+        SCOPED_TRACE(testing::Message()
+                     << value << ", axis=" << axis << ", upper=" << upper);
+        Rect rect({0, 0}, {1, 1});
+        (upper ? rect.max : rect.min)[axis] = value;
+        const CrossSection section(rect);
+        EXPECT_TRUE(section.IsEmpty());
+        EXPECT_EQ(section.NumVert(), 0);
+        EXPECT_DOUBLE_EQ(section.Area(), 0);
+        EXPECT_DOUBLE_EQ((valid + section).Area(), 6);
+      }
+    }
+  }
+}
+
 // Position-inclusive eps scales with the absolute coordinate (matching
 // Boolean3), so Offset is intentionally NOT invariant under a large
 // translation: at 1e12 the round-join arc falls below eps and collapses, while
