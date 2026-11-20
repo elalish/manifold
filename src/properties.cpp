@@ -14,6 +14,7 @@
 
 #include <cmath>
 #include <limits>
+#include <utility>
 
 #if MANIFOLD_PAR == 1
 #include <tbb/combinable.h>
@@ -380,8 +381,9 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
 
   const int oldNumProp = NumProp();
   const int numProp = std::max(oldNumProp, std::max(gaussianIdx, meanIdx) + 1);
-  const Vec<double> oldProperties = properties_;
-  properties_ = Vec<double>(numProp * NumPropVert(), 0);
+  const size_t numPropVert = NumPropVert();
+  const Vec<double> oldProperties = std::move(properties_);
+  properties_ = Vec<double>(numProp * numPropVert, 0);
   numProp_ = numProp;
 
   Vec<uint8_t> counters(NumPropVert(), 0);
