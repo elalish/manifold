@@ -69,6 +69,11 @@ typedef struct ManifoldProperties {
 } ManifoldProperties;
 
 typedef struct ManifoldMeshGLOptions {
+  // Set struct_size to sizeof(ManifoldMeshGLOptions), for example with the
+  // initializer. Smaller values make manifold_meshgl_w_options abort.
+  // NULL options mean no options. Bindings that cannot call static inline
+  // functions must set struct_size themselves.
+  size_t struct_size;
   uint32_t* run_indices;
   size_t run_indices_length;
   uint32_t* run_original_ids;
@@ -77,9 +82,19 @@ typedef struct ManifoldMeshGLOptions {
   uint32_t* merge_to_vert;
   size_t merge_verts_length;
   float* halfedge_tangents;
+  float* run_transform;
+  size_t run_transform_length;
+  uint8_t* run_flags;
+  size_t run_flags_length;
+  uint32_t* face_id;
 } ManifoldMeshGLOptions;
 
 typedef struct ManifoldMeshGL64Options {
+  // Set struct_size to sizeof(ManifoldMeshGL64Options), for example with the
+  // initializer. Smaller values make manifold_meshgl64_w_options abort.
+  // NULL options mean no options. Bindings that cannot call static inline
+  // functions must set struct_size themselves.
+  size_t struct_size;
   uint64_t* run_indices;
   size_t run_indices_length;
   uint32_t* run_original_ids;
@@ -88,7 +103,32 @@ typedef struct ManifoldMeshGL64Options {
   uint64_t* merge_to_vert;
   size_t merge_verts_length;
   double* halfedge_tangents;
+  double* run_transform;
+  size_t run_transform_length;
+  uint8_t* run_flags;
+  size_t run_flags_length;
+  uint64_t* face_id;
 } ManifoldMeshGL64Options;
+
+static inline ManifoldMeshGLOptions manifold_meshgl_options_init(void) {
+#ifdef __cplusplus
+  ManifoldMeshGLOptions options = {};
+#else
+  ManifoldMeshGLOptions options = {0};
+#endif
+  options.struct_size = sizeof(options);
+  return options;
+}
+
+static inline ManifoldMeshGL64Options manifold_meshgl64_options_init(void) {
+#ifdef __cplusplus
+  ManifoldMeshGL64Options options = {};
+#else
+  ManifoldMeshGL64Options options = {0};
+#endif
+  options.struct_size = sizeof(options);
+  return options;
+}
 
 typedef struct ManifoldRayHit {
   uint64_t face_id;
