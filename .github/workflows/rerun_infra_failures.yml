@@ -1,0 +1,43 @@
+# Reruns a failed CI run when no job failed on its own, for example when a
+# hosted runner was never assigned. Any job that ran and failed blocks the
+# rerun, so real failures still need a manual look.
+name: Rerun infrastructure failures
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  actions: write
+
+jobs:
+  rerun:
+    if: >-
+      github.event.workflow_run.conclusion == 'failure' &&
+      github.event.workflow_run.run_attempt < 3
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+    - name: Rerun if every failure is infrastructure
+      env:
+        GH_TOKEN: ${{ github.token }}
+        GH_REPO: ${{ github.repository }}
+        RUN_ID: ${{ github.event.workflow_run.id }}
+      run: |
+        # A job that never got a runner ends with no steps. Anything else that
+        # did not succeed or get skipped counts as a real failure.
+        jobs=$(gh api --paginate \
+          "repos/$GH_REPO/actions/runs/$RUN_ID/jobs?filter=latest&per_page=100" \
+          --jq '.jobs[] | select(.conclusion != "success" and .conclusion != "skipped")
+                | [.name, .conclusion, (.steps | length)] | @tsv')
+        echo "$jobs"
+        if [ -z "$jobs" ]; then
+          echo "No unsuccessful jobs."
+          exit 0
+        fi
+        if echo "$jobs" | awk -F'\t' '$3 != 0 { found = 1 } END { exit !found }'; then
+          echo "A job ran and did not succeed, so not rerunning."
+          exit 0
+        fi
+        gh run rerun "$RUN_ID" --failed
