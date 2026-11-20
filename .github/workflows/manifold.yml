@@ -596,7 +596,9 @@ jobs:
         LDFLAGS=-Wl,-rpath,/usr/local/lib ./scripts/test-pkgconfig.sh
 
   build_nix:
-    timeout-minutes: 30
+    # Usually 2-8 minutes, but a slow download of the emscripten toolchain
+    # from the Nix cache has taken over 20.
+    timeout-minutes: 45
     strategy:
       matrix:
         variant: [manifold-none, manifold-tbb, manifold-js, manifold-js-tbb, manifold3d]
