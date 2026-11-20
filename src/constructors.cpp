@@ -507,33 +507,30 @@ std::vector<Manifold> Manifold::Decompose() const {
     return meshes;
   }
 
-  std::vector<double> volumes(numMeshes);
   std::vector<int> parent(numMeshes, -1);
   for (int i = 0; i < numMeshes; ++i) {
-    Manifold mesh(components[i]);
-    volumes[i] = mesh.Volume();
-  }
-
-  for (int i = 0; i < numMeshes; ++i) {
     if (!isVug[i]) continue;
-    double smallestParentVolume = std::numeric_limits<double>::infinity();
     const auto& childVerts = components[i]->vertPos_;
+    Box parentBox;
     for (int j = 0; j < numMeshes; ++j) {
-      const double parentVolume = std::fabs(volumes[j]);
-      if (i == j || parentVolume <= std::fabs(volumes[i]) ||
-          parentVolume >= smallestParentVolume) {
-        continue;
-      }
+      if (i == j || isVug[j]) continue;
       const Box& childBox = components[i]->bBox_;
-      const Box& parentBox = components[j]->bBox_;
+      const Box& currentBox = components[j]->bBox_;
       const vec3 eps(components[j]->epsilon_);
-      const Box expandedParentBox(parentBox.min - eps, parentBox.max + eps);
-      if (!expandedParentBox.Contains(childBox)) continue;
+      const Box expandedBox(currentBox.min - eps, currentBox.max + eps);
+      if (!expandedBox.Contains(childBox)) continue;
 
+      if (parent[i] >= 0) {
+        if (!parentBox.Contains(currentBox) ||
+            components[parent[i]]->PointWinding(VecView<const vec3>(
+                components[j]->vertPos_.data(), 1))[0] != 1) {
+          continue;
+        }
+      }
       if (components[j]->PointWinding(
               VecView<const vec3>(childVerts.data(), 1))[0] == 1) {
         parent[i] = j;
-        smallestParentVolume = parentVolume;
+        parentBox = expandedBox;
       }
     }
   }
@@ -551,13 +548,8 @@ std::vector<Manifold> Manifold::Decompose() const {
   }
   for (int i = 0; i < numMeshes; ++i) {
     if (!isVug[i]) continue;
-    int ancestor = parent[i];
-    for (int hops = 0; ancestor >= 0 && isVug[ancestor] && hops <= numMeshes;
-         ++hops) {
-      ancestor = parent[ancestor];
-    }
-    if (ancestor >= 0) {
-      const int output = outputByComponent[componentLabels[ancestor]];
+    if (parent[i] >= 0) {
+      const int output = outputByComponent[componentLabels[parent[i]]];
       outputByComponent[componentLabels[i]] = output;
       ++outputComponentCount[output];
     } else {

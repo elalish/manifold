@@ -802,6 +802,35 @@ TEST(Manifold, DecomposeGroupsEnclosedNegativeVolume) {
   EXPECT_EQ(componentTriangles, shape.NumTri());
 }
 
+TEST(Manifold, DecomposeDeeplyNestedVugsAndSeparateSolid) {
+  const Manifold outer = Manifold::Cube({20, 20, 20}, true);
+  const Manifold cavity = Manifold::Cube({16, 16, 16}, true);
+  const Manifold island = Manifold::Cube({12, 12, 12}, true);
+  const Manifold nestedCavity = Manifold::Cube({8, 8, 8}, true);
+  const Manifold nestedIsland = Manifold::Cube({4, 4, 4}, true);
+  const Manifold innerCavity = Manifold::Cube({2, 2, 2}, true);
+  const Manifold separate =
+      Manifold::Cube({3, 3, 3}, true).Translate({30, 0, 0});
+  const Manifold shape = outer - cavity + island - nestedCavity + nestedIsland -
+                         innerCavity + separate;
+
+  const auto components = shape.Decompose();
+  ASSERT_EQ(components.size(), 4);
+  std::vector<double> volumes;
+  size_t triangles = 0;
+  for (const Manifold& component : components) {
+    EXPECT_EQ(component.Status(), Manifold::Error::NoError);
+    volumes.push_back(component.Volume());
+    triangles += component.NumTri();
+  }
+  std::sort(volumes.begin(), volumes.end());
+  EXPECT_NEAR(volumes[0], 27, 1e-8);
+  EXPECT_NEAR(volumes[1], 56, 1e-8);
+  EXPECT_NEAR(volumes[2], 1216, 1e-8);
+  EXPECT_NEAR(volumes[3], 3904, 1e-8);
+  EXPECT_EQ(triangles, shape.NumTri());
+}
+
 TEST(Manifold, DecomposeProps) {
   std::vector<MeshGL> input;
   std::vector<Manifold> manifoldList;
