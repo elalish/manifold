@@ -584,14 +584,32 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
  */
 void Manifold::Impl::DistributeTangents(Vec<bool>& fixedHalfedges) {
   const int numHalfedge = fixedHalfedges.size();
+  struct AngleScratch {
+    Vec<double> current;
+    Vec<double> desired;
+  };
+#if MANIFOLD_PAR == 1
+  tbb::combinable<AngleScratch> scratch;
+#else
+  AngleScratch scratch;
+#endif
   for_each_n(
       autoPolicy(numHalfedge, 1e4), countAt(0), numHalfedge,
-      [this, &fixedHalfedges](int halfedge) {
+      [this, &fixedHalfedges, &scratch](int halfedge) {
         if (!fixedHalfedges[halfedge]) return;
 
+    // Reuse capacity across sectors, with independent storage on each
+    // worker. A new pair of Vecs would allocate 2 KiB for every sector.
+#if MANIFOLD_PAR == 1
+        auto& angles = scratch.local();
+#else
+        auto& angles = scratch;
+#endif
+        auto& currentAngle = angles.current;
+        auto& desiredAngle = angles.desired;
+        currentAngle.clear(false);
+        desiredAngle.clear(false);
         vec3 normal(0.0);
-        Vec<double> currentAngle;
-        Vec<double> desiredAngle;
 
         const vec3 approxNormal = vertNormal_[halfedge_.Start(halfedge)];
         const vec3 center = vertPos_[halfedge_.Start(halfedge)];
