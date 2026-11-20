@@ -457,7 +457,8 @@ namespace manifold {
  * @param bounds An axis-aligned box that defines the extent of the grid.
  * @param edgeLength Approximate maximum edge length of the triangles in the
  * final result. This affects grid spacing, and hence has a strong effect on
- * performance.
+ * performance. Every positive-length axis has at least one grid interval,
+ * including when its extent is smaller than edgeLength.
  * @param level Extract the surface at this value of your sdf; defaults to
  * zero. You can inset your mesh by using a positive value, or outset it with a
  * negative value.
@@ -514,8 +515,16 @@ void Manifold::Impl::CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
     MakeEmpty(Error::ResultTooLarge);
     return;
   }
-  const ivec3 gridSize(gridSizeD);
-  const vec3 spacing = dim / (vec3(gridSize - 1));
+  ivec3 gridSize(gridSizeD);
+  // A positive span needs both endpoints even when the requested spacing is
+  // larger than that span. Otherwise gridSize is 1 and spacing becomes
+  // infinite.
+  for (const int axis : {0, 1, 2}) {
+    if (dim[axis] > 0.0) gridSize[axis] = std::max(gridSize[axis], 2);
+  }
+  // A zero-span axis keeps its single point and zero spacing, so a degenerate
+  // box remains empty without passing non-finite coordinates to the callback.
+  const vec3 spacing = dim / vec3(la::max(gridSize - 1, ivec3(1)));
 
   const ivec3 gridPow = ComputeGridPow(gridSize);
   if (1 + gridPow.x + gridPow.y + gridPow.z + 3 > 64) {
