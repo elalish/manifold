@@ -1,4 +1,4 @@
-from manifold3d import Manifold
+from manifold3d import Manifold, OpType
 import numpy as np
 
 
@@ -32,7 +32,7 @@ def run(n=1):
     holes = []
     fractal(holes, result, 1.0, np.array([0.0, 0.0]), 1, n)
 
-    hole = Manifold.compose(holes)
+    hole = Manifold.batch_boolean(holes, OpType.Add)
 
     result -= hole
     result -= hole.rotate([90, 0, 0])

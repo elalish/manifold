@@ -708,10 +708,6 @@ Module.setup = function() {
   }
 
   Module.Manifold.union = manifoldBatchbool('Union');
-  // Aliasing compose to union.
-  // Native compose has some issues, and is deprecated.
-  Module.Manifold.compose = Module.Manifold.union;
-
   Module.Manifold.difference = manifoldBatchbool('Difference');
   Module.Manifold.intersection = manifoldBatchbool('Intersection');
 

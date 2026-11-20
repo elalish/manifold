@@ -416,24 +416,10 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
 }
 
 /**
- * Deprecated: Use BatchBoolean with OpType::Add instead.
- *
- * Constructs a new manifold from a vector of other manifolds. This is a purely
- * topological operation, so care should be taken to avoid creating
- * overlapping results. It is the inverse operation of Decompose().
- *
- * @param manifolds A vector of Manifolds to lazy-union together.
- */
-Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
-  return BatchBoolean(manifolds, OpType::Add);
-}
-
-/**
  * This operation returns a vector of topologically disconnected Manifolds,
  * keeping enclosed negative-volume shells with their enclosing
  * positive-volume shell. If everything is connected, the vector is length
- * one, containing a copy of the original. It is the inverse operation of
- * Compose().
+ * one, containing a copy of the original.
  */
 std::vector<Manifold> Manifold::Decompose() const {
   ZoneScoped;
