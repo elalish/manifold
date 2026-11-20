@@ -228,6 +228,32 @@ TEST(Measurement, MinGapCubeSphereOverlapping) {
   EXPECT_FLOAT_EQ(distance, 0);
 }
 
+TEST(Measurement, MinGapUnequalResolutionOperands) {
+  const Manifold cube = Manifold::Cube();
+  for (int segments : {16, 64}) {
+    const Manifold sphere =
+        Manifold::Sphere(1, segments).Translate({4, 0.5, 0.5});
+    ASSERT_LT(cube.NumTri(), sphere.NumTri());
+    for (double limit : {0.0, -0.25, 1.0, 2.01, 3.0}) {
+      const double expected = std::min(2.0, std::abs(limit));
+      EXPECT_NEAR(cube.MinGap(sphere, limit), expected, 1e-12);
+      EXPECT_NEAR(sphere.MinGap(cube, limit), expected, 1e-12);
+    }
+  }
+}
+
+TEST(Measurement, MinGapRetessellatedOperands) {
+  const Manifold cube = Manifold::Cube();
+  for (int divisions : {2, 8}) {
+    const Manifold dense = cube.Refine(divisions).Translate({3, 4, 0});
+    ASSERT_LT(cube.NumTri(), dense.NumTri());
+    // Retessellation leaves the cube unchanged: its closest corners are at
+    // axis separations 2 and 3, regardless of which mesh supplies the queries.
+    EXPECT_NEAR(cube.MinGap(dense, 4), std::sqrt(13.0), 1e-12);
+    EXPECT_NEAR(dense.MinGap(cube, 4), std::sqrt(13.0), 1e-12);
+  }
+}
+
 TEST(Measurement, MinGapSphereSphere) {
   auto a = Manifold::Sphere(1);
   auto b = Manifold::Sphere(1).Translate({2, 2, 0});
