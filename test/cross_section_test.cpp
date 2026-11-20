@@ -2718,6 +2718,29 @@ TEST(CrossSection, SimplifyReducesCurveWithoutCollapsing) {
   EXPECT_GT(simplified.Area(), 0.9 * area0);
 }
 
+TEST(CrossSection, SimplifyEqualDeviationsKeepDeterministicCorners) {
+  // Every initial vertex is sqrt(0.4) from the line through its neighbors.
+  // Removing tied vertices in their original order leaves these four corners.
+  const CrossSection input(SimplePolygon{
+      {0, 0}, {2, 0}, {3, 1}, {3, 3}, {2, 4}, {0, 4}, {-1, 3}, {-1, 1}});
+  const Polygons before = input.ToPolygons();
+  const Polygons actual = input.Simplify(1.1).ToPolygons();
+  const SimplePolygon expected = {{-1, 1}, {2, 0}, {3, 3}, {0, 4}};
+
+  ASSERT_EQ(actual.size(), 1);
+  ASSERT_EQ(actual[0].size(), expected.size());
+  for (size_t i = 0; i < expected.size(); ++i) {
+    EXPECT_EQ(actual[0][i].x, expected[i].x);
+    EXPECT_EQ(actual[0][i].y, expected[i].y);
+  }
+  const Polygons after = input.ToPolygons();
+  ASSERT_EQ(after[0].size(), before[0].size());
+  for (size_t i = 0; i < before[0].size(); ++i) {
+    EXPECT_EQ(after[0][i].x, before[0][i].x);
+    EXPECT_EQ(after[0][i].y, before[0][i].y);
+  }
+}
+
 TEST(CrossSection, Empty) {
   Polygons polys(2);
   auto e = CrossSection(polys);
