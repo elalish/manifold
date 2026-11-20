@@ -88,7 +88,7 @@ ManifoldError to_c(manifold::Manifold::Error error) {
       e = MANIFOLD_NOT_MANIFOLD;
       break;
     case Manifold::Error::VertexOutOfBounds:
-      e = MANIFOLD_VERTEX_INDEX_OUT_OF_BOUNDS;
+      e = MANIFOLD_VERTEX_OUT_OF_BOUNDS;
       break;
     case Manifold::Error::PropertiesWrongLength:
       e = MANIFOLD_PROPERTIES_WRONG_LENGTH;
