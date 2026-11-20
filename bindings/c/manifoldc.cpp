@@ -812,8 +812,8 @@ ManifoldManifold* manifold_calculate_curvature(const ManifoldManifold* m,
 }
 
 double manifold_min_gap(const ManifoldManifold* m,
-                        const ManifoldManifold* other, double searchLength) {
-  return from_c(m)->MinGap(*from_c(other), searchLength);
+                        const ManifoldManifold* other, double search_length) {
+  return from_c(m)->MinGap(*from_c(other), search_length);
 }
 
 ManifoldRayHitVec* manifold_ray_cast(const ManifoldManifold* m, double origin_x,

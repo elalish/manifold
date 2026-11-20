@@ -23,7 +23,7 @@ extern "C" {
 #endif
 
 // In general, if the function return type is `T*`,
-// you have to cleanup the result by calling `maninfold_delete_*`.
+// you have to cleanup the result by calling `manifold_delete_*`.
 // If the function return type is `const T*`,
 // the result is borrowed from input arguments.
 
@@ -235,7 +235,7 @@ ManifoldManifold* manifold_set_properties(
 ManifoldManifold* manifold_calculate_curvature(const ManifoldManifold* m,
                                                int gaussian_idx, int mean_idx);
 double manifold_min_gap(const ManifoldManifold* m,
-                        const ManifoldManifold* other, double searchLength);
+                        const ManifoldManifold* other, double search_length);
 ManifoldManifold* manifold_calculate_normals(const ManifoldManifold* m,
                                              int normal_idx,
                                              double min_sharp_angle);
