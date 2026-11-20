@@ -74,19 +74,19 @@ typedef struct ManifoldMeshGLOptions {
   // NULL options mean no options. Bindings that cannot call static inline
   // functions must set struct_size themselves.
   size_t struct_size;
-  uint32_t* run_indices;
+  const uint32_t* run_indices;
   size_t run_indices_length;
-  uint32_t* run_original_ids;
+  const uint32_t* run_original_ids;
   size_t run_original_ids_length;
-  uint32_t* merge_from_vert;
-  uint32_t* merge_to_vert;
+  const uint32_t* merge_from_vert;
+  const uint32_t* merge_to_vert;
   size_t merge_verts_length;
-  float* halfedge_tangents;
-  float* run_transform;
+  const float* halfedge_tangents;
+  const float* run_transform;
   size_t run_transform_length;
-  uint8_t* run_flags;
+  const uint8_t* run_flags;
   size_t run_flags_length;
-  uint32_t* face_id;
+  const uint32_t* face_id;
 } ManifoldMeshGLOptions;
 
 typedef struct ManifoldMeshGL64Options {
@@ -95,19 +95,19 @@ typedef struct ManifoldMeshGL64Options {
   // NULL options mean no options. Bindings that cannot call static inline
   // functions must set struct_size themselves.
   size_t struct_size;
-  uint64_t* run_indices;
+  const uint64_t* run_indices;
   size_t run_indices_length;
-  uint32_t* run_original_ids;
+  const uint32_t* run_original_ids;
   size_t run_original_ids_length;
-  uint64_t* merge_from_vert;
-  uint64_t* merge_to_vert;
+  const uint64_t* merge_from_vert;
+  const uint64_t* merge_to_vert;
   size_t merge_verts_length;
-  double* halfedge_tangents;
-  double* run_transform;
+  const double* halfedge_tangents;
+  const double* run_transform;
   size_t run_transform_length;
-  uint8_t* run_flags;
+  const uint8_t* run_flags;
   size_t run_flags_length;
-  uint64_t* face_id;
+  const uint64_t* face_id;
 } ManifoldMeshGL64Options;
 
 static inline ManifoldMeshGLOptions manifold_meshgl_options_init(void) {
