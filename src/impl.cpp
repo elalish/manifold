@@ -849,7 +849,7 @@ bool WriteOBJ(std::ostream& stream, const MeshGL64& mesh) {
  * Debugging output using high precision OBJ files with specialized comments
  */
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
-  MeshGL64 mesh = GetMeshGLImpl<double, uint64_t>(impl, -1);
+  MeshGL64 mesh = GetMeshGLImpl<double, uint64_t>(impl);
   return WriteOBJWithEpsilon(stream, mesh, {impl.epsilon_});
 }
 

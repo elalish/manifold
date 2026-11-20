@@ -61,13 +61,12 @@ namespace manifold {
  *
  * You can have any number of arbitrary floating-point properties per vertex,
  * and they will all be interpolated as necessary during operations. It is up to
- * you to keep track of which channel represents what type of data. A few of
- * Manifold's methods allow you to specify the channel where normals data
- * starts, in order to update it automatically for transforms and such. This
- * will be easier if your meshes all use the same channels for properties, but
- * this is not a requirement. Operations between meshes with different numbers
- * of properties will simply use the larger numProp and pad the smaller one
- * with zeroes.
+ * you to keep track of which channel represents what type of data. Normals,
+ * when recorded, always occupy the first three extra property channels. Each
+ * triangle run records whether it carries those normals with runFlags bit 1;
+ * only recorded normals are updated automatically by transforms. Operations
+ * between meshes with different numbers of properties use the larger numProp
+ * and pad the smaller one with zeroes.
  *
  * On output, the triangles are sorted into runs (runIndex, runOriginalID,
  * runTransform) that correspond to different mesh inputs. Other 3D libraries
@@ -242,7 +241,7 @@ struct MeshGLP {
   /**
    * Returns true if the first three extra-property channels (slots 3, 4, 5)
    * of this run carry world-frame vertex normals (set by
-   * `Manifold::CalculateNormals(0)` and round-tripped via `runFlags` bit 1).
+   * `Manifold::CalculateNormals()` and round-tripped via `runFlags` bit 1).
    * Consumers should treat the slot as normals and skip re-applying
    * `runTransform` to it.
    *

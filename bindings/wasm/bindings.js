@@ -252,13 +252,12 @@ Module.setup = function() {
     return out;
   };
 
-  Module.Manifold.prototype.calculateNormals = function(
-      normalIdx = 0, minSharpAngle = 52.5) {
-    return this._CalculateNormals(normalIdx, minSharpAngle);
+  Module.Manifold.prototype.calculateNormals = function(minSharpAngle = 52.5) {
+    return this._CalculateNormals(minSharpAngle);
   };
 
-  Module.Manifold.prototype.smoothByNormals = function(normalIdx = 0) {
-    return this._SmoothByNormals(normalIdx);
+  Module.Manifold.prototype.smoothByNormals = function() {
+    return this._SmoothByNormals();
   };
 
   Module.Manifold.prototype.setProperties = function(numProp, func) {
@@ -473,8 +472,8 @@ Module.setup = function() {
 
   Module.Mesh = Mesh;
 
-  Module.Manifold.prototype.getMesh = function(normalIdx = -1) {
-    return new Mesh(this._GetMeshJS(normalIdx));
+  Module.Manifold.prototype.getMesh = function() {
+    return new Mesh(this._GetMeshJS());
   };
 
   Module.ManifoldError = function ManifoldError(code, ...args) {
