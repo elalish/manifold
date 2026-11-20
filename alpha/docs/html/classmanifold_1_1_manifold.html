@@ -267,8 +267,8 @@ I/O</h2></td></tr>
 <div class="line">  }</div>
 <div class="line">  ifile.close();</div>
 <div class="line">}</div>
-<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:338</div></div>
-<div class="ttc" id="aclassmanifold_1_1_manifold_html_ad5f60691d05e3402630122740cdf3a0b"><div class="ttname"><a href="#ad5f60691d05e3402630122740cdf3a0b">manifold::Manifold::Manifold</a></div><div class="ttdeci">Manifold()</div><div class="ttdef"><b>Definition</b> manifold.cpp:154</div></div>
+<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:346</div></div>
+<div class="ttc" id="aclassmanifold_1_1_manifold_html_ad5f60691d05e3402630122740cdf3a0b"><div class="ttname"><a href="#ad5f60691d05e3402630122740cdf3a0b">manifold::Manifold::Manifold</a></div><div class="ttdeci">Manifold()</div><div class="ttdef"><b>Definition</b> manifold.cpp:162</div></div>
 </div><!-- fragment --><p>Writing: </p><div class="fragment"><div class="line">std::ofstream ofile;</div>
 <div class="line">ofile.open(filename);</div>
 <div class="line"><span class="keywordflow">if</span> (ofile.is_open()) {</div>
@@ -1841,7 +1841,7 @@ Testing Hooks</h2></td></tr>
 <p>Increase the density of the mesh by splitting each edge into pieces of roughly the input length. Interior verts are added to keep the rest of the triangulation edges also of roughly the same length. If halfedgeTangents are present (e.g. from the Smooth() constructor), the new vertices will be moved to the interpolated surface according to their barycentric coordinates. Quads will ignore their interior triangle bisector. Any normals recording set by <span class="tt"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals()</a></span> is preserved; the new verts get linearly-interpolated normals, which are less precise than recomputed ones but still meaningful.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">length</td><td>The length that edges will be broken down to. </td></tr>
+    <tr><td class="paramname">length</td><td>The length that edges will be broken down to. Its sign is ignored, and zero or NaN is an error. </td></tr>
   </table>
   </dd>
 </dl>
@@ -1865,7 +1865,7 @@ Testing Hooks</h2></td></tr>
 <p>Increase the density of the mesh by splitting each edge into pieces such that any point on the resulting triangles is roughly within tolerance of the smoothly curved surface defined by the tangent vectors. This means tightly curving regions will be divided more finely than smoother regions. If halfedgeTangents are not present, the result will simply be a copy of the original. Quads will ignore their interior triangle bisector. Any normals recording set by <span class="tt"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals()</a></span> is preserved; the new verts get linearly-interpolated normals.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">tolerance</td><td>The desired maximum distance between the faceted mesh produced and the exact smoothly curving surface. All vertices are exactly on the surface, within rounding error. </td></tr>
+    <tr><td class="paramname">tolerance</td><td>The desired maximum distance between the faceted mesh produced and the exact smoothly curving surface. All vertices are exactly on the surface, within rounding error. Its sign is ignored, and zero or NaN is an error. </td></tr>
   </table>
   </dd>
 </dl>
