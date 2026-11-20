@@ -113,7 +113,8 @@ TEST(SDF, ThinBoundsKeepFiniteGridSpacing) {
 TEST(SDF, DegenerateBoundsSampleFiniteCoordinates) {
   for (const vec3 size :
        {vec3(0, 2, 2), vec3(2, 0, 2), vec3(2, 2, 0), vec3(0.0)}) {
-    SCOPED_TRACE(size);
+    SCOPED_TRACE(::testing::Message() << "size=(" << size.x << "," << size.y
+                                      << "," << size.z << ")");
     bool finite = true;
     const Manifold empty = Manifold::LevelSet(
         [&](vec3 p) {
