@@ -57,19 +57,19 @@ TEST(CBIND, meshgl_options) {
   const float tangents[48] = {};
 
   ManifoldMeshGLOptions options = manifold_meshgl_options_init();
-  options.run_indices = const_cast<uint32_t*>(runIndices);
+  options.run_indices = runIndices;
   options.run_indices_length = 5;
-  options.run_original_ids = const_cast<uint32_t*>(runOriginalIDs);
+  options.run_original_ids = runOriginalIDs;
   options.run_original_ids_length = 2;
-  options.merge_from_vert = const_cast<uint32_t*>(mergeFrom);
-  options.merge_to_vert = const_cast<uint32_t*>(mergeTo);
+  options.merge_from_vert = mergeFrom;
+  options.merge_to_vert = mergeTo;
   options.merge_verts_length = 3;
-  options.halfedge_tangents = const_cast<float*>(tangents);
-  options.run_transform = const_cast<float*>(runTransform);
+  options.halfedge_tangents = tangents;
+  options.run_transform = runTransform;
   options.run_transform_length = 24;
-  options.run_flags = const_cast<uint8_t*>(runFlags);
+  options.run_flags = runFlags;
   options.run_flags_length = 4;
-  options.face_id = const_cast<uint32_t*>(faceIDs);
+  options.face_id = faceIDs;
 
   ManifoldMeshGL* mesh =
       manifold_meshgl_w_options(vertProps, 4, 6, triVerts, 4, &options);
@@ -127,24 +127,18 @@ TEST(CBIND, meshgl_options_run_flags_rotate_normals) {
   const size_t numTri = manifold_meshgl_num_tri(source);
 
   ManifoldMeshGLOptions options = manifold_meshgl_options_init();
-  options.run_indices =
-      const_cast<uint32_t*>(manifold_meshgl_run_index(source));
+  options.run_indices = manifold_meshgl_run_index(source);
   options.run_indices_length = manifold_meshgl_run_index_length(source);
-  options.run_original_ids =
-      const_cast<uint32_t*>(manifold_meshgl_run_original_id(source));
+  options.run_original_ids = manifold_meshgl_run_original_id(source);
   options.run_original_ids_length =
       manifold_meshgl_run_original_id_length(source);
-  options.merge_from_vert =
-      const_cast<uint32_t*>(manifold_meshgl_merge_from_vert(source));
-  options.merge_to_vert =
-      const_cast<uint32_t*>(manifold_meshgl_merge_to_vert(source));
+  options.merge_from_vert = manifold_meshgl_merge_from_vert(source);
+  options.merge_to_vert = manifold_meshgl_merge_to_vert(source);
   options.merge_verts_length = manifold_meshgl_merge_length(source);
-  options.halfedge_tangents =
-      const_cast<float*>(manifold_meshgl_halfedge_tangent(source));
-  options.run_transform =
-      const_cast<float*>(manifold_meshgl_run_transform(source));
+  options.halfedge_tangents = manifold_meshgl_halfedge_tangent(source);
+  options.run_transform = manifold_meshgl_run_transform(source);
   options.run_transform_length = manifold_meshgl_run_transform_length(source);
-  options.run_flags = const_cast<uint8_t*>(manifold_meshgl_run_flags(source));
+  options.run_flags = manifold_meshgl_run_flags(source);
   options.run_flags_length = manifold_meshgl_run_flags_length(source);
   ManifoldMeshGL* flagged = manifold_meshgl_w_options(
       manifold_meshgl_vert_properties(source), numVert, numProp,
@@ -219,19 +213,19 @@ TEST(CBIND, meshgl64_options) {
   const double tangents[48] = {};
 
   ManifoldMeshGL64Options options = manifold_meshgl64_options_init();
-  options.run_indices = const_cast<uint64_t*>(runIndices);
+  options.run_indices = runIndices;
   options.run_indices_length = 5;
-  options.run_original_ids = const_cast<uint32_t*>(runOriginalIDs);
+  options.run_original_ids = runOriginalIDs;
   options.run_original_ids_length = 2;
-  options.merge_from_vert = const_cast<uint64_t*>(mergeFrom);
-  options.merge_to_vert = const_cast<uint64_t*>(mergeTo);
+  options.merge_from_vert = mergeFrom;
+  options.merge_to_vert = mergeTo;
   options.merge_verts_length = 3;
-  options.halfedge_tangents = const_cast<double*>(tangents);
-  options.run_transform = const_cast<double*>(runTransform);
+  options.halfedge_tangents = tangents;
+  options.run_transform = runTransform;
   options.run_transform_length = 24;
-  options.run_flags = const_cast<uint8_t*>(runFlags);
+  options.run_flags = runFlags;
   options.run_flags_length = 4;
-  options.face_id = const_cast<uint64_t*>(faceIDs);
+  options.face_id = faceIDs;
 
   ManifoldMeshGL64* mesh =
       manifold_meshgl64_w_options(vertProps, 4, 6, triVerts, 4, &options);
