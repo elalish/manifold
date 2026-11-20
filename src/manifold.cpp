@@ -398,11 +398,11 @@ double Manifold::GetEpsilon() const {
 }
 
 /**
- * Return a copy of the manifold simplified to the given tolerance, but with its
- * actual tolerance value unchanged. If the tolerance is not given or is less
- * than the current tolerance, the current tolerance is used for simplification.
- * The result will contain a subset of the original verts and all surfaces will
- * have moved by less than tolerance.
+ * Return a simplified copy of the manifold. The tolerance controls the local
+ * error when collapsing edges, measured relative to nearby face planes.
+ * Simplification tends to remove features thinner than the tolerance.
+ * @param tolerance Simplification tolerance, lower-bounded by the manifold's
+ * epsilon.
  */
 Manifold Manifold::Simplify(double tolerance) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
