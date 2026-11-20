@@ -288,6 +288,11 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   double radius = 0;
   for (const SimplePolygon& poly : crossSection) {
     if (poly.size() < 3) continue;
+    // Check before clipping so invalid coordinates cannot be discarded
+    // silently.
+    for (const vec2& v : poly) {
+      if (!la::all(la::isfinite(v))) return Invalid();
+    }
     size_t i = 0;
     while (i < poly.size() && poly[i].x < 0) {
       ++i;
