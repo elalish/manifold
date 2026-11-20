@@ -398,11 +398,11 @@ double Manifold::GetEpsilon() const {
 }
 
 /**
- * Return a copy of the manifold simplified to the given tolerance, but with its
- * actual tolerance value unchanged. If the tolerance is not given or is less
- * than the current tolerance, the current tolerance is used for simplification.
- * The result will contain a subset of the original verts and all surfaces will
- * have moved by less than tolerance.
+ * Return a simplified copy of the manifold. The tolerance controls the local
+ * error when collapsing edges, measured relative to nearby face planes.
+ * Simplification tends to remove features thinner than the tolerance.
+ * @param tolerance Simplification tolerance, lower-bounded by the manifold's
+ * epsilon.
  */
 Manifold Manifold::Simplify(double tolerance) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
@@ -1166,11 +1166,23 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
  * @param searchLength The maximum distance to search for a minimum gap.
  */
 double Manifold::MinGap(const Manifold& other, double searchLength) const {
+  const auto impl = GetCsgLeafNode().GetImpl();
+  const auto otherImpl = other.GetCsgLeafNode().GetImpl();
+  // The mesh bounds give a lower bound on the gap. If they are already beyond
+  // a positive search limit, even the solid intersection check is unnecessary.
+  const vec3 gap =
+      la::max(vec3(0.0), la::max(impl->bBox_.min - otherImpl->bBox_.max,
+                                 otherImpl->bBox_.min - impl->bBox_.max));
+  const double gapSquared = la::length2(gap);
+  if (searchLength > 0 && gapSquared > 0 &&
+      gapSquared >= searchLength * searchLength) {
+    return searchLength;
+  }
+
   auto intersect = *this ^ other;
   if (!intersect.IsEmpty()) return 0.0;
 
-  return GetCsgLeafNode().GetImpl()->MinGap(*other.GetCsgLeafNode().GetImpl(),
-                                            searchLength);
+  return impl->MinGap(*otherImpl, searchLength);
 }
 
 /**
