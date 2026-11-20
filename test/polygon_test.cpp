@@ -208,6 +208,41 @@ TEST(Triangulation, LargeSmoothContour) {
   EXPECT_EQ(triangles.size(), numVert - 2);
 }
 
+// The triangulator must not build fans on smooth contours. Each clipped ear
+// adds a triangle at the fan's center vertex, the fan's edges reach across the
+// polygon, and its long sliver triangles slow both the ear search and later
+// booleans.
+TEST(Triangulation, NoFansOnSmoothContour) {
+  // With sharpest-ear-first ordering, the max vertex degree reached about
+  // numVert / 3.5 and the interior edge length about numVert / 5 perimeters.
+  // With shortest-ear-first ordering, both stay 1.3-2x below the limits
+  // checked here.
+  for (const int numVert : {1000, 20000}) {
+    const Polygons polys = SmoothBlob(numVert);
+    const std::vector<ivec3> triangles = Triangulate(polys);
+    ASSERT_EQ(triangles.size(), numVert - 2);
+    const SimplePolygon& poly = polys[0];
+    std::vector<int> degree(numVert, 0);
+    double edgeLength = 0;
+    for (const ivec3& tri : triangles) {
+      for (int i : {0, 1, 2}) {
+        ++degree[tri[i]];
+        edgeLength += la::length(poly[tri[i]] - poly[tri[(i + 1) % 3]]);
+      }
+    }
+    double perimeter = 0;
+    for (int i = 0; i < numVert; ++i) {
+      perimeter += la::length(poly[i] - poly[(i + 1) % numVert]);
+    }
+    // Boundary edges appear in one triangle, interior edges in two.
+    const double interiorLength = (edgeLength - perimeter) / 2;
+    EXPECT_LE(*std::max_element(degree.begin(), degree.end()), numVert / 25)
+        << numVert << " verts";
+    EXPECT_LE(interiorLength / perimeter, numVert / 40.0)
+        << numVert << " verts";
+  }
+}
+
 #ifndef MANIFOLD_NO_IOSTREAM
 void RegisterPolygonTests() {
   std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",

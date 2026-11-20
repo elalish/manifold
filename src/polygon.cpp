@@ -490,35 +490,37 @@ class EarClip {
       return std::min(cost, openCost);
     }
 
-    // For verts outside the ear, apply a cost based on the Delaunay condition
-    // to aid in prioritization and produce cleaner triangulations. This doesn't
-    // affect robustness, but may be adjusted to improve output.
-    static double DelaunayCost(vec2 diff, double scale, double epsilon) {
-      return -epsilon - scale * la::dot(diff, diff);
-    }
-
     // This is the expensive part of the algorithm, checking this ear against
     // every Vert to ensure none are inside. The Collider brings the total
     // triangulator cost down from O(n^2) to O(nlogn) for most large polygons.
     //
     // Think of a cost as vaguely a distance metric - 0 is right on the edge of
     // being invalid. cost > epsilon is definitely invalid. Cost < -epsilon
-    // is definitely valid, so all improvement costs are designed to always give
-    // values < -epsilon so they will never affect validity. The first
-    // totalCost is designed to give priority to sharper angles. Any cost < (-1
-    // - epsilon) has satisfied the Delaunay condition.
-    double EarCost(double epsilon, IdxCollider& collider) const {
+    // is definitely valid, so every priority cost stays below -epsilon and
+    // never changes which ears are valid.
+    //
+    // EarClip ranks collinear ears by sharpness, so it clips folded ears,
+    // which double back, first, with costs near -2 - epsilon. It ranks other
+    // valid ears by the length of their open side, shortest first, with costs
+    // in (-2 - epsilon, -1.5 - epsilon] for open sides up to scale, the
+    // bounding box diagonal.
+    //
+    // Short ears add short edges, which keeps the search below fast, since its
+    // box spans the open side, and keeps triangle bounding boxes small for
+    // later booleans. Sharpness doesn't serve as the ranking: on a smooth
+    // contour the sharpest ears are also the longest.
+    double EarCost(double epsilon, double scale, IdxCollider& collider) const {
       vec2 openSide = left->pos - right->pos;
       const vec2 center = 0.5 * (left->pos + right->pos);
-      const double scale = 4 / la::dot(openSide, openSide);
-      const double radius = la::length(openSide) / 2;
+      const double openLength = la::length(openSide);
+      const double radius = openLength / 2;
       openSide = la::normalize(openSide);
 
-      double totalCost = la::dot(left->rightDir, rightDir) - 1 - epsilon;
       if (CCW(pos, left->pos, right->pos, epsilon) == 0) {
         // Clip folded ears first
-        return totalCost;
+        return la::dot(left->rightDir, rightDir) - 1 - epsilon;
       }
+      double totalCost = -1 - epsilon - scale / (scale + openLength);
 
       Rect earBox = Rect(vec2(center.x - radius, center.y - radius),
                          vec2(center.x + radius, center.y + radius));
@@ -533,11 +535,8 @@ class EarClip {
         if (!Clipped(test) && test->mesh_idx != mesh_idx &&
             test->mesh_idx != lid &&
             test->mesh_idx != rid) {  // Skip duplicated verts
-          double cost = Cost(test, openSide, epsilon);
-          if (cost < -epsilon) {
-            cost = DelaunayCost(test->pos - center, scale, epsilon);
-          }
-          if (cost > totalCost) totalCost = cost;
+          const double cost = Cost(test, openSide, epsilon);
+          if (cost >= -epsilon && cost > totalCost) totalCost = cost;
         }
       });
       return totalCost;
@@ -857,7 +856,7 @@ class EarClip {
       v->cost = kBest;
       v->ear = earsQueue_.insert(v);
     } else if (v->IsConvex(2 * epsilon_)) {
-      v->cost = v->EarCost(epsilon_, collider);
+      v->cost = v->EarCost(epsilon_, la::length(bBox_.Size()), collider);
       v->ear = earsQueue_.insert(v);
     } else {
       v->cost = 1;  // not used, but marks reflex verts for debug
