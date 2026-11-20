@@ -725,10 +725,17 @@ CrossSection CrossSection::Hull(const SimplePolygon& pts) {
  * compute a convex hull.
  */
 CrossSection CrossSection::Hull(const Polygons& polys) {
+  size_t numPoints = 0;
+  for (const auto& path : polys) numPoints += path.size();
+
   SimplePolygon points;
+  points.reserve(numPoints);
   for (const auto& path : polys)
-    for (const vec2& point : path) points.push_back(point);
-  return Hull(points);
+    points.insert(points.end(), path.begin(), path.end());
+
+  SimplePolygon hull = HullImpl(points);
+  if (hull.size() < 3) return CrossSection();
+  return CrossSection(shared_path(std::move(hull)));
 }
 
 /**
