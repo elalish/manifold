@@ -438,11 +438,15 @@ Polygons Manifold::Impl::Project() const {
   Vec<Halfedge> cusps;
   // Vec::push_back starts at 128 elements; reserve less for smaller meshes.
   cusps.reserve(std::min(NumEdge(), size_t{128}));
-  for (size_t i = 0; i < halfedge_.size(); ++i) {
-    const int pair = halfedge_.Pair(i);
-    if (faceNormal_[halfedge_.Pair(pair) / 3].z >= 0 &&
-        faceNormal_[pair / 3].z < 0) {
-      cusps.push_back(halfedge_.Get(i));
+  for (size_t tri = 0; tri < NumTri(); ++tri) {
+    // Only front-facing triangles can contribute silhouette edges.
+    if (faceNormal_[tri].z >= 0) {
+      for (int local = 0; local < 3; ++local) {
+        const size_t edge = 3 * tri + local;
+        if (faceNormal_[halfedge_.Pair(edge) / 3].z < 0) {
+          cusps.push_back(halfedge_.Get(edge));
+        }
+      }
     }
   }
   PolygonsIdx polysIndexed =
