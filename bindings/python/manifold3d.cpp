@@ -499,27 +499,27 @@ NB_MODULE(manifold3d, m) {
 
   nb::class_<MeshGL>(m, "Mesh")
       .def(
-          // note that reshape requires mutable ndarray, but this will not
-          // affect the original array passed into the function
           "__init__",
           [](MeshGL* self,
-             nb::ndarray<float, nb::shape<-1, -1>, nb::c_contig>& vertProp,
-             nb::ndarray<uint32_t, nb::shape<-1, 3>, nb::c_contig>& triVerts,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<-1>,
+             nb::ndarray<const float, nb::shape<-1, -1>, nb::c_contig>&
+                 vertProp,
+             nb::ndarray<const uint32_t, nb::shape<-1, 3>, nb::c_contig>&
+                 triVerts,
+             const std::optional<nb::ndarray<const uint32_t, nb::shape<-1>,
                                              nb::c_contig>>& mergeFromVert,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<-1>,
+             const std::optional<nb::ndarray<const uint32_t, nb::shape<-1>,
                                              nb::c_contig>>& mergeToVert,
-             const std::optional<
-                 nb::ndarray<uint32_t, nb::shape<-1>, nb::c_contig>>& runIndex,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<-1>,
+             const std::optional<nb::ndarray<const uint32_t, nb::shape<-1>,
+                                             nb::c_contig>>& runIndex,
+             const std::optional<nb::ndarray<const uint32_t, nb::shape<-1>,
                                              nb::c_contig>>& runOriginalID,
-             std::optional<nb::ndarray<float, nb::shape<-1, 4, 3>,
+             std::optional<nb::ndarray<const float, nb::shape<-1, 4, 3>,
                                        nb::c_contig>>& runTransform,
-             const std::optional<
-                 nb::ndarray<uint8_t, nb::shape<-1>, nb::c_contig>>& runFlags,
-             const std::optional<
-                 nb::ndarray<uint32_t, nb::shape<-1>, nb::c_contig>>& faceID,
-             const std::optional<nb::ndarray<float, nb::shape<-1, 3, 4>,
+             const std::optional<nb::ndarray<const uint8_t, nb::shape<-1>,
+                                             nb::c_contig>>& runFlags,
+             const std::optional<nb::ndarray<const uint32_t, nb::shape<-1>,
+                                             nb::c_contig>>& faceID,
+             const std::optional<nb::ndarray<const float, nb::shape<-1, 3, 4>,
                                              nb::c_contig>>& halfedgeTangent) {
             if (vertProp.shape(1) < 3)
               throw std::runtime_error(
@@ -616,27 +616,27 @@ NB_MODULE(manifold3d, m) {
 
   nb::class_<MeshGL64>(m, "Mesh64")
       .def(
-          // note that reshape requires mutable ndarray, but this will not
-          // affect the original array passed into the function
           "__init__",
           [](MeshGL64* self,
-             nb::ndarray<double, nb::shape<-1, -1>, nb::c_contig>& vertProp,
-             nb::ndarray<uint64_t, nb::shape<-1, 3>, nb::c_contig>& triVerts,
-             const std::optional<nb::ndarray<uint64_t, nb::shape<-1>,
+             nb::ndarray<const double, nb::shape<-1, -1>, nb::c_contig>&
+                 vertProp,
+             nb::ndarray<const uint64_t, nb::shape<-1, 3>, nb::c_contig>&
+                 triVerts,
+             const std::optional<nb::ndarray<const uint64_t, nb::shape<-1>,
                                              nb::c_contig>>& mergeFromVert,
-             const std::optional<nb::ndarray<uint64_t, nb::shape<-1>,
+             const std::optional<nb::ndarray<const uint64_t, nb::shape<-1>,
                                              nb::c_contig>>& mergeToVert,
-             const std::optional<
-                 nb::ndarray<uint64_t, nb::shape<-1>, nb::c_contig>>& runIndex,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<-1>,
+             const std::optional<nb::ndarray<const uint64_t, nb::shape<-1>,
+                                             nb::c_contig>>& runIndex,
+             const std::optional<nb::ndarray<const uint32_t, nb::shape<-1>,
                                              nb::c_contig>>& runOriginalID,
-             std::optional<nb::ndarray<double, nb::shape<-1, 4, 3>,
+             std::optional<nb::ndarray<const double, nb::shape<-1, 4, 3>,
                                        nb::c_contig>>& runTransform,
-             const std::optional<
-                 nb::ndarray<uint8_t, nb::shape<-1>, nb::c_contig>>& runFlags,
-             const std::optional<
-                 nb::ndarray<uint64_t, nb::shape<-1>, nb::c_contig>>& faceID,
-             const std::optional<nb::ndarray<double, nb::shape<-1, 3, 4>,
+             const std::optional<nb::ndarray<const uint8_t, nb::shape<-1>,
+                                             nb::c_contig>>& runFlags,
+             const std::optional<nb::ndarray<const uint64_t, nb::shape<-1>,
+                                             nb::c_contig>>& faceID,
+             const std::optional<nb::ndarray<const double, nb::shape<-1, 3, 4>,
                                              nb::c_contig>>& halfedgeTangent) {
             if (vertProp.shape(1) < 3)
               throw std::runtime_error(
