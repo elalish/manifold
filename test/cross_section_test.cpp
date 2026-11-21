@@ -3150,6 +3150,57 @@ TEST(CrossSection, BatchBoolean) {
   EXPECT_FLOAT_EQ(subtract.NumVert(), 42);
 }
 
+TEST(CrossSection, BatchIntersectionEmptyOperands) {
+  const auto circle = CrossSection::Circle(10, 256);
+  for (int emptyAt : {0, 1, 4, 7}) {
+    std::vector<CrossSection> sections(8, circle);
+    sections[emptyAt] = CrossSection();
+    std::vector<Polygons> originals;
+    for (const auto& section : sections)
+      originals.push_back(section.ToPolygons());
+
+    const auto result = CrossSection::BatchBoolean(sections, OpType::Intersect);
+    EXPECT_TRUE(result.IsEmpty());
+    EXPECT_EQ(result.NumContour(), 0);
+    EXPECT_EQ(result.NumVert(), 0);
+    EXPECT_EQ(result.Area(), 0);
+    for (size_t i = 0; i < sections.size(); ++i)
+      EXPECT_EQ(sections[i].ToPolygons(), originals[i]);
+  }
+}
+
+TEST(CrossSection, BatchIntersectionDisjointPrefix) {
+  std::vector<CrossSection> sections = {
+      CrossSection::Square({1, 1}),
+      CrossSection::Square({1, 1}).Translate({2, 0})};
+  for (int i = 0; i < 30; ++i)
+    sections.push_back(CrossSection::Circle(10, 256));
+  const auto result = CrossSection::BatchBoolean(sections, OpType::Intersect);
+  EXPECT_TRUE(result.IsEmpty());
+  EXPECT_EQ(result.Area(), 0);
+  EXPECT_EQ(result.NumVert(), 0);
+}
+
+TEST(CrossSection, BatchIntersectionNonemptyAndOtherOperations) {
+  const std::vector<CrossSection> sections = {
+      CrossSection::Square({10, 10}),
+      CrossSection::Square({10, 10}).Translate({2, 0}),
+      CrossSection::Square({10, 10}).Translate({0, 3}),
+      CrossSection::Square({10, 10}).Translate({1, 1})};
+  const auto result = CrossSection::BatchBoolean(sections, OpType::Intersect);
+  EXPECT_EQ(result.Area(), 56);
+  EXPECT_EQ(result.NumVert(), 4);
+  EXPECT_EQ(result.NumContour(), 1);
+  EXPECT_EQ(result.Bounds().min, (vec2{2, 3}));
+  EXPECT_EQ(result.Bounds().max, (vec2{10, 10}));
+  EXPECT_EQ(CrossSection::BatchBoolean(sections, OpType::Add).Area(), 151);
+  EXPECT_EQ(CrossSection::BatchBoolean(sections, OpType::Subtract).Area(), 4);
+  EXPECT_TRUE(CrossSection::BatchBoolean({}, OpType::Intersect).IsEmpty());
+  EXPECT_EQ(
+      CrossSection::BatchBoolean({sections[0]}, OpType::Intersect).ToPolygons(),
+      sections[0].ToPolygons());
+}
+
 // A is a 37-vertex near-degenerate star (many zero-radius vertices); B is a
 // 5-vertex star translated ~5e-5 in x so its vertices land just inside A's eps
 // band. The intersection of A and B used to return area=0, leaking ~51290 of
