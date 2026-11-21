@@ -332,7 +332,7 @@ function writePrimitiveAttributes(
       throw new Error(attribute + ' is not a recognized attribute.');
 
     if (def.type == null) {
-      ++offset;
+      offset += def.components;
       return;
     }
 
