@@ -1846,6 +1846,30 @@ TEST(Manifold, MergeCollapsedEdgeParity) {
   EXPECT_EQ(merged.mergeToVert, (std::vector<uint32_t>{0, 0, 0}));
 }
 
+TEST(Manifold, MergeSingleCollapsedTriangle) {
+  const auto check = [](auto mesh) {
+    mesh.vertProperties = {0, 0, 0, 0, 0, 0, 1, 0, 0};
+    for (const bool premerged : {false, true}) {
+      if (premerged) {
+        mesh.triVerts = {0, 1, 2};
+        mesh.mergeFromVert = {1};
+        mesh.mergeToVert = {0};
+      } else {
+        mesh.triVerts = {0, 0, 2};
+      }
+      // The opposing edges cancel, leaving one self-edge and one open vertex.
+      // There is no other vertex to merge with, so keep the existing mapping.
+      const auto merged = mesh.Merge();
+      EXPECT_EQ(merged.vertProperties, mesh.vertProperties);
+      EXPECT_EQ(merged.triVerts, mesh.triVerts);
+      EXPECT_EQ(merged.mergeFromVert, mesh.mergeFromVert);
+      EXPECT_EQ(merged.mergeToVert, mesh.mergeToVert);
+    }
+  };
+  check(MeshGL());
+  check(MeshGL64());
+}
+
 TEST(Manifold, MergeEmpty) {
   MeshGL shape;
   shape.numProp = 7;
