@@ -156,8 +156,8 @@ MeshGL ImportMesh(const std::string& filename, bool forceCleanup) {
       else
         mesh_out.vertProperties.insert(
             mesh_out.vertProperties.end(),
-            {static_cast<float>(vert.z), static_cast<float>(vert.x),
-             static_cast<float>(vert.y)});
+            {static_cast<float>(vert.x), static_cast<float>(vert.y),
+             static_cast<float>(vert.z)});
     }
     for (size_t j = 0; j < mesh_i->mNumFaces; ++j) {
       const aiFace face = mesh_i->mFaces[j];
