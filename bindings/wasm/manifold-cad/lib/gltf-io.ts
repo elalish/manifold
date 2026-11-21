@@ -73,7 +73,7 @@ export const attributeDefs = {
 export type Attribute = keyof(typeof attributeDefs);
 
 export interface Properties {
-  material: GLTFTransform.Material;
+  material: GLTFTransform.Material|null;
   attributes: Attribute[];
 }
 
@@ -183,7 +183,7 @@ export function readMesh(
       triVertArray = [...triVertArray, ...indices.getArray()!];
       runIndexArray.push(triVertArray.length);
       runProperties.push({
-        material: primitive.getMaterial()!,
+        material: primitive.getMaterial(),
         attributes: attributesIn.filter(b => attributes.some(a => a == b))
       });
     }
@@ -213,7 +213,7 @@ export function readMesh(
 
       const attributesIn = primitive.listSemantics() as Attribute[];
       runProperties.push({
-        material: primitive.getMaterial()!,
+        material: primitive.getMaterial(),
         attributes: attributesIn.filter(b => attributes.some(a => a == b))
       });
     }
