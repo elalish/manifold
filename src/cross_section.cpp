@@ -410,7 +410,7 @@ CrossSection CrossSection::BatchBoolean(
 
   if (op == OpType::Intersect) {
     Polygons result = crossSections[0].GetPaths()->paths_;
-    for (size_t i = 1; i < crossSections.size(); ++i) {
+    for (size_t i = 1; i < crossSections.size() && !result.empty(); ++i) {
       const auto& clip = crossSections[i].GetPaths()->paths_;
       const double eps = InferEps(result, clip);
       result = Boolean2D(result, clip, OpType::Intersect, eps);
