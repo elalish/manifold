@@ -605,14 +605,15 @@ jobs:
     - uses: actions/checkout@v7
     - uses: DeterminateSystems/nix-installer-action@main
     - uses: DeterminateSystems/magic-nix-cache-action@main
-    # Downloads from the Nix cache, like the emscripten toolchain, have
-    # stalled for over 20 minutes. Fetch the build inputs on their own so a
-    # stalled download can be retried without retrying the build. The store
-    # keeps whatever was already fetched.
+    # One cache download has taken over 20 minutes. Fetch the build inputs
+    # on their own so that phase can be retried. Fully fetched store paths
+    # carry over to the next attempt, but an interrupted one starts over.
     - name: Fetch build inputs
       run: |
         for attempt in 1 2 3; do
-          timeout 6m nix develop '.?submodules=1#${{matrix.variant}}' --command true && exit 0
+          if timeout --kill-after=30s 6m nix develop '.?submodules=1#${{matrix.variant}}' --command true; then
+            exit 0
+          fi
           echo "Fetch attempt $attempt failed or stalled"
         done
         exit 1
