@@ -374,7 +374,7 @@ template&lt;typename Precision, typename I&gt; </div>
 </table>
 </div><div class="memdoc">
 <p>Returns true if the first three extra-property channels (slots 3, 4, 5) of this run carry world-frame vertex normals (set by <span class="tt">Manifold::CalculateNormals(0)</span> and round-tripped via <span class="tt"><a class="el" href="#a4bce13a5930d514634403ea7b105d370">runFlags</a></span> bit 1). Consumers should treat the slot as normals and skip re-applying <span class="tt"><a class="el" href="#a4a2f4e21de0e8026daf67353dfd3458b">runTransform</a></span> to it.</p>
-<p>hasNormals is per-run, so different runs may set it differently. Behavior is undefined when a single propVert is shared by triangles from runs that disagree - the slot has one interpretation, and a Transform rotates it for hasNormals=true and clobbers any hasNormals=false sharer. Standard <span class="tt">CalculateNormals</span> / Boolean / Compose outputs never produce that shape.</p>
+<p>hasNormals is per-run, so different runs may set it differently. Behavior is undefined when a single propVert is shared by triangles from runs that disagree - the slot has one interpretation, and a Transform rotates it for hasNormals=true and clobbers any hasNormals=false sharer. Standard <span class="tt">CalculateNormals</span> and Boolean outputs never produce that shape.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">run</td><td>The index of the triangle run (0 &lt;= run &lt; runFlags.size()). </td></tr>

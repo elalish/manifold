@@ -10,7 +10,6 @@ var group___core =
       [ "GetMeshGL", "classmanifold_1_1_manifold.html#a70f13b1aa67f6face29ade0b74777ee5", null ],
       [ "GetMeshGL64", "classmanifold_1_1_manifold.html#a5f9fe692814946154356ceed4dae46fa", null ],
       [ "Decompose", "classmanifold_1_1_manifold.html#a7f20b130779680156ce0d28d91e5d106", null ],
-      [ "Compose", "classmanifold_1_1_manifold.html#a96a1b20e25443713304db55196573e3d", null ],
       [ "Tetrahedron", "classmanifold_1_1_manifold.html#afbd42733f05fb87dec1b3dae9ff9f582", null ],
       [ "Cube", "classmanifold_1_1_manifold.html#ad5486e9d0cff020565c3c20c1f496ab9", null ],
       [ "Cylinder", "classmanifold_1_1_manifold.html#a879b867522c562c7166af539894a2815", null ],

@@ -152,7 +152,6 @@ Constructors</h2></td></tr>
 <tr><td class="ititle" colspan="2"><p>Topological ops, primitives, and SDF </p>
 </td></tr>
 <tr class="memitem:a7f20b130779680156ce0d28d91e5d106" id="r_a7f20b130779680156ce0d28d91e5d106"><td class="memItemLeft">std::vector&lt; <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> &gt;&#160;</td><td class="memItemRight"><a class="el" href="#a7f20b130779680156ce0d28d91e5d106">Decompose</a> () const</td></tr>
-<tr class="memitem:a96a1b20e25443713304db55196573e3d" id="r_a96a1b20e25443713304db55196573e3d"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a96a1b20e25443713304db55196573e3d">Compose</a> (const std::vector&lt; <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> &gt; &amp;)</td></tr>
 <tr class="memitem:afbd42733f05fb87dec1b3dae9ff9f582" id="r_afbd42733f05fb87dec1b3dae9ff9f582"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#afbd42733f05fb87dec1b3dae9ff9f582">Tetrahedron</a> ()</td></tr>
 <tr class="memitem:ad5486e9d0cff020565c3c20c1f496ab9" id="r_ad5486e9d0cff020565c3c20c1f496ab9"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#ad5486e9d0cff020565c3c20c1f496ab9">Cube</a> (vec3 size=vec3(1.0), bool center=false)</td></tr>
 <tr class="memitem:a879b867522c562c7166af539894a2815" id="r_a879b867522c562c7166af539894a2815"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a879b867522c562c7166af539894a2815">Cylinder</a> (double height, double radiusLow, double radiusHigh=-1.0, int circularSegments=0, bool center=false)</td></tr>
@@ -430,40 +429,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>This operation returns a vector of topologically disconnected Manifolds, keeping enclosed negative-volume shells with their enclosing positive-volume shell. If everything is connected, the vector is length one, containing a copy of the original. It is the inverse operation of <a class="el" href="#a96a1b20e25443713304db55196573e3d">Compose()</a>. </p>
-
-</div>
-</div>
-<a id="a96a1b20e25443713304db55196573e3d" name="a96a1b20e25443713304db55196573e3d"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a96a1b20e25443713304db55196573e3d">&#9670;&#160;</a></span>Compose()</h2>
-
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> Compose </td>
-          <td>(</td>
-          <td class="paramtype">const std::vector&lt; <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>manifolds</em></span></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-<p>Deprecated: Use BatchBoolean with OpType::Add instead.</p>
-<p>Constructs a new manifold from a vector of other manifolds. This is a purely topological operation, so care should be taken to avoid creating overlapping results. It is the inverse operation of <a class="el" href="#a7f20b130779680156ce0d28d91e5d106">Decompose()</a>.</p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">manifolds</td><td>A vector of Manifolds to lazy-union together. </td></tr>
-  </table>
-  </dd>
-</dl>
+<p>This operation returns a vector of topologically disconnected Manifolds, keeping enclosed negative-volume shells with their enclosing positive-volume shell. If everything is connected, the vector is length one, containing a copy of the original. </p>
 
 </div>
 </div>

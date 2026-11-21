@@ -5,6 +5,5 @@ var group___debug_structmanifold_1_1_execution_params =
     [ "verifyNoDegenerates", "group___debug.html#acb0dd3ed3ab0d2b6adac1c53ea811f99", null ],
     [ "processOverlaps", "group___debug.html#a7166fd3caef3744f7241075f21f76af3", null ],
     [ "suppressErrors", "group___debug.html#a48b673772893c29c426e98f8c84f0206", null ],
-    [ "cleanupTriangles", "group___debug.html#a85c1664e476e1da1b3d0973b3451857b", null ],
     [ "verbose", "group___debug.html#a0b2caeb4b6f130be43e5a2f0267dd453", null ]
 ];
