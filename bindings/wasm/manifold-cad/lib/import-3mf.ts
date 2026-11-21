@@ -39,9 +39,36 @@ export const importFormats = [{extension: '3mf', mimetype: 'model/3mf'}];
 export async function fromArrayBuffer(buffer: ArrayBuffer):
     Promise<GLTFTransform.Document> {
   const files = unzipSync(new Uint8Array(buffer));
-  const modelData = files['3D/3dmodel.model'];
+  let modelPath = '3D/3dmodel.model';
+  const relsData = files['_rels/.rels'];
+  if (relsData) {
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: '',
+      removeNSPrefix: true,
+    });
+    const rels = parser.parse(new TextDecoder().decode(relsData));
+    const startPart =
+        asArray<{Type?: string; Target?: string; TargetMode?: string;}>(
+            rels.Relationships?.Relationship)
+            .find(
+                rel => rel.Type ===
+                    'http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel');
+    if (startPart) {
+      if (!startPart.Target)
+        throw new Error('Invalid 3MF file: StartPart has no target');
+      const base = 'https://3mf.invalid/';
+      const target = new URL(startPart.Target, base);
+      if (startPart.TargetMode === 'External' ||
+          target.origin !== new URL(base).origin)
+        throw new Error('External 3MF model relationships are not supported');
+      modelPath = target.pathname.slice(1);
+      if (!files[modelPath]) modelPath = decodeURIComponent(modelPath);
+    }
+  }
+  const modelData = files[modelPath];
   if (!modelData) {
-    throw new Error('Invalid 3MF file: missing 3D/3dmodel.model');
+    throw new Error(`Invalid 3MF file: missing ${modelPath}`);
   }
   return parse3mfXml(new TextDecoder().decode(modelData));
 }
