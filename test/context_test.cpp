@@ -801,6 +801,163 @@ TEST(Context, ManifoldContextRefineDropsAttachmentFromResult) {
   EXPECT_EQ(other.impl_->totalBooleans.load(), kSentinel);
 }
 
+// True if `m` still carries `ctx`: Status() through an attached ctx resets
+// its counters, so a sentinel left in them is overwritten.
+static bool CarriesContext(const Manifold& m, ExecutionContext& ctx) {
+  constexpr int kSentinel = 97;
+  ctx.impl_->totalBooleans.store(kSentinel);
+  (void)m.Status();
+  return ctx.impl_->totalBooleans.load() != kSentinel;
+}
+
+// Every op that returns a new Manifold drops the attachment, whatever its
+// inputs, including compound assignment, which assigns a derived result.
+// Each case attaches a ctx, runs the op, and checks that no result still
+// observes it. The attached Manifold is used as either operand.
+TEST(Context, ManifoldContextEveryOpDropsAttachment) {
+  using Op = std::function<std::vector<Manifold>(const Manifold&)>;
+  const Manifold other = Manifold::Cube(vec3(1), true).Translate({5, 0, 0});
+  const Manifold empty;
+  const auto pair = [](std::pair<Manifold, Manifold> p) {
+    return std::vector{p.first, p.second};
+  };
+  const std::vector<std::pair<const char*, Op>> ops = {
+      {"Decompose", [](const Manifold& m) { return m.Decompose(); }},
+      {"AsOriginal",
+       [](const Manifold& m) { return std::vector{m.AsOriginal()}; }},
+      {"Translate",
+       [](const Manifold& m) { return std::vector{m.Translate(vec3(0.0))}; }},
+      {"Scale",
+       [](const Manifold& m) { return std::vector{m.Scale(vec3(1))}; }},
+      {"Rotate", [](const Manifold& m) { return std::vector{m.Rotate(0)}; }},
+      {"Mirror",
+       [](const Manifold& m) { return std::vector{m.Mirror({1, 0, 0})}; }},
+      {"MirrorZero",
+       [](const Manifold& m) { return std::vector{m.Mirror(vec3(0.0))}; }},
+      {"Transform",
+       [](const Manifold& m) {
+         return std::vector{m.Transform(la::identity)};
+       }},
+      {"Warp",
+       [](const Manifold& m) { return std::vector{m.Warp([](vec3&) {})}; }},
+      {"WarpBatch",
+       [](const Manifold& m) {
+         return std::vector{m.WarpBatch([](VecView<vec3>) {})};
+       }},
+      {"Simplify", [](const Manifold& m) { return std::vector{m.Simplify()}; }},
+      {"RemoveDegenerates",
+       [](const Manifold& m) { return std::vector{m.RemoveDegenerates()}; }},
+      {"Boolean",
+       [&](const Manifold& m) {
+         return std::vector{m.Boolean(other, OpType::Add)};
+       }},
+      {"BooleanOther",
+       [&](const Manifold& m) {
+         return std::vector{other.Boolean(m, OpType::Add)};
+       }},
+      {"AddEmpty", [&](const Manifold& m) { return std::vector{m + empty}; }},
+      {"EmptyAdd", [&](const Manifold& m) { return std::vector{empty + m}; }},
+      {"SubtractEmpty",
+       [&](const Manifold& m) { return std::vector{m - empty}; }},
+      {"IntersectEmpty",
+       [&](const Manifold& m) { return std::vector{m ^ empty}; }},
+      {"AddAssign",
+       [&](const Manifold& m) {
+         Manifold r = m;
+         r += other;
+         return std::vector{r};
+       }},
+      {"SubtractAssign",
+       [&](const Manifold& m) {
+         Manifold r = m;
+         r -= other;
+         return std::vector{r};
+       }},
+      {"IntersectAssign",
+       [&](const Manifold& m) {
+         Manifold r = m;
+         r ^= other;
+         return std::vector{r};
+       }},
+      {"BatchBooleanOne",
+       [](const Manifold& m) {
+         return std::vector{Manifold::BatchBoolean({m}, OpType::Add)};
+       }},
+      {"BatchBooleanSubtractOne",
+       [](const Manifold& m) {
+         return std::vector{Manifold::BatchBoolean({m}, OpType::Subtract)};
+       }},
+      {"BatchBooleanEmpty",
+       [&](const Manifold& m) {
+         return std::vector{Manifold::BatchBoolean({m, empty}, OpType::Add)};
+       }},
+      {"Split", [&](const Manifold& m) { return pair(m.Split(other)); }},
+      {"SplitEmpty", [&](const Manifold& m) { return pair(m.Split(empty)); }},
+      {"SplitByPlane",
+       [&](const Manifold& m) { return pair(m.SplitByPlane({1, 0, 0}, 0)); }},
+      {"SplitByPlaneAway",
+       [&](const Manifold& m) { return pair(m.SplitByPlane({1, 0, 0}, 100)); }},
+      {"TrimByPlaneAway",
+       [](const Manifold& m) {
+         return std::vector{m.TrimByPlane({1, 0, 0}, -100)};
+       }},
+      {"MinkowskiSumOther",
+       [&](const Manifold& m) { return std::vector{other.MinkowskiSum(m)}; }},
+      {"MinkowskiDifferenceOther",
+       [&](const Manifold& m) {
+         return std::vector{other.MinkowskiDifference(m)};
+       }},
+      {"SetProperties",
+       [](const Manifold& m) {
+         return std::vector{m.SetProperties(0, nullptr)};
+       }},
+      {"CalculateCurvature",
+       [](const Manifold& m) {
+         return std::vector{m.CalculateCurvature(-1, -1)};
+       }},
+      {"CalculateNormals",
+       [](const Manifold& m) { return std::vector{m.CalculateNormals()}; }},
+      {"Refine", [](const Manifold& m) { return std::vector{m.Refine(1)}; }},
+      {"RefineToLength",
+       [](const Manifold& m) { return std::vector{m.RefineToLength(100)}; }},
+      {"RefineToTolerance",
+       [](const Manifold& m) { return std::vector{m.RefineToTolerance(100)}; }},
+      {"SmoothByNormals",
+       [](const Manifold& m) { return std::vector{m.SmoothByNormals()}; }},
+      {"Hull", [](const Manifold& m) { return std::vector{m.Hull()}; }},
+      {"HullVector",
+       [](const Manifold& m) {
+         return std::vector{Manifold::Hull(std::vector{m})};
+       }},
+      {"MinkowskiSum",
+       [&](const Manifold& m) { return std::vector{m.MinkowskiSum(other)}; }},
+      {"MinkowskiDifference",
+       [&](const Manifold& m) {
+         return std::vector{m.MinkowskiDifference(other)};
+       }},
+  };
+
+  // An empty Manifold, an evaluated leaf, a lazy tree that is one piece, and
+  // a lazy tree of two disjoint pieces.
+  const auto makeSource = [](int kind) {
+    const Manifold cube = Manifold::Cube(vec3(1), true);
+    if (kind == 0) return Manifold();
+    if (kind == 1) return cube;
+    return cube + cube.Translate({kind == 2 ? 0.5 : 2.0, 0, 0});
+  };
+  for (int kind : {0, 1, 2, 3}) {
+    for (const auto& [name, op] : ops) {
+      SCOPED_TRACE(std::string(name) + " source " + std::to_string(kind));
+      ExecutionContext ctx;
+      for (const Manifold& result : op(makeSource(kind).WithContext(ctx))) {
+        EXPECT_FALSE(CarriesContext(result, ctx));
+      }
+      // The probe can detect an attachment.
+      EXPECT_TRUE(CarriesContext(makeSource(kind).WithContext(ctx), ctx));
+    }
+  }
+}
+
 // Eager Hull observes attached ctx -- a pre-cancelled ctx aborts the
 // post-pass that runs after QuickHull's buildMesh, returning a Cancelled
 // result rather than a finished hull.

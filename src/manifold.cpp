@@ -946,15 +946,15 @@ Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
  * Perform the given boolean operation on a list of Manifolds. In case of
  * Subtract, all Manifolds in the tail are differenced from the head. The
  * empty-input case returns a default-constructed Manifold; the
- * single-input case returns the input unchanged (a no-op identity, including
- * any attached ExecutionContext on that single input).
+ * single-input case returns the input unchanged, without any attached
+ * ExecutionContext.
  */
 Manifold Manifold::BatchBoolean(const std::vector<Manifold>& manifolds,
                                 OpType op) {
   if (manifolds.size() == 0)
     return Manifold();
   else if (manifolds.size() == 1)
-    return manifolds[0];
+    return Manifold(manifolds[0].LoadPNode());
   std::vector<std::shared_ptr<CsgNode>> children;
   children.reserve(manifolds.size());
   for (const auto& m : manifolds) children.push_back(m.LoadPNode());
