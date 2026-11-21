@@ -7,7 +7,7 @@ name: JAVA_BINDINGS
 on:
   push:
     pull_request:
-      branches: [ master, 'v*-release' ]
+      branches: [ master, 'v*-release',"java-bindings" ]
     tags:
       - '*'
 
