@@ -123,10 +123,12 @@ var NAVTREEINDEX0 =
 "classmanifold_1_1_quality.html":[1,0,2,5],
 "classmanifold_1_1_quality.html#a0b788f3338b1e3a4728dc61e3b00c583":[1,0,2,5,0],
 "classmanifold_1_1_quality.html#a0c2040a91412e38387568d9886dc0a0d":[1,0,2,5,1],
-"classmanifold_1_1_quality.html#a44e4d5610bee38664e43a437892aa0c0":[1,0,2,5,5],
+"classmanifold_1_1_quality.html#a3a9ac33d81933ba697c2950a55543b70":[1,0,2,5,5],
+"classmanifold_1_1_quality.html#a44e4d5610bee38664e43a437892aa0c0":[1,0,2,5,7],
 "classmanifold_1_1_quality.html#a6333f6c738389041fd0fe9ac6575dc3e":[1,0,2,5,3],
-"classmanifold_1_1_quality.html#a76616b17d51c30b88fabe3d66cdb2aa1":[1,0,2,5,4],
+"classmanifold_1_1_quality.html#a76616b17d51c30b88fabe3d66cdb2aa1":[1,0,2,5,6],
 "classmanifold_1_1_quality.html#a83bab95001e6106324ec1da89b916518":[1,0,2,5,2],
+"classmanifold_1_1_quality.html#aaa1a8e4bae899e60a3bbb7479d49ee07":[1,0,2,5,4],
 "classmanifold_1_1_vec_view.html":[2,0,1,13],
 "functions.html":[2,2,0],
 "functions_func.html":[2,2,1],
@@ -247,7 +249,5 @@ var NAVTREEINDEX0 =
 "group__vec__algebra.html#gae5dc172bd9041ee4ba8ad2ecc9b3772b":[1,0,1,1,1,0],
 "group__vec__algebra.html#gaee21f91e6491b605605877fb9c292f43":[1,0,1,1,1,15],
 "group__vec__algebra.html#gaf95c4ba484d6efe575e8fe8225f7203f":[1,0,1,1,1,6],
-"group__vec__algebra.html#gafa2e270a2bd944eef65542243670f65f":[1,0,1,1,1,9],
-"hierarchy.html":[2,1],
-"index.html":[]
+"group__vec__algebra.html#gafa2e270a2bd944eef65542243670f65f":[1,0,1,1,1,9]
 };

@@ -267,8 +267,8 @@ I/O</h2></td></tr>
 <div class="line">  }</div>
 <div class="line">  ifile.close();</div>
 <div class="line">}</div>
-<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:346</div></div>
-<div class="ttc" id="aclassmanifold_1_1_manifold_html_ad5f60691d05e3402630122740cdf3a0b"><div class="ttname"><a href="#ad5f60691d05e3402630122740cdf3a0b">manifold::Manifold::Manifold</a></div><div class="ttdeci">Manifold()</div><div class="ttdef"><b>Definition</b> manifold.cpp:162</div></div>
+<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:358</div></div>
+<div class="ttc" id="aclassmanifold_1_1_manifold_html_ad5f60691d05e3402630122740cdf3a0b"><div class="ttname"><a href="#ad5f60691d05e3402630122740cdf3a0b">manifold::Manifold::Manifold</a></div><div class="ttdeci">Manifold()</div><div class="ttdef"><b>Definition</b> manifold.cpp:174</div></div>
 </div><!-- fragment --><p>Writing: </p><div class="fragment"><div class="line">std::ofstream ofile;</div>
 <div class="line">ofile.open(filename);</div>
 <div class="line"><span class="keywordflow">if</span> (ofile.is_open()) {</div>
@@ -519,7 +519,7 @@ Testing Hooks</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
-<p>Constructs a unit cube (edge lengths all one), by default in the first octant, touching the origin. If any dimensions in size are negative, or if all are zero, an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> will be returned.</p>
+<p>Constructs a unit cube (edge lengths all one), by default in the first octant, touching the origin. If any dimensions in size are negative or non-finite, or if all are zero, an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with InvalidConstruction status will be returned.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">size</td><td>The X, Y, and Z dimensions of the box. </td></tr>
@@ -572,11 +572,12 @@ Testing Hooks</h2></td></tr>
 </table>
 </div><div class="memdoc">
 <p>A convenience constructor for the common case of extruding a circle. Can also form cones if both radii are specified.</p>
+<p>Non-finite dimensions return an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with InvalidConstruction status.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">height</td><td>Z-extent </td></tr>
-    <tr><td class="paramname">radiusLow</td><td>Radius of bottom circle. Must be non-negative. If zero, radiusHigh must be positive and a cone with apex at the bottom is created. </td></tr>
-    <tr><td class="paramname">radiusHigh</td><td>Radius of top circle. Can equal zero. Default is equal to radiusLow. </td></tr>
+    <tr><td class="paramname">height</td><td>Z-extent. Must be positive and finite. </td></tr>
+    <tr><td class="paramname">radiusLow</td><td>Radius of bottom circle. Must be non-negative and finite. If zero, radiusHigh must be positive and a cone with apex at the bottom is created. </td></tr>
+    <tr><td class="paramname">radiusHigh</td><td>Radius of top circle. Must be finite and can equal zero. Negative values, including the default, use radiusLow. </td></tr>
     <tr><td class="paramname">circularSegments</td><td>How many line segments to use around the circle. Default is calculated by the static Defaults. </td></tr>
     <tr><td class="paramname">center</td><td>Set to true to shift the center to the origin. Default is origin at the bottom. </td></tr>
   </table>
@@ -614,7 +615,7 @@ Testing Hooks</h2></td></tr>
 <p>Constructs a geodesic sphere of a given radius.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">radius</td><td>Radius of the sphere. Must be positive. </td></tr>
+    <tr><td class="paramname">radius</td><td>Radius of the sphere. Must be positive and finite; otherwise returns an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with InvalidConstruction status. </td></tr>
     <tr><td class="paramname">circularSegments</td><td>Number of segments along its diameter. This number will always be rounded up to the nearest factor of four, as this sphere is constructed by refining an octahedron. This means there are a circle of vertices on all three of the axis planes. Default is calculated by the static Defaults. </td></tr>
   </table>
   </dd>
@@ -673,7 +674,7 @@ Testing Hooks</h2></td></tr>
   <table class="params">
     <tr><td class="paramname">sdf</td><td>The signed-distance functor, containing this function signature: <span class="tt">double operator()(vec3 point)</span>, which returns the signed distance of a given point in R^3. Positive values are inside, negative outside. There is no requirement that the function be a true distance, or even continuous. </td></tr>
     <tr><td class="paramname">bounds</td><td>An axis-aligned box that defines the extent of the grid. </td></tr>
-    <tr><td class="paramname">edgeLength</td><td>Approximate maximum edge length of the triangles in the final result. This affects grid spacing, and hence has a strong effect on performance. </td></tr>
+    <tr><td class="paramname">edgeLength</td><td>Approximate maximum edge length of the triangles in the final result. This affects grid spacing, and hence has a strong effect on performance. Every positive-length axis has at least one grid interval, including when its extent is smaller than edgeLength. </td></tr>
     <tr><td class="paramname">level</td><td>Extract the surface at this value of your sdf; defaults to zero. You can inset your mesh by using a positive value, or outset it with a negative value. </td></tr>
     <tr><td class="paramname">tolerance</td><td>Ensure each vertex is within this distance of the true surface. Defaults to -1, which will return the interpolated crossing-point based on the two nearest grid points. Small positive values will require more sdf evaluations per output vertex. </td></tr>
     <tr><td class="paramname">canParallel</td><td>Parallel policies violate will crash language runtimes with runtime locks that expect to not be called back by unregistered threads. This allows bindings use LevelSet despite being compiled with MANIFOLD_PAR active. </td></tr>

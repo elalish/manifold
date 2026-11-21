@@ -290,7 +290,7 @@ Convex Hull</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Create a 2d cross-section from an axis-aligned rectangle (bounding box).</p>
+<p>Create a 2d cross-section from an axis-aligned rectangle (bounding box). Empty or non-finite bounds produce an empty <a class="el" href="classmanifold_1_1_cross_section.html" title="Two-dimensional cross sections guaranteed to be without self-intersections, or overlaps between polyg...">CrossSection</a>.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">rect</td><td>An axis-aligned rectangular bounding box. </td></tr>
@@ -493,7 +493,7 @@ Convex Hull</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
-<p>Constructs a square with the given XY dimensions. By default it is positioned in the first quadrant, touching the origin. If any dimensions in size are negative, or if all are zero, an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> will be returned.</p>
+<p>Constructs a square with the given XY dimensions. By default it is positioned in the first quadrant, touching the origin. If any dimensions in size are negative or non-finite, or if all are zero, an empty <a class="el" href="classmanifold_1_1_cross_section.html" title="Two-dimensional cross sections guaranteed to be without self-intersections, or overlaps between polyg...">CrossSection</a> will be returned.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">size</td><td>The X, and Y dimensions of the square. </td></tr>
@@ -533,7 +533,7 @@ Convex Hull</h2></td></tr>
 <p>Constructs a circle of a given radius.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">radius</td><td>Radius of the circle. Must be positive. </td></tr>
+    <tr><td class="paramname">radius</td><td>Radius of the circle. Must be positive and finite; otherwise returns an empty <a class="el" href="classmanifold_1_1_cross_section.html" title="Two-dimensional cross sections guaranteed to be without self-intersections, or overlaps between polyg...">CrossSection</a>. </td></tr>
     <tr><td class="paramname">circularSegments</td><td>Number of segments along its diameter. Default is calculated by the static <a class="el" href="classmanifold_1_1_quality.html" title="These static properties control how circular shapes are quantized by default on construction.">Quality</a> defaults according to the radius. </td></tr>
   </table>
   </dd>

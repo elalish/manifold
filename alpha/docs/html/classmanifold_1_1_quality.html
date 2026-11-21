@@ -103,6 +103,8 @@ Static Public Member Functions</h2></td></tr>
 <tr class="memitem:a6333f6c738389041fd0fe9ac6575dc3e" id="r_a6333f6c738389041fd0fe9ac6575dc3e"><td class="memItemLeft">static void&#160;</td><td class="memItemRight"><a class="el" href="#a6333f6c738389041fd0fe9ac6575dc3e">SetCircularSegments</a> (int number)</td></tr>
 <tr class="memitem:ad8d080345133353602c84c04ba69b1ba" id="r_ad8d080345133353602c84c04ba69b1ba"><td class="memItemLeft"><a id="ad8d080345133353602c84c04ba69b1ba" name="ad8d080345133353602c84c04ba69b1ba"></a>
 static double&#160;</td><td class="memItemRight"><b>GetRelativePrecision</b> ()</td></tr>
+<tr class="memitem:aaa1a8e4bae899e60a3bbb7479d49ee07" id="r_aaa1a8e4bae899e60a3bbb7479d49ee07"><td class="memItemLeft">static double&#160;</td><td class="memItemRight"><a class="el" href="#aaa1a8e4bae899e60a3bbb7479d49ee07">GetMinCircularAngle</a> ()</td></tr>
+<tr class="memitem:a3a9ac33d81933ba697c2950a55543b70" id="r_a3a9ac33d81933ba697c2950a55543b70"><td class="memItemLeft">static double&#160;</td><td class="memItemRight"><a class="el" href="#a3a9ac33d81933ba697c2950a55543b70">GetMinCircularEdgeLength</a> ()</td></tr>
 <tr class="memitem:a76616b17d51c30b88fabe3d66cdb2aa1" id="r_a76616b17d51c30b88fabe3d66cdb2aa1"><td class="memItemLeft">static int&#160;</td><td class="memItemRight"><a class="el" href="#a76616b17d51c30b88fabe3d66cdb2aa1">GetCircularSegments</a> (double radius)</td></tr>
 <tr class="memitem:a44e4d5610bee38664e43a437892aa0c0" id="r_a44e4d5610bee38664e43a437892aa0c0"><td class="memItemLeft">static void&#160;</td><td class="memItemRight"><a class="el" href="#a44e4d5610bee38664e43a437892aa0c0">ResetToDefaults</a> ()</td></tr>
 </table>
@@ -235,6 +237,58 @@ static double&#160;</td><td class="memItemRight"><b>GetRelativePrecision</b> ()<
   </table>
   </dd>
 </dl>
+
+</div>
+</div>
+<a id="aaa1a8e4bae899e60a3bbb7479d49ee07" name="aaa1a8e4bae899e60a3bbb7479d49ee07"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aaa1a8e4bae899e60a3bbb7479d49ee07">&#9670;&#160;</a></span>GetMinCircularAngle()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">double GetMinCircularAngle </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Returns the configured minimum angle in degrees between circular segments. This is the angle constraint, even when <a class="el" href="#a6333f6c738389041fd0fe9ac6575dc3e">SetCircularSegments()</a> overrides it. </p>
+
+</div>
+</div>
+<a id="a3a9ac33d81933ba697c2950a55543b70" name="a3a9ac33d81933ba697c2950a55543b70"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3a9ac33d81933ba697c2950a55543b70">&#9670;&#160;</a></span>GetMinCircularEdgeLength()</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">double GetMinCircularEdgeLength </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel static">static</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>Returns the configured minimum length of circular segments. This is the length constraint, even when <a class="el" href="#a6333f6c738389041fd0fe9ac6575dc3e">SetCircularSegments()</a> overrides it. </p>
 
 </div>
 </div>

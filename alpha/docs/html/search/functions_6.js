@@ -5,9 +5,11 @@ var searchData=
   ['getepsilon_2',['GetEpsilon',['../classmanifold_1_1_manifold.html#ad4952fe30496434f3e128a33f5e350ef',1,'manifold::Manifold']]],
   ['getmeshgl_3',['GetMeshGL',['../classmanifold_1_1_manifold.html#a70f13b1aa67f6face29ade0b74777ee5',1,'manifold::Manifold']]],
   ['getmeshgl64_4',['GetMeshGL64',['../classmanifold_1_1_manifold.html#a5f9fe692814946154356ceed4dae46fa',1,'manifold::Manifold']]],
-  ['getruntransform_5',['GetRunTransform',['../structmanifold_1_1_mesh_g_l_p.html#a8dbaecb7b8708b78a3605fc15ae5c372',1,'manifold::MeshGLP']]],
-  ['gettangent_6',['GetTangent',['../structmanifold_1_1_mesh_g_l_p.html#ab2842d78e1ce13e2e1228d91b1c9dcfb',1,'manifold::MeshGLP']]],
-  ['gettriverts_7',['GetTriVerts',['../structmanifold_1_1_mesh_g_l_p.html#a0d413b0c710e37a4e5a9fbaebe74b93f',1,'manifold::MeshGLP']]],
-  ['getvertpos_8',['GetVertPos',['../structmanifold_1_1_mesh_g_l_p.html#ad7bfcdc27db8d7486f016bf63052625d',1,'manifold::MeshGLP']]],
-  ['gyroidmodule_9',['GyroidModule',['../group___samples.html#ga5141b952c15a0aa27af95791a65455d2',1,'manifold']]]
+  ['getmincircularangle_5',['GetMinCircularAngle',['../classmanifold_1_1_quality.html#aaa1a8e4bae899e60a3bbb7479d49ee07',1,'manifold::Quality']]],
+  ['getmincircularedgelength_6',['GetMinCircularEdgeLength',['../classmanifold_1_1_quality.html#a3a9ac33d81933ba697c2950a55543b70',1,'manifold::Quality']]],
+  ['getruntransform_7',['GetRunTransform',['../structmanifold_1_1_mesh_g_l_p.html#a8dbaecb7b8708b78a3605fc15ae5c372',1,'manifold::MeshGLP']]],
+  ['gettangent_8',['GetTangent',['../structmanifold_1_1_mesh_g_l_p.html#ab2842d78e1ce13e2e1228d91b1c9dcfb',1,'manifold::MeshGLP']]],
+  ['gettriverts_9',['GetTriVerts',['../structmanifold_1_1_mesh_g_l_p.html#a0d413b0c710e37a4e5a9fbaebe74b93f',1,'manifold::MeshGLP']]],
+  ['getvertpos_10',['GetVertPos',['../structmanifold_1_1_mesh_g_l_p.html#ad7bfcdc27db8d7486f016bf63052625d',1,'manifold::MeshGLP']]],
+  ['gyroidmodule_11',['GyroidModule',['../group___samples.html#ga5141b952c15a0aa27af95791a65455d2',1,'manifold']]]
 ];
