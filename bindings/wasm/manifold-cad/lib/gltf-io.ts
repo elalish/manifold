@@ -155,7 +155,7 @@ export function readMesh(
   if (manifoldPrimitive != null) {
     const numVert = primitives[0].getAttribute('POSITION')!.getCount();
     const foundAttribute = attributes.map((a) => attributeDefs[a].type == null);
-    vertPropArray = new Array<number>(numProp * numVert);
+    vertPropArray = new Array<number>(numProp * numVert).fill(0);
 
     for (const primitive of primitives) {
       const indices = primitive.getIndices();
@@ -493,7 +493,8 @@ function writeProperties(
 function readPrimitive(
     primitive: GLTFTransform.Primitive, numProp: number,
     attributes: Attribute[]) {
-  const vertProperties: number[] = [];
+  const numVert = primitive.getAttribute('POSITION')!.getCount();
+  const vertProperties = new Array<number>(numVert * numProp).fill(0);
   let offset = 0;
   for (const attribute of attributes) {
     const size = attributeDefs[attribute].components;
