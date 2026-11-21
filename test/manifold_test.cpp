@@ -1052,6 +1052,34 @@ TEST(Manifold, DecomposeProps) {
   }
 }
 
+TEST(Manifold, DecomposeManyUnequalComponents) {
+  std::vector<Manifold> originals;
+  std::vector<MeshGL> input;
+  for (int i = 0; i < 24; ++i) {
+    const Manifold shape = i % 3 == 0   ? Manifold::Cube()
+                           : i % 3 == 1 ? Manifold::Tetrahedron()
+                                        : Manifold::Sphere(1, 12);
+    originals.push_back(
+        WithPositionColors(shape.Translate({5.0 * i, 0, 0}).AsOriginal()));
+    input.push_back(originals.back().GetMeshGL());
+  }
+  auto parts = Manifold::BatchBoolean(originals, OpType::Add).Decompose();
+  ASSERT_EQ(parts.size(), originals.size());
+  std::sort(parts.begin(), parts.end(),
+            [](const Manifold& a, const Manifold& b) {
+              return a.BoundingBox().min.x < b.BoundingBox().min.x;
+            });
+  for (size_t i = 0; i < parts.size(); ++i) {
+    SCOPED_TRACE(i);
+    ASSERT_EQ(parts[i].Status(), Manifold::Error::NoError);
+    EXPECT_EQ(parts[i].NumVert(), originals[i].NumVert());
+    EXPECT_EQ(parts[i].NumTri(), originals[i].NumTri());
+    EXPECT_EQ(parts[i].NumProp(), originals[i].NumProp());
+    EXPECT_NEAR(parts[i].Volume(), originals[i].Volume(), 1e-10);
+    RelatedGL(parts[i], input);
+  }
+}
+
 /**
  * These tests check the various manifold constructors.
  */
