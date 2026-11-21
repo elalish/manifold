@@ -118,6 +118,7 @@ int main(int argc, char** argv) {
   FrameMarkEnd(name);
 
   RegisterPolygonTests();
+  RegisterFilletTests();
   return RUN_ALL_TESTS();
 }
 

@@ -1,0 +1,3 @@
+file,case,segments,seed,transform,factor,kind,reason,sharp_turns,max_turn_degrees,input_area,raw_area,polygon
+sponge.txt,Sponge3,20,97,27,0.5,empty,sharp_angle,2,161.56505094503009,0.34557156896992425,0.32657197850494357,extras/fillet_benchmark/results/stress_674cb693_updated/deep/replays/Sponge3-s97-t27.txt
+sponge.txt,Sponge3,20,227,47,0.5,empty,sharp_angle,8,153.16310515161041,0.016774459556726611,0.01356705328399138,extras/fillet_benchmark/results/stress_674cb693_updated/deep/replays/Sponge3-s227-t47.txt

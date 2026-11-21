@@ -1,0 +1,13 @@
+UTC: 2026-11-10T08:43:48.271535+00:00
+Repository commit: 9b6ff7ef1a8cdf7d7b8818daacd0870bc1127bcf
+Source SHA256: 6b1db5c4f032bf50a99e56703a8ea2776b464a6f4b3c26189aa89261bcc80e7b  src/fillet2d.cpp
+Tracked changes:
+Clipper2 version: 2.0.1
+Clipper2 commit: 46f639177fe418f9689e8ddb74f08a870c71f5b4
+c++ (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0
+Linux-5.15.0-70-generic-x86_64-with-glibc2.35
+CPU: Intel Core i9-12900K, pinned CPU 0
+Release, -O3 -DNDEBUG, sequential backend, debug/assert disabled, floating point contraction off
+32 segments per circle, random seed 20261109, identical 969-case suite
+Benchmark: taskset -c 0 build/fillet-benchmark/fillet_benchmark "$PWD" extras/fillet_benchmark/results/9b6ff7ef/clipper_gt.csv --large --clipper-gt
+Diagnostics: taskset -c 0 build/fillet-benchmark/fillet_rejections "$PWD" extras/fillet_benchmark/results/9b6ff7ef/rejections.csv

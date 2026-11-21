@@ -1,0 +1,16 @@
+UTC: 2026-11-10T11:46:54.172329+00:00
+Baseline commit: 9b6ff7ef1a8cdf7d7b8818daacd0870bc1127bcf
+Final production diff:
+Compiler: c++ (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0
+CPU: Intel Core i9-12900K
+Affinity: 0,2,4,6,8,10,12,14 (eight physical P cores)
+TBB limits: 1,2,4,8
+Build: Release -O3 -DNDEBUG MANIFOLD_PAR=ON MANIFOLD_DEBUG=OFF
+Workload: two round offsets, segments=32
+Baseline and experiment performance: 6 cases, 5 timed repetitions per thread count after one profiled warmup
+Experimental full verification: 973 cases, 4 thread counts, every coordinate and contour order compared exactly
+before.csv: unchanged production offset code
+after.csv and verify.csv: experiment in contour_parallel.patch; production changes subsequently removed
+Test log (experiment): /tmp/offset-parallel-tests.log, 20 tests passed including determinism test
+Final production test log: /tmp/offset-parallel-restored-tests.log
+Preliminary overlapping runs were stopped; saved before.csv and after.csv were regenerated in isolated runs.

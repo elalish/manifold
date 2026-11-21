@@ -27,28 +27,31 @@
 namespace manifold {
 
 // One entry of the shared polygon test corpus: a test name, its expected
-// triangle count and epsilon, and the polygon set.
+// triangle count and epsilon, the polygon set, and its largest inscribed
+// circle radius.
 struct PolygonCorpusEntry {
   std::string name;
   int expectedNumTri;
   double epsilon;
   Polygons polys;
+  // Radius of the largest inscribed circle, used by the fillet tests.
+  double maxCircleRadius;
 };
 
 #ifndef MANIFOLD_NO_IOSTREAM
 // Read a polygon corpus file - per entry: name, expectedNumTri, epsilon,
-// numPolys, then each polygon's point count and its vertices. Returns empty if
-// the file cannot be opened.
+// numPolys, maxCircleRadius, then each polygon's point count and its vertices.
+// Returns empty if the file cannot be opened.
 inline std::vector<PolygonCorpusEntry> ReadPolygonCorpus(
     const std::string& path) {
   std::vector<PolygonCorpusEntry> corpus;
   std::ifstream f(path);
   if (!f.is_open()) return corpus;
   std::string name;
-  double epsilon, x, y;
+  double epsilon, maxCircleRadius, x, y;
   int expectedNumTri, numPolys, numPoints;
   while (f >> name) {
-    f >> expectedNumTri >> epsilon >> numPolys;
+    f >> expectedNumTri >> epsilon >> numPolys >> maxCircleRadius;
     Polygons polys;
     for (int i = 0; i < numPolys; ++i) {
       polys.emplace_back();
@@ -58,8 +61,8 @@ inline std::vector<PolygonCorpusEntry> ReadPolygonCorpus(
         polys.back().emplace_back(x, y);
       }
     }
-    corpus.push_back(
-        {std::move(name), expectedNumTri, epsilon, std::move(polys)});
+    corpus.push_back({std::move(name), expectedNumTri, epsilon,
+                      std::move(polys), maxCircleRadius});
   }
   return corpus;
 }

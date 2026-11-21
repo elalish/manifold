@@ -134,6 +134,8 @@ CMakeSettings.json
 
 # Benchmark stl files
 extras/ember_tests/testfiles/raw_meshes/*
+/build-bench/
+/build-rebase/
 
 #Eclipse project files
 /.project

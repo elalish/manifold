@@ -1,0 +1,1 @@
+PASS: 969 cases, 2907 results, sample counts, Clipper self-XOR, analytic rectangle area, matching normal/instrumented output counts and resolved areas, identical rejection classifications to baseline, unchanged production source.

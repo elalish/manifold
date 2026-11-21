@@ -1,0 +1,14 @@
+UTC: 2026-11-10T06:06:14.651534+00:00
+Repository commit: 6bd50c7f384a9349eb4d3e95ef38870ffe7c7f69
+Clipper2 version: 2.0.1
+Clipper2 commit: 46f639177fe418f9689e8ddb74f08a870c71f5b4
+c++ (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0
+Linux-5.15.0-70-generic-x86_64-with-glibc2.35
+CPU: Intel Core i9-12900K; pinned CPU 0
+Build: Release -O3 -DNDEBUG, MANIFOLD_PAR=OFF, MANIFOLD_DEBUG=OFF, MANIFOLD_ASSERT=OFF
+Manifold floating-point contraction: off
+Segments: 32
+Random seed: 20261109
+Input construction and geometric validation excluded from timing
+Command: taskset -c 0 build/fillet-benchmark/fillet_benchmark "$PWD" extras/fillet_benchmark/results/current.csv --large
+Clipper2 GT command: taskset -c 0 build/fillet-benchmark/fillet_benchmark "$PWD" extras/fillet_benchmark/results/clipper_gt.csv --large --clipper-gt

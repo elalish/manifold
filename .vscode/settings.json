@@ -135,6 +135,7 @@
     "-DCMAKE_CXX_FLAGS=''" //'-fsanitize=address,undefined'"
   ],
   "search.exclude": {
+    "**/Testing/Fillet/**": true,
     "**/third_party/*": true,
     "build*": true,
     "docs/*": true
@@ -154,6 +155,15 @@
     "Voxel",
     "voxels"
   ],
+  "files.watcherExclude": {
+    "**/Testing/Fillet/**": true,
+    ".git/objects/**": true,
+    ".git/subtree-cache/**": true,
+    ".hg/store/**": true,
+    "*/.git/objects/**": true,
+    "*/.git/subtree-cache/**": true,
+    "*/.hg/store/**": true
+  },
   "javascript.format.semicolons": "insert",
   "[python]": {
     "editor.defaultFormatter": "ms-python.black-formatter"
@@ -165,4 +175,9 @@
   ],
   "editor.defaultFormatter": "xaver.clang-format",
   "python-envs.defaultEnvManager": "ms-python.python:system",
+  "C_Cpp.files.exclude": {
+    "**/Testing/**": true,
+    "**/third_party/**": true,
+    "**/build*/**": true
+  }
 }

@@ -106,6 +106,8 @@ class CrossSection {
   CrossSection Simplify(double tolerance = 0) const;
   CrossSection Offset(double delta, JoinType jt = JoinType::Round,
                       double miter_limit = 2.0, int circularSegments = 0) const;
+  std::vector<CrossSection> Fillet(double radius,
+                                   int circularSegments = 0) const;
   ///@}
 
   /** @name Boolean

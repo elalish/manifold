@@ -1,0 +1,109 @@
+diff --git a/src/boolean2_offset.cpp b/src/boolean2_offset.cpp
+index 279bd46c..5392bc7f 100644
+--- a/src/boolean2_offset.cpp
++++ b/src/boolean2_offset.cpp
+@@ -19,6 +19,7 @@
+ 
+ #include "boolean2.h"
+ #include "manifold/optional_assert.h"
++#include "parallel.h"
+ #include "utils.h"
+ 
+ // Polygon offset backing `CrossSection::Offset`.
+@@ -268,10 +269,30 @@ Polygons Offset(const Polygons& in, double delta, JoinType jt,
+                      : Quality::GetCircularSegments(std::fabs(delta));
+   segments = std::min(std::max(segments, 3), kMaxRoundJoinSegments);
+   Polygons offsetRings;
+-  offsetRings.reserve(in.size());
+-  for (const auto& ring : in) {
+-    auto off = OffsetContour(ring, delta, jt, miterLimit, segments);
+-    if (off.size() >= 3) offsetRings.push_back(std::move(off));
++#if (MANIFOLD_PAR == 1)
++  // Each contour emits independently. Write to its original index so the
++  // subsequent fill sees exactly the same ring order as the sequential path.
++  // Schedule by vertex count: many tiny rings can still be substantial work.
++  constexpr size_t kParallelOffsetVertices = 1024;
++  size_t numVertices = 0;
++  for (const auto& ring : in) numVertices += ring.size();
++  if (in.size() > 1 && numVertices > kParallelOffsetVertices) {
++    offsetRings.resize(in.size());
++    for_each_n(ExecutionPolicy::Par, countAt(0), in.size(), [&](size_t i) {
++      offsetRings[i] = OffsetContour(in[i], delta, jt, miterLimit, segments);
++    });
++    offsetRings.erase(
++        std::remove_if(offsetRings.begin(), offsetRings.end(),
++                       [](const SimplePolygon& ring) { return ring.size() < 3; }),
++        offsetRings.end());
++  } else
++#endif
++  {
++    offsetRings.reserve(in.size());
++    for (const auto& ring : in) {
++      auto off = OffsetContour(ring, delta, jt, miterLimit, segments);
++      if (off.size() >= 3) offsetRings.push_back(std::move(off));
++    }
+   }
+   if (offsetRings.empty()) return {};
+   const double eps = InferEps(offsetRings, {});
+diff --git a/test/cross_section_test.cpp b/test/cross_section_test.cpp
+index 28905921..12c4773e 100644
+--- a/test/cross_section_test.cpp
++++ b/test/cross_section_test.cpp
+@@ -29,6 +29,10 @@
+ #include <thread>
+ #include <vector>
+ 
++#if (MANIFOLD_PAR == 1)
++#include <tbb/global_control.h>
++#endif
++
+ #include "manifold/common.h"
+ #include "manifold/manifold.h"
+ #include "test.h"
+@@ -513,6 +517,46 @@ TEST(CrossSection, OffsetMultipleDisjointOuters) {
+   EXPECT_EQ(merged.NumContour(), 1);
+ }
+ 
++#if (MANIFOLD_PAR == 1)
++TEST(CrossSection, OffsetParallelPreservesCoordinatesAndOrder) {
++  Polygons rings;
++  for (int i = 0; i < 256; ++i) {
++    const double x = (i % 16) * 12, y = (i / 16) * 12;
++    rings.push_back({{x, y}, {x + 10, y}, {x + 10, y + 10}, {x, y + 10}});
++    rings.push_back({{x + 3, y + 3}, {x + 3, y + 6},
++                     {x + 6, y + 6}, {x + 6, y + 3}});
++  }
++  const CrossSection input(rings);
++  for (const JoinType join : {JoinType::Round, JoinType::Miter,
++                             JoinType::Square, JoinType::Bevel}) {
++    for (const double delta : {0.5, 1.5, -0.5}) {
++      Polygons expected;
++      {
++        tbb::global_control serial(tbb::global_control::max_allowed_parallelism, 1);
++        const auto result = input.Offset(delta, join, 2, 32);
++        expected = result.ToPolygons();
++        if (join == JoinType::Miter && delta != 1.5) {
++          EXPECT_NEAR(result.Area(), 256 * (delta > 0 ? 117.0 : 65.0), 1e-6);
++        }
++      }
++      for (const int threads : {2, 4, 8}) {
++        tbb::global_control parallel(
++            tbb::global_control::max_allowed_parallelism, threads);
++        const auto actual = input.Offset(delta, join, 2, 32).ToPolygons();
++        ASSERT_EQ(actual.size(), expected.size());
++        for (size_t i = 0; i < actual.size(); ++i) {
++          ASSERT_EQ(actual[i].size(), expected[i].size());
++          for (size_t j = 0; j < actual[i].size(); ++j) {
++            EXPECT_EQ(actual[i][j].x, expected[i][j].x);
++            EXPECT_EQ(actual[i][j].y, expected[i][j].y);
++          }
++        }
++      }
++    }
++  }
++}
++#endif
++
+ TEST(CrossSection, FourConcurrentEdges) {
+   auto rhomb = [](double angleDegrees) {
+     const double angle = angleDegrees * kPi / 180.;
