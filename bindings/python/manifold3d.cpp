@@ -229,6 +229,12 @@ NB_MODULE(manifold3d, m) {
   m.def("set_min_circular_edge_length", Quality::SetMinCircularEdgeLength,
         nb::arg("length"), quality__set_min_circular_edge_length__length);
 
+  m.def("get_min_circular_angle", Quality::GetMinCircularAngle,
+        quality__get_min_circular_angle);
+
+  m.def("get_min_circular_edge_length", Quality::GetMinCircularEdgeLength,
+        quality__get_min_circular_edge_length);
+
   m.def("set_circular_segments", Quality::SetCircularSegments,
         nb::arg("number"), quality__set_circular_segments__number);
 

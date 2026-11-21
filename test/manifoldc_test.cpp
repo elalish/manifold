@@ -19,6 +19,19 @@ TEST(CBIND, version) {
   EXPECT_EQ(version[2], MANIFOLD_VERSION_PATCH);
 }
 
+TEST(CBIND, circular_constraints_restore) {
+  const double angle = manifold_get_min_circular_angle();
+  const double length = manifold_get_min_circular_edge_length();
+  manifold_set_min_circular_angle(22.5);
+  manifold_set_min_circular_edge_length(0.125);
+  EXPECT_DOUBLE_EQ(manifold_get_min_circular_angle(), 22.5);
+  EXPECT_DOUBLE_EQ(manifold_get_min_circular_edge_length(), 0.125);
+  manifold_set_min_circular_angle(angle);
+  manifold_set_min_circular_edge_length(length);
+  EXPECT_DOUBLE_EQ(manifold_get_min_circular_angle(), angle);
+  EXPECT_DOUBLE_EQ(manifold_get_min_circular_edge_length(), length);
+}
+
 TEST(CBIND, meshgl_no_props) {
   const float vertProps[] = {0, 0, 0};
   ManifoldMeshGL* mesh = manifold_meshgl(vertProps, 1, 0, NULL, 0);

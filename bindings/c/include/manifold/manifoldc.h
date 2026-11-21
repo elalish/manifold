@@ -432,6 +432,8 @@ void manifold_set_relative_precision(double precision);
 double manifold_get_relative_precision();
 void manifold_set_min_circular_angle(double degrees);
 void manifold_set_min_circular_edge_length(double length);
+double manifold_get_min_circular_angle();
+double manifold_get_min_circular_edge_length();
 void manifold_set_circular_segments(int number);
 void manifold_reset_to_circular_defaults();
 

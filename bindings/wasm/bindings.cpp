@@ -231,6 +231,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("getRelativePrecision", &Quality::GetRelativePrecision);
   function("setMinCircularAngle", &Quality::SetMinCircularAngle);
   function("setMinCircularEdgeLength", &Quality::SetMinCircularEdgeLength);
+  function("getMinCircularAngle", &Quality::GetMinCircularAngle);
+  function("getMinCircularEdgeLength", &Quality::GetMinCircularEdgeLength);
   function("setCircularSegments", &Quality::SetCircularSegments);
   function("getCircularSegments", &Quality::GetCircularSegments);
   function("resetToCircularDefaults", &Quality::ResetToDefaults);

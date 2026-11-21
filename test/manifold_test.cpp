@@ -1092,6 +1092,43 @@ TEST(Manifold, CircularSegmentsWhileReset) {
 }
 #endif
 
+TEST(Manifold, CircularConstraintsRestore) {
+  Quality::ResetToDefaults();
+  EXPECT_DOUBLE_EQ(Quality::GetMinCircularAngle(), DEFAULT_ANGLE);
+  EXPECT_DOUBLE_EQ(Quality::GetMinCircularEdgeLength(), DEFAULT_LENGTH);
+
+  Quality::SetMinCircularAngle(22.5);
+  Quality::SetMinCircularEdgeLength(0.125);
+  const double angle = Quality::GetMinCircularAngle();
+  const double length = Quality::GetMinCircularEdgeLength();
+  const int segments = Quality::GetCircularSegments(2.0);
+  EXPECT_DOUBLE_EQ(angle, 22.5);
+  EXPECT_DOUBLE_EQ(length, 0.125);
+  EXPECT_EQ(segments, 16);
+
+  Quality::SetCircularSegments(12);
+  EXPECT_DOUBLE_EQ(Quality::GetMinCircularAngle(), angle);
+  EXPECT_DOUBLE_EQ(Quality::GetMinCircularEdgeLength(), length);
+  Quality::SetCircularSegments(0);
+
+  Quality::SetMinCircularAngle(5);
+  Quality::SetMinCircularEdgeLength(0.25);
+  EXPECT_NE(Quality::GetCircularSegments(2.0), segments);
+  Quality::SetMinCircularAngle(angle);
+  Quality::SetMinCircularEdgeLength(length);
+  EXPECT_EQ(Quality::GetCircularSegments(2.0), segments);
+
+  for (const double invalid : {0.0, -1.0, static_cast<double>(NAN)}) {
+    Quality::SetMinCircularAngle(invalid);
+    Quality::SetMinCircularEdgeLength(invalid);
+    EXPECT_DOUBLE_EQ(Quality::GetMinCircularAngle(), angle);
+    EXPECT_DOUBLE_EQ(Quality::GetMinCircularEdgeLength(), length);
+  }
+  Quality::ResetToDefaults();
+  EXPECT_DOUBLE_EQ(Quality::GetMinCircularAngle(), DEFAULT_ANGLE);
+  EXPECT_DOUBLE_EQ(Quality::GetMinCircularEdgeLength(), DEFAULT_LENGTH);
+}
+
 TEST(Manifold, CircularSegmentsTinyAngle) {
   // 360 / angle doesn't fit in an int here, so the edge length should decide.
   Quality::SetMinCircularAngle(1e-9);
