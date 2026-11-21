@@ -45,14 +45,6 @@ inline mat3 NormalTransform(const mat3x4& transform) {
 }
 
 /**
-This is the corresponding normal transform for the inverse of the input
-transform.
-*/
-inline mat3 InverseNormalTransform(const mat3x4& transform) {
-  return la::inverse(la::transpose(la::inverse(mat3(transform))));
-}
-
-/**
  * Symbolic perturbation primitives shared by Boolean3 and Boolean2.
  * Carefully designed to minimize FP rounding error and eliminate it at edge
  * cases.

@@ -625,7 +625,7 @@ TEST(CBIND, run_flag_accessors) {
   ManifoldManifold* oldSphere = manifold_sphere(1.0, 32);
   ManifoldManifold* sphere = manifold_as_original(oldSphere, -1);
   ManifoldManifold* cut = manifold_difference(cube, sphere);
-  ManifoldManifold* with_normals = manifold_calculate_normals(cut, 0, 60.0);
+  ManifoldManifold* with_normals = manifold_calculate_normals(cut, 60.0);
   ManifoldMeshGL* mesh = manifold_get_meshgl(with_normals);
 
   const size_t runs = manifold_meshgl_num_run(mesh);

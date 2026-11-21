@@ -66,11 +66,17 @@ export interface GLTFMaterial {
    * Every vertex in a glTF Mesh has a set of attributes.
    * `POSITION` cannot be specified -- ManifoldCAD will set it internally.
    *
-   * This array specifies how vertex properties are arranged in memory.
-   * For example, a value of `['TEXCOORD_0', 'NORMAL', 'SKIP_2', 'COLOR_0']`
-   * would implicitly use property channels 0-2 for position, followed by
-   * channels 3-4 for texture, 5-7 for surface normal, ignore 8-9, and 10-12 for
-   * color.
+   * This array specifies how vertex properties are arranged in memory. If it
+   * includes `NORMAL`, ManifoldCAD reads it from the channels directly after
+   * position. For
+   * example, `['TEXCOORD_0', 'NORMAL', 'SKIP_2', 'COLOR_0']` uses channels
+   * 0-2 for position, 3-5 for surface normal, 6-7 for texture, ignores 8-9,
+   * and uses 10-12 for color.
+   *
+   * Normals follow transforms only when they come from `calculateNormals()` on
+   * every operand or a MeshGL input whose corresponding runFlags bit 1 is set.
+   * Values supplied by `setProperties()`, and unflagged values after
+   * `setMaterial()` on mixed Boolean results, remain ordinary properties.
    *
    * Some properties such as `TEXCOORD_0` or `COLOR_0` may be set when importing
    * a model that has a texture or material.
