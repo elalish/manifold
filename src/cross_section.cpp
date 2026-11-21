@@ -483,7 +483,9 @@ CrossSection& CrossSection::operator^=(const CrossSection& Q) {
  * holes.
  */
 std::vector<CrossSection> CrossSection::Decompose() const {
-  if (NumContour() < 2) return {*this};
+  const size_t count = NumContour();
+  if (count == 0) return {};
+  if (count == 1) return {*this};
   const auto& paths = GetPaths()->paths_;
   std::vector<Polygons> components = DecomposeByContainment(paths);
   std::vector<CrossSection> out;

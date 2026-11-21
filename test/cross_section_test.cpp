@@ -3270,3 +3270,27 @@ TEST(CrossSection, WindingSweepCrossingsAndRoundOffsets) {
   EXPECT_EQ(mesh.Status(), Manifold::Error::NoError);
   EXPECT_NEAR(mesh.Volume(), eroded.Area() * 2.0, 1e-5);
 }
+
+TEST(CrossSection, EmptyDecompositionHasNoComponents) {
+  const CrossSection square = CrossSection::Square({2, 2});
+  const std::vector<CrossSection> empty = {
+      CrossSection(), CrossSection(Polygons{}), square - square,
+      square ^ square.Translate({10, 0})};
+  for (const CrossSection& section : empty) {
+    ASSERT_TRUE(section.IsEmpty());
+    EXPECT_TRUE(section.Decompose().empty());
+    EXPECT_TRUE(section.Translate({2, 3}).Decompose().empty());
+  }
+}
+
+TEST(CrossSection, DecompositionCountsNonemptyConnectedComponents) {
+  const CrossSection ring = CrossSection::Square({4, 4}) -
+                            CrossSection::Square({2, 2}).Translate({1, 1});
+  const auto one = ring.Decompose();
+  ASSERT_EQ(one.size(), 1);
+  EXPECT_EQ(one[0].NumContour(), 2);
+  EXPECT_DOUBLE_EQ(one[0].Area(), 12);
+  const auto two = (ring + ring.Translate({10, 0})).Decompose();
+  ASSERT_EQ(two.size(), 2);
+  EXPECT_DOUBLE_EQ(two[0].Area() + two[1].Area(), 24);
+}
