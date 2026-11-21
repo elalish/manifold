@@ -124,20 +124,39 @@ export const getSourceMappedStackTrace =
 
 export const findExtension =
     (extension: string, list: Array<{extension: string}>) => {
-      let match = list.find(entry => entry.extension === extension);
-      if (match) return match;
-      match = list.find(entry => `.${entry.extension}` === extension);
+      const matchExtension = (value: string) => list.find(
+          entry => entry.extension.replace(/^\./, '').toLowerCase() ===
+              value.replace(/^\./, '').toLowerCase());
+      const match = matchExtension(extension);
       if (match) return match;
 
-      // Do we have a filename instead of just an extension?
-      const fileExt = extension.match(/(\.[^\.]+)$/);
-      if (!fileExt) return null;
+      const matchPath = (path: string) => {
+        const filename = path.split(/[\\/]/).pop()!;
+        const dot = filename.lastIndexOf('.');
+        return dot < 0 ? null : matchExtension(filename.slice(dot + 1));
+      };
 
-      const [ext] = fileExt;
-      match = list.find(entry => entry.extension === ext);
-      if (match) return match;
-      match = list.find(entry => `.${entry.extension}` === ext);
-      return match;
+      // A bare filename may legally contain '?' or '#'. Preserve a recognized
+      // full suffix unless an explicit URL authority makes the intent clear.
+      const hasAuthority = /^(?:[a-z][a-z\d+.-]*:)?\/\//i.test(extension);
+      if (!hasAuthority) {
+        const match = matchPath(extension);
+        if (match) return match;
+      }
+
+      // URL query strings, fragments and host names do not describe the model.
+      let path: string;
+      try {
+        path = new URL(extension, 'https://model.invalid').pathname;
+      } catch {
+        path = extension.split(/[?#]/, 1)[0];
+      }
+      try {
+        path = decodeURIComponent(path);
+      } catch {
+        // A literal '%' is allowed in local filenames.
+      }
+      return matchPath(path);
     };
 
 export const findMimeType =
