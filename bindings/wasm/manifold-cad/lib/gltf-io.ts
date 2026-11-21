@@ -316,6 +316,7 @@ function writePrimitiveAttributes(
       });
     } else {
       primitive2attributes.set(primitive, ['POSITION']);
+      if (attributeUnion.length === 0) attributeUnion.push('POSITION');
     }
 
     mesh.addPrimitive(primitive);
