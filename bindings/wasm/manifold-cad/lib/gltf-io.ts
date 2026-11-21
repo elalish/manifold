@@ -207,8 +207,9 @@ export function readMesh(
       const numVert = vertPropArray.length / numProp;
       vertPropArray =
           [...vertPropArray, ...readPrimitive(primitive, numProp, attributes)];
-      triVertArray =
-          [...triVertArray, ...indices.getArray()!.map((i) => i + numVert)];
+      // Offset in number space, not in the source Uint8/Uint16Array: the
+      // combined mesh may need wider indices than any individual primitive.
+      for (const i of indices.getArray()!) triVertArray.push(i + numVert);
       runIndexArray.push(triVertArray.length);
 
       const attributesIn = primitive.listSemantics() as Attribute[];
