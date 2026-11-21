@@ -621,6 +621,28 @@ TEST(CBIND, properties) {
   free(context);
 }
 
+TEST(CBIND, set_properties_null_zero_fills) {
+  ManifoldManifold* cube = manifold_cube(1.0, 1.0, 1.0, 1);
+  ManifoldManifold* zeroed = manifold_set_properties(cube, 2, NULL, NULL);
+  EXPECT_EQ(manifold_status(zeroed), MANIFOLD_NO_ERROR);
+  EXPECT_EQ(manifold_num_prop(zeroed), 2);
+
+  ManifoldMeshGL* mesh = manifold_get_meshgl(zeroed);
+  const size_t num_prop = manifold_meshgl_num_prop(mesh);
+  ASSERT_EQ(num_prop, 5);
+  const float* props = manifold_meshgl_vert_properties(mesh);
+  const size_t len = manifold_meshgl_vert_properties_length(mesh);
+  ASSERT_GT(len, 0);
+  for (size_t i = 0; i < len; i += num_prop) {
+    EXPECT_EQ(props[i + 3], 0);
+    EXPECT_EQ(props[i + 4], 0);
+  }
+
+  manifold_delete_meshgl(mesh);
+  manifold_delete_manifold(zeroed);
+  manifold_delete_manifold(cube);
+}
+
 TEST(CBIND, extrude) {
   ManifoldVec2 pts[] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
   ManifoldSimplePolygon* sq[] = {manifold_simple_polygon(&pts[0], 4)};
