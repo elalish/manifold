@@ -196,7 +196,6 @@ ManifoldManifold* manifold_extrude(const ManifoldPolygons* cs, double height,
 ManifoldManifold* manifold_revolve(const ManifoldPolygons* cs,
                                    int circular_segments,
                                    double revolve_degrees);
-ManifoldManifold* manifold_compose(const ManifoldManifoldVec* ms);
 ManifoldManifoldVec* manifold_decompose(const ManifoldManifold* m);
 
 // id: the original ID to assign; pass a negative value (e.g. -1) for a new one.

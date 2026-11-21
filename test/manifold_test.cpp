@@ -615,7 +615,7 @@ TEST(Manifold, NormalsSharedPropVertMixedFlagsUndefined) {
   // hasNormals=true run and a hasNormals=false run, a Transform rotates
   // the slot on behalf of the hasNormals=true camp; the other camp's
   // interpretation (e.g. color) is collateral damage. Standard
-  // CalculateNormals / Boolean / Compose outputs never share propVerts
+  // CalculateNormals and Boolean outputs never share propVerts
   // this way - this test pins the documented behaviour for the only
   // input shape that can produce it.
   MeshGL gl;
@@ -948,8 +948,8 @@ TEST(Manifold, OppositeFace) {
 }
 
 /**
- * ExpectMeshes performs a decomposition, so this test ensures that compose and
- * decompose are inverse operations.
+ * ExpectMeshes performs a decomposition, so this test ensures that a disjoint
+ * BatchBoolean Add and Decompose are inverse operations.
  */
 TEST(Manifold, Decompose) {
   std::vector<Manifold> manifoldList;

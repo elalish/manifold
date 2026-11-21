@@ -29,8 +29,8 @@ const memoryRegistry = Array<Manifold|CrossSection>();
 
 // manifold static methods (that return a new manifold)
 const manifoldStaticFunctions = [
-  'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'compose',
-  'union', 'difference', 'intersection', 'levelSet', 'smooth', 'ofMesh', 'hull'
+  'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'union',
+  'difference', 'intersection', 'levelSet', 'smooth', 'ofMesh', 'hull'
 ];
 // manifold member functions (that return a new manifold)
 const manifoldMemberFunctions = [

@@ -250,8 +250,8 @@ struct MeshGLP {
    * Behavior is undefined when a single propVert is shared by triangles
    * from runs that disagree - the slot has one interpretation, and a
    * Transform rotates it for hasNormals=true and clobbers any
-   * hasNormals=false sharer. Standard `CalculateNormals` / Boolean /
-   * Compose outputs never produce that shape.
+   * hasNormals=false sharer. Standard `CalculateNormals` and Boolean
+   * outputs never produce that shape.
    *
    * @param run The index of the triangle run (0 <= run < runFlags.size()).
    */
