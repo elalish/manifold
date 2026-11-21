@@ -48,7 +48,10 @@ def test_mesh_copies_all_input_buffers(mesh_type, export, readonly):
         np.testing.assert_array_equal(getattr(copied, name), expected[name])
 
 
-@pytest.mark.parametrize("mesh_type,dtype,index", [(Mesh, np.float32, np.uint32), (Mesh64, np.float64, np.uint64)])
+@pytest.mark.parametrize(
+    "mesh_type,dtype,index",
+    [(Mesh, np.float32, np.uint32), (Mesh64, np.float64, np.uint64)],
+)
 def test_readonly_vertices_still_require_three_properties(mesh_type, dtype, index):
     vertices = np.zeros((4, 2), dtype=dtype)
     triangles = np.zeros((0, 3), dtype=index)
