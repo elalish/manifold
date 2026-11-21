@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 
 import com.cadoodlecad.manifold.ManifoldBindings;
+import com.cadoodlecad.manifold.RayHit;
 
 /**
  * Smoke tests for the API surface added on top of the v3.5.5 C bindings:
@@ -62,7 +63,7 @@ class NewApiSmokeTest {
 	void rayCastHitsAndMisses() throws Throwable {
 		MemorySegment cube = mb.cube(2, 2, 2, true);
 		try {
-			ArrayList<ManifoldBindings.RayHit> hits = mb.rayCast(cube, new double[] { 0, 0, 5 },
+			ArrayList<RayHit> hits = mb.rayCast(cube, new double[] { 0, 0, 5 },
 					new double[] { 0, 0, -5 });
 			assertEquals(2, hits.size(), "a ray through a cube hits entry and exit faces");
 			assertTrue(hits.get(0).distance() < hits.get(1).distance(), "hits are ordered");
@@ -70,7 +71,7 @@ class NewApiSmokeTest {
 			assertEquals(-1.0, hits.get(1).position()[2], 1e-9, "exit at z = -1");
 			assertEquals(0.4, hits.get(0).distance(), 1e-9, "entry is 40% along the segment");
 
-			ArrayList<ManifoldBindings.RayHit> miss = mb.rayCast(cube, new double[] { 5, 5, 5 },
+			ArrayList<RayHit> miss = mb.rayCast(cube, new double[] { 5, 5, 5 },
 					new double[] { 5, 5, -5 });
 			assertTrue(miss.isEmpty(), "a ray outside the cube misses");
 		} finally {
