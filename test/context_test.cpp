@@ -1064,6 +1064,21 @@ TEST(Context, LevelSetHappyPath) {
   EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
 }
 
+TEST(Context, LevelSetCoarseGrid) {
+  ExecutionContext ctx;
+  bool finite = true;
+  const Manifold box = ctx.LevelSet(
+      [&](vec3 p) {
+        finite &= la::all(la::isfinite(p));
+        return 1.0;
+      },
+      {vec3(-1.0), vec3(1.0)}, 3.0, 0.0, -1.0, false);
+  EXPECT_TRUE(finite);
+  EXPECT_EQ(box.Status(), Manifold::Error::NoError);
+  EXPECT_NEAR(box.Volume(), 8.0, 1e-10);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
+}
+
 // Equivalent geometry to the plain factory. (Named MatchesFactory, not
 // MatchesCtor - LevelSet has no constructor form.)
 TEST(Context, LevelSetMatchesFactory) {
