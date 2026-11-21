@@ -48,7 +48,6 @@ Module.setup = function() {
       for (let j = 0; j < nPts; j++) {
         poly.push(f(v.get(j)));
       }
-      v.delete();
       result.push(poly);
     }
     return result;
@@ -58,16 +57,17 @@ Module.setup = function() {
     if (polygons[0].length < 3) {
       polygons = [polygons];
     }
-    const polygonsVec = new Module.Vector2_vec2();
-    for (const poly of polygons) {
-      const polyVec = toVec(new Module.Vector_vec2(), poly, p => {
-        if (p instanceof Array) return {x: p[0], y: p[1]};
-        return p;
-      });
-      polygonsVec.push_back(polyVec);
-      polyVec.delete();
-    }
-    return polygonsVec;
+    return toVec(
+        new Module.Vector2_vec2(), polygons,
+        poly => toVec(new Module.Vector_vec2(), poly, p => {
+          if (p instanceof Array) return {x: p[0], y: p[1]};
+          return p;
+        }));
+  }
+
+  function disposePolygons(polygonsVec) {
+    for (let i = 0; i < polygonsVec.size(); i++) polygonsVec.get(i).delete();
+    polygonsVec.delete();
   }
 
   function vararg2vec2(vec) {
@@ -87,26 +87,31 @@ Module.setup = function() {
     return vec[0];
   }
 
+  function fillRuleToInt(fillRule) {
+    return fillRule == 'EvenOdd' ? 0 :
+        fillRule == 'NonZero'    ? 1 :
+        fillRule == 'Negative'   ? 3 :
+                                   /* Positive */ 2;
+  }
+
   function joinTypeToInt(joinType) {
-    return joinType == 'Round' ? 1 :
-        joinType == 'Miter'    ? 2 :
-        joinType == 'Bevel'    ? 3 :
-                                 /* Square */ 0;
+    return joinType == 'Round' ? 1 : joinType == 'Miter' ? 2 : /* Square */ 0;
   }
 
   // CrossSection methods
 
   const CrossSectionCtor = Module.CrossSection;
 
-  function withCrossSection(polygons, f) {
-    if (polygons instanceof CrossSectionCtor) return f(polygons);
-    const polygonsVec = polygons2vec(polygons);
-    const cs = new CrossSectionCtor(polygonsVec);
-    polygonsVec.delete();
-    const result = f(cs);
-    cs.delete();
-    return result;
-  }
+  function cross(polygons, fillRule = 'Positive') {
+    if (polygons instanceof CrossSectionCtor) {
+      return polygons;
+    } else {
+      const polygonsVec = polygons2vec(polygons);
+      const cs = new CrossSectionCtor(polygonsVec, fillRuleToInt(fillRule));
+      disposePolygons(polygonsVec);
+      return cs;
+    }
+  };
 
   Module.CrossSection.prototype.translate = function(...vec) {
     return this._Translate(vararg2vec2(vec));
@@ -159,46 +164,35 @@ Module.setup = function() {
         delta, joinTypeToInt(joinType), miterLimit, circularSegments);
   };
 
-  Module.CrossSection.prototype.simplify = function(tolerance = 0) {
-    return this._Simplify(tolerance);
+  Module.CrossSection.prototype.simplify = function(epsilon = 1e-6) {
+    return this._Simplify(epsilon);
   };
 
   Module.CrossSection.prototype.extrude = function(
       height, nDivisions = 0, twistDegrees = 0.0, scaleTop = [1.0, 1.0],
       center = false) {
-    // if only one factor provided, scale both x and y with it
-    if (typeof scaleTop == 'number') {
-      scaleTop = [scaleTop, scaleTop];
-    }
     scaleTop = vararg2vec2([scaleTop]);
-    const polygonsVec = this._ToPolygons();
     const man = Module._Extrude(
-        polygonsVec, height, nDivisions, twistDegrees, scaleTop);
-    polygonsVec.delete();
-    if (!center) return man;
-    const centered = man.translate([0., 0., -height / 2.]);
-    man.delete();
-    return centered;
+        this._ToPolygons(), height, nDivisions, twistDegrees, scaleTop);
+    return (center ? man.translate([0., 0., -height / 2.]) : man);
   };
 
   Module.CrossSection.prototype.revolve = function(
       circularSegments = 0, revolveDegrees = 360.0) {
-    const polygonsVec = this._ToPolygons();
-    const man = Module._Revolve(polygonsVec, circularSegments, revolveDegrees);
-    polygonsVec.delete();
-    return man;
+    return Module._Revolve(
+        this._ToPolygons(), circularSegments, revolveDegrees);
   };
 
   Module.CrossSection.prototype.add = function(other) {
-    return withCrossSection(other, cs => this._add(cs));
+    return this._add(cross(other));
   };
 
   Module.CrossSection.prototype.subtract = function(other) {
-    return withCrossSection(other, cs => this._subtract(cs));
+    return this._subtract(cross(other));
   };
 
   Module.CrossSection.prototype.intersect = function(other) {
-    return withCrossSection(other, cs => this._intersect(cs));
+    return this._intersect(cross(other));
   };
 
   Module.CrossSection.prototype.toPolygons = function() {
@@ -209,6 +203,11 @@ Module.setup = function() {
   };
 
   // Manifold methods
+
+  Module.Manifold.prototype.smoothOut = function(
+      minSharpAngle = 52.5, minSmoothness = 0) {
+    return this._SmoothOut(minSharpAngle, minSmoothness);
+  };
 
   Module.Manifold.prototype.warp = function(func) {
     const wasmFuncPtr = addFunction(function(vec3Ptr) {
@@ -318,25 +317,15 @@ Module.setup = function() {
 
   Module.Manifold.prototype.slice = function(height = 0.) {
     const polygonsVec = this._Slice(height);
-    const result = new CrossSectionCtor(polygonsVec);
-    polygonsVec.delete();
+    const result = new CrossSectionCtor(polygonsVec, fillRuleToInt('Positive'));
+    disposePolygons(polygonsVec);
     return result;
   };
 
   Module.Manifold.prototype.project = function() {
     const polygonsVec = this._Project();
-    const result = new CrossSectionCtor(polygonsVec);
-    polygonsVec.delete();
-    return result;
-  };
-
-  Module.Manifold.prototype.windingNumber = function(points) {
-    const inVec = new Module.Vector_vec3();
-    for (const p of points) inVec.push_back(vararg2vec3([p]));
-    const outVec = this._WindingNumber(inVec);
-    inVec.delete();
-    const result = fromVec(outVec);
-    outVec.delete();
+    const result = new CrossSectionCtor(polygonsVec, fillRuleToInt('Positive'));
+    disposePolygons(polygonsVec);
     return result;
   };
 
@@ -348,7 +337,6 @@ Module.setup = function() {
                        distance: hit.distance,
                        position: ['x', 'y', 'z'].map(f => hit.position[f]),
                        normal: ['x', 'y', 'z'].map(f => hit.normal[f]),
-                       crossing: hit.crossing,
                      }));
     vec.delete();
     return result;
@@ -400,7 +388,8 @@ Module.setup = function() {
       faceID,
       halfedgeTangent,
       runTransform,
-      runFlags
+      runFlags,
+      tolerance = 0
     } = {}) {
       this.numProp = numProp;
       this.triVerts = triVerts;
@@ -413,6 +402,7 @@ Module.setup = function() {
       this.halfedgeTangent = halfedgeTangent;
       this.runTransform = runTransform;
       this.runFlags = runFlags;
+      this.tolerance = tolerance;
     }
 
     get numTri() {
@@ -427,8 +417,10 @@ Module.setup = function() {
       return this.runOriginalID.length;
     }
 
-    merge(tolerance = 0) {
-      return new Mesh(Module._Merge(this, tolerance));
+    merge() {
+      const {changed, mesh} = Module._Merge(this);
+      Object.assign(this, {...mesh});
+      return changed;
     }
 
     verts(tri) {
@@ -535,29 +527,15 @@ Module.setup = function() {
 
   // CrossSection Constructors
 
-  Module.CrossSection = function(polygons) {
+  Module.CrossSection = function(polygons, fillRule = 'Positive') {
     const polygonsVec = polygons2vec(polygons);
-    const cs = new CrossSectionCtor(polygonsVec);
-    polygonsVec.delete();
+    const cs = new CrossSectionCtor(polygonsVec, fillRuleToInt(fillRule));
+    disposePolygons(polygonsVec);
     return cs;
   };
 
-  Module.CrossSection.ofPolygons = function(polygons) {
-    return new Module.CrossSection(polygons);
-  };
-
-  Module.CrossSection.evenOdd = function(polygons) {
-    const polygonsVec = polygons2vec(polygons);
-    const cs = Module._EvenOdd(polygonsVec);
-    polygonsVec.delete();
-    return cs;
-  };
-
-  Module.CrossSection.nonZero = function(polygons) {
-    const polygonsVec = polygons2vec(polygons);
-    const cs = Module._NonZero(polygonsVec);
-    polygonsVec.delete();
-    return cs;
+  Module.CrossSection.ofPolygons = function(polygons, fillRule = 'Positive') {
+    return new Module.CrossSection(polygons, fillRule);
   };
 
   Module.CrossSection.square = function(...args) {
@@ -582,13 +560,14 @@ Module.setup = function() {
     return function(...args) {
       if (args.length == 1) args = args[0];
       const v = new Module.Vector_crossSection();
-      for (const arg of args) withCrossSection(arg, cs => v.push_back(cs));
+      for (const cs of args) v.push_back(cross(cs));
       const result = Module['_crossSection' + name](v);
       v.delete();
       return result;
     };
   }
 
+  Module.CrossSection.compose = crossSectionBatchbool('Compose');
   Module.CrossSection.union = crossSectionBatchbool('UnionN');
   Module.CrossSection.difference = crossSectionBatchbool('DifferenceN');
   Module.CrossSection.intersection = crossSectionBatchbool('IntersectionN');
@@ -678,18 +657,29 @@ Module.setup = function() {
     return Module._Sphere(radius, circularSegments);
   };
 
+  Module.Manifold.smooth = function(mesh, sharpenedEdges = []) {
+    const sharp = new Module.Vector_smoothness();
+    toVec(sharp, sharpenedEdges);
+    const result = Module._Smooth(mesh, sharp);
+    sharp.delete();
+    return result;
+  };
+
   Module.Manifold.extrude = function(
       polygons, height, nDivisions = 0, twistDegrees = 0.0,
       scaleTop = [1.0, 1.0], center = false) {
-    return withCrossSection(
-        polygons,
-        cs => cs.extrude(height, nDivisions, twistDegrees, scaleTop, center));
+    const cs = (polygons instanceof CrossSectionCtor) ?
+        polygons :
+        Module.CrossSection(polygons, 'Positive');
+    return cs.extrude(height, nDivisions, twistDegrees, scaleTop, center);
   };
 
   Module.Manifold.revolve = function(
       polygons, circularSegments = 0, revolveDegrees = 360.0) {
-    return withCrossSection(
-        polygons, cs => cs.revolve(circularSegments, revolveDegrees));
+    const cs = (polygons instanceof CrossSectionCtor) ?
+        polygons :
+        Module.CrossSection(polygons, 'Positive');
+    return cs.revolve(circularSegments, revolveDegrees);
   };
 
   Module.Manifold.reserveIDs = function(n) {
@@ -734,10 +724,19 @@ Module.setup = function() {
     return out;
   };
 
-  // ctx-aware static factories: mirror Manifold.ofMesh / levelSet but
+  // ctx-aware static factories: mirror Manifold.ofMesh / smooth / levelSet but
   // run under this ExecutionContext so progress/cancellation are observed.
   Module.ExecutionContext.prototype.fromMesh = function(mesh) {
     return this._FromMesh(mesh);
+  };
+
+  Module.ExecutionContext.prototype.smooth = function(
+      mesh, sharpenedEdges = []) {
+    const sharp = new Module.Vector_smoothness();
+    toVec(sharp, sharpenedEdges);
+    const result = this._Smooth(mesh, sharp);
+    sharp.delete();
+    return result;
   };
 
   Module.ExecutionContext.prototype.levelSet = function(
@@ -800,10 +799,10 @@ Module.setup = function() {
 
   Module.triangulate = function(polygons, epsilon = -1, allowConvex = true) {
     const polygonsVec = polygons2vec(polygons);
-    const trianglesVec = Module._Triangulate(polygonsVec, epsilon, allowConvex);
-    polygonsVec.delete();
-    const result = fromVec(trianglesVec, (x) => [x[0], x[1], x[2]]);
-    trianglesVec.delete();
+    const result = fromVec(
+        Module._Triangulate(polygonsVec, epsilon, allowConvex),
+        (x) => [x[0], x[1], x[2]]);
+    disposePolygons(polygonsVec);
     return result;
   };
 };

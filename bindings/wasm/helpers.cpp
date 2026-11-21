@@ -47,6 +47,8 @@ val MeshGL2JS(const MeshGL& mesh) {
   meshJS.set("runFlags",
              val(typed_memory_view(mesh.runFlags.size(), mesh.runFlags.data()))
                  .call<val>("slice"));
+  meshJS.set("tolerance", mesh.tolerance);
+
   return meshJS;
 }
 
@@ -85,6 +87,9 @@ MeshGL MeshJS2GL(const val& mesh) {
   if (mesh["runFlags"] != val::undefined()) {
     out.runFlags = convertJSArrayToNumberVector<uint8_t>(mesh["runFlags"]);
   }
+  if (mesh["tolerance"] != val::undefined()) {
+    out.tolerance = mesh["tolerance"].as<float>();
+  }
   return out;
 }
 
@@ -93,23 +98,30 @@ val GetMeshJS(const Manifold& manifold, int normalIdx) {
   return MeshGL2JS(mesh);
 }
 
-val Merge(const val& mesh, float tolerance) {
-  return MeshGL2JS(MeshJS2GL(mesh).Merge(tolerance));
+val Merge(const val& mesh) {
+  val out = val::object();
+  MeshGL meshGL = MeshJS2GL(mesh);
+  bool changed = meshGL.Merge();
+  out.set("changed", changed);
+  out.set("mesh", changed ? MeshGL2JS(meshGL) : mesh);
+  return out;
+}
+
+Manifold Smooth(const val& mesh,
+                const std::vector<Smoothness>& sharpenedEdges = {}) {
+  return Manifold::Smooth(MeshJS2GL(mesh), sharpenedEdges);
 }
 
 }  // namespace js
 
 namespace cross_js {
-CrossSection OfPolygons(std::vector<std::vector<vec2>> polygons) {
-  return CrossSection(polygons);
-}
-
-CrossSection EvenOdd(std::vector<std::vector<vec2>> polygons) {
-  return CrossSection::EvenOdd(polygons);
-}
-
-CrossSection NonZero(std::vector<std::vector<vec2>> polygons) {
-  return CrossSection::NonZero(polygons);
+CrossSection OfPolygons(std::vector<std::vector<vec2>> polygons,
+                        int fill_rule) {
+  auto fr = fill_rule == 0   ? CrossSection::FillRule::EvenOdd
+            : fill_rule == 1 ? CrossSection::FillRule::NonZero
+            : fill_rule == 2 ? CrossSection::FillRule::Positive
+                             : CrossSection::FillRule::Negative;
+  return CrossSection(polygons, fr);
 }
 
 CrossSection Union(const CrossSection& a, const CrossSection& b) {
@@ -245,6 +257,11 @@ Manifold LevelSet(uintptr_t funcPtr, Box bounds, double edgeLength,
 // (first arg is the receiver).
 Manifold ExecutionContextFromMesh(ExecutionContext& ctx, const val& mesh) {
   return ctx.FromMeshGL(js::MeshJS2GL(mesh));
+}
+
+Manifold ExecutionContextSmooth(ExecutionContext& ctx, const val& mesh,
+                                const std::vector<Smoothness>& sharpenedEdges) {
+  return ctx.Smooth(js::MeshJS2GL(mesh), sharpenedEdges);
 }
 
 Manifold ExecutionContextLevelSet(ExecutionContext& ctx, uintptr_t funcPtr,

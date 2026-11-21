@@ -19,8 +19,8 @@ import 'monaco-editor/esm/vs/editor/browser/widget/codeEditor/editor.css';
 import 'monaco-editor/esm/vs/editor/standalone/browser/standalone-tokens.css';
 
 import esbuildWasmUrl from 'esbuild-wasm/esbuild.wasm?url';
+import ManifoldWorker from 'manifold-3d/lib/worker.bundled.js?worker';
 import manifoldWasmUrl from 'manifold-3d/manifold.wasm?url';
-import ManifoldWorker from 'manifold-cad/lib/worker.bundled.js?worker';
 import {Box3, BufferGeometry, CanvasTexture, Float32BufferAttribute, Group, LineBasicMaterial, LineSegments, Mesh, MeshBasicMaterial, PlaneGeometry, SkinnedMesh,} from 'three';
 
 const CODE_START = '<code>';
@@ -36,10 +36,9 @@ if (navigator.serviceWorker) {
 
   if (window.caches) {
     window.caches.keys().then(keys => {
-      // Caches are now keyed by deployment scope ('manifoldCAD-cache:'),
-      // and the service worker prunes its own. Anything left on the old
-      // 'manifoldCAD-cache-' scheme is dead and can go.
-      keys.filter(key => key.startsWith('manifoldCAD-cache-'))
+      keys.filter(
+              key => key.startsWith('manifoldCAD-cache-') &&
+                  key !== 'manifoldCAD-cache-v4')
           .forEach(key => window.caches.delete(key));
     });
   }
@@ -205,22 +204,17 @@ function attachSplitterDrag(splitterElement, handleDragMove) {
     pointerDownEvent.preventDefault();
     splitterElement.setPointerCapture(pointerDownEvent.pointerId);
 
-    const dragAbortController = new AbortController();
     const onPointerMove = moveEvent => handleDragMove(moveEvent);
     const onPointerEnd = endEvent => {
       splitterElement.releasePointerCapture(endEvent.pointerId);
-      dragAbortController.abort();
+      splitterElement.removeEventListener('pointermove', onPointerMove);
+      splitterElement.removeEventListener('pointerup', onPointerEnd);
+      splitterElement.removeEventListener('pointercancel', onPointerEnd);
     };
 
-    splitterElement.addEventListener('pointermove', onPointerMove, {
-      signal: dragAbortController.signal,
-    });
-    splitterElement.addEventListener('pointerup', onPointerEnd, {
-      signal: dragAbortController.signal,
-    });
-    splitterElement.addEventListener('pointercancel', onPointerEnd, {
-      signal: dragAbortController.signal,
-    });
+    splitterElement.addEventListener('pointermove', onPointerMove);
+    splitterElement.addEventListener('pointerup', onPointerEnd);
+    splitterElement.addEventListener('pointercancel', onPointerEnd);
   });
 }
 
@@ -262,6 +256,10 @@ function setupPaneSplitters() {
         leftPanePercent, LEFT_PANE_MIN_PERCENT, LEFT_PANE_MAX_PERCENT);
     pageElement.style.setProperty('--left-pane', `${clampedLeftPanePercent}%`);
     window.localStorage.setItem(leftPaneStorageKey, clampedLeftPanePercent);
+
+    // Monaco reacts to container size changes, but an explicit layout keeps
+    // drag updates immediate and smooth.
+    editor?.layout({});
   });
 
   attachSplitterDrag(verticalSplitterElement, moveEvent => {
@@ -623,19 +621,15 @@ async function createEditor() {
     allowNonTsExtensions: true,
   });
 
-  // Make sure `manifold-cad/manifoldCAD` types are available for import, and
-  // `manifold-3d/manifoldCAD` for older models.
+  // Make sure `manifold-3d/manifoldCAD` types are available for import.
   const manifoldCADTypesUrl =
       new URL('./manifoldCAD.d.ts', window.location.href);
   const manifoldCADGlobalsTypesUrl =
       new URL('./manifoldCADGlobals.d.ts', window.location.href);
 
-  const manifoldCADTypes = await (await fetch(manifoldCADTypesUrl)).text();
-  for (const packageName of ['manifold-cad', 'manifold-3d']) {
-    monaco.languages.typescript.typescriptDefaults.addExtraLib(
-        manifoldCADTypes,
-        `inmemory://model/node_modules/${packageName}/manifoldCAD.d.ts`);
-  }
+  monaco.languages.typescript.typescriptDefaults.addExtraLib(
+      await (await fetch(manifoldCADTypesUrl)).text(),
+      'inmemory://model/node_modules/manifold-3d/manifoldCAD.d.ts');
 
   // Types in the global namespace for top-level scripts.
   // This could be improved in the future.  API-Extractor intentionally doesn't
@@ -784,14 +778,14 @@ async function initializeAutoTypings(showTypeIndicator) {
       await import('monaco-editor-auto-typings');
   self.window.typecache = new LocalStorageCache();
 
-  // We inject manifoldCAD typings locally above, and text-shaper publishes
+  // We inject manifold-3d typings locally above, and text-shaper publishes
   // broken declaration re-exports to non-existent source files. Avoid CDN
   // probes for those packages to keep refreshes quiet.
   // This skip list only affects Monaco auto-typing CDN lookups, not runtime
   // imports.
   const jsDelivrResolver = new JsDelivrSourceResolver();
   const skippedTypingPackages =
-      new Set(['manifold-3d', 'manifold-cad', 'text-shaper', '@types/require']);
+      new Set(['manifold-3d', 'text-shaper', '@types/require']);
   const shouldSkipTypingPackage = packageName => {
     return skippedTypingPackages.has(packageName);
   };
@@ -1275,9 +1269,7 @@ function createWorker() {
       output.threeMFURL = null;
       threemfButton.disabled = true;
 
-      // Start all over again.  Stop the old worker first, or it stays alive
-      // with its wasm memory after every error.
-      manifoldWorker.terminate();
+      // Start all over again.
       createWorker();
 
     } else if (message?.type === 'log') {

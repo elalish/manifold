@@ -100,15 +100,21 @@ export type Box = {
   max: Vec3
 };
 
+export type Smoothness = {
+  halfedge: number,
+  smoothness: number
+};
+
 export type RayHit = {
   faceID: number,
   distance: number,
   position: Vec3,
-  normal: Vec3,
-  crossing: number
+  normal: Vec3
 };
 
-export type JoinType = 'Square'|'Round'|'Miter'|'Bevel';
+export type FillRule = 'EvenOdd'|'NonZero'|'Positive'|'Negative';
+
+export type JoinType = 'Square'|'Round'|'Miter';
 
 /**
  * @see {@link Manifold.status}
@@ -142,12 +148,14 @@ export interface ExecutionContext {
    */
   progress(): number;
 
-  // ctx-aware static factories: like Manifold.ofMesh / levelSet, but
+  // ctx-aware static factories: like Manifold.ofMesh / smooth / levelSet, but
   // run under this context so progress / cancellation are observed (these ops
   // have no source Manifold to attach via Manifold.withContext).
 
   /** Like {@link Manifold.ofMesh}, observed/cancellable via this context. */
   fromMesh(mesh: Mesh): Manifold;
+  /** Like {@link Manifold.smooth}, observed/cancellable via this context. */
+  smooth(mesh: Mesh, sharpenedEdges?: readonly Smoothness[]): Manifold;
   /** Like {@link Manifold.levelSet}, observed/cancellable via this context. */
   levelSet(
       sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,

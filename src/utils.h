@@ -18,7 +18,6 @@
 #include <memory>
 #include <mutex>
 
-#include "atomic_compat.h"
 #include "manifold/common.h"
 #include "vec.h"
 
@@ -63,24 +62,21 @@ void Permute(std::vector<T>& inOut, const Vec<T1>& new2Old) {
   gather(new2Old.begin(), new2Old.end(), tmp.begin(), inOut.begin());
 }
 
-// Floating-point accumulation, since fetch_add takes integers only. The
-// relaxed seed and relaxed failure order are what libstdc++'s __fetch_add_flt
-// and libc++'s floating-point fetch_add both use: only the successful exchange
-// needs to synchronize.
 template <typename T>
 T AtomicAdd(T& target, T add) {
-  AtomicRef<T> tar(target);
-  T old_val = tar.load(std::memory_order_relaxed);
+  std::atomic<T>& tar = reinterpret_cast<std::atomic<T>&>(target);
+  T old_val = tar.load();
   while (!tar.compare_exchange_weak(old_val, old_val + add,
-                                    std::memory_order_seq_cst,
-                                    std::memory_order_relaxed)) {
+                                    std::memory_order_seq_cst)) {
   }
   return old_val;
 }
 
 template <>
 inline int AtomicAdd(int& target, int add) {
-  return AtomicRef<int>(target).fetch_add(add);
+  std::atomic<int>& tar = reinterpret_cast<std::atomic<int>&>(target);
+  int old_val = tar.fetch_add(add, std::memory_order_seq_cst);
+  return old_val;
 }
 
 template <typename T>

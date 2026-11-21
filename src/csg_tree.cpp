@@ -177,7 +177,7 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl& a,
               << std::endl;
     std::cout << "RHS self-intersecting: " << b.IsSelfIntersecting()
               << std::endl;
-    if (ManifoldParams().verbose > 3) {
+    if (ManifoldParams().verbose) {
       if (op == OpType::Add)
         std::cout << "Add";
       else if (op == OpType::Intersect)
@@ -222,6 +222,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
     const std::vector<std::shared_ptr<CsgLeafNode>>& nodes) {
   ZoneScoped;
   double epsilon = -1;
+  double tolerance = -1;
   Box bbox;
   int numVert = 0;
   int numEdge = 0;
@@ -238,10 +239,15 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
       impl.status_ = node->pImpl_->status_;
       return ImplToLeaf(std::move(impl));
     }
-    // Compose applies pending transforms directly, bypassing Impl::Transform.
-    if (!all(la::isfinite(node->transform_))) {
-      return ErrorLeaf(Manifold::Error::NonFiniteVertex);
-    }
+    double nodeOldScale = node->pImpl_->bBox_.Scale();
+    double nodeNewScale =
+        node->pImpl_->bBox_.Transform(node->transform_).Scale();
+    double nodeEpsilon = node->pImpl_->epsilon_;
+    nodeEpsilon *= std::max(1.0, nodeNewScale / nodeOldScale);
+    nodeEpsilon = std::max(nodeEpsilon, kPrecision * nodeNewScale);
+    if (!std::isfinite(nodeEpsilon)) nodeEpsilon = -1;
+    epsilon = std::max(epsilon, nodeEpsilon);
+    tolerance = std::max(tolerance, node->pImpl_->tolerance_);
     bbox = bbox.Union(node->GetBoundingBox());
 
     vertIndices.push_back(numVert);
@@ -258,8 +264,9 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
   }
 
   Manifold::Impl combined;
+  combined.epsilon_ = epsilon;
+  combined.tolerance_ = tolerance;
   combined.bBox_ = bbox;
-  combined.epsilon_ = Quality::GetRelativePrecision() * combined.bBox_.Scale();
   combined.vertPos_.resize_nofill(numVert);
   combined.vertNormal_.resize_nofill(numVert);
   combined.halfedge_.resize_nofill(2 * numEdge);
@@ -404,6 +411,8 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
     }
   }
 
+  // required to remove parts that are smaller than the tolerance
+  combined.RemoveDegenerates();
   combined.SortGeometry();
   combined.IncrementMeshIDs();
   return ImplToLeaf(std::move(combined));
@@ -514,13 +523,7 @@ std::shared_ptr<CsgLeafNode> BatchUnion(
     for (size_t i = 0; i < boxes.size(); i++) {
       auto lambda = [&boxes, i](const Vec<size_t>& set) {
         return std::find_if(set.begin(), set.end(), [&boxes, i](size_t j) {
-                 // Children touching within the pair's tie tolerance
-                 // are booleaned, not composed.
-                 const double tol =
-                     Quality::GetRelativePrecision() *
-                     std::min(boxes[i].Scale(), boxes[j].Scale());
-                 return Box(boxes[i].min - tol, boxes[i].max + tol)
-                     .DoesOverlap(boxes[j]);
+                 return boxes[i].DoesOverlap(boxes[j]);
                }) == set.end();
       };
       auto it = std::find_if(disjointSets.begin(), disjointSets.end(), lambda);
@@ -755,10 +758,8 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode(
       // eval of any op on the stack returns Cancelled.
       auto cancelled = ErrorLeaf(Manifold::Error::Cancelled);
       for (auto& frame : stack) {
-        auto guard = frame->op_node->impl_.GetGuard();
         if (!frame->op_node->cache_) frame->op_node->cache_ = cancelled;
       }
-      auto guard = impl_.GetGuard();
       cache_ = cancelled;
       return cache_;
     }
@@ -843,7 +844,6 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode(
       }
     }
   }
-  auto guard = impl_.GetGuard();
   return cache_;
 }
 
@@ -864,26 +864,24 @@ size_t CsgOpNode::NumLeaves() const {
   // An already-evaluated CsgOpNode counts as a single leaf for the purposes
   // of estimating remaining boolean work. Iterative walk: `+=` chains can
   // produce very deep CsgOpNode trees that would blow the call stack if
-  // this were recursive. Another thread may evaluate a shared op node
-  // meanwhile, so read cache_ under the node's guard and hold each child
-  // op node by shared_ptr, since its evaluation can drop the children.
+  // this were recursive.
+  if (cache_ != nullptr) return 1;
   size_t total = 0;
-  std::vector<std::shared_ptr<const CsgOpNode>> stack;
-  stack.push_back(
-      std::static_pointer_cast<const CsgOpNode>(shared_from_this()));
+  std::vector<const CsgOpNode*> stack;
+  stack.push_back(this);
   while (!stack.empty()) {
-    std::shared_ptr<const CsgOpNode> op = stack.back();
+    const CsgOpNode* op = stack.back();
     stack.pop_back();
-    auto impl = op->impl_.GetGuard();
     if (op->cache_ != nullptr) {
       total += 1;
       continue;
     }
+    auto impl = op->impl_.GetGuard();
     for (const auto& child : *impl) {
       if (child->GetNodeType() == CsgNodeType::Leaf) {
         total += 1;
       } else {
-        stack.push_back(std::static_pointer_cast<const CsgOpNode>(child));
+        stack.push_back(static_cast<const CsgOpNode*>(child.get()));
       }
     }
   }

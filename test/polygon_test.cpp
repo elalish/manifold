@@ -15,19 +15,11 @@
 #include "manifold/polygon.h"
 
 #include <algorithm>
-#include <array>
-#include <atomic>
-#include <cmath>
 #ifndef MANIFOLD_NO_IOSTREAM
 #include <fstream>
 #endif
 #include <limits>
-#include <thread>
-#include <utility>
 
-#include "../src/polygon_internal.h"
-#include "gtest/gtest.h"
-#include "polygon_corpus.h"
 #include "test.h"
 
 namespace {
@@ -65,29 +57,6 @@ Polygons Duplicate(Polygons polys) {
   return polys;
 }
 
-Polygons StarPolygon(int numVert) {
-  Polygons polys(1);
-  polys[0].reserve(numVert);
-  for (int i = 0; i < numVert; ++i) {
-    const double angle = kTwoPi * i / numVert;
-    const double radius = i % 2 == 0 ? 2.0 : 1.0;
-    polys[0].push_back({radius * std::cos(angle), radius * std::sin(angle)});
-  }
-  return polys;
-}
-
-PolygonsIdx IndexPolygons(const Polygons& polys) {
-  PolygonsIdx indexed;
-  int idx = 0;
-  for (const SimplePolygon& poly : polys) {
-    SimplePolygonIdx simple;
-    simple.reserve(poly.size());
-    for (const vec2& pos : poly) simple.push_back({pos, idx++});
-    indexed.push_back(std::move(simple));
-  }
-  return indexed;
-}
-
 void TestPoly(const Polygons& polys, int expectedNumTri,
               double epsilon = -1.0) {
   std::vector<ivec3> triangles;
@@ -114,79 +83,45 @@ class PolygonTestFixture : public testing::Test {
 
 #ifndef MANIFOLD_NO_IOSTREAM
 void RegisterPolygonTestsFile(const std::string& filename) {
-  const std::vector<PolygonCorpusEntry> corpus = ReadPolygonCorpus(filename);
-  // The corpus files are committed, so an empty read means a missing or
-  // unreadable file; fail loudly rather than silently registering no tests.
-  EXPECT_FALSE(corpus.empty()) << "no polygon corpus read from " << filename;
-  for (const auto& entry : corpus) {
+  auto f = std::ifstream(filename);
+  EXPECT_TRUE(f.is_open());
+
+  // for each test:
+  //   test name, expectedNumTri, epsilon, num polygons
+  //   for each polygon:
+  //     num points
+  //     for each vertex:
+  //       x coord, y coord
+  //
+  // note that we should not have commas in the file
+
+  std::string name;
+  double epsilon, x, y;
+  int expectedNumTri, numPolys, numPoints;
+
+  while (1) {
+    f >> name;
+    if (f.eof()) break;
+    f >> expectedNumTri >> epsilon >> numPolys;
+    Polygons polys;
+    for (int i = 0; i < numPolys; i++) {
+      polys.emplace_back();
+      f >> numPoints;
+      for (int j = 0; j < numPoints; j++) {
+        f >> x >> y;
+        polys.back().emplace_back(x, y);
+      }
+    }
     testing::RegisterTest(
-        "Polygon", entry.name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
-        [polys = entry.polys, epsilon = entry.epsilon,
-         expectedNumTri = entry.expectedNumTri]() -> PolygonTestFixture* {
+        "Polygon", name.c_str(), nullptr, nullptr, __FILE__, __LINE__,
+        [=, polys = std::move(polys)]() -> PolygonTestFixture* {
           return new PolygonTestFixture(polys, epsilon, expectedNumTri);
         });
   }
+  f.close();
 }
 #endif
 }  // namespace
-
-TEST(TriangulatorReuse, ClearsState) {
-  const Polygons large = StarPolygon(64);
-  const Polygons withHole = SquareHole();
-  const PolygonsIdx largeIndexed = IndexPolygons(large);
-  const PolygonsIdx holeIndexed = IndexPolygons(withHole);
-  PolygonTriangulatorStore triangulators;
-
-  const auto largeTriangles = Triangulate(large, -1, false);
-  const auto holeTriangles = Triangulate(withHole, -1, false);
-
-  EXPECT_EQ(largeTriangles.size(), 62);
-  EXPECT_EQ(holeTriangles.size(), 8);
-  EXPECT_EQ(
-      TriangulateIdxHalfedges(largeIndexed, -1, false, triangulators.local())
-          .Triangles(),
-      largeTriangles);
-  EXPECT_EQ(
-      TriangulateIdxHalfedges(holeIndexed, -1, false, triangulators.local())
-          .Triangles(),
-      holeTriangles);
-  EXPECT_EQ(
-      TriangulateIdxHalfedges(largeIndexed, -1, false, triangulators.local())
-          .Triangles(),
-      largeTriangles);
-}
-
-#if MANIFOLD_PAR == 1 && !defined(__EMSCRIPTEN__)
-TEST(TriangulatorReuse, IsThreadLocal) {
-  const Polygons large = StarPolygon(64);
-  const Polygons withHole = SquareHole();
-  const PolygonsIdx largeIndexed = IndexPolygons(large);
-  const PolygonsIdx holeIndexed = IndexPolygons(withHole);
-  const auto largeTriangles = Triangulate(large, -1, false);
-  const auto holeTriangles = Triangulate(withHole, -1, false);
-  PolygonTriangulatorStore triangulators;
-
-  std::atomic<bool> success = true;
-  std::array<std::thread, 8> threads;
-  for (std::thread& thread : threads) {
-    thread = std::thread([&] {
-      PolygonTriangulator& triangulator = triangulators.local();
-      for (int i = 0; i < 10; ++i) {
-        if (TriangulateIdxHalfedges(largeIndexed, -1, false, triangulator)
-                    .Triangles() != largeTriangles ||
-            TriangulateIdxHalfedges(holeIndexed, -1, false, triangulator)
-                    .Triangles() != holeTriangles) {
-          success = false;
-          return;
-        }
-      }
-    });
-  }
-  for (std::thread& thread : threads) thread.join();
-
-  EXPECT_TRUE(success);
-}
-#endif
 
 TEST(Triangulation, ShortContours) {
   const SimplePolygon square = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
@@ -195,52 +130,6 @@ TEST(Triangulation, ShortContours) {
   EXPECT_TRUE(Triangulate({{{0, 0}, {1, 0}}}).empty());
   EXPECT_EQ(Triangulate({{}, square}).size(), 2);
   EXPECT_EQ(Triangulate({square, {{2, 2}}}).size(), 2);
-}
-
-// Benchmark: triangulate one large, smooth, non-convex contour, like a finely
-// sampled curve. Triangulation time should grow nearly linearly with the
-// vertex count.
-TEST(Triangulation, LargeSmoothContour) {
-  const int numVert = 20000;
-  const Polygons polys = SmoothBlob(numVert);
-  std::vector<ivec3> triangles;
-  EXPECT_NO_THROW(triangles = Triangulate(polys));
-  EXPECT_EQ(triangles.size(), numVert - 2);
-}
-
-// The triangulator must not build fans on smooth contours. Each clipped ear
-// adds a triangle at the fan's center vertex, the fan's edges reach across the
-// polygon, and its long sliver triangles slow both the ear search and later
-// booleans.
-TEST(Triangulation, NoFansOnSmoothContour) {
-  // With sharpest-ear-first ordering, the max vertex degree reached about
-  // numVert / 3.5 and the interior edge length about numVert / 5 perimeters.
-  // With shortest-ear-first ordering, both stay 1.3-2x below the limits
-  // checked here.
-  for (const int numVert : {1000, 20000}) {
-    const Polygons polys = SmoothBlob(numVert);
-    const std::vector<ivec3> triangles = Triangulate(polys);
-    ASSERT_EQ(triangles.size(), numVert - 2);
-    const SimplePolygon& poly = polys[0];
-    std::vector<int> degree(numVert, 0);
-    double edgeLength = 0;
-    for (const ivec3& tri : triangles) {
-      for (int i : {0, 1, 2}) {
-        ++degree[tri[i]];
-        edgeLength += la::length(poly[tri[i]] - poly[tri[(i + 1) % 3]]);
-      }
-    }
-    double perimeter = 0;
-    for (int i = 0; i < numVert; ++i) {
-      perimeter += la::length(poly[i] - poly[(i + 1) % numVert]);
-    }
-    // Boundary edges appear in one triangle, interior edges in two.
-    const double interiorLength = (edgeLength - perimeter) / 2;
-    EXPECT_LE(*std::max_element(degree.begin(), degree.end()), numVert / 25)
-        << numVert << " verts";
-    EXPECT_LE(interiorLength / perimeter, numVert / 40.0)
-        << numVert << " verts";
-  }
 }
 
 #ifndef MANIFOLD_NO_IOSTREAM

@@ -31,8 +31,6 @@
 #define ZoneScoped
 #define ZoneScopedN(name)
 #endif
-#include <cstdlib>
-#include <limits>
 #include <vector>
 
 #include "manifold/vec_view.h"
@@ -89,14 +87,9 @@ class Vec : public VecView<T> {
   // cannot be template methods
   inline Vec(const Vec<T, true>& vec) : VecView<T>() {
     ZoneScopedN("Vec(const vec&)");
-    if constexpr (shared) {
-      // Share storage just like copy assignment. MakeUnique() detaches before
-      // mutation; copying into an unshared Vec still needs its own buffer.
-      count_ = nullptr;
-      *this = vec;
-    } else {
-      *this = Vec(vec.view());
-    }
+    // initialized with operator=
+    if constexpr (shared) count_ = nullptr;
+    *this = Vec(vec.view());
   }
 
   inline Vec(const Vec<T, false>& vec) : VecView<T>() {
@@ -110,8 +103,6 @@ class Vec : public VecView<T> {
     if constexpr (shared) {
       this->count_ = other.count_;
       other.count_ = nullptr;
-    } else {
-      if (other.count_ != nullptr) other.MakeUnique();
     }
     moveContent(other);
   }
@@ -128,7 +119,8 @@ class Vec : public VecView<T> {
     this->capacity_ = this->size_;
     auto policy = autoPolicy(this->size_);
     if (this->size_ != 0) {
-      this->ptr_ = Allocate(this->size_);
+      this->ptr_ = reinterpret_cast<T*>(malloc(this->size_ * sizeof(T)));
+      ASSERT(this->ptr_ != nullptr, std::bad_alloc());
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       copy(policy, vec.begin(), vec.end(), this->ptr_);
     }
@@ -145,10 +137,6 @@ class Vec : public VecView<T> {
   Vec& operator=(const Vec& other) {
     ZoneScopedN("Vec operator=(other)");
     if (&other == this) return *this;
-    if constexpr (shared) {
-      // A moved-from SharedVec has no reference counter.
-      if (other.count_ == nullptr) return *this = Vec();
-    }
     dealloc();
     if constexpr (shared) {
       other.count_->fetch_add(1);
@@ -161,7 +149,8 @@ class Vec : public VecView<T> {
     this->size_ = other.size_;
     this->capacity_ = other.size_;
     if (this->size_ != 0) {
-      this->ptr_ = Allocate(this->size_);
+      this->ptr_ = reinterpret_cast<T*>(malloc(this->size_ * sizeof(T)));
+      ASSERT(this->ptr_ != nullptr, std::bad_alloc());
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       manifold::copy(other.begin(), other.end(), this->ptr_);
     }
@@ -175,7 +164,8 @@ class Vec : public VecView<T> {
     this->size_ = other.size_;
     this->capacity_ = other.size_;
     if (this->size_ != 0) {
-      this->ptr_ = Allocate(this->size_);
+      this->ptr_ = reinterpret_cast<T*>(malloc(this->size_ * sizeof(T)));
+      ASSERT(this->ptr_ != nullptr, std::bad_alloc());
       TracyAllocS(this->ptr_, this->size_ * sizeof(T), 3);
       manifold::copy(other.begin(), other.end(), this->ptr_);
     }
@@ -195,11 +185,7 @@ class Vec : public VecView<T> {
 
   inline Vec<T, shared>& operator=(Vec<T, !shared>&& other) {
     dealloc();
-    if constexpr (shared) {
-      this->count_ = new std::atomic<int>(1);
-    } else {
-      if (other.count_ != nullptr) other.MakeUnique();
-    }
+    if constexpr (shared) this->count_ = new std::atomic<int>(1);
     moveContent(other);
     return *this;
   }
@@ -235,7 +221,8 @@ class Vec : public VecView<T> {
   void reserve(size_t n) {
     AssertUnique();
     if (n > capacity_) {
-      T* newBuffer = Allocate(n);
+      T* newBuffer = reinterpret_cast<T*>(malloc(n * sizeof(T)));
+      ASSERT(newBuffer != nullptr, std::bad_alloc());
       TracyAllocS(newBuffer, n * sizeof(T), 3);
       if (this->size_ > 0)
         manifold::copy(autoPolicy(this->size_), this->ptr_,
@@ -284,7 +271,8 @@ class Vec : public VecView<T> {
     AssertUnique();
     T* newBuffer = nullptr;
     if (this->size_ > 0) {
-      newBuffer = Allocate(this->size_);
+      newBuffer = reinterpret_cast<T*>(malloc(this->size_ * sizeof(T)));
+      ASSERT(newBuffer != nullptr, std::bad_alloc());
       TracyAllocS(newBuffer, this->size_ * sizeof(T), 3);
       manifold::copy(this->ptr_, this->ptr_ + this->size_, newBuffer);
     }
@@ -323,18 +311,6 @@ class Vec : public VecView<T> {
     if constexpr (shared) {
       ASSERT(count_->load() == 1, logicErr("can only mutate unique vector"));
     }
-  }
-
-  // Out of memory is fatal. Never return null: writing through it is silent
-  // memory corruption under WASM, where address 0 is valid.
-  static T* Allocate(size_t n) {
-    // An overflowing size saturates, so malloc fails instead of wrapping.
-    const size_t bytes = n > std::numeric_limits<size_t>::max() / sizeof(T)
-                             ? std::numeric_limits<size_t>::max()
-                             : n * sizeof(T);
-    T* p = reinterpret_cast<T*>(malloc(bytes));
-    if (p == nullptr) std::abort();
-    return p;
   }
 
   inline void dealloc() {

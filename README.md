@@ -26,12 +26,10 @@ Here is an incomplete list of our users, whose integrations may be anywhere from
 | [Cadova](https://github.com/tomasf/Cadova) | [BREP.io](https://github.com/mmiscool/BREP)  | [Otterplans](https://otterplans.com) |
 | [Bracket Engineer](https://bracket.engineer) | [Nodillo](https://nodillo3d.com) | [CaDoodle CAD](https://cadoodlecad.com/) |
 | [Bridge Designer](https://www.asce.org/career-growth/pre-college-outreach/bridge-designer) |[AdaShape](https://adashape.com)| [PyVista](https://github.com/pyvista/pyvista-manifold) |
-| [Nasscad 4.7.0](https://www.nasscad.com) | [SolidSKeleton](https://github.com/FerroIT/SolidSKeleton) | [Piecad (Python-based)](https://github.com/briansturgill/Piecad) |
-| [3D Model Print Simple Edit](https://www.huragankodu.com/3defaulthk) 
 
 ### Bindings & Packages
 
-Manifold has bindings to many other languages, some maintained in this repository, and others elsewhere. It can also be built in C++ via [vcpkg](https://github.com/microsoft/vcpkg.git). There is also a native Rust port, [manifold-rust](https://github.com/larsbrubaker/manifold-rust), which passes Manifold's full test suite with identical results and has no C++ dependency — from a user's perspective it works like a binding.
+Manifold has bindings to many other languages, some maintained in this repository, and others elsewhere. It can also be built in C++ via [vcpkg](https://github.com/microsoft/vcpkg.git).
 
 | Language | Packager | Name | Maintenance |
 | --- | --- | --- | --- |
@@ -45,7 +43,6 @@ Manifold has bindings to many other languages, some maintained in this repositor
 | Julia | Packages | [ManifoldBindings.jl](https://juliapackages.com/p/manifoldbindings) | external |
 | OCaml | N/A | [OManifold](https://ocadml.github.io/OManifold/OManifold/index.html) | external |
 | Rust | crates.io | [manifold-csg](https://github.com/zmerlynn/manifold-csg) | external |
-| Rust (native port) | crates.io | [manifold-rust](https://crates.io/crates/manifold-rust) | external |
 | Swift | SPM | [Manifold-Swift](https://github.com/tomasf/manifold-swift) | external |
 
 ## Frontend Sandboxes
@@ -55,7 +52,7 @@ Manifold has bindings to many other languages, some maintained in this repositor
 
 ### [ManifoldCAD.org]
 
-If you like OpenSCAD / JSCAD, you might also like [ManifoldCAD][ManifoldCAD.org] - our own solid modelling web app where you script in JS/TS. This uses our npm packages: [manifold-3d](https://www.npmjs.com/package/manifold-3d), the library built via WASM, and [manifold-cad](https://www.npmjs.com/package/manifold-cad), the scripting runtime and command line tool built on top of it. It's not quite as fast as our raw C++, but it's hard to beat for interoperability.
+If you like OpenSCAD / JSCAD, you might also like [ManifoldCAD][ManifoldCAD.org] - our own solid modelling web app where you script in JS/TS. This uses our npm package, [manifold-3d](https://www.npmjs.com/package/manifold-3d), built via WASM. It's not quite as fast as our raw C++, but it's hard to beat for interoperability.
 
 ### [Python Colab Example]
 
@@ -83,6 +80,7 @@ Manifold no longer has **any** required dependencies! However, we do have severa
 | Name | CMake Flag | Provides |
 | --- | --- | --- |
 | [`TBB`](https://github.com/oneapi-src/oneTBB/) |`MANIFOLD_PAR=ON` | Parallel acceleration |
+| [`Clipper2`](https://github.com/AngusJohnson/Clipper2) | `MANIFOLD_CROSS_SECTION=ON` | 2D: [`CrossSection`](https://manifoldcad.org/docs/html/classmanifold_1_1_cross_section.html) |
 | [`Nanobind`](https://github.com/wjakob/nanobind) | `MANIFOLD_PYBIND=ON` | Python bindings |
 | [`Emscripten`](https://github.com/emscripten-core/emscripten) | `MANIFOLD_JSBIND=ON` | JS bindings via WASM |
 | [`GTest`](https://github.com/google/googletest/) | `MANIFOLD_TEST=ON` | Testing framework |
@@ -96,7 +94,7 @@ Please avoid saving to STL files! They are lossy and inefficient - when saving a
 
 If you use vertex properties for things like interpolated normals or texture UV coordinates, [glTF](https://www.khronos.org/Gltf) is recommended, specifically using the [`EXT_mesh_manifold`](https://github.com/KhronosGroup/glTF/blob/main/extensions/2.0/Vendor/EXT_mesh_manifold/README.md) extension. This allows for the lossless and efficient transmission of manifoldness even with property boundaries. Try our [make-manifold](https://manifoldcad.org/make-manifold) page to add this extension to your existing glTF/GLB models. 
 
-Manifold provides high precision OBJ file IO, but it is limited in functionality and is primarily to aid in testing. If you are using our npm module, we have a much more capable [gltf-io.ts](https://github.com/elalish/manifold/blob/master/bindings/wasm/manifold-cad/lib/gltf-io.ts) you can use instead. For other languages we strongly recommend using existing packages that focus on 3D file I/O, e.g. [trimesh](https://trimesh.org/) for Python, particularly when using vertex properties or materials.
+Manifold provides high precision OBJ file IO, but it is limited in functionality and is primarily to aid in testing. If you are using our npm module, we have a much more capable [gltf-io.ts](https://github.com/elalish/manifold/blob/master/bindings/wasm/examples/gltf-io.ts) you can use instead. For other languages we strongly recommend using existing packages that focus on 3D file I/O, e.g. [trimesh](https://trimesh.org/) for Python, particularly when using vertex properties or materials.
 Example for integrating with [Assimp](https://github.com/assimp/assimp) is in `extras/meshIO.cpp`, which is used by files such as `extras/convert_file.cpp`.
 
 ## Building
@@ -118,6 +116,7 @@ CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
 - `MANIFOLD_CBIND=[<OFF>, ON]`: Build C FFI binding.
 - `MANIFOLD_PYBIND=[OFF, <ON>]`: Build python binding, requires `nanobind`.
 - `MANIFOLD_PAR=[<OFF>, ON]`: Enables multi-thread parallelization, requires `tbb`.
+- `MANIFOLD_CROSS_SECTION=[OFF, <ON>]`: Build CrossSection for 2D support (needed by language bindings), requires `Clipper2`.
 - `MANIFOLD_DEBUG=[<OFF>, ON]`: Enables exceptions, timing, verbosity, OBJ test dumps. Has almost no effect on its own, but enables further runtime parameters to dump various outputs.
 - `MANIFOLD_ASSERT=[<OFF>, ON]`: Enables internal assertions. This incurs around 20% runtime overhead. Requires MANIFOLD_DEBUG to work.
 - `MANIFOLD_TEST=[OFF, <ON>]`: Build unit tests, requires `GTest`.
@@ -136,9 +135,10 @@ CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
 
 Dependency version override:
 - `MANIFOLD_USE_BUILTIN_TBB=[<OFF>, ON]`: Use builtin version of tbb.
+- `MANIFOLD_USE_BUILTIN_CLIPPER2=[<OFF>, ON]`: Use builtin version of clipper2.
 - `MANIFOLD_USE_BUILTIN_NANOBIND=[<OFF>, ON]`: Use builtin version of nanobind.
 
-> Note: These two options can force the build to avoid using the system
+> Note: These three options can force the build to avoid using the system
 > version of the dependency. This will either use the provided source directory
 > via `FETCHCONTENT_SOURCE_DIR_*` (see below), or fetch the source from GitHub.
 > Note that the dependency will be built as static dependency to avoid dynamic
@@ -156,6 +156,7 @@ Offline building (with missing dependencies/dependency version override):
 - `MANIFOLD_DOWNLOADS=[OFF, <ON>]`: Automatically download missing dependencies.
   Need to set `FETCHCONTENT_SOURCE_DIR_*` if the dependency `*` is missing.
 - `FETCHCONTENT_SOURCE_DIR_TBB`: path to tbb source (if `MANIFOLD_PAR` is enabled).
+- `FETCHCONTENT_SOURCE_DIR_CLIPPER2`: path to tbb source (if `MANIFOLD_CROSS_SECTION` is enabled).
 - `FETCHCONTENT_SOURCE_DIR_NANOBIND`: path to nanobind source (if `MANIFOLD_PYBIND` is enabled).
 - `FETCHCONTENT_SOURCE_DIR_GOOGLETEST`: path to googletest source (if `MANIFOLD_TEST` is enabled).
 
@@ -164,18 +165,6 @@ Offline building (with missing dependencies/dependency version override):
 > `MANIFOLD_DOWNLOADS`.
 
 The build instructions used by our CI are in [manifold.yml](https://github.com/elalish/manifold/blob/master/.github/workflows/manifold.yml), which is a good source to check if something goes wrong and for instructions specific to other platforms, like Windows.
-
-#### Sanitizer CI Reproduction
-
-To reproduce the sanitizer CI test locally from repo root:
-
-```bash
-bash ./scripts/ci/sanitizer_build.sh
-source ./scripts/sanitizer_cases.sh
-ASAN_OPTIONS=detect_container_overflow=0:strict_init_order=1 \
-UBSAN_OPTIONS=print_stacktrace=1 \
-./build/test/manifold_test --gtest_filter="${SANITIZER_GTEST_FILTER_CORE}"
-```
 
 ### WASM
 
@@ -230,13 +219,6 @@ python binding documentation:
 ```
 
 For more detailed documentation, please refer to the C++ API.
-
-`manifold3d` supports free-threaded Python (3.14t and later) and keeps the
-GIL disabled, so threads can build and evaluate Manifolds in parallel.
-Manifold and CrossSection objects are immutable and can be shared between
-threads. On regular Python, the calls that report progress to an
-`ExecutionContext` release the GIL, so another thread can watch progress or
-cancel them.
 
 ### Windows Shenanigans
 

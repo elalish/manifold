@@ -136,10 +136,7 @@ inline double sind(double x) {
  *
  * @param x Angle in degrees.
  */
-inline double cosd(double x) {
-  if (!la::isfinite(x)) return NAN;
-  return sind(90.0 - std::fmod(std::fabs(x), 360.0));
-}
+inline double cosd(double x) { return sind(x + 90.0); }
 /** @} */
 
 /** @addtogroup Structs
@@ -164,6 +161,19 @@ using SimplePolygon = std::vector<vec2>;
 using Polygons = std::vector<SimplePolygon>;
 
 /**
+ * @brief Defines which edges to sharpen and how much for the Manifold.Smooth()
+ * constructor.
+ */
+struct Smoothness {
+  /// The halfedge index = 3 * tri + i, referring to Mesh.triVerts[tri][i].
+  size_t halfedge;
+  /// A value between 0 and 1, where 0 is sharp and 1 is the default and the
+  /// curvature is interpolated between these values. The two paired halfedges
+  /// can have different values while maintaining C-1 continuity (except for 0).
+  double smoothness;
+};
+
+/**
  * @brief Result of a ray cast query against a Manifold.
  */
 struct RayHit {
@@ -177,13 +187,6 @@ struct RayHit {
   vec3 position = vec3(0.0);
   /// The geometric face normal at the hit.
   vec3 normal = vec3(0.0);
-  /// +1 if the ray enters the solid here, -1 if it exits. Summing these
-  /// along the ray gives the change in winding number from origin to
-  /// endpoint. Prefer this over the sign of dot(normal, direction), which
-  /// can disagree with the mesh's internal crossing in degenerate cases.
-  /// A ray grazing a vertex or edge can return a +1/-1 pair at the same
-  /// distance; such ties are ordered by faceID.
-  int crossing = 0;
 };
 
 /**
@@ -272,6 +275,15 @@ class ExecutionContext {
   /// values; the returned Manifolds remain valid.
   Manifold FromMeshGL(const MeshGL& mesh);
   Manifold FromMeshGL(const MeshGL64& mesh);
+
+  /// Eager ctx-aware `Manifold::Smooth(MeshGL[64])`. The ingest phases
+  /// plus the tangent-creation phases check cancel and credit
+  /// `Progress()` between phases. Same cancel-vs-validation precedence
+  /// as `FromMeshGL`.
+  Manifold Smooth(const MeshGL& mesh,
+                  const std::vector<Smoothness>& sharpenedEdges = {});
+  Manifold Smooth(const MeshGL64& mesh,
+                  const std::vector<Smoothness>& sharpenedEdges = {});
 
   /// Eager ctx-aware `Manifold::LevelSet`. The voxel-sampling and
   /// mesh-extraction phases check cancel and credit `Progress()` between
@@ -606,10 +618,8 @@ struct Rect {
    */
   constexpr Rect Transform(const mat2x3& m) const {
     Rect rect;
-    vec2 minT = m * vec3(min, 1);
-    vec2 maxT = m * vec3(max, 1);
-    rect.min = la::min(minT, maxT);
-    rect.max = la::max(minT, maxT);
+    rect.min = m * vec3(min, 1);
+    rect.max = m * vec3(max, 1);
     return rect;
   }
   ///@}
@@ -620,39 +630,6 @@ struct Rect {
  * Intersect.
  */
 enum class OpType : char { Add, Subtract, Intersect };
-
-// Adapted from Clipper2 docs:
-// http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/JoinType.htm
-// (Copyright © 2010-2023 Angus Johnson)
-/**
- * Specifies the treatment of path/contour joins (corners) when offseting
- * CrossSections. See the [Clipper2
- * doc](http://www.angusj.com/clipper2/Docs/Units/Clipper/Types/JoinType.htm)
- * for illustrations.
- */
-enum class JoinType {
-  Square, /*!< Squaring is applied uniformly at all joins where the internal
-            join angle is less that 90 degrees. The squared edge will be at
-            exactly the offset distance from the join vertex. */
-  Round,  /*!< Rounding is applied to all joins that have convex external
-           angles, and it maintains the exact offset distance from the join
-           vertex. */
-  Miter,  /*!< There's a necessary limit to mitered joins (to avoid narrow
-           angled joins producing excessively long and narrow
-           [spikes](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)).
-           So where mitered joins would exceed a given maximum miter distance
-           (relative to the offset distance), these are 'squared' instead. */
-  Bevel   /*!< Bevelled joins are similar to 'squared' joins except that
-           squaring won't occur at a fixed distance. While bevelled joins may
-           not be as pretty as squared joins, bevelling is much easier (ie
-           faster) than squaring. And perhaps this is why bevelling rather
-           than squaring is preferred in numerous graphics display formats
-           (including
-           [SVG](https://developer.mozilla.org/en-US/docs/Web/SVG/Attribute/stroke-linejoin)
-           and
-           [PDF](https://helpx.adobe.com/indesign/using/applying-line-stroke-settings.html)
-           document formats). */
-};
 
 constexpr int DEFAULT_SEGMENTS = 0;
 constexpr double DEFAULT_ANGLE = 10.0;
@@ -669,13 +646,9 @@ constexpr double DEFAULT_LENGTH = 1.0;
  */
 class Quality {
  public:
-  static void SetRelativePrecision(double p);
   static void SetMinCircularAngle(double angle);
   static void SetMinCircularEdgeLength(double length);
   static void SetCircularSegments(int number);
-  static double GetRelativePrecision();
-  static double GetMinCircularAngle();
-  static double GetMinCircularEdgeLength();
   static int GetCircularSegments(double radius);
   static void ResetToDefaults();
 };
@@ -697,10 +670,6 @@ struct ExecutionParams {
   /// Perform 3D mesh self-intersection test on intermediate boolean results to
   /// test for ϵ-validity. For debug purposes only.
   bool selfIntersectionChecks = false;
-  /// Check that each Boolean does not produce any degenerate triangles. For
-  /// debug purposes only. Only valid for inputs that also don't contain
-  /// degenerate triangles.
-  bool verifyNoDegenerates = false;
   /// If processOverlaps is false, a geometric check will be performed to assert
   /// all triangles are CCW.
   bool processOverlaps = true;
@@ -726,6 +695,11 @@ inline std::ostream& operator<<(std::ostream& stream, const Box& box) {
 
 inline std::ostream& operator<<(std::ostream& stream, const Rect& box) {
   return stream << "min: " << box.min << ", " << "max: " << box.max;
+}
+
+inline std::ostream& operator<<(std::ostream& stream, const Smoothness& s) {
+  return stream << "halfedge: " << s.halfedge << ", "
+                << "smoothness: " << s.smoothness;
 }
 
 /**

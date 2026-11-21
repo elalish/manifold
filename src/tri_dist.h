@@ -53,14 +53,11 @@ inline void EdgeEdgeDist(vec3& x, vec3& y,  // closest points
   // u parameterizes ray (q, b)
 
   // Compute t for the closest point on ray (p, a) to ray (q, b)
-  // The equivalent difference of dot products loses the angle between nearly
-  // parallel edges to cancellation, incorrectly treating them as parallel.
-  const vec3 normal = la::cross(a, b);
-  const auto Denom = la::dot(normal, normal);
+  const auto Denom = ADotA * BDotB - ADotB * ADotB;
 
   double t;  // We will clamp result so t is on the segment (p, a)
   t = Denom != 0.0
-          ? la::clamp(la::dot(la::cross(T, b), normal) / Denom, 0.0, 1.0)
+          ? la::clamp((ADotT * BDotB - BDotT * ADotB) / Denom, 0.0, 1.0)
           : 0.0;
 
   // find u for point on ray (q, b) closest to point at t

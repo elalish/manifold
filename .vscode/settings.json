@@ -164,5 +164,4 @@
     "--header-insertion=never"
   ],
   "editor.defaultFormatter": "xaver.clang-format",
-  "python-envs.defaultEnvManager": "ms-python.python:system",
 }

@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "disjoint_sets.h"
 #include "execution_impl.h"
 #include "impl.h"
 #include "parallel.h"
@@ -52,9 +51,6 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
   };
   if (IsCancelled(ctx)) return cancelled();
 
-  // Eroding an empty base must not return the other operand.
-  if (inset && IsEmpty()) return Manifold(std::make_shared<Impl>(*this));
-
   const Impl* aImpl = this;
   const Impl* bImpl = &other;
 
@@ -63,8 +59,8 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
 
   constexpr size_t BATCH_SIZE = 1000;
 
-  // Only the sum is commutative; erosion must preserve the first operand.
-  if (!inset && aConvex && !bConvex) {
+  // If the convex manifold was supplied first, swap them!
+  if (aConvex && !bConvex) {
     std::swap(aImpl, bImpl);
     std::swap(aConvex, bConvex);
   }
@@ -79,43 +75,13 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
     return Manifold(result);
   }
 
+  std::shared_ptr<Impl> aImplCopy = std::make_shared<Impl>(*aImpl);
+  Manifold a(aImplCopy);
   std::vector<Manifold> composedHulls;
-  // Reserve for face batches; component seeds may require additional space.
+  // Reserve space: 1 for base + batches for non-convex cases
   size_t numBatches = (aImpl->NumTri() + BATCH_SIZE - 1) / BATCH_SIZE;
   composedHulls.reserve(1 + numBatches);
-  if (inset) {
-    composedHulls.push_back(Manifold(std::make_shared<Impl>(*aImpl)));
-  } else if (!aConvex && bConvex) {
-    // A translated by any point of B belongs to A + B; unshifted A may not.
-    Manifold a(std::make_shared<Impl>(*aImpl));
-    composedHulls.push_back(a.Translate(bImpl->vertPos_[0]));
-  }
-  if (!aConvex && !bConvex) {
-    // Face-pair sweeps do not fill components contained inside the other
-    // operand. Seed at a vertex of each boundary component, including cavity
-    // surfaces, so the sweep contains the initial volume as well as its walls.
-    auto addSeeds = [&composedHulls, inset](const Impl& source,
-                                            const Impl& shape) {
-      DisjointSets components(source.NumVert());
-      for (size_t edge = 0; edge < source.halfedge_.size(); ++edge) {
-        if (source.halfedge_.IsForward(edge)) {
-          components.unite(source.halfedge_.Start(edge),
-                           source.halfedge_.End(edge));
-        }
-      }
-      Manifold base(std::make_shared<Impl>(shape));
-      // Like the cutting hulls, erosion seeds must not add cutter properties.
-      if (inset && base.NumProp() > 0) base = base.SetProperties(0, nullptr);
-      for (size_t vert = 0; vert < source.NumVert(); ++vert) {
-        if (components.find(vert) == vert) {
-          composedHulls.push_back(base.Translate(source.vertPos_[vert]));
-        }
-      }
-    };
-    // Erosion sweeps B over A's boundary; only the sum is symmetric.
-    if (!inset) addSeeds(*bImpl, *aImpl);
-    addSeeds(*aImpl, *bImpl);
-  }
+  composedHulls.push_back(a);
 
   // Convex-Convex Minkowski: Very Fast
   if (!inset && aConvex && bConvex) {
@@ -128,9 +94,8 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
                         TransformIterator(verts.end(), t));
     }
     composedHulls.push_back(Manifold::Hull(simpleHull));
-    // Hull each A face with all B vertices when B is convex. For erosion,
-    // convex A also permits this: A eroded by B equals A eroded by B's hull.
-  } else if (bConvex || (inset && aConvex)) {
+    // Convex - Non-Convex Minkowski: Slower
+  } else if ((inset || !aConvex) && bConvex) {
     const size_t numTri = aImpl->NumTri();
     const VecView<vec3> verts = bImpl->vertPos_;
 
@@ -158,7 +123,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
     // Non-Convex - Non-Convex Minkowski: Very Slow
     // Process A faces sequentially with periodic batch reduction to balance
     // memory usage and performance.
-  } else {
+  } else if (!aConvex && !bConvex) {
     const size_t numTriA = aImpl->NumTri();
     const size_t numTriB = bImpl->NumTri();
 
@@ -229,7 +194,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
   if (IsCancelled(ctx)) return cancelled();
   return evalBatch(std::move(composedHulls),
                    inset ? manifold::OpType::Subtract : manifold::OpType::Add)
-      .AsOriginal(0);
+      .AsOriginal();
 }
 
 }  // namespace manifold

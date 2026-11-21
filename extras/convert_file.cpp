@@ -35,12 +35,11 @@ int main(int argc, char** argv) {
   std::cout << input.NumVert() << " vertices, " << input.NumTri()
             << " triangles" << std::endl;
 
-  Manifold manifold(input);
-  if (manifold.Status() == Manifold::Error::NotManifold) {
+  if (input.Merge())
     std::cout << filename << " is not manifold, attempting to fix."
               << std::endl;
-    manifold = Manifold(input.Merge());
-  }
+
+  const Manifold manifold(input);
   if (manifold.Status() != Manifold::Error::NoError) {
     std::cout << "Could not make a valid manifold, error: "
               << (int)manifold.Status() << std::endl;

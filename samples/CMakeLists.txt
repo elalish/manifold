@@ -25,7 +25,9 @@ add_library(
   src/gyroid_module.cpp
   src/condensed_matter.cpp
 )
-target_sources(samples PUBLIC src/bracelet.cpp src/knot.cpp)
+if(MANIFOLD_CROSS_SECTION)
+  target_sources(samples PUBLIC src/bracelet.cpp src/knot.cpp)
+endif()
 
 target_include_directories(samples PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 

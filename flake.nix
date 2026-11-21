@@ -1,17 +1,31 @@
 {
   inputs.flake-utils.url = "github:numtide/flake-utils";
   inputs.nixpkgs.url = "nixpkgs/nixos-unstable";
+  inputs.clipper2-src = {
+    url = "github:AngusJohnson/Clipper2";
+    flake = false;
+  };
   outputs =
     { self
     , nixpkgs
     , flake-utils
+    , clipper2-src
     }:
     flake-utils.lib.eachDefaultSystem
       (system:
       let
-        manifold-version = "3.5.1";
+        manifold-version = "3.5.5";
         pkgs = import nixpkgs {
           inherit system;
+          overlays = [
+            (final: prev: {
+              clipper2 = prev.clipper2.overrideAttrs (_: rec {
+                version = clipper2-src.rev;
+                src = clipper2-src;
+                sourceRoot = "source/CPP";
+              });
+            })
+          ];
         };
         manifold =
           { parallel ? true }: pkgs.stdenv.mkDerivation {
@@ -25,7 +39,9 @@
                 (ps: with ps; [ nanobind trimesh pytest ]))
               gtest
             ]) ++ (if parallel then [ pkgs.onetbb ] else [ ]);
-            buildInputs = [ ];
+            buildInputs = with pkgs; [
+              clipper2
+            ];
             cmakeFlags = [
               "-DMANIFOLD_STRICT=ON"
               "-DMANIFOLD_CBIND=ON"
@@ -46,6 +62,8 @@
           nativeBuildInputs = (with pkgs; [ cmake python3 ]);
           buildInputs = [ pkgs.nodejs ];
           configurePhase = ''
+            cp -r ${clipper2-src} clipper2
+            chmod -R +w clipper2
             mkdir -p .emscriptencache
             export EM_CACHE=$(pwd)/.emscriptencache
             mkdir build
@@ -55,7 +73,8 @@
             -DMANIFOLD_PAR=${if parallel then "ON" else "OFF"} \
             -DMANIFOLD_USE_BUILTIN_TBB=${if parallel then "ON" else "OFF"} \
             -DFETCHCONTENT_SOURCE_DIR_GOOGLETEST=${pkgs.gtest.src} \
-            -DFETCHCONTENT_SOURCE_DIR_TBB=${pkgs.onetbb.src} ..
+            -DFETCHCONTENT_SOURCE_DIR_TBB=${pkgs.onetbb.src} \
+            -DFETCHCONTENT_SOURCE_DIR_CLIPPER2=../clipper2 ..
           '';
           buildPhase = ''
             emmake make -j''${NIX_BUILD_CORES}
@@ -88,8 +107,7 @@
             version = manifold-version;
             src = self;
             propagatedBuildInputs = [ numpy ];
-            buildInputs = with pkgs; [ onetbb ];
-            SKBUILD_CMAKE_DEFINE = "MANIFOLD_USE_BUILTIN_TBB=OFF";
+            buildInputs = with pkgs; [ clipper2 onetbb ];
             nativeBuildInputs = with pkgs; [
               cmake
               ninja
@@ -129,6 +147,7 @@
             onetbb
             gtest
             assimp
+            clipper2
             pkg-config
 
             # useful tools

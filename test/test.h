@@ -14,6 +14,7 @@
 
 #pragma once
 
+#include "gtest/gtest.h"
 #include "manifold/common.h"
 #include "manifold/manifold.h"
 
@@ -38,23 +39,7 @@ struct ManifoldParamGuard {
   ~ManifoldParamGuard() { ManifoldParams() = params; }
 };
 
-inline double RawSignedArea(const manifold::SimplePolygon& ring) {
-  if (ring.size() < 3) return 0.0;
-  double sum = 0.0;
-  for (size_t i = 0; i < ring.size(); ++i) {
-    const manifold::vec2& a = ring[i];
-    const manifold::vec2& b = ring[(i + 1) % ring.size()];
-    sum += la::cross(a, b);
-  }
-  return 0.5 * sum;
-}
-
-inline double RawArea(const manifold::SimplePolygon& ring) {
-  return std::fabs(RawSignedArea(ring));
-}
-
 Polygons SquareHole(double xOffset = 0.0);
-Polygons SmoothBlob(int numVert, double radius = 10.0);
 MeshGL Csaszar();
 Manifold Gyroid();
 MeshGL TetGL();
@@ -69,6 +54,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
                bool checkNormals = false, bool updateNormals = false);
 void ExpectMeshes(const Manifold& manifold,
                   const std::vector<MeshSize>& meshSize);
+void CheckStrictly(const Manifold& manifold);
 void CheckGL(const Manifold& manifold, bool noMerge = true);
 void CheckGLEquiv(const MeshGL& mgl1, const MeshGL& mgl2);
 Manifold ReadTestOBJ(const std::string& filename);

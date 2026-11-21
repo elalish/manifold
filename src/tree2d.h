@@ -25,13 +25,11 @@ void BuildTwoDTreeImpl(VecView<PolyVert> points, bool sortX);
 
 void BuildTwoDTree(VecView<PolyVert> points);
 
-// A negative index disables a point. Keep its coordinates unchanged so an
-// internal pivot still partitions the remaining points correctly.
 template <typename F>
 void QueryTwoDTree(VecView<PolyVert> points, Rect r, F f) {
   if (points.size() <= 8) {
     for (const auto& p : points)
-      if (p.idx >= 0 && r.Contains(p.pos)) f(p);
+      if (r.Contains(p.pos)) f(p);
     return;
   }
   Rect current;
@@ -48,7 +46,7 @@ void QueryTwoDTree(VecView<PolyVert> points, Rect r, F f) {
   while (1) {
     if (currentView.size() <= 8) {
       for (const auto& p : currentView)
-        if (p.idx >= 0 && r.Contains(p.pos)) f(p);
+        if (r.Contains(p.pos)) f(p);
       if (--stackPointer < 0) break;
       level = levelStack[stackPointer];
       currentView = viewStack[stackPointer];
@@ -65,7 +63,7 @@ void QueryTwoDTree(VecView<PolyVert> points, Rect r, F f) {
     else
       left.max.y = right.min.y = middle.pos.y;
 
-    if (middle.idx >= 0 && r.Contains(middle.pos)) f(middle);
+    if (r.Contains(middle.pos)) f(middle);
     if (left.DoesOverlap(r)) {
       if (right.DoesOverlap(r)) {
         DEBUG_ASSERT(stackPointer < 64, logicErr, "Stack overflow");

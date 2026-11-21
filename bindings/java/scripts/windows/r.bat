@@ -1,0 +1,1 @@
+java --enable-preview --enable-native-access=ALL-UNNAMED --add-modules javafx.controls -cp "target/classes;/d/git/java/bin/javafx/*" -Djava.library.path=/d/git/manifold-c/cad-app/src/resources/natives/win-x86_64 com.cad.ManifoldCADApp

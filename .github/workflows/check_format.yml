@@ -11,20 +11,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v7
+    - uses: actions/checkout@v6
     - uses: DoozyX/clang-format-lint-action@v0.20
       with:
         source: '.'
         extensions: 'h,cpp,js,ts,html'
         clangFormatVersion: 20
-    - uses: actions/setup-python@v7
+    - uses: actions/setup-python@v5
       with:
         python-version: '3.12' 
         cache: 'pip'
     - uses: psf/black@stable
       with:
         options: "--check --verbose"
-        src: "./bindings/python/examples ./bindings/python/tests"
+        src: "./bindings/python/examples"
     # - name: "gersemi cmake check"
     #   run: |
     #     pip3 install gersemi

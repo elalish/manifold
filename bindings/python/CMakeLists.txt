@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-nanobind_add_module(manifold3d NB_STATIC STABLE_ABI FREE_THREADED LTO autogen_docstrings.inl
+nanobind_add_module(manifold3d NB_STATIC STABLE_ABI LTO autogen_docstrings.inl
                     manifold3d.cpp
 )
 
@@ -62,7 +62,7 @@ set(
   ${PROJECT_SOURCE_DIR}/src/manifold.cpp
   ${PROJECT_SOURCE_DIR}/src/constructors.cpp
   ${PROJECT_SOURCE_DIR}/src/sort.cpp
-  ${PROJECT_SOURCE_DIR}/src/cross_section.cpp
+  ${PROJECT_SOURCE_DIR}/src/cross_section/cross_section.cpp
   ${PROJECT_SOURCE_DIR}/src/polygon.cpp
   ${PROJECT_SOURCE_DIR}/include/manifold/common.h
   ${CMAKE_CURRENT_SOURCE_DIR}/gen_docs.py

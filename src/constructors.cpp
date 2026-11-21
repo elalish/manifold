@@ -22,88 +22,71 @@
 #include "parallel.h"
 
 namespace manifold {
-namespace {
-std::shared_ptr<Manifold::Impl> ExtrudeImpl(const Polygons& crossSection,
-                                            double height, int nDivisions,
-                                            double twistDegrees, vec2 scaleTop,
-                                            double zOffset = 0.0,
-                                            bool flipZ = false) {
-  scaleTop.x = std::max(scaleTop.x, 0.0);
-  scaleTop.y = std::max(scaleTop.y, 0.0);
-
-  auto pImpl_ = std::make_shared<Manifold::Impl>();
-  ++nDivisions;
-  auto& vertPos = pImpl_->vertPos_;
-  Vec<ivec3> triVertsDH;
-  auto& triVerts = triVertsDH;
-  int nCrossSection = 0;
-  bool isCone = scaleTop.x == 0.0 && scaleTop.y == 0.0;
-  size_t idx = 0;
-  PolygonsIdx polygonsIndexed;
-  for (auto& poly : crossSection) {
-    nCrossSection += poly.size();
-    SimplePolygonIdx simpleIndexed;
-    for (const vec2& polyVert : poly) {
-      vertPos.push_back({polyVert.x, polyVert.y, 0.0});
-      simpleIndexed.push_back({polyVert, static_cast<int>(idx++)});
-    }
-    polygonsIndexed.push_back(simpleIndexed);
-  }
-  for (int i = 1; i < nDivisions + 1; ++i) {
-    double alpha = i / double(nDivisions);
-    double phi = alpha * twistDegrees;
-    vec2 scale = la::lerp(vec2(1.0), scaleTop, alpha);
-    mat2 rotation({cosd(phi), sind(phi)}, {-sind(phi), cosd(phi)});
-    mat2 transform = mat2({scale.x, 0.0}, {0.0, scale.y}) * rotation;
-    size_t j = 0;
-    size_t idx = 0;
-    for (const auto& poly : crossSection) {
-      for (size_t vert = 0; vert < poly.size(); ++vert) {
-        size_t offset = idx + nCrossSection * i;
-        size_t thisVert = vert + offset;
-        size_t lastVert = (vert == 0 ? poly.size() : vert) - 1 + offset;
-        if (i == nDivisions && isCone) {
-          triVerts.push_back(ivec3(nCrossSection * i + j,
-                                   lastVert - nCrossSection,
-                                   thisVert - nCrossSection));
-        } else {
-          vec2 pos = transform * poly[vert];
-          vertPos.push_back({pos.x, pos.y, height * alpha});
-          triVerts.push_back(
-              ivec3(thisVert, lastVert, thisVert - nCrossSection));
-          triVerts.push_back(ivec3(lastVert, lastVert - nCrossSection,
-                                   thisVert - nCrossSection));
-        }
-      }
-      ++j;
-      idx += poly.size();
-    }
-  }
-  if (isCone)
-    for (size_t j = 0; j < crossSection.size();
-         ++j)  // Duplicate vertex for Genus
-      vertPos.push_back({0.0, 0.0, height});
-  std::vector<ivec3> top = TriangulateIdx(polygonsIndexed);
-  for (const ivec3& tri : top) {
-    triVerts.push_back({tri[0], tri[2], tri[1]});
-    if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
-  }
-
-  if (flipZ) {
-    for (vec3& v : vertPos) v.z = zOffset - v.z;
-    for (ivec3& tri : triVerts) std::swap(tri[1], tri[2]);
-  } else if (zOffset != 0.0) {
-    for (vec3& v : vertPos) v.z += zOffset;
-  }
-
-  pImpl_->CreateHalfedges(triVertsDH);
-  pImpl_->CalculateBBox();
-  pImpl_->SortGeometry();
-  pImpl_->SetFaceAndVertNormals();
-  pImpl_->InitializeOriginal();
-  return pImpl_;
+/**
+ * Constructs a smooth version of the input mesh by creating tangents; this
+ * method will throw if you have supplied tangents with your mesh already. The
+ * actual triangle resolution is unchanged; use the Refine() method to
+ * interpolate to a higher-resolution curve.
+ *
+ * By default, every edge is calculated for maximum smoothness (very much
+ * approximately), attempting to minimize the maximum mean Curvature magnitude.
+ * No higher-order derivatives are considered, as the interpolation is
+ * independent per triangle, only sharing constraints on their boundaries.
+ *
+ * @param meshGL input MeshGL.
+ * @param sharpenedEdges If desired, you can supply a vector of sharpened
+ * halfedges, which should in general be a small subset of all halfedges. Order
+ * of entries doesn't matter, as each one specifies the desired smoothness
+ * (between zero and one, with one the default for all unspecified halfedges)
+ * and the halfedge index (3 * triangle index + [0,1,2] where 0 is the edge
+ * between triVert 0 and 1, etc).
+ *
+ * At a smoothness value of zero, a sharp crease is made. The smoothness is
+ * interpolated along each edge, so the specified value should be thought of as
+ * an average. Where exactly two sharpened edges meet at a vertex, their
+ * tangents are rotated to be colinear so that the sharpened edge can be
+ * continuous. Vertices with only one sharpened edge are completely smooth,
+ * allowing sharpened edges to smoothly vanish at termination. A single vertex
+ * can be sharpened by sharping all edges that are incident on it, allowing
+ * cones to be formed.
+ */
+Manifold Manifold::Smooth(const MeshGL& meshGL,
+                          const std::vector<Smoothness>& sharpenedEdges) {
+  return Manifold(MakeSmoothImpl(meshGL, sharpenedEdges));
 }
-}  // namespace
+
+/**
+ * Constructs a smooth version of the input mesh by creating tangents; this
+ * method will throw if you have supplied tangents with your mesh already. The
+ * actual triangle resolution is unchanged; use the Refine() method to
+ * interpolate to a higher-resolution curve.
+ *
+ * By default, every edge is calculated for maximum smoothness (very much
+ * approximately), attempting to minimize the maximum mean Curvature magnitude.
+ * No higher-order derivatives are considered, as the interpolation is
+ * independent per triangle, only sharing constraints on their boundaries.
+ *
+ * @param meshGL64 input MeshGL64.
+ * @param sharpenedEdges If desired, you can supply a vector of sharpened
+ * halfedges, which should in general be a small subset of all halfedges. Order
+ * of entries doesn't matter, as each one specifies the desired smoothness
+ * (between zero and one, with one the default for all unspecified halfedges)
+ * and the halfedge index (3 * triangle index + [0,1,2] where 0 is the edge
+ * between triVert 0 and 1, etc).
+ *
+ * At a smoothness value of zero, a sharp crease is made. The smoothness is
+ * interpolated along each edge, so the specified value should be thought of as
+ * an average. Where exactly two sharpened edges meet at a vertex, their
+ * tangents are rotated to be colinear so that the sharpened edge can be
+ * continuous. Vertices with only one sharpened edge are completely smooth,
+ * allowing sharpened edges to smoothly vanish at termination. A single vertex
+ * can be sharpened by sharping all edges that are incident on it, allowing
+ * cones to be formed.
+ */
+Manifold Manifold::Smooth(const MeshGL64& meshGL64,
+                          const std::vector<Smoothness>& sharpenedEdges) {
+  return Manifold(MakeSmoothImpl(meshGL64, sharpenedEdges));
+}
 
 /**
  * Constructs a tetrahedron centered at the origin with one vertex at (1,1,1)
@@ -115,16 +98,14 @@ Manifold Manifold::Tetrahedron() {
 
 /**
  * Constructs a unit cube (edge lengths all one), by default in the first
- * octant, touching the origin. If any dimensions in size are negative or
- * non-finite, or if all are zero, an empty Manifold with InvalidConstruction
- * status will be returned.
+ * octant, touching the origin. If any dimensions in size are negative, or if
+ * all are zero, an empty Manifold will be returned.
  *
  * @param size The X, Y, and Z dimensions of the box.
  * @param center Set to true to shift the center to the origin.
  */
 Manifold Manifold::Cube(vec3 size, bool center) {
-  if (!la::all(la::isfinite(size)) || size.x < 0.0 || size.y < 0.0 ||
-      size.z < 0.0 || la::length(size) == 0.) {
+  if (size.x < 0.0 || size.y < 0.0 || size.z < 0.0 || la::length(size) == 0.) {
     return Invalid();
   }
   mat3x4 m({{size.x, 0.0, 0.0}, {0.0, size.y, 0.0}, {0.0, 0.0, size.z}},
@@ -136,15 +117,11 @@ Manifold Manifold::Cube(vec3 size, bool center) {
  * A convenience constructor for the common case of extruding a circle. Can also
  * form cones if both radii are specified.
  *
- * Non-finite dimensions return an empty Manifold with InvalidConstruction
- * status.
- *
- * @param height Z-extent. Must be positive and finite.
- * @param radiusLow Radius of bottom circle. Must be non-negative and finite. If
- * zero, radiusHigh must be positive and a cone with apex at the bottom is
- * created.
- * @param radiusHigh Radius of top circle. Must be finite and can equal zero.
- * Negative values, including the default, use radiusLow.
+ * @param height Z-extent
+ * @param radiusLow Radius of bottom circle. Must be non-negative. If zero,
+ * radiusHigh must be positive and a cone with apex at the bottom is created.
+ * @param radiusHigh Radius of top circle. Can equal zero. Default is equal to
+ * radiusLow.
  * @param circularSegments How many line segments to use around the circle.
  * Default is calculated by the static Defaults.
  * @param center Set to true to shift the center to the origin. Default is
@@ -152,16 +129,19 @@ Manifold Manifold::Cube(vec3 size, bool center) {
  */
 Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
                             int circularSegments, bool center) {
-  if (!std::isfinite(height) || !std::isfinite(radiusLow) ||
-      !std::isfinite(radiusHigh) || height <= 0.0 || radiusLow < 0.0) {
+  if (height <= 0.0 || radiusLow < 0.0) {
     return Invalid();
   }
-  const bool flip = radiusLow == 0.0;
-  if (flip) {
+  if (radiusLow == 0.0) {
     if (radiusHigh <= 0.0) {
       return Invalid();
     }
-    std::swap(radiusLow, radiusHigh);
+    // Cone with apex at bottom: create the centered apex-at-top version and
+    // mirror it
+    Manifold cone = Cylinder(height, radiusHigh, 0.0, circularSegments, true);
+    cone = cone.Mirror(vec3(0.0, 0.0, 1.0));
+    if (!center) cone = cone.Translate(vec3(0.0, 0.0, height / 2.0));
+    return cone.AsOriginal();
   }
   const double scale = radiusHigh >= 0.0 ? radiusHigh / radiusLow : 1.0;
   const double radius = fmax(radiusLow, radiusHigh);
@@ -174,16 +154,16 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
     circle[i] = {radiusLow * cosd(dPhi * i), radiusLow * sind(dPhi * i)};
   }
 
-  const double zOffset = (flip ? height : 0.0) - (center ? height / 2.0 : 0.0);
-  return Manifold(
-      ExtrudeImpl({circle}, height, 0, 0.0, vec2(scale), zOffset, flip));
+  Manifold cylinder = Manifold::Extrude({circle}, height, 0, 0.0, vec2(scale));
+  if (center)
+    cylinder = cylinder.Translate(vec3(0.0, 0.0, -height / 2.0)).AsOriginal();
+  return cylinder;
 }
 
 /**
  * Constructs a geodesic sphere of a given radius.
  *
- * @param radius Radius of the sphere. Must be positive and finite; otherwise
- * returns an empty Manifold with InvalidConstruction status.
+ * @param radius Radius of the sphere. Must be positive.
  * @param circularSegments Number of segments along its
  * diameter. This number will always be rounded up to the nearest factor of
  * four, as this sphere is constructed by refining an octahedron. This means
@@ -191,14 +171,13 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
  * calculated by the static Defaults.
  */
 Manifold Manifold::Sphere(double radius, int circularSegments) {
-  if (radius <= 0.0 || !std::isfinite(radius)) {
+  if (radius <= 0.0) {
     return Invalid();
   }
   int n = circularSegments > 0 ? (circularSegments + 3) / 4
                                : Quality::GetCircularSegments(radius) / 4;
   auto pImpl_ = std::make_shared<Impl>(Impl::Shape::Octahedron);
   pImpl_->Subdivide([n](vec3, vec4, vec4) { return n - 1; });
-  if (pImpl_->status_ != Error::NoError) return Manifold(pImpl_);
   for_each_n(autoPolicy(pImpl_->NumVert(), 1e5), pImpl_->vertPos_.begin(),
              pImpl_->NumVert(), [radius](vec3& v) {
                v = vec3(la::cos(kHalfPi * (1.0 - v.x)),
@@ -208,10 +187,11 @@ Manifold Manifold::Sphere(double radius, int circularSegments) {
                if (std::isnan(v.x)) v = vec3(0.0);
              });
   // Ignore preceding octahedron.
-  pImpl_->CalculateBBox();
-  pImpl_->SortGeometry();
-  pImpl_->SetFaceAndVertNormals();
   pImpl_->InitializeOriginal();
+  pImpl_->CalculateBBox();
+  pImpl_->SetEpsilon();
+  pImpl_->SortGeometry();
+  pImpl_->SetNormalsAndCoplanar();
   return Manifold(pImpl_);
 }
 
@@ -257,8 +237,74 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
   if (numVert * (nDivisions + int64_t(2)) > std::numeric_limits<int>::max()) {
     return PropagateStatus(Error::ResultTooLarge);
   }
-  return Manifold(
-      ExtrudeImpl(polygons, height, nDivisions, twistDegrees, scaleTop));
+
+  scaleTop.x = std::max(scaleTop.x, 0.0);
+  scaleTop.y = std::max(scaleTop.y, 0.0);
+
+  auto pImpl_ = std::make_shared<Impl>();
+  ++nDivisions;
+  auto& vertPos = pImpl_->vertPos_;
+  Vec<ivec3> triVertsDH;
+  auto& triVerts = triVertsDH;
+  int nCrossSection = 0;
+  bool isCone = scaleTop.x == 0.0 && scaleTop.y == 0.0;
+  size_t idx = 0;
+  PolygonsIdx polygonsIndexed;
+  for (auto& poly : polygons) {
+    nCrossSection += poly.size();
+    SimplePolygonIdx simpleIndexed;
+    for (const vec2& polyVert : poly) {
+      vertPos.push_back({polyVert.x, polyVert.y, 0.0});
+      simpleIndexed.push_back({polyVert, static_cast<int>(idx++)});
+    }
+    polygonsIndexed.push_back(simpleIndexed);
+  }
+  for (int i = 1; i < nDivisions + 1; ++i) {
+    double alpha = i / double(nDivisions);
+    double phi = alpha * twistDegrees;
+    vec2 scale = la::lerp(vec2(1.0), scaleTop, alpha);
+    mat2 rotation({cosd(phi), sind(phi)}, {-sind(phi), cosd(phi)});
+    mat2 transform = mat2({scale.x, 0.0}, {0.0, scale.y}) * rotation;
+    size_t j = 0;
+    size_t idx = 0;
+    for (const auto& poly : polygons) {
+      for (size_t vert = 0; vert < poly.size(); ++vert) {
+        size_t offset = idx + nCrossSection * i;
+        size_t thisVert = vert + offset;
+        size_t lastVert = (vert == 0 ? poly.size() : vert) - 1 + offset;
+        if (i == nDivisions && isCone) {
+          triVerts.push_back(ivec3(nCrossSection * i + j,
+                                   lastVert - nCrossSection,
+                                   thisVert - nCrossSection));
+        } else {
+          vec2 pos = transform * poly[vert];
+          vertPos.push_back({pos.x, pos.y, height * alpha});
+          triVerts.push_back(
+              ivec3(thisVert, lastVert, thisVert - nCrossSection));
+          triVerts.push_back(ivec3(lastVert, lastVert - nCrossSection,
+                                   thisVert - nCrossSection));
+        }
+      }
+      ++j;
+      idx += poly.size();
+    }
+  }
+  if (isCone)
+    for (size_t j = 0; j < polygons.size(); ++j)  // Duplicate vertex for Genus
+      vertPos.push_back({0.0, 0.0, height});
+  std::vector<ivec3> top = TriangulateIdx(polygonsIndexed);
+  for (const ivec3& tri : top) {
+    triVerts.push_back({tri[0], tri[2], tri[1]});
+    if (!isCone) triVerts.push_back(tri + nCrossSection * nDivisions);
+  }
+
+  pImpl_->CreateHalfedges(triVertsDH);
+  pImpl_->InitializeOriginal();
+  pImpl_->CalculateBBox();
+  pImpl_->SetEpsilon();
+  pImpl_->SortGeometry();
+  pImpl_->SetNormalsAndCoplanar();
+  return Manifold(pImpl_);
 }
 
 /**
@@ -271,28 +317,16 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
  * @param crossSection A set of non-overlapping polygons to revolve.
  * @param circularSegments Number of segments along its diameter. Default is
  * calculated by the static Defaults.
- * @param revolveDegrees Number of degrees to revolve. Must be finite and
- * nonzero. A negative value revolves the other way. Default is 360 degrees.
+ * @param revolveDegrees Number of degrees to revolve. Default is 360 degrees.
  */
 Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
                            double revolveDegrees) {
   ZoneScoped;
-  if (!std::isfinite(revolveDegrees) || revolveDegrees == 0.0) {
-    return Invalid();
-  }
-  // A negative angle builds the positive sweep and mirrors it in y below.
-  const bool negative = revolveDegrees < 0;
-  revolveDegrees = std::abs(revolveDegrees);
 
   Polygons polygons;
   double radius = 0;
   for (const SimplePolygon& poly : crossSection) {
     if (poly.size() < 3) continue;
-    // Check before clipping so invalid coordinates cannot be discarded
-    // silently.
-    for (const vec2& v : poly) {
-      if (!la::all(la::isfinite(v))) return Invalid();
-    }
     size_t i = 0;
     while (i < poly.size() && poly[i].x < 0) {
       ++i;
@@ -330,8 +364,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   const int nDivisions =
       circularSegments > 2
           ? circularSegments
-          : std::max(1, static_cast<int>(Quality::GetCircularSegments(radius) *
-                                         revolveDegrees / 360));
+          : Quality::GetCircularSegments(radius) * revolveDegrees / 360;
 
   auto pImpl_ = std::make_shared<Impl>();
   auto& vertPos = pImpl_->vertPos_;
@@ -343,8 +376,6 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
 
   const double dPhi = revolveDegrees / nDivisions;
   // first and last slice are distinguished if not a full revolution.
-  if (!isFullRevolution && nDivisions == std::numeric_limits<int>::max())
-    return PropagateStatus(Error::ResultTooLarge);
   const int nSlices = isFullRevolution ? nDivisions : nDivisions + 1;
 
   for (const auto& poly : polygons) {
@@ -413,18 +444,12 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
     }
   }
 
-  // Mirror in y for a negative angle, and flip the winding to keep the volume
-  // positive.
-  if (negative) {
-    for (vec3& v : vertPos) v.y = -v.y;
-    for (ivec3& tri : triVerts) std::swap(tri.y, tri.z);
-  }
-
   pImpl_->CreateHalfedges(triVertsDH);
-  pImpl_->CalculateBBox();
-  pImpl_->SortGeometry();
-  pImpl_->SetFaceAndVertNormals();
   pImpl_->InitializeOriginal();
+  pImpl_->CalculateBBox();
+  pImpl_->SetEpsilon();
+  pImpl_->SortGeometry();
+  pImpl_->SetNormalsAndCoplanar();
   return Manifold(pImpl_);
 }
 
@@ -442,11 +467,9 @@ Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
 }
 
 /**
- * This operation returns a vector of topologically disconnected Manifolds,
- * keeping enclosed negative-volume shells with their enclosing
- * positive-volume shell. If everything is connected, the vector is length
- * one, containing a copy of the original. It is the inverse operation of
- * Compose().
+ * This operation returns a vector of Manifolds that are topologically
+ * disconnected. If everything is connected, the vector is length one,
+ * containing a copy of the original. It is the inverse operation of Compose().
  */
 std::vector<Manifold> Manifold::Decompose() const {
   ZoneScoped;
@@ -468,128 +491,21 @@ std::vector<Manifold> Manifold::Decompose() const {
     meshes[0] = *this;
     return meshes;
   }
-  const auto& vertLabel = componentIndices;
+  Vec<int> vertLabel(componentIndices);
+
   const int numVert = NumVert();
-  const size_t numTri = pImpl_->NumTri();
-  std::vector<Vec<int>> componentVerts(numComponents);
-  std::vector<Vec<int>> componentFaces(numComponents);
-  for (int v = 0; v < numVert; ++v) {
-    componentVerts[componentIndices[v]].push_back(v);
-  }
-  const auto& halfedge = pImpl_->halfedge_;
-  for (size_t face = 0; face < numTri; ++face) {
-    const int v = halfedge.Start(static_cast<int>(3 * face));
-    componentFaces[componentIndices[v]].push_back(static_cast<int>(face));
-  }
-  std::vector<std::shared_ptr<Impl>> components;
-  std::vector<int> componentLabels;
-  components.reserve(numComponents);
-  componentLabels.reserve(numComponents);
-  for (int i = 0; i < numComponents; ++i) {
-    const Vec<int>& vertNew2Old = componentVerts[i];
-    const Vec<int>& faceNew2Old = componentFaces[i];
-    if (faceNew2Old.empty()) continue;
-
-    auto impl = std::make_shared<Impl>();
-    const int nVert = vertNew2Old.size();
-    impl->vertPos_.resize(nVert);
-    impl->vertNormal_.resize(nVert);
-    gather(vertNew2Old.begin(), vertNew2Old.end(), pImpl_->vertPos_.begin(),
-           impl->vertPos_.begin());
-    gather(vertNew2Old.begin(), vertNew2Old.end(), pImpl_->vertNormal_.begin(),
-           impl->vertNormal_.begin());
-
-    impl->GatherFaces(*pImpl_, faceNew2Old);
-    impl->ReindexVerts(vertNew2Old, pImpl_->NumVert());
-    impl->CalculateBBox();
-    impl->SortGeometry();
-
-    components.push_back(std::move(impl));
-    componentLabels.push_back(i);
-  }
-
-  const int numMeshes = static_cast<int>(components.size());
-  std::vector<bool> isVug(numMeshes);
-  bool hasVug = false;
-  for (int i = 0; i < numMeshes; ++i) {
-    isVug[i] = components[i]->IsVug();
-    hasVug |= isVug[i];
-  }
-  if (!hasVug) {
-    std::vector<Manifold> meshes;
-    meshes.reserve(numMeshes);
-    for (auto& component : components) meshes.push_back(Manifold(component));
-    return meshes;
-  }
-
-  std::vector<int> parent(numMeshes, -1);
-  for (int i = 0; i < numMeshes; ++i) {
-    if (!isVug[i]) continue;
-    const auto& childVerts = components[i]->vertPos_;
-    Box parentBox;
-    for (int j = 0; j < numMeshes; ++j) {
-      if (i == j || isVug[j]) continue;
-      const Box& childBox = components[i]->bBox_;
-      const Box& currentBox = components[j]->bBox_;
-      const vec3 eps(components[j]->epsilon_);
-      const Box expandedBox(currentBox.min - eps, currentBox.max + eps);
-      if (!expandedBox.Contains(childBox)) continue;
-
-      if (parent[i] >= 0) {
-        if (!parentBox.Contains(currentBox) ||
-            components[parent[i]]->PointWinding(VecView<const vec3>(
-                components[j]->vertPos_.data(), 1))[0] != 1) {
-          continue;
-        }
-      }
-      if (components[j]->PointWinding(
-              VecView<const vec3>(childVerts.data(), 1))[0] == 1) {
-        parent[i] = j;
-        parentBox = expandedBox;
-      }
-    }
-  }
-
-  std::vector<int> outputByComponent(numComponents, -1);
-  std::vector<int> outputRoot;
-  std::vector<int> outputComponentCount;
-  int numOutputs = 0;
-  for (int i = 0; i < numMeshes; ++i) {
-    if (!isVug[i]) {
-      outputByComponent[componentLabels[i]] = numOutputs++;
-      outputRoot.push_back(i);
-      outputComponentCount.push_back(1);
-    }
-  }
-  for (int i = 0; i < numMeshes; ++i) {
-    if (!isVug[i]) continue;
-    if (parent[i] >= 0) {
-      const int output = outputByComponent[componentLabels[parent[i]]];
-      outputByComponent[componentLabels[i]] = output;
-      ++outputComponentCount[output];
-    } else {
-      outputByComponent[componentLabels[i]] = numOutputs++;
-      outputRoot.push_back(i);
-      outputComponentCount.push_back(1);
-    }
-  }
-
   std::vector<Manifold> meshes;
-  meshes.reserve(numOutputs);
-  for (int i = 0; i < numOutputs; ++i) {
-    if (outputComponentCount[i] == 1) {
-      meshes.push_back(Manifold(components[outputRoot[i]]));
-      continue;
-    }
-
+  for (int i = 0; i < numComponents; ++i) {
     auto impl = std::make_shared<Impl>();
+    // inherit original object's precision
+    impl->epsilon_ = pImpl_->epsilon_;
+    impl->tolerance_ = pImpl_->tolerance_;
 
     Vec<int> vertNew2Old(numVert);
-    const int nVert = copy_if(countAt(0), countAt(numVert), vertNew2Old.begin(),
-                              [i, &vertLabel, &outputByComponent](int v) {
-                                return outputByComponent[vertLabel[v]] == i;
-                              }) -
-                      vertNew2Old.begin();
+    const int nVert =
+        copy_if(countAt(0), countAt(numVert), vertNew2Old.begin(),
+                [i, &vertLabel](int v) { return vertLabel[v] == i; }) -
+        vertNew2Old.begin();
     impl->vertPos_.resize(nVert);
     impl->vertNormal_.resize(nVert);
     vertNew2Old.resize(nVert);
@@ -602,9 +518,7 @@ std::vector<Manifold> Manifold::Decompose() const {
     faceNew2Old.reserve(NumTri());
     const auto& halfedge = pImpl_->halfedge_;
     for (size_t face = 0; face < NumTri(); ++face) {
-      const int component =
-          vertLabel[halfedge.Start(static_cast<int>(3 * face))];
-      if (outputByComponent[component] == i) {
+      if (vertLabel[halfedge.Start(static_cast<int>(3 * face))] == i) {
         faceNew2Old.push_back(static_cast<int>(face));
       }
     }
@@ -615,6 +529,7 @@ std::vector<Manifold> Manifold::Decompose() const {
     impl->ReindexVerts(vertNew2Old, pImpl_->NumVert());
     impl->CalculateBBox();
     impl->SortGeometry();
+
     meshes.push_back(Manifold(impl));
   }
   return meshes;

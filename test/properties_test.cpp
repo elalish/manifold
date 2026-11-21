@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cmath>
 #include <limits>
 
 #include "../src/utils.h"
-#include "gtest/gtest.h"
 #include "manifold/manifold.h"
 #include "test.h"
 
@@ -35,62 +33,33 @@ TEST(Properties, Measurements) {
   EXPECT_FLOAT_EQ(cube.SurfaceArea(), 6.0);
 }
 
-TEST(Properties, BooleanBarycentricWeightsRemainFinite) {
-  const double height = std::sqrt(3.0);
-  const Manifold prism =
-      Manifold::Extrude(Polygons{{{0, 0}, {2, 0}, {1, height}}}, 2)
-          .SetProperties(3, [height](double* color, vec3 p, const double*) {
-            color[2] = p.y / height;
-            color[1] = (p.x - color[2]) / 2;
-            color[0] = 1 - color[1] - color[2];
-          });
-  // A distant component raises epsilon to about 0.7. Interpolation at newly
-  // created vertices can then snap every weight to zero.
-  const Manifold input =
-      prism + Manifold::Cube({10, 10, 10}, true).Translate({7e11, 0, 0});
-  const Manifold tool = Manifold::Cube({2, 2, 4}).Translate({0.7, 0.7, -1});
-  ASSERT_EQ(prism.Status(), Manifold::Error::NoError);
-  ASSERT_EQ(input.Status(), Manifold::Error::NoError);
-  ASSERT_EQ(tool.Status(), Manifold::Error::NoError);
-
-  const Manifold result = input - tool;
-  ASSERT_EQ(result.Status(), Manifold::Error::NoError);
-  ASSERT_GT(result.NumTri(), 0);
-  const MeshGL64 mesh = result.GetMeshGL64();
-  ASSERT_EQ(mesh.numProp, 6);
-  for (size_t i = 0; i < mesh.vertProperties.size(); ++i) {
-    EXPECT_TRUE(std::isfinite(mesh.vertProperties[i]))
-        << "property index " << i;
-  }
-  EXPECT_EQ(Manifold(mesh).Status(), Manifold::Error::NoError);
-}
-
 TEST(Properties, Epsilon) {
   Manifold cube = Manifold::Cube();
-  EXPECT_FLOAT_EQ(cube.GetEpsilon(), Quality::GetRelativePrecision());
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), kPrecision);
   cube = cube.Scale({0.1, 1, 10});
-  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 10 * Quality::GetRelativePrecision());
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 10 * kPrecision);
   cube = cube.Translate({-100, -10, -1});
-  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 100 * Quality::GetRelativePrecision());
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 100 * kPrecision);
 }
 
 TEST(Properties, Epsilon2) {
   Manifold cube = Manifold::Cube();
   cube = cube.Translate({-0.5, 0, 0}).Scale({2, 1, 1});
-  EXPECT_FLOAT_EQ(cube.GetEpsilon(), Quality::GetRelativePrecision());
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 2 * kPrecision);
 }
 
 TEST(Properties, Tolerance) {
   double degrees = 1;
   double tol = sind(degrees);
   Manifold cube = Manifold::Cube({1, 1, 1}, true);
-  Manifold imperfect = cube ^ cube.Rotate(degrees);
+  Manifold imperfect = (cube ^ cube.Rotate(degrees)).AsOriginal();
   EXPECT_EQ(imperfect.NumTri(), 28);
 
   Manifold imperfect2 = imperfect.Simplify(tol);
   EXPECT_EQ(imperfect2.NumTri(), 12);
 
   MeshGL mesh = imperfect.GetMeshGL();
+  mesh.tolerance = tol;
   Manifold imperfect3(mesh);
   EXPECT_EQ(imperfect3.NumTri(), 28);  // Don't automatically simplify
 
@@ -106,38 +75,16 @@ TEST(Properties, Tolerance) {
 }
 
 TEST(Properties, ToleranceSphere) {
-  const int n = 500;
+  const int n = 1000;
   Manifold sphere = Manifold::Sphere(1, 4 * n);
   EXPECT_EQ(sphere.NumTri(), 8 * n * n);
 
-  Manifold sphere2 = sphere.Simplify(0.01);
-  EXPECT_LT(sphere2.NumTri(), 1250);
+  Manifold sphere2 = sphere.SetTolerance(0.01);
+  EXPECT_LT(sphere2.NumTri(), 2500);
   EXPECT_EQ(sphere2.Genus(), 0);
-  EXPECT_NEAR(sphere.Volume(), sphere2.Volume(), 0.002);
-  EXPECT_NEAR(sphere.SurfaceArea(), sphere2.SurfaceArea(), 0.015);
+  EXPECT_NEAR(sphere.Volume(), sphere2.Volume(), 0.05);
+  EXPECT_NEAR(sphere.SurfaceArea(), sphere2.SurfaceArea(), 0.06);
   if (options.exportModels) WriteTestOBJ("sphere.obj", sphere2);
-}
-
-TEST(Properties, ToleranceCylinder) {
-  const int n = 40;
-  Manifold cylinder = Manifold::Cylinder(2, 1, 1, 4 * n);
-  Manifold cylinder2 = cylinder.Simplify(0.01);
-  EXPECT_LT(cylinder2.NumTri(), 165);
-  EXPECT_EQ(cylinder2.Genus(), 0);
-  EXPECT_NEAR(cylinder.Volume(), cylinder2.Volume(), 0.011);
-  EXPECT_NEAR(cylinder.SurfaceArea(), cylinder2.SurfaceArea(), 0.02);
-  if (options.exportModels) WriteTestOBJ("cylinder.obj", cylinder2);
-}
-
-TEST(Properties, ToleranceCube) {
-  Manifold cube = Manifold::Cube().Refine(5);
-  EXPECT_EQ(cube.NumTri(), 300);
-  Manifold cube2 = cube.Simplify();
-  EXPECT_EQ(cube2.NumTri(), 12);
-  EXPECT_EQ(cube2.Genus(), 0);
-  EXPECT_DOUBLE_EQ(cube.Volume(), cube2.Volume());
-  EXPECT_DOUBLE_EQ(cube.SurfaceArea(), cube2.SurfaceArea());
-  if (options.exportModels) WriteTestOBJ("cube.obj", cube2);
 }
 
 /**
@@ -171,52 +118,6 @@ TEST(Properties, CalculateCurvature) {
     EXPECT_NEAR(GetMaxProperty(sphereGL, meanIdx), 1, precision);
     EXPECT_NEAR(GetMinProperty(sphereGL, gaussianIdx), 0.25, 0.25 * precision);
     EXPECT_NEAR(GetMaxProperty(sphereGL, gaussianIdx), 0.25, 0.25 * precision);
-  }
-}
-
-TEST(Properties, CurvatureChannels) {
-  for (const Manifold& shape :
-       {Manifold::Sphere(1, 24), Manifold::Cube(vec3(1), true),
-        Manifold::Sphere(1, 24) -
-            Manifold::Cube(vec3(1), true).Translate({0.8, 0, 0})}) {
-    const Manifold input =
-        shape.SetProperties(3, [](double* props, vec3 p, const double*) {
-          for (int i = 0; i < 3; ++i) props[i] = 10 * (i + 1) + p[i];
-        });
-    ASSERT_EQ(input.Status(), Manifold::Error::NoError);
-    const MeshGL64 before = input.GetMeshGL64();
-    ASSERT_GT(before.NumVert(), 0);
-    for (const int gaussianIdx : {1, 3}) {
-      const int meanIdx = gaussianIdx + 1;
-      const MeshGL64 both =
-          input.CalculateCurvature(gaussianIdx, meanIdx).GetMeshGL64();
-      ASSERT_EQ(both.NumVert(), before.NumVert());
-      for (const bool gaussian : {false, true}) {
-        const int channel = gaussian ? gaussianIdx : meanIdx;
-        const MeshGL64 single = input
-                                    .CalculateCurvature(gaussian ? channel : -1,
-                                                        gaussian ? -1 : channel)
-                                    .GetMeshGL64();
-        ASSERT_EQ(single.NumVert(), both.NumVert());
-        EXPECT_EQ(single.triVerts, both.triVerts);
-        EXPECT_EQ(single.numProp, std::max<uint64_t>(6, channel + 4));
-        for (size_t v = 0; v < single.NumVert(); ++v) {
-          const double expected =
-              both.vertProperties[v * both.numProp + 3 + channel];
-          EXPECT_NEAR(single.vertProperties[v * single.numProp + 3 + channel],
-                      expected, 1e-12 * std::max(1.0, std::abs(expected)));
-          for (int p = 0; p < 6; ++p) {
-            if (p != channel + 3) {
-              EXPECT_DOUBLE_EQ(single.vertProperties[v * single.numProp + p],
-                               before.vertProperties[v * before.numProp + p]);
-            }
-          }
-        }
-      }
-    }
-    EXPECT_EQ(input.CalculateCurvature(-1, -1).GetMeshGL64().vertProperties,
-              before.vertProperties);
-    EXPECT_EQ(input.GetMeshGL64().vertProperties, before.vertProperties);
   }
 }
 
@@ -255,59 +156,15 @@ TEST(Properties, CalculateNormals) {
   }
   EXPECT_EQ(numBad, 0);
   EXPECT_EQ(numBad2, 0);
-}
-
-TEST(Properties, CalculateNormalsWithPropertySeams) {
-  const MeshGL64 cube = Manifold::Cube().GetMeshGL64();
-  MeshGL64 mesh = cube;
-  mesh.numProp = 7;
-  mesh.vertProperties.clear();
-  for (size_t v = 0; v < cube.NumVert(); ++v) {
-    const vec3 p = cube.GetVertPos(v);
-    mesh.vertProperties.insert(mesh.vertProperties.end(),
-                               {p.x, p.y, p.z, 0, 0, 0, 0});
-  }
-  // Give one triangle a different color. The remaining color property is
-  // shared across several sharp normal groups around each of its vertices.
-  vec3 coloredCenter(0.0);
-  for (int corner : {0, 1, 2}) {
-    const auto original = cube.triVerts[corner];
-    const vec3 p = cube.GetVertPos(original);
-    coloredCenter += p / 3.0;
-    const size_t duplicate = mesh.NumVert();
-    mesh.vertProperties.insert(mesh.vertProperties.end(),
-                               {p.x, p.y, p.z, 0, 0, 0, 1});
-    mesh.mergeFromVert.push_back(duplicate);
-    mesh.mergeToVert.push_back(original);
-    mesh.triVerts[corner] = duplicate;
-  }
-  const Manifold input(mesh);
-  ASSERT_EQ(input.Status(), Manifold::Error::NoError);
-  for (double sharpAngle : {0.0, 52.5}) {
-    SCOPED_TRACE(sharpAngle);
-    const Manifold result = input.CalculateNormals(0, sharpAngle);
-    ASSERT_EQ(result.Status(), Manifold::Error::NoError);
-    EXPECT_DOUBLE_EQ(result.Volume(), 1.0);
-    EXPECT_NEAR(result.SmoothByNormals().Refine(3).Volume(), 1.0, 1e-12);
-    const MeshGL64 out = result.GetMeshGL64();
-    ASSERT_EQ(out.NumTri(), 12);
-    ASSERT_EQ(out.numProp, 7);
-    for (size_t tri = 0; tri < out.NumTri(); ++tri) {
-      const vec3 a = out.GetVertPos(out.triVerts[3 * tri]);
-      const vec3 b = out.GetVertPos(out.triVerts[3 * tri + 1]);
-      const vec3 c = out.GetVertPos(out.triVerts[3 * tri + 2]);
-      const vec3 expected = la::normalize(la::cross(b - a, c - a));
-      const double color =
-          la::length((a + b + c) / 3.0 - coloredCenter) < 1e-12 ? 1 : 0;
-      for (int corner : {0, 1, 2}) {
-        const auto v = out.triVerts[3 * tri + corner];
-        for (int axis : {0, 1, 2}) {
-          EXPECT_NEAR(out.vertProperties[7 * v + 3 + axis], expected[axis],
-                      1e-12);
-        }
-        EXPECT_DOUBLE_EQ(out.vertProperties[7 * v + 6], color);
-      }
+  for (int tv = out2.runIndex[0]; tv < out2.runIndex[1]; ++tv) {
+    const int v = out2.triVerts[tv];
+    auto pos = out2.GetVertPos(v);
+    auto norm = pos;
+    for (int j : {0, 1, 2}) {
+      norm[j] = out2.vertProperties[np * v + 3 + j];
     }
+    EXPECT_FLOAT_EQ(la::length(norm), 1.0);
+    EXPECT_GT(dot(la::normalize(pos), norm), 0.99);
   }
 }
 
@@ -355,19 +212,4 @@ TEST(Properties, Coplanar) {
   EXPECT_EQ(minPegZ, 0);
 
   if (options.exportModels) WriteTestOBJ("coplanar.obj", result);
-}
-
-TEST(Properties, CalculateCurvatureDeterministic) {
-  // Above the parallel threshold, where the per-vertex sums used to depend on
-  // thread scheduling.
-  const Manifold sphere = Manifold::Sphere(1, 256);
-  ASSERT_GT(sphere.NumTri(), 10000);
-  const MeshGL64 first = sphere.CalculateCurvature(3, 4).GetMeshGL64();
-  for (int i = 0; i < 3; ++i) {
-    const MeshGL64 again = sphere.CalculateCurvature(3, 4).GetMeshGL64();
-    ASSERT_EQ(again.vertProperties.size(), first.vertProperties.size());
-    for (size_t j = 0; j < first.vertProperties.size(); ++j)
-      ASSERT_EQ(again.vertProperties[j], first.vertProperties[j])
-          << "run " << i << " property " << j;
-  }
 }

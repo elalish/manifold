@@ -1,47 +1,18 @@
-name: Deploy documentation
+name: Deploy documentation 
 
 on:
-  release:
-    types: [published]
   workflow_run:
     workflows: [CI]
-    types: [completed]
+    types:
+      - completed
     branches: [master]
-  workflow_dispatch:
-    inputs:
-      ref:
-        description: 'Branch or tag to build docs from (e.g. v3.4.0)'
-        required: true
-      destination_dir:
-        description: 'Subdirectory to deploy to on gh-pages (e.g. v3.4.0)'
-        required: true
 
 jobs:
   deploy_github_pages:
     runs-on: ubuntu-latest
-    permissions:
-      actions: read    # download the CI artifact
-      contents: write  # push to gh-pages
-    # The branches filter above matches the head branch name of any CI run,
-    # including a pull request from a fork's master branch. Deploy only after
-    # CI succeeds on a push.
-    if: >-
-      github.event_name != 'workflow_run' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push')
 
     steps:
-    - uses: actions/checkout@v7
-      with:
-        ref: ${{ (github.event_name == 'workflow_dispatch' && inputs.ref) || (github.event_name == 'workflow_run' && github.event.workflow_run.head_sha) || github.ref }}
-        persist-credentials: false
-
-    # github.sha is the ref the workflow was launched from, which on a manual
-    # dispatch is not the ref being deployed. Use what checkout landed on so
-    # the artifact matches the code.
-    - name: Resolve deployed commit
-      id: deployed
-      run: echo "sha=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+    - uses: actions/checkout@v6
 
     - name: Doxygen Action
       uses: mattnotmitt/doxygen-action@edge
@@ -51,54 +22,24 @@ jobs:
         mkdir public
         mv ./samples ./public
         mv ./docs ./public
-        mv ./dashboard ./public
 
-    # No continue-on-error: a missing artifact means the editor, examples and
-    # TypeScript docs would be absent, and publishing that silently is worse
-    # than failing.
     - name: Download manifoldCAD editor, examples and documentation
-      uses: dawidd6/action-download-artifact@v28
+      uses: dawidd6/action-download-artifact@v6
       with:
         workflow: manifold.yml
-        workflow_conclusion: success
-        # Pin to the artifact from the CI run that triggered us
-        commit: ${{ (github.event_name != 'workflow_run' && steps.deployed.outputs.sha) || '' }}
-        run_id: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.id) || '' }}
-        check_artifacts: true
+        workflow_conclusion: completed
+        # specific to the triggering workflow
+        run_id: ${{github.event.workflow_run.id}}
+        # do not download from old run
+        check_artifacts: true 
         name: wasmpublic
         path: ./public
 
-    # unreleased build for testing, not a version anyone should pin to.
-    - name: Deploy master to alpha/
-      if: github.event_name == 'workflow_run'
-      uses: peaceiris/actions-gh-pages@v4
+    - name: Deploy to Github Pages
+      uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
         publish_branch: gh-pages
-        publish_dir: ./public
-        destination_dir: alpha
-
-    - name: Deploy to vX.Y.Z/
-      if: github.event_name != 'workflow_run'
-      uses: peaceiris/actions-gh-pages@v4
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_branch: gh-pages
-        publish_dir: ./public
-        destination_dir: ${{ (github.event_name == 'release' && github.ref_name) || inputs.destination_dir }}
-
-    # A release also publishes to the site root, so manifoldcad.org always
-    # serves the current release without a redirect.(it is the latest release)
-    #
-    # keep_files is load-bearing here and must not be removed. With no
-    # destination_dir the action's cleanup runs at the branch root, so
-    # without this it would delete alpha/ and every vX.Y.Z/ directory.
-    - name: Deploy to gh-pages root
-      if: github.event_name == 'release'
-      uses: peaceiris/actions-gh-pages@v4
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_branch: gh-pages
-        publish_dir: ./public
-        keep_files: true
+        force_orphan: true
         cname: manifoldcad.org
+        publish_dir: ./public

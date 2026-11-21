@@ -17,7 +17,6 @@ def all_cross_section():
     poly = [[0, 0], [1, 0], [1, 1]]
     c = CrossSection([np.array(poly)])
     c = CrossSection([poly])
-    c = CrossSection.even_odd([poly])
     c = CrossSection() + c
     a = c.area()
     c = CrossSection.batch_boolean(
@@ -31,7 +30,7 @@ def all_cross_section():
     c = CrossSection.batch_hull([c, c.translate((1, 0))])
     b = c.bounds()
     c = CrossSection.circle(1)
-    c = CrossSection.batch_boolean([c, c.translate((1, 0))], OpType.Add)
+    c = CrossSection.compose([c, c.translate((1, 0))])
     cs = c.decompose()
     m = c.extrude(1)
     c = c.hull()
@@ -91,15 +90,19 @@ def all_manifold():
     n = m.num_tri()
     n = m.num_vert()
     i = m.original_id()
+    p = m.get_tolerance()
+    pp = m.set_tolerance(0.0001)
     m = m.simplify(0.001)
     c = m.project()
     m = m.refine(2)
     m = m.refine_to_length(0.1)
     m = m.refine_to_tolerance(0.01)
+    m = m.smooth_out()
     i = Manifold.reserve_ids(1)
     m = m.scale((1, 2, 3))
     m = m.set_properties(3, lambda pos, prop: pos)
     c = m.slice(0.5)
+    m = Manifold.smooth(mesh, [0], [0.5])
     m = Manifold.sphere(1)
     m, n = m.split(m.translate((1, 0, 0)))
     m, n = m.split_by_plane((0, 0, 1), 0)
@@ -128,6 +131,8 @@ def all_manifold():
         0.2,
     )
     assert sphere.status() == Error.NoError
+    smooth_ctx = ExecutionContext()
+    m = smooth_ctx.smooth(Manifold.cube().to_mesh(), [0], [0.5])
     # A pre-cancelled ctx propagates through a factory; this proves the ctx is
     # wired, since NoError + progress==1 also hold for an untouched ctx.
     cancel_factory_ctx = ExecutionContext()
@@ -136,7 +141,7 @@ def all_manifold():
     assert cancelled.status() == Error.Cancelled
     m = Manifold.tetrahedron()
     mesh = m.to_mesh()
-    merged = mesh.merge()
+    ok = mesh.merge()
     m = m.transform([[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]])
     m = m.translate((0, 0, 0))
     m = m.trim_by_plane((0, 0, 1), 0)
@@ -146,7 +151,7 @@ def all_manifold():
     m2 = Manifold.cube().translate([2, 0, 0])
     d = m.min_gap(m2, 2)
     mesh2 = m.to_mesh64()
-    merged = mesh2.merge()
+    ok = mesh.merge()
 
 
 def run():

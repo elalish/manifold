@@ -56,9 +56,30 @@ struct Manifold::Impl {
 
   Box bBox_;
   double epsilon_ = -1;
+  double tolerance_ = -1;
   int numProp_ = 0;
   Error status_ = Error::NoError;
 
+  // True only when every meshID carries normals at slot 0..2 - the
+  // condition under which GetMeshGL(-1) can safely auto-substitute that
+  // slot. A mixed Boolean output (some meshIDs with normals, some
+  // without) returns false; the output MeshGL's per-run bit 1 still
+  // marks the with-normals runs individually.
+  bool AllHaveNormals() const {
+    if (meshRelation_.meshIDtransform.empty()) return false;
+    for (const auto& m : meshRelation_.meshIDtransform) {
+      if (!m.second.hasNormals) return false;
+    }
+    return true;
+  }
+
+  // True iff the meshID owning `tri` has hasNormals set. Returns false when
+  // the meshID isn't in meshRelation_.meshIDtransform (treat as no-normals).
+  static bool TriHasNormals(const MeshRelationD& meshRelation, int tri) {
+    const int meshID = meshRelation.triRef[tri].meshID;
+    auto it = meshRelation.meshIDtransform.find(meshID);
+    return it != meshRelation.meshIDtransform.end() && it->second.hasNormals;
+  }
   Vec<vec3> vertPos_;
   Halfedges halfedge_;
   Vec<double> properties_;
@@ -87,38 +108,17 @@ struct Manifold::Impl {
                       bool canParallel, ExecutionContext::Impl* ctx = nullptr);
 
   template <typename F>
-  inline void ForVert(int halfedge, F func) const;
+  inline void ForVert(int halfedge, F func);
 
   template <typename T>
   void ForVert(
       int halfedge, std::function<T(int halfedge)> transform,
-      std::function<void(int halfedge, const T& here, T& next)> binaryOp) const;
+      std::function<void(int halfedge, const T& here, T& next)> binaryOp);
 
-  // True only when every meshID carries normals at slot 0..2 - the
-  // condition under which GetMeshGL(-1) can safely auto-substitute that
-  // slot. A mixed Boolean output (some meshIDs with normals, some
-  // without) returns false; the output MeshGL's per-run bit 1 still
-  // marks the with-normals runs individually.
-  bool AllHaveNormals() const {
-    if (meshRelation_.meshIDtransform.empty()) return false;
-    for (const auto& m : meshRelation_.meshIDtransform) {
-      if (!m.second.hasNormals) return false;
-    }
-    return true;
-  }
-
-  // True iff the meshID owning `tri` has hasNormals set. Returns false when
-  // the meshID isn't in meshRelation_.meshIDtransform (treat as no-normals).
-  static bool TriHasNormals(const MeshRelationD& meshRelation, int tri) {
-    const int meshID = meshRelation.triRef[tri].meshID;
-    auto it = meshRelation.meshIDtransform.find(meshID);
-    return it != meshRelation.meshIDtransform.end() && it->second.hasNormals;
-  }
-
-  void SetFaceAndVertNormals();
+  void SetNormalsAndCoplanar();
   void DedupePropVerts();
   void RemoveUnreferencedVerts();
-  void InitializeOriginal(int id = 0);
+  void InitializeOriginal();
   void CreateHalfedges(const Vec<ivec3>& triProp,
                        const Vec<ivec3>& triVert = {});
   void CalculateVertNormals();
@@ -158,19 +158,17 @@ struct Manifold::Impl {
   void CalculateBBox();
   bool IsFinite() const;
   bool IsIndexInBounds(VecView<const ivec3> triVerts) const;
+  void SetEpsilon(double minEpsilon = -1, bool useSingle = false);
   bool IsManifold() const;
   bool Is2Manifold() const;
   bool IsSelfIntersecting() const;
   bool MatchesTriNormals() const;
   int NumDegenerateTris() const;
-  bool HasSimpleProps() const;
   bool IsConvex() const;
-  bool IsVug() const;
   double MinGap(const Impl& other, double searchLength) const;
 
   // boolean3.cpp
   std::vector<RayHit> RayCast(vec3 origin, vec3 endpoint) const;
-  Vec<int> PointWinding(VecView<const vec3> points) const;
 
   // sort.cpp
   void SortGeometry(ExecutionContext::Impl* ctx = nullptr);
@@ -196,42 +194,17 @@ struct Manifold::Impl {
   Polygons Project() const;
 
   // edge_op.cpp
-  struct Merger {
-    double addedCost = std::numeric_limits<double>::infinity();
-    double totalCost = std::numeric_limits<double>::infinity();
-    double a = std::numeric_limits<double>::quiet_NaN();
-    vec3 newPos = vec3(a);
-
-    static constexpr double kShort = -2;
-    static constexpr double kSwap = -1;
-
-    bool Valid() const { return std::isfinite(addedCost); }
-    bool Free() const { return totalCost < 0; }
-    bool Short() const { return totalCost == kShort; }
-    bool Swap() const { return totalCost == kSwap; }
-  };
-
-  struct TriResult {
-    bool colinear;
-    int longEdge;  // 0, 1, 2
-  };
-
   void CleanupTopology();
+  void SimplifyTopology(int firstNewVert = 0);
   void RemoveDegenerates(int firstNewVert = 0);
-  void Decimate(double tolerance);
-  TriResult IsDegenerate(int tri) const;
-  bool IsFolded(int edge) const;
-  Merger CheckEdge(int edge) const;
-  bool Continuous(int edge) const;
-  bool Swappable(int edge) const;
-  bool Colinear(int edge) const;
-  void SwapEdge(int edge, double a);
-  bool IsDuplicated(int edge) const;
+  void CollapseShortEdges(int firstNewVert = 0);
+  void CollapseColinearEdges(int firstNewVert = 0);
+  void SwapDegenerates(int firstNewVert = 0);
   void DedupeEdge(int edge);
-  void CollapseDegenerate(int edge, Vec<int>& scratch);
-  bool CollapseEdge(int edge, Vec<int>& scratch, const Merger& merger);
-  int SwapDegenerateEdges(Vec<int>& scratch);
-  bool SplitQuad(int edge, bool nextDiag);
+  bool CollapseEdge(int edge, Vec<int>& edges, double tol = -1,
+                    int firstNewVert = 0);
+  void RecursiveEdgeSwap(int edge, int& tag, Vec<int>& visited,
+                         Vec<int>& edgeSwapStack, Vec<int>& edges);
   void RemoveIfFolded(int edge);
   void PairUp(int edge0, int edge1);
   void UpdateVert(int vert, int startEdge, int endEdge);
@@ -249,16 +222,25 @@ struct Manifold::Impl {
                              bool = false);
 
   // smoothing.cpp
+  bool IsInsideQuad(int halfedge) const;
   bool IsMarkedInsideQuad(int halfedge) const;
   vec3 GetNormal(int halfedge, int normalIdx) const;
   vec4 TangentFromNormal(const vec3& normal, int halfedge) const;
-  Vec<int> VertHalfedge() const;
   bool ValidTangents() const;
-  void MarkQuads(const Vec<bool>& fixedHalfedge);
+  std::vector<Smoothness> UpdateSharpenedEdges(
+      const std::vector<Smoothness>&) const;
+  Vec<bool> FlatFaces() const;
+  Vec<int> VertFlatFace(const Vec<bool>&) const;
+  Vec<int> VertHalfedge() const;
+  std::vector<Smoothness> SharpenEdges(double minSharpAngle,
+                                       double minSmoothness) const;
+  void SharpenTangent(int halfedge, double smoothness);
   void SetNormals(int normalIdx, double minSharpAngle);
-  void DistributeTangents(Vec<bool>& fixedHalfedges);
+  void LinearizeFlatTangents();
+  void DistributeTangents(const Vec<bool>& fixedHalfedges);
   void CreateTangents(int normalIdx);
-
+  void CreateTangents(std::vector<Smoothness>,
+                      ExecutionContext::Impl* ctx = nullptr);
   void Refine(std::function<int(vec3, vec4, vec4)>, bool = false,
               ExecutionContext::Impl* ctx = nullptr);
 
@@ -277,7 +259,7 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl);
 // Template implementations follow:
 
 template <typename F>
-inline void Manifold::Impl::ForVert(int halfedge, F func) const {
+inline void Manifold::Impl::ForVert(int halfedge, F func) {
   int current = halfedge;
   do {
     current = NextHalfedge(halfedge_.Pair(current));
@@ -288,7 +270,7 @@ inline void Manifold::Impl::ForVert(int halfedge, F func) const {
 template <typename T>
 void Manifold::Impl::ForVert(
     int halfedge, std::function<T(int halfedge)> transform,
-    std::function<void(int halfedge, const T& here, T& next)> binaryOp) const {
+    std::function<void(int halfedge, const T& here, T& next)> binaryOp) {
   T here = transform(halfedge);
   int current = halfedge;
   do {
@@ -303,7 +285,6 @@ void Manifold::Impl::ForVert(
 template <typename Precision, typename I>
 Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
                      ExecutionContext::Impl* ctx) {
-  MANIFOLD_BEGIN_PHASE_TIMING();
   // Entry-time cancel wins over empty/malformed input; past this gate,
   // validation errors win over races.
   if (IsCancelled(ctx)) {
@@ -383,8 +364,8 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
     prop2vert.resize(numVert);
     std::iota(prop2vert.begin(), prop2vert.end(), 0);
     for (size_t i = 0; i < meshGL.mergeFromVert.size(); ++i) {
-      const auto from = meshGL.mergeFromVert[i];
-      const auto to = meshGL.mergeToVert[i];
+      const uint32_t from = meshGL.mergeFromVert[i];
+      const uint32_t to = meshGL.mergeToVert[i];
       if (from >= numVert || to >= numVert) {
         MakeEmpty(Error::MergeIndexOutOfBounds);
         return;
@@ -396,6 +377,7 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   const auto numProp = meshGL.numProp - 3;
   numProp_ = numProp;
   properties_.resize_nofill(meshGL.NumVert() * numProp);
+  tolerance_ = meshGL.tolerance;
   // This will have unreferenced duplicate positions that will be removed by
   // Impl::RemoveUnreferencedVerts().
   vertPos_.resize_nofill(meshGL.NumVert());
@@ -427,9 +409,11 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
     runIndex.push_back(runEnd);
   }
 
+  const auto startID =
+      Impl::ReserveIDs(std::max(1_uz, meshGL.runOriginalID.size()));
   auto runOriginalID = meshGL.runOriginalID;
   if (runOriginalID.empty()) {
-    runOriginalID.push_back(0);  // untracked
+    runOriginalID.push_back(startID);
   }
 
   if (runIndex.size() < runOriginalID.size() + 1 || runIndex[0] != 0 ||
@@ -440,8 +424,8 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
     return;
   }
   for (size_t i = 0; i < runOriginalID.size(); ++i) {
+    const int meshID = startID + i;
     const int originalID = runOriginalID[i];
-    const int meshID = originalID == 0 ? 0 : Impl::ReserveIDs(1);
     const bool backside = meshGL.Backside(i);
     // Per-run hasNormals (runFlags bit 1). Defensively require numProp >= 3
     // so a caller setting the bit on a too-small MeshGL doesn't make us read
@@ -452,7 +436,7 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
       ref.meshID = meshID;
       ref.originalID = originalID;
       ref.faceID = meshGL.faceID.empty() ? -1 : meshGL.faceID[tri];
-      ref.triID = meshGL.faceID.empty() ? tri : meshGL.faceID[tri];
+      ref.coplanarID = tri;
     }
 
     if (meshGL.runTransform.empty()) {
@@ -479,7 +463,7 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   for (size_t i = 0; i < numTri; ++i) {
     ivec3 triP, triV;
     for (const size_t j : {0, 1, 2}) {
-      const auto vert = meshGL.triVerts[3 * i + j];
+      uint32_t vert = (uint32_t)meshGL.triVerts[3 * i + j];
       if (vert >= numVert) {
         MakeEmpty(Error::VertexOutOfBounds);
         return;
@@ -510,6 +494,7 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   ADVANCE_PHASE_OR_RETURN(ctx);
 
   CalculateBBox();
+  SetEpsilon(-1, std::is_same<Precision, float>::value);
 
   // we need to split pinched verts before calculating vertex normals, because
   // the algorithm doesn't work with pinched verts
@@ -519,7 +504,10 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   DedupePropVerts();
   ADVANCE_PHASE_OR_RETURN(ctx);
 
-  SetFaceAndVertNormals();
+  SetNormalsAndCoplanar();
+  ADVANCE_PHASE_OR_RETURN(ctx);
+
+  RemoveDegenerates();
   ADVANCE_PHASE_OR_RETURN(ctx);
 
   RemoveUnreferencedVerts();
@@ -551,11 +539,25 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
 
   MeshGLP<Precision, I> out;
   out.numProp = 3 + numProp;
+  out.tolerance = impl.tolerance_;
+  if (std::is_same<Precision, float>::value)
+    out.tolerance =
+        std::max(out.tolerance,
+                 static_cast<Precision>(std::numeric_limits<float>::epsilon() *
+                                        impl.bBox_.Scale()));
   out.triVerts.resize(3 * numTri);
 
   const int numHalfedge = impl.halfedgeTangent_.size();
   out.halfedgeTangent.resize(4 * numHalfedge);
+  for (int i = 0; i < numHalfedge; ++i) {
+    const vec4 t = impl.halfedgeTangent_[i];
+    out.halfedgeTangent[4 * i] = t.x;
+    out.halfedgeTangent[4 * i + 1] = t.y;
+    out.halfedgeTangent[4 * i + 2] = t.z;
+    out.halfedgeTangent[4 * i + 3] = t.w;
+  }
   // Sort the triangles into runs
+  out.faceID.resize(numTri);
   std::vector<int> triNew2Old(numTri);
   std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
   VecView<const TriRef> triRef = impl.meshRelation_.triRef;
@@ -590,11 +592,6 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     }
   };
 
-  // only create the faceID array if the mesh relation faceIDs are not all -1.
-  if (std::any_of(triRef.begin(), triRef.end(),
-                  [](const TriRef& ref) { return ref.faceID != -1; })) {
-    out.faceID.resize(numTri);
-  }
   auto meshIDtransform = impl.meshRelation_.meshIDtransform;
   int lastID = -1;
   for (int tri = 0; tri < numTri; ++tri) {
@@ -602,20 +599,9 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     const auto ref = triRef[oldTri];
     const int meshID = ref.meshID;
 
-    if (!out.faceID.empty()) {
-      out.faceID[tri] = std::max(ref.faceID, 0);
-    }
-    for (const int i : {0, 1, 2}) {
+    out.faceID[tri] = ref.faceID >= 0 ? ref.faceID : ref.coplanarID;
+    for (const int i : {0, 1, 2})
       out.triVerts[3 * tri + i] = impl.halfedge_.Start(3 * oldTri + i);
-      if (numHalfedge > 0) {
-        // Tangents belong to halfedges, so follow the same run ordering as
-        // the triangle corners they describe.
-        const vec4 tangent = impl.halfedgeTangent_[3 * oldTri + i];
-        for (const int j : {0, 1, 2, 3}) {
-          out.halfedgeTangent[4 * (3 * tri + i) + j] = tangent[j];
-        }
-      }
-    }
 
     if (meshID != lastID) {
       manifold::Manifold::Impl::Relation rel;
@@ -645,12 +631,7 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
   }
   // Duplicate verts with different props
   std::vector<int> vert2idx(impl.NumVert(), -1);
-  std::vector<int> vertPropHead(impl.NumVert(), -1);
-  // One entry per output vertex: property index and the next output vertex
-  // sharing its geometric vertex. Keep the bins in contiguous storage rather
-  // than allocating a separate vector for every geometric vertex.
-  std::vector<ivec2> vertPropPair;
-  vertPropPair.reserve(numVert);
+  std::vector<std::vector<ivec2>> vertPropPair(impl.NumVert());
   out.vertProperties.reserve(numVert * static_cast<size_t>(out.numProp));
 
   for (size_t run = 0; run < out.runOriginalID.size(); ++run) {
@@ -660,18 +641,19 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
         const int prop = impl.halfedge_.Prop(3 * triNew2Old[tri] + i);
         const int vert = out.triVerts[3 * tri + i];
 
-        int found = vertPropHead[vert];
-        while (found >= 0 && vertPropPair[found].x != prop) {
-          found = vertPropPair[found].y;
+        auto& bin = vertPropPair[vert];
+        bool bFound = false;
+        for (const auto& b : bin) {
+          if (b.x == prop) {
+            bFound = true;
+            out.triVerts[3 * tri + i] = b.y;
+            break;
+          }
         }
-        if (found >= 0) {
-          out.triVerts[3 * tri + i] = found;
-          continue;
-        }
+        if (bFound) continue;
         const int idx = out.vertProperties.size() / out.numProp;
         out.triVerts[3 * tri + i] = idx;
-        vertPropPair.push_back({prop, vertPropHead[vert]});
-        vertPropHead[vert] = idx;
+        bin.push_back({prop, idx});
 
         for (int p : {0, 1, 2}) {
           out.vertProperties.push_back(impl.vertPos_[vert][p]);
@@ -717,5 +699,44 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
     }
   }
   return out;
+}
+
+// Entry-time cancel wins over empty/malformed input; past this gate,
+// validation errors win over races.
+template <typename P, typename I>
+std::shared_ptr<Manifold::Impl> MakeSmoothImpl(
+    const MeshGLP<P, I>& meshGL, const std::vector<Smoothness>& sharpenedEdges,
+    ExecutionContext::Impl* ctx = nullptr) {
+  if (IsCancelled(ctx)) {
+    auto impl = std::make_shared<Manifold::Impl>();
+    impl->MakeEmpty(Manifold::Error::Cancelled);
+    return impl;
+  }
+
+  DEBUG_ASSERT(meshGL.halfedgeTangent.empty(), std::runtime_error,
+               "when supplying tangents, the normal constructor should be used "
+               "rather than Smooth().");
+
+  MeshGLP<P, I> meshTmp = meshGL;
+  meshTmp.faceID.resize(meshGL.NumTri());
+  std::iota(meshTmp.faceID.begin(), meshTmp.faceID.end(), 0);
+
+  std::shared_ptr<Manifold::Impl> impl =
+      std::make_shared<Manifold::Impl>(meshTmp, ctx);
+  // Skip tangent creation if ingest failed; phase counters must not
+  // credit smoothing phases that never ran.
+  if (impl->status_ != Manifold::Error::NoError) return impl;
+  impl->CreateTangents(impl->UpdateSharpenedEdges(sharpenedEdges), ctx);
+  // NumTri() is 0 after MakeEmpty, so this loop is a no-op on cancel.
+  const size_t numTri = impl->NumTri();
+  for (size_t i = 0; i < numTri; ++i) {
+    if (meshGL.faceID.size() == numTri) {
+      impl->meshRelation_.triRef[i].faceID =
+          meshGL.faceID[impl->meshRelation_.triRef[i].faceID];
+    } else {
+      impl->meshRelation_.triRef[i].faceID = -1;
+    }
+  }
+  return impl;
 }
 }  // namespace manifold

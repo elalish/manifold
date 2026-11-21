@@ -28,10 +28,6 @@ struct std::hash<manifold::ivec4> {
 namespace {
 using namespace manifold;
 
-// Division counts above this are rejected by Subdivide's size check, and the
-// cap keeps the sums that adjust them within int.
-constexpr int kMaxEdgeAdded = std::numeric_limits<int>::max() / 4;
-
 class Partition {
  public:
   // The cached partitions don't have idx - it's added to the copy returned
@@ -48,22 +44,6 @@ class Partition {
   }
 
   int NumInterior() const { return vertBary.size() - InteriorOffset(); }
-
-  // An upper bound on the triangles GetPartition(divisions) emits, found
-  // without building it. Interior verts are bounded by the product of the two
-  // shorter sides, or for an obtuse triangle by its strips' height.
-  static double NumTriBound(ivec4 n) {
-    if (n[3] > 0) {
-      return 2.0 * (la::max(n[0], n[2]) + 1) * (la::max(n[1], n[3]) + 1);
-    }
-    std::sort(&n[0], &n[0] + 3, std::greater<int>());
-    const double perimeter = double(n[0]) + n[1] + n[2];
-    const double bound = 2.0 * (n[1] + 1) * (n[2] + 1) + perimeter;
-    const int nh = ObtuseSplit(n)[1];
-    if (nh == 0) return bound;
-    return la::min(bound,
-                   2.0 * (double(n[1]) + n[2] + 2) * (nh + 1) + perimeter);
-  }
 
   static Partition GetPartition(ivec4 divisions) {
     if (divisions[0] == 0) return Partition();  // skip wrong side of quad
@@ -201,14 +181,14 @@ class Partition {
       }
       const ivec3 edgeOffsets = {3, 3 + n[0] - 1, 3 + n[0] - 1 + n[1] - 1};
 
-      const ivec2 split = ObtuseSplit(n);
+      const double f = n[2] * n[2] + n[0] * n[0];
       if (n[1] == 1) {
         if (n[0] == 1) {
           partition.triVert.push_back({0, 1, 2});
         } else {
           PartitionFan(partition.triVert, {0, 1, 2}, n[0] - 1, edgeOffsets[0]);
         }
-      } else if (split[1] == 0) {  // acute-ish
+      } else if (n[1] * n[1] > f - std::sqrt(2.0) * n[0] * n[2]) {  // acute-ish
         partition.triVert.push_back({edgeOffsets[1] - 1, 1, edgeOffsets[1]});
         PartitionQuad(partition.triVert, partition.vertBary,
                       {edgeOffsets[1] - 1, edgeOffsets[1], 2, 0},
@@ -216,8 +196,12 @@ class Partition {
                       {0, n[1] - 2, n[2] - 1, n[0] - 2},
                       {true, true, true, true});
       } else {  // obtuse -> spit into two acute
-        const int ns = split[0];
-        const int nh = split[1];
+        // portion of n[0] under n[2]
+        const int ns =
+            std::min(n[0] - 2, (int)std::round((f - n[1] * n[1]) / (2 * n[0])));
+        // height from n[0]: nh <= n[2]
+        const int nh =
+            std::max(1., std::round(std::sqrt(n[2] * n[2] - ns * ns)));
 
         const int hOffset = partition.vertBary.size();
         const vec4 middleBary = partition.vertBary[edgeOffsets[0] + ns - 1];
@@ -259,21 +243,6 @@ class Partition {
     auto lockGuard = std::lock_guard<std::mutex>(cacheLock);
     cache.insert({n, std::make_unique<Partition>(partition)});
     return partition;
-  }
-
-  // For a sorted triangle that is split into two acute ones, returns the
-  // portion of n[0] under n[2] and the height from n[0] (nh <= n[2]). Returns
-  // {0, 0} for a triangle that is not split.
-  static ivec2 ObtuseSplit(ivec4 n) {
-    const double f = double(n[2]) * n[2] + double(n[0]) * n[0];
-    if (n[1] == 1 || double(n[1]) * n[1] > f - std::sqrt(2.0) * n[0] * n[2]) {
-      return {0, 0};
-    }
-    const int ns = std::min(
-        n[0] - 2, (int)std::round((f - double(n[1]) * n[1]) / (2.0 * n[0])));
-    const int nh = std::max(
-        1., std::round(std::sqrt(double(n[2]) * n[2] - double(ns) * ns)));
-    return {ns, nh};
   }
 
   // Side 0 has added edges while sides 1 and 2 do not. Fan spreads from vert 2.
@@ -362,9 +331,9 @@ class Partition {
     bvec4 newEdgeFwd = {edgeFwd[1], true, edgeFwd[3], edgeFwd[0]};
 
     for (int i = 1; i < partitions; ++i) {
-      const int cornerOffset1 = (int64_t(edgeAdded[1]) * i) / partitions;
+      const int cornerOffset1 = (edgeAdded[1] * i) / partitions;
       const int cornerOffset3 =
-          edgeAdded[3] - 1 - (int64_t(edgeAdded[3]) * i) / partitions;
+          edgeAdded[3] - 1 - (edgeAdded[3] * i) / partitions;
       const int nextOffset1 = GetEdgeVert(1, cornerOffset1 + 1);
       const int nextOffset3 = GetEdgeVert(3, cornerOffset3 + 1);
       const int added = std::round(la::lerp(
@@ -545,8 +514,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
         const vec4 tangent1 = halfedgeTangent_.empty()
                                   ? vec4(0.0)
                                   : halfedgeTangent_[halfedge_.Pair(hIdx)];
-        edgeAdded[i] =
-            std::min(edgeDivisions(vec, tangent0, tangent1), kMaxEdgeAdded);
+        edgeAdded[i] = edgeDivisions(vec, tangent0, tangent1);
       });
 
   if (keepInterior) {
@@ -568,7 +536,7 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
           const int thisAdded = tmp[i];
           auto Added = [&edgeAdded, &half2Edge, thisAdded, this](int hIdx) {
             int longest = 0;
-            int64_t total = 0;
+            int total = 0;
             for (int _ : {0, 1, 2}) {
               const int added = edgeAdded[half2Edge[hIdx]];
               longest = la::max(longest, added);
@@ -581,40 +549,15 @@ Vec<Barycentric> Manifold::Impl::Subdivide(
                 break;
               }
             }
-            const int64_t minExtra = longest * 0.2 + 1;
-            const int64_t extra = 2 * int64_t(longest) + minExtra - total;
+            const int minExtra = longest * 0.2 + 1;
+            const int extra = 2 * longest + minExtra - total;
             if (longest == 0) return 0;
-            return extra > 0 ? static_cast<int>(
-                                   (extra * (longest - thisAdded)) / longest)
-                             : 0;
+            return extra > 0 ? (extra * (longest - thisAdded)) / longest : 0;
           };
 
           tmp[i] += la::max(Added(hIdx), Added(halfedge_.Pair(hIdx)));
         });
     edgeAdded = std::move(tmp);
-  }
-
-  // Vert, tri, and property indices are int, so check the result's size
-  // before building any partitions.
-  const int64_t numTriBound = manifold::transform_reduce(
-      countAt(0), countAt(numTri), int64_t(0), std::plus<int64_t>(),
-      [&faceHalfedges, &edgeAdded, &half2Edge](int tri) -> int64_t {
-        const ivec4 halfedges = faceHalfedges[tri];
-        if (halfedges[0] < 0) return 0;
-        ivec4 divisions(0);
-        for (const int i : {0, 1, 2, 3}) {
-          if (halfedges[i] >= 0) {
-            divisions[i] = edgeAdded[half2Edge[halfedges[i]]] + 1;
-          }
-        }
-        return la::min(Partition::NumTriBound(divisions),
-                       double(std::numeric_limits<int>::max()));
-      });
-  if (numTriBound > std::numeric_limits<int>::max() / 3 ||
-      numProp_ * (NumPropVert() + numTriBound) >
-          std::numeric_limits<int>::max()) {
-    MakeEmpty(Error::ResultTooLarge);
-    return {};
   }
 
   Vec<int> edgeOffset(numEdge);

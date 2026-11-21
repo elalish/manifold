@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <cmath>
 #include <limits>
-#include <utility>
 
 #if MANIFOLD_PAR == 1
 #include <tbb/combinable.h>
@@ -27,13 +25,11 @@
 namespace {
 using namespace manifold;
 
-// Computes each triangle's contributions to its vertices' curvature sums. The
-// sums are accumulated afterwards in triangle order, so the result doesn't
-// depend on the execution policy or thread scheduling.
 struct CurvatureAngles {
-  VecView<double> dihedral;  // per halfedge, if mean curvature is requested
-  VecView<double> angle;     // per halfedge, if Gaussian curvature is requested
-  VecView<double> area3;     // per triangle, a third of its area
+  VecView<double> meanCurvature;
+  VecView<double> gaussianCurvature;
+  VecView<double> area;
+  VecView<double> degree;
   const Halfedges& halfedge;
   VecView<const vec3> vertPos;
   VecView<const vec3> triNormal;
@@ -48,24 +44,28 @@ struct CurvatureAngles {
       edge[i] = vertPos[endVert] - vertPos[startVert];
       edgeLength[i] = la::length(edge[i]);
       edge[i] /= edgeLength[i];
-      if (!dihedral.empty()) {
-        const int neighborTri = halfedge.Pair(edgeIdx) / 3;
-        dihedral[edgeIdx] =
-            0.25 * edgeLength[i] *
-            math::asin(la::dot(
-                la::cross(triNormal[tri], triNormal[neighborTri]), edge[i]));
-      }
+      const int neighborTri = halfedge.Pair(edgeIdx) / 3;
+      const double dihedral =
+          0.25 * edgeLength[i] *
+          math::asin(la::dot(la::cross(triNormal[tri], triNormal[neighborTri]),
+                             edge[i]));
+      AtomicAdd(meanCurvature[startVert], dihedral);
+      AtomicAdd(meanCurvature[endVert], dihedral);
+      AtomicAdd(degree[startVert], 1.0);
     }
 
-    if (!angle.empty()) {
-      const double phi0 = math::acos(-la::dot(edge[2], edge[0]));
-      const double phi1 = math::acos(-la::dot(edge[0], edge[1]));
-      angle[3 * tri] = phi0;
-      angle[3 * tri + 1] = phi1;
-      angle[3 * tri + 2] = kPi - phi0 - phi1;
+    vec3 phi;
+    phi[0] = math::acos(-la::dot(edge[2], edge[0]));
+    phi[1] = math::acos(-la::dot(edge[0], edge[1]));
+    phi[2] = kPi - phi[0] - phi[1];
+    const double area3 = edgeLength[0] * edgeLength[1] *
+                         la::length(la::cross(edge[0], edge[1])) / 6;
+
+    for (int i : {0, 1, 2}) {
+      const int vert = halfedge.Start(3 * tri + i);
+      AtomicAdd(gaussianCurvature[vert], -phi[i]);
+      AtomicAdd(area[vert], area3);
     }
-    area3[tri] = edgeLength[0] * edgeLength[1] *
-                 la::length(la::cross(edge[0], edge[1])) / 6;
   }
 };
 
@@ -195,8 +195,7 @@ bool Manifold::Impl::IsSelfIntersecting() const {
  */
 bool Manifold::Impl::MatchesTriNormals() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
-  const double tol = 1000 * epsilon_;
-  return all_of(countAt(0_uz), countAt(NumTri()), [&](size_t face) {
+  return all_of(countAt(0_uz), countAt(NumTri()), [this](size_t face) {
     if (halfedge_.Pair(3 * face) < 0) return true;
 
     const mat2x3 projection = GetAxisAlignedProjection(faceNormal_[face]);
@@ -211,62 +210,28 @@ bool Manifold::Impl::MatchesTriNormals() const {
       max = std::max(max, d);
       min = std::min(min, d);
     }
-    if (max - min > tol) return false;
+    if (max - min > 2 * tolerance_) return false;
 
-    const int ccw = CCW(v[0], v[1], v[2], tol);
+    const int ccw = CCW(v[0], v[1], v[2], epsilon_ * 2);
     return ccw >= 0;
   });
 }
 
 /**
- * Returns the number of triangles that are colinear.
+ * Returns the number of triangles that are colinear within tolerance_.
  */
 int Manifold::Impl::NumDegenerateTris() const {
-  if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return 0;
+  if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
   return count_if(countAt(0_uz), countAt(NumTri()), [this](size_t face) {
-    if (halfedge_.Pair(3 * face) < 0) return false;
+    if (halfedge_.Pair(3 * face) < 0) return true;
 
     const mat2x3 projection = GetAxisAlignedProjection(faceNormal_[face]);
     vec2 v[3];
     for (int i : {0, 1, 2})
       v[i] = projection * vertPos_[halfedge_.Start(3 * face + i)];
 
-    const int ccw = CCW(v[0], v[1], v[2], epsilon_ / 2);
-    // if (ccw == 0) {
-    //   std::cout << "degenerate tri: " << face << ", e: " << face * 3 << ", "
-    //             << faceNormal_[face] << ", "
-    //             << vertPos_[halfedge_.Start(3 * face + 0)] << ", "
-    //             << vertPos_[halfedge_.Start(3 * face + 1)] << ", "
-    //             << vertPos_[halfedge_.Start(3 * face + 2)] << std::endl;
-    // }
+    const int ccw = CCW(v[0], v[1], v[2], tolerance_ / 2);
     return ccw == 0;
-  });
-}
-
-/**
- * Returns true if properties are shared everywhere except across mesh
- * boundaries. This is not true in general, but only because an input mesh may
- * have property discontinuities. For simple input meshes where properties are
- * 1:1 with verts, this HasSimpleProps condition should still be true after any
- * combination of boolean operations and simplifications. CalculateNormals()
- * will cause this to be false anytime the mesh contains a sharp edge.
- */
-bool Manifold::Impl::HasSimpleProps() const {
-  if (halfedge_.size() == 0 || NumProp() == 0) return true;
-  return all_of(countAt(0_uz), countAt(halfedge_.size()), [this](size_t edge) {
-    const int pair = halfedge_.Pair(edge);
-    if (pair < 0 || !halfedge_.IsForward(edge)) return true;
-
-    const bool propsMatch = halfedge_.Prop(edge) == halfedge_.PropEnd(pair) &&
-                            halfedge_.Prop(pair) == halfedge_.PropEnd(edge);
-    const bool meshesMatch = meshRelation_.triRef[halfedge_.Tri(edge)].meshID ==
-                             meshRelation_.triRef[halfedge_.Tri(pair)].meshID;
-    // if (meshesMatch != propsMatch) {
-    //   std::cout << "edge: " << edge << ", pair: " << pair
-    //             << ", meshesMatch: " << meshesMatch
-    //             << ", propsMatch: " << propsMatch << std::endl;
-    // }
-    return meshesMatch == propsMatch;
   });
 }
 
@@ -295,16 +260,6 @@ bool Manifold::Impl::IsConvex() const {
         linalg::dot(edgeVec, linalg::cross(normal0, normal1)) > 0;
     return convex;
   });
-}
-
-/**
- * Returns true if the Manifold has negative volume, not including manifolds
- * less than tolerance thick on average (indeterminate volume).
- */
-bool Manifold::Impl::IsVug() const {
-  const double volume = GetProperty(Property::Volume);
-  const double area = GetProperty(Property::SurfaceArea);
-  return volume < -area * bBox_.Scale() * Quality::GetRelativePrecision();
 }
 
 double Manifold::Impl::GetProperty(Property prop) const {
@@ -342,48 +297,26 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
   ZoneScoped;
   if (IsEmpty()) return;
   if (gaussianIdx < 0 && meanIdx < 0) return;
-  const size_t numHalfedge = halfedge_.size();
-  Vec<double> dihedral(meanIdx >= 0 ? numHalfedge : 0);
-  Vec<double> angle(gaussianIdx >= 0 ? numHalfedge : 0);
-  Vec<double> area3(NumTri());
+  Vec<double> vertMeanCurvature(NumVert(), 0);
+  Vec<double> vertGaussianCurvature(NumVert(), kTwoPi);
+  Vec<double> vertArea(NumVert(), 0);
+  Vec<double> degree(NumVert(), 0);
   auto policy = autoPolicy(NumTri(), 1e4);
   for_each(policy, countAt(0_uz), countAt(NumTri()),
-           CurvatureAngles{dihedral, angle, area3, halfedge_, vertPos_,
-                           faceNormal_});
-
-  // Sequential, so each vertex sums its terms in the same order every time.
-  Vec<double> vertMeanCurvature(meanIdx >= 0 ? NumVert() : 0, 0);
-  Vec<double> vertGaussianCurvature(gaussianIdx >= 0 ? NumVert() : 0, kTwoPi);
-  Vec<double> vertArea(NumVert(), 0);
-  Vec<int> degree(NumVert(), 0);
-  for (size_t tri = 0; tri < NumTri(); ++tri) {
-    for (const int i : {0, 1, 2}) {
-      const size_t edge = 3 * tri + i;
-      const int startVert = halfedge_.Start(edge);
-      if (!dihedral.empty()) {
-        vertMeanCurvature[startVert] += dihedral[edge];
-        vertMeanCurvature[halfedge_.End(edge)] += dihedral[edge];
-      }
-      degree[startVert] += 1;
-      if (!angle.empty()) vertGaussianCurvature[startVert] -= angle[edge];
-      vertArea[startVert] += area3[tri];
-    }
-  }
+           CurvatureAngles{vertMeanCurvature, vertGaussianCurvature, vertArea,
+                           degree, halfedge_, vertPos_, faceNormal_});
   for_each_n(policy, countAt(0), NumVert(),
              [&vertMeanCurvature, &vertGaussianCurvature, &vertArea,
               &degree](const int vert) {
                const double factor = degree[vert] / (6 * vertArea[vert]);
-               if (!vertMeanCurvature.empty())
-                 vertMeanCurvature[vert] *= factor;
-               if (!vertGaussianCurvature.empty())
-                 vertGaussianCurvature[vert] *= factor;
+               vertMeanCurvature[vert] *= factor;
+               vertGaussianCurvature[vert] *= factor;
              });
 
   const int oldNumProp = NumProp();
   const int numProp = std::max(oldNumProp, std::max(gaussianIdx, meanIdx) + 1);
-  const size_t numPropVert = NumPropVert();
-  const Vec<double> oldProperties = std::move(properties_);
-  properties_ = Vec<double>(numProp * numPropVert, 0);
+  const Vec<double> oldProperties = properties_;
+  properties_ = Vec<double>(numProp * NumPropVert(), 0);
   numProp_ = numProp;
 
   Vec<uint8_t> counters(NumPropVert(), 0);
@@ -393,8 +326,9 @@ void Manifold::Impl::CalculateCurvature(int gaussianIdx, int meanIdx) {
       const int vert = halfedge_.Start(edge);
       const int propVert = halfedge_.Prop(edge);
 
-      auto old = AtomicRef<uint8_t>(counters[propVert])
-                     .exchange(static_cast<uint8_t>(1));
+      auto old = std::atomic_exchange(
+          reinterpret_cast<std::atomic<uint8_t>*>(&counters[propVert]),
+          static_cast<uint8_t>(1));
       if (old == 1) continue;
 
       for (int p = 0; p < oldNumProp; ++p) {
@@ -437,7 +371,6 @@ void Manifold::Impl::CalculateBBox() {
     // Decimated out of existence - early out.
     MakeEmpty(Error::NoError);
   }
-  epsilon_ = Quality::GetRelativePrecision() * bBox_.Scale();
 }
 
 /**

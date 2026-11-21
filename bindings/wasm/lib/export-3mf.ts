@@ -1,0 +1,297 @@
+// Copyright 2023-2025 The Manifold Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+/**
+ * Serialize in memory glTF-transform documents to 3MF.
+ * @packageDocumentation
+ * @group ManifoldCAD
+ * @category Input/Output
+ * @groupDescription Export
+ * These properties implement the {@link lib/export-model!Exporter | Exporter}
+ * interface. Through this interface, manifoldCAD can determine when to use this
+ * module to export a model.
+ */
+
+import * as GLTFTransform from '@gltf-transform/core';
+import {fileForContentTypes, FileForRelThumbnail, to3dmodel} from '@jscadui/3mf-export';
+import type {Zippable} from 'fflate';
+import {strToU8, zipSync} from 'fflate';
+
+import type {Mat4} from '../manifold-global-types.d.ts';
+
+import type {ExportOptions} from './export-model.ts';
+import {ManifoldPrimitive} from './manifold-gltf.ts';
+
+const supportedFormat = {
+  extension: '3mf',
+  mimetype: 'model/3mf'
+};
+
+/**
+ * @group Export
+ */
+export const exportFormats = [supportedFormat];
+
+interface Mesh3MF {
+  id: string;
+  vertices: Float32Array;
+  indices: Uint32Array;
+  name?: string;
+}
+
+/**
+ * @hidden
+ * Exported for unit tests.
+ */
+export interface Child3MF {
+  objectID: string;
+  transform?: Mat4|Array<string>;
+}
+
+/**
+ * @hidden
+ * Exported for unit tests.
+ */
+export interface Component3MF {
+  id: string;
+  children: Array<Child3MF>;
+  name?: string;
+  transform?: Mat4|Array<string>;
+}
+
+export interface Header {
+  unit?: 'micron'|'millimeter'|'centimeter'|'inch'|'foot'|'meter';
+  title?: string;
+  author?: string;
+  description?: string;
+  application?: string;
+  creationDate?: string;
+  license?: string;
+  modificationDate?: string;
+}
+
+interface To3MF {
+  meshes: Array<Mesh3MF>;
+  components: Array<Component3MF>;
+  items: Array<Child3MF>;
+  precision: number;
+  header: Header;
+}
+
+const defaultHeader: Header = {
+  unit: 'millimeter',
+  title: 'ManifoldCAD.org model',
+  description: 'ManifoldCAD.org model',
+  application: 'ManifoldCAD.org',
+}
+
+export interface Export3MFOptions extends ExportOptions {
+  mimetype?: string;
+  header?: Header;
+}
+
+/**
+ * Sort 3MF components topologically.
+ *
+ * Some 3MF parsers (like PrusaSlicer and descendants) expect child nodes to be
+ * defined before their parents.  This function sorts the component list
+ * accordingly.
+ *
+ * This is a version of Kahn's algorithm -- a stripped down breadth first
+ * search.  It finds root nodes, adds them to the result, then removes them from
+ * the graph.  It moves on to their children, which are now root nodes
+ * themselves.
+ *
+ * Rinse, lather, repeat, and the final result is a list of nodes ordered by
+ * generation.  Order within a generation is not guaranteed, and is not required
+ * in this particular case.
+ *
+ * @hidden
+ * Exported for unit tests.
+ */
+export const toposort = (unsorted: Component3MF[]): Component3MF[] => {
+  // Create a local graph.  We will destroy it by removing edges and do not want
+  // to introduce any side effects.
+  let graph: Array<[Component3MF, Component3MF]> = [];
+  for (const parent of unsorted) {
+    for (const {objectID} of parent.children) {
+      const child = unsorted.find(c => c.id === objectID);
+      if (child) graph.push([parent, child]);
+    }
+  }
+
+  const isRoot = (child: Component3MF): boolean =>
+      graph.filter(([, c]) => c.id === child.id).length === 0;
+  const children = (parent: Component3MF): Component3MF[] =>
+      graph.filter(([p]) => p.id === parent.id).map(([, c]) => c);
+  const disown = (parent: Component3MF, child: Component3MF) => graph =
+      graph.filter(([p, c]) => !(p.id === parent.id && c.id === child.id));
+
+  const roots = unsorted.filter(isRoot);
+  const sorted = [];
+
+  let root;
+  while (root = roots.shift()) {  // For each root node...
+    sorted.unshift(root);         // ...insert before potential ancestors.
+    for (const child of children(root)) {  // For each child....
+      disown(root, child);  // ...remove the parent-child edge from the graph.
+      if (isRoot(child)) roots.push(child);  // Enqueue new root nodes.
+    }
+  }
+
+  return sorted;
+};
+
+/**
+ * Convert a GLTF-Transform document to a 3MF model.
+ *
+ * 3MF files are more sophisticated than STL files; they can encode meshes,
+ * components and build items.
+ *
+ * 3MF components are like a scene graph.  Each component can have multiple
+ * children, and does have its own transformation matrix.
+ * This is flexible enough to allow putting several parts in the same file
+ * (multiple components, each with a mesh) as well as multi-material files (a
+ * tree containing multiple meshes, each for a particular material).
+ *
+ * Finally, build items define what the slicer software actually sees.
+ * ManifoldCAD doesn't have an equivalent comprehension.  We assume that top
+ * level objects -- nodes with no parents -- are build objects.
+ *
+ * @param doc The GLTF document to convert.
+ * @returns A blob containing the converted model.
+ * @group Export
+ */
+export async function toArrayBuffer(
+    doc: GLTFTransform.Document,
+    options?: Export3MFOptions): Promise<ArrayBuffer> {
+  const to3mf = {
+    meshes: [],
+    components: [],
+    items: [],
+    precision: 7,
+    header: {...defaultHeader, ...(options?.header ?? {})}
+  } as To3MF;
+
+  // GLTF references by array index.
+  // 3MF references by ID.
+  let nextGlobalID = 1;
+  const object2globalID =
+      new Map<GLTFTransform.Node|GLTFTransform.Mesh, string>();
+  const getObjectID = (obj: GLTFTransform.Node|GLTFTransform.Mesh) =>
+      `${object2globalID.get(obj)}`;
+  const getMeshID = (mesh: GLTFTransform.Mesh) => {
+    // If a mesh has been cloned with a different material, find
+    // the original mesh.  This isn't a general GLTF feature; this is set
+    // by the ManifoldCAD GLTF exporter.
+    const {clonedFrom} = mesh.getExtras();
+    if (clonedFrom) {
+      return object2globalID.get(clonedFrom as GLTFTransform.Mesh)
+    }
+    return object2globalID.get(mesh);
+  };
+  const setObjectID =
+      (obj: GLTFTransform.Node|GLTFTransform.Mesh) => {
+        const objectID = `${nextGlobalID++}`;
+        object2globalID.set(obj, objectID);
+        return objectID
+      }
+
+  // Get meshes in place first.
+  for (const mesh of doc.getRoot().listMeshes()) {
+    const manifoldPrimitive =
+        mesh.getExtension('EXT_mesh_manifold') as ManifoldPrimitive;
+    if (manifoldPrimitive) {
+      // This mesh has a list of triangle vertices already.
+      const indices = manifoldPrimitive.getIndices();
+      const positionAccessor =
+          mesh.listPrimitives()[0].getAttribute('POSITION')!;
+
+      const objectID = setObjectID(mesh)
+      to3mf.meshes.push({
+        vertices: positionAccessor.getArray()! as Float32Array,
+        indices: indices.getArray()! as Uint32Array,
+        id: objectID
+      });
+    }
+
+    const {clonedFrom} = mesh.getExtras();
+    if (!manifoldPrimitive && clonedFrom) {
+      // GLTF Mesh, instance of another mesh.
+      // getMeshID will find this when adding it to components.
+      continue;
+    }
+    if (!manifoldPrimitive && !clonedFrom) {
+      // GLTF Mesh, no manifold primitive,
+      // not an instance of another mesh.
+      // We should handle this case, but for now we do not.
+      console.log('skipping non-ManifoldCAD mesh')
+    }
+  }
+
+  // Create our components...
+  const components: Component3MF[] = [];
+  for (const node of doc.getRoot().listNodes()) {
+    const meshID = node.getMesh() && getMeshID(node.getMesh()!);
+    components.push({
+      id: setObjectID(node),
+      name: node.getName(),
+      children: meshID ? [{objectID: meshID}] : [],
+      transform: node.getMatrix().map(n => n.toFixed(to3mf.precision))
+    });
+  }
+
+  // ...work out our component hierarchy...
+  for (const node of doc.getRoot().listNodes()) {
+    const objectID = getObjectID(node)
+    if (!objectID) {
+      console.log(`Could not find object ID for ${node.getName()}`)
+      continue;
+    }
+    const child = {
+      objectID,
+      // Most 3MF parsers will not accept a number in scientific notation.
+      // Transforms are serialized to a string, containing 12 numbers
+      // separated by spaces.  If we force a number to a string here,
+      // 3mf-export passes it through.
+      transform: node.getMatrix().map(n => n.toFixed(to3mf?.precision ?? 7))
+    };
+    const parent = node.getParentNode();
+
+    if (parent) {
+      // This is a child node, add it to its parent.
+      const parentID = getObjectID(parent);
+      const parent3mf = components.find((comp) => comp.id == parentID)!;
+      parent3mf.children.push(child);
+    } else {
+      // This is a root node.
+      // Add it to the build list.
+      to3mf.items.push({objectID})
+    }
+  }
+
+  // ...and sort it so that parents always follow children.
+  to3mf.components = toposort(components);
+
+  const fileForRelThumbnail = new FileForRelThumbnail();
+  fileForRelThumbnail.add3dModel('3D/3dmodel.model')
+
+  const model = to3dmodel(to3mf as any);
+  const files: Zippable = {};
+  files['3D/3dmodel.model'] = strToU8(model);
+  files[fileForContentTypes.name] = strToU8(fileForContentTypes.content);
+  files[fileForRelThumbnail.name] = strToU8(fileForRelThumbnail.content);
+  const zipFile = zipSync(files);
+  return zipFile.buffer as ArrayBuffer;
+};

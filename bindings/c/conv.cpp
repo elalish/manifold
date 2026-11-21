@@ -141,60 +141,48 @@ ManifoldVec3 to_c(vec3 v) { return {v.x, v.y, v.z}; }
 
 ManifoldIVec3 to_c(ivec3 v) { return {v.x, v.y, v.z}; }
 
-ManifoldTriangulation* to_c(std::vector<int>* m) {
+ManifoldTriangulation* to_c(std::vector<ivec3>* m) {
   return reinterpret_cast<ManifoldTriangulation*>(m);
 }
 
-const manifold::Manifold* from_c(const ManifoldManifold* m) {
-  return reinterpret_cast<const manifold::Manifold*>(m);
+manifold::Manifold* from_c(ManifoldManifold* m) {
+  return reinterpret_cast<manifold::Manifold*>(m);
 }
 
 ManifoldVec* from_c(ManifoldManifoldVec* ms) {
   return reinterpret_cast<ManifoldVec*>(ms);
 }
 
-const ManifoldVec* from_c(const ManifoldManifoldVec* ms) {
-  return reinterpret_cast<const ManifoldVec*>(ms);
-}
-
-const manifold::CrossSection* from_c(const ManifoldCrossSection* cs) {
-  return reinterpret_cast<const manifold::CrossSection*>(cs);
+manifold::CrossSection* from_c(ManifoldCrossSection* cs) {
+  return reinterpret_cast<manifold::CrossSection*>(cs);
 }
 
 CrossSectionVec* from_c(ManifoldCrossSectionVec* csv) {
   return reinterpret_cast<CrossSectionVec*>(csv);
 }
 
-const CrossSectionVec* from_c(const ManifoldCrossSectionVec* csv) {
-  return reinterpret_cast<const CrossSectionVec*>(csv);
-}
-
-const RayHitVec* from_c(const ManifoldRayHitVec* v) {
-  return reinterpret_cast<const RayHitVec*>(v);
+RayHitVec* from_c(ManifoldRayHitVec* v) {
+  return reinterpret_cast<RayHitVec*>(v);
 }
 
 ExecutionContext* from_c(ManifoldExecutionContext* ctx) {
   return reinterpret_cast<ExecutionContext*>(ctx);
 }
 
-const ExecutionContext* from_c(const ManifoldExecutionContext* ctx) {
-  return reinterpret_cast<const ExecutionContext*>(ctx);
+manifold::SimplePolygon* from_c(ManifoldSimplePolygon* m) {
+  return reinterpret_cast<manifold::SimplePolygon*>(m);
 }
 
-const manifold::SimplePolygon* from_c(const ManifoldSimplePolygon* m) {
-  return reinterpret_cast<const manifold::SimplePolygon*>(m);
+manifold::Polygons* from_c(ManifoldPolygons* m) {
+  return reinterpret_cast<manifold::Polygons*>(m);
 }
 
-const manifold::Polygons* from_c(const ManifoldPolygons* m) {
-  return reinterpret_cast<const manifold::Polygons*>(m);
+manifold::MeshGL* from_c(ManifoldMeshGL* m) {
+  return reinterpret_cast<manifold::MeshGL*>(m);
 }
 
-const manifold::MeshGL* from_c(const ManifoldMeshGL* m) {
-  return reinterpret_cast<const manifold::MeshGL*>(m);
-}
-
-const manifold::MeshGL64* from_c(const ManifoldMeshGL64* m) {
-  return reinterpret_cast<const manifold::MeshGL64*>(m);
+manifold::MeshGL64* from_c(ManifoldMeshGL64* m) {
+  return reinterpret_cast<manifold::MeshGL64*>(m);
 }
 
 OpType from_c(ManifoldOpType optype) {
@@ -210,6 +198,24 @@ OpType from_c(ManifoldOpType optype) {
       break;
   };
   return op;
+}
+
+CrossSection::FillRule from_c(ManifoldFillRule fillrule) {
+  auto fr = CrossSection::FillRule::EvenOdd;
+  switch (fillrule) {
+    case MANIFOLD_FILL_RULE_EVEN_ODD:
+      break;
+    case MANIFOLD_FILL_RULE_NON_ZERO:
+      fr = CrossSection::FillRule::NonZero;
+      break;
+    case MANIFOLD_FILL_RULE_POSITIVE:
+      fr = CrossSection::FillRule::Positive;
+      break;
+    case MANIFOLD_FILL_RULE_NEGATIVE:
+      fr = CrossSection::FillRule::Negative;
+      break;
+  };
+  return fr;
 }
 
 CrossSection::JoinType from_c(ManifoldJoinType join_type) {
@@ -234,16 +240,8 @@ manifold::Box* from_c(ManifoldBox* m) {
   return reinterpret_cast<manifold::Box*>(m);
 }
 
-const manifold::Box* from_c(const ManifoldBox* m) {
-  return reinterpret_cast<const manifold::Box*>(m);
-}
-
 manifold::Rect* from_c(ManifoldRect* m) {
   return reinterpret_cast<manifold::Rect*>(m);
-}
-
-const manifold::Rect* from_c(const ManifoldRect* m) {
-  return reinterpret_cast<const manifold::Rect*>(m);
 }
 
 vec2 from_c(ManifoldVec2 v) { return vec2(v.x, v.y); }
@@ -254,6 +252,30 @@ ivec3 from_c(ManifoldIVec3 v) { return ivec3(v.x, v.y, v.z); }
 
 vec4 from_c(ManifoldVec4 v) { return vec4(v.x, v.y, v.z, v.w); }
 
-const std::vector<int>* from_c(const ManifoldTriangulation* m) {
-  return reinterpret_cast<const std::vector<int>*>(m);
+std::vector<ivec3>* from_c(ManifoldTriangulation* m) {
+  return reinterpret_cast<std::vector<ivec3>*>(m);
+}
+
+std::vector<vec3> vector_of_vec_array(ManifoldVec3* vs, size_t length) {
+  auto vec = std::vector<vec3>();
+  for (size_t i = 0; i < length; ++i) {
+    vec.push_back(from_c(vs[i]));
+  }
+  return vec;
+}
+
+std::vector<ivec3> vector_of_vec_array(ManifoldIVec3* vs, size_t length) {
+  auto vec = std::vector<ivec3>();
+  for (size_t i = 0; i < length; ++i) {
+    vec.push_back(from_c(vs[i]));
+  }
+  return vec;
+}
+
+std::vector<vec4> vector_of_vec_array(ManifoldVec4* vs, size_t length) {
+  auto vec = std::vector<vec4>();
+  for (size_t i = 0; i < length; ++i) {
+    vec.push_back(from_c(vs[i]));
+  }
+  return vec;
 }

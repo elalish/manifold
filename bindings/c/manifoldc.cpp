@@ -21,6 +21,7 @@
 
 #include "conv.h"
 #include "manifold/common.h"
+#include "manifold/cross_section.h"
 #include "manifold/manifold.h"
 #include "manifold/polygon.h"
 #include "manifold/types.h"
@@ -28,11 +29,10 @@
 using namespace manifold;
 
 namespace {
-ManifoldManifold* level_set(double (*sdf_context)(double, double, double,
-                                                  void*),
-                            const ManifoldBox* bounds, double edge_length,
-                            double level, double tolerance, bool seq, void* ctx,
-                            ExecutionContext* ec = nullptr) {
+ManifoldManifold* level_set(
+    void* mem, double (*sdf_context)(double, double, double, void*),
+    ManifoldBox* bounds, double edge_length, double level, double tolerance,
+    bool seq, void* ctx, ExecutionContext* ec = nullptr) {
   // Bind function with context argument to one without
   using namespace std::placeholders;
   std::function<double(double, double, double)> sdf =
@@ -45,7 +45,7 @@ ManifoldManifold* level_set(double (*sdf_context)(double, double, double,
                                       tolerance, !seq)
                        : Manifold::LevelSet(fun, *from_c(bounds), edge_length,
                                             level, tolerance, !seq);
-  return to_c(new Manifold(result));
+  return to_c(new (mem) Manifold(result));
 }
 
 // Raw uninitialized storage for a T — callers must placement-new into it
@@ -65,220 +65,222 @@ T* alloc_raw() {
 extern "C" {
 #endif
 
-ManifoldSimplePolygon* manifold_simple_polygon(const ManifoldVec2* ps,
+ManifoldSimplePolygon* manifold_simple_polygon(void* mem, ManifoldVec2* ps,
                                                size_t length) {
-  auto vec = new std::vector<vec2>;
-  vec->reserve(length);
+  auto vec = new (mem) std::vector<vec2>;
   for (size_t i = 0; i < length; ++i) {
     vec->push_back({ps[i].x, ps[i].y});
   }
   return to_c(vec);
 }
 
-ManifoldPolygons* manifold_polygons(const ManifoldSimplePolygon* const* ps,
+ManifoldPolygons* manifold_polygons(void* mem, ManifoldSimplePolygon** ps,
                                     size_t length) {
-  auto vec = new std::vector<SimplePolygon>;
-  vec->reserve(length);
-  auto polys = reinterpret_cast<const SimplePolygon* const*>(ps);
+  auto vec = new (mem) std::vector<SimplePolygon>;
+  auto polys = reinterpret_cast<SimplePolygon**>(ps);
   for (size_t i = 0; i < length; ++i) {
     vec->push_back(*polys[i]);
   }
   return to_c(vec);
 }
 
-size_t manifold_simple_polygon_length(const ManifoldSimplePolygon* p) {
+size_t manifold_simple_polygon_length(ManifoldSimplePolygon* p) {
   return from_c(p)->size();
 }
 
-size_t manifold_polygons_length(const ManifoldPolygons* ps) {
+size_t manifold_polygons_length(ManifoldPolygons* ps) {
   return from_c(ps)->size();
 }
 
-size_t manifold_polygons_simple_length(const ManifoldPolygons* ps, size_t idx) {
+size_t manifold_polygons_simple_length(ManifoldPolygons* ps, size_t idx) {
   return (*from_c(ps))[idx].size();
 }
 
-ManifoldVec2 manifold_simple_polygon_get_point(const ManifoldSimplePolygon* p,
+ManifoldVec2 manifold_simple_polygon_get_point(ManifoldSimplePolygon* p,
                                                size_t idx) {
   return to_c((*from_c(p))[idx]);
 }
 
-ManifoldSimplePolygon* manifold_polygons_get_simple(const ManifoldPolygons* ps,
+ManifoldSimplePolygon* manifold_polygons_get_simple(void* mem,
+                                                    ManifoldPolygons* ps,
                                                     size_t idx) {
-  return to_c(new SimplePolygon((*from_c(ps))[idx]));
+  auto sp = (*from_c(ps))[idx];
+  return to_c(new (mem) SimplePolygon(sp));
 }
 
-ManifoldVec2 manifold_polygons_get_point(const ManifoldPolygons* ps,
+ManifoldVec2 manifold_polygons_get_point(ManifoldPolygons* ps,
                                          size_t simple_idx, size_t pt_idx) {
   return to_c((*from_c(ps))[simple_idx][pt_idx]);
 }
 
-ManifoldManifoldVec* manifold_manifold_empty_vec() {
-  return to_c(new ManifoldVec());
+ManifoldManifoldVec* manifold_manifold_empty_vec(void* mem) {
+  return to_c(new (mem) ManifoldVec());
 }
 
-ManifoldManifoldVec* manifold_manifold_vec(size_t sz) {
-  return to_c(new ManifoldVec(sz));
+ManifoldManifoldVec* manifold_manifold_vec(void* mem, size_t sz) {
+  return to_c(new (mem) ManifoldVec(sz));
 }
 
 void manifold_manifold_vec_reserve(ManifoldManifoldVec* ms, size_t sz) {
   from_c(ms)->reserve(sz);
 }
 
-size_t manifold_manifold_vec_length(const ManifoldManifoldVec* ms) {
+size_t manifold_manifold_vec_length(ManifoldManifoldVec* ms) {
   return from_c(ms)->size();
 }
 
-ManifoldManifold* manifold_manifold_vec_get(const ManifoldManifoldVec* ms,
+ManifoldManifold* manifold_manifold_vec_get(void* mem, ManifoldManifoldVec* ms,
                                             size_t idx) {
   auto m = (*from_c(ms))[idx];
-  return to_c(new Manifold(m));
+  return to_c(new (mem) Manifold(m));
 }
 
 void manifold_manifold_vec_set(ManifoldManifoldVec* ms, size_t idx,
-                               const ManifoldManifold* m) {
+                               ManifoldManifold* m) {
   (*from_c(ms))[idx] = *from_c(m);
 }
 
 void manifold_manifold_vec_push_back(ManifoldManifoldVec* ms,
-                                     const ManifoldManifold* m) {
+                                     ManifoldManifold* m) {
   return from_c(ms)->push_back(*from_c(m));
 }
 
-ManifoldManifold* manifold_boolean(const ManifoldManifold* a,
-                                   const ManifoldManifold* b,
-                                   ManifoldOpType op) {
+ManifoldManifold* manifold_boolean(void* mem, ManifoldManifold* a,
+                                   ManifoldManifold* b, ManifoldOpType op) {
   auto m = from_c(a)->Boolean(*from_c(b), from_c(op));
-  return to_c(new Manifold(m));
+  return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold* manifold_batch_boolean(const ManifoldManifoldVec* ms,
+ManifoldManifold* manifold_batch_boolean(void* mem, ManifoldManifoldVec* ms,
                                          ManifoldOpType op) {
   auto m = Manifold::BatchBoolean(*from_c(ms), from_c(op));
-  return to_c(new Manifold(m));
+  return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold* manifold_union(const ManifoldManifold* a,
-                                 const ManifoldManifold* b) {
+ManifoldManifold* manifold_union(void* mem, ManifoldManifold* a,
+                                 ManifoldManifold* b) {
   auto m = (*from_c(a)) + (*from_c(b));
-  return to_c(new Manifold(m));
+  return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold* manifold_difference(const ManifoldManifold* a,
-                                      const ManifoldManifold* b) {
+ManifoldManifold* manifold_difference(void* mem, ManifoldManifold* a,
+                                      ManifoldManifold* b) {
   auto m = (*from_c(a)) - (*from_c(b));
-  return to_c(new Manifold(m));
+  return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold* manifold_intersection(const ManifoldManifold* a,
-                                        const ManifoldManifold* b) {
+ManifoldManifold* manifold_intersection(void* mem, ManifoldManifold* a,
+                                        ManifoldManifold* b) {
   auto m = (*from_c(a)) ^ (*from_c(b));
-  return to_c(new Manifold(m));
+  return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifoldPair manifold_split(const ManifoldManifold* a,
-                                    const ManifoldManifold* b) {
+ManifoldManifoldPair manifold_split(void* mem_first, void* mem_second,
+                                    ManifoldManifold* a, ManifoldManifold* b) {
   auto pair = from_c(a)->Split(*from_c(b));
-  auto first = new Manifold(pair.first);
-  auto second = new Manifold(pair.second);
+  auto first = new (mem_first) Manifold(pair.first);
+  auto second = new (mem_second) Manifold(pair.second);
   return {to_c(first), to_c(second)};
 }
 
-ManifoldManifoldPair manifold_split_by_plane(const ManifoldManifold* m,
+ManifoldManifoldPair manifold_split_by_plane(void* mem_first, void* mem_second,
+                                             ManifoldManifold* m,
                                              double normal_x, double normal_y,
                                              double normal_z, double offset) {
   auto normal = vec3(normal_x, normal_y, normal_z);
   auto pair = from_c(m)->SplitByPlane(normal, offset);
-  auto first = new Manifold(pair.first);
-  auto second = new Manifold(pair.second);
+  auto first = new (mem_first) Manifold(pair.first);
+  auto second = new (mem_second) Manifold(pair.second);
   return {to_c(first), to_c(second)};
 }
 
-ManifoldManifold* manifold_trim_by_plane(const ManifoldManifold* m,
+ManifoldManifold* manifold_trim_by_plane(void* mem, ManifoldManifold* m,
                                          double normal_x, double normal_y,
                                          double normal_z, double offset) {
   auto normal = vec3(normal_x, normal_y, normal_z);
   auto trimmed = from_c(m)->TrimByPlane(normal, offset);
-  return to_c(new Manifold(trimmed));
+  return to_c(new (mem) Manifold(trimmed));
 }
 
-ManifoldManifold* manifold_minkowski_sum(const ManifoldManifold* a,
-                                         const ManifoldManifold* b) {
+ManifoldManifold* manifold_minkowski_sum(void* mem, ManifoldManifold* a,
+                                         ManifoldManifold* b) {
   auto m = (*from_c(a)).MinkowskiSum(*from_c(b));
-  return to_c(new Manifold(m));
+  return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold* manifold_minkowski_difference(const ManifoldManifold* a,
-                                                const ManifoldManifold* b) {
+ManifoldManifold* manifold_minkowski_difference(void* mem, ManifoldManifold* a,
+                                                ManifoldManifold* b) {
   auto m = (*from_c(a)).MinkowskiDifference(*from_c(b));
-  return to_c(new Manifold(m));
+  return to_c(new (mem) Manifold(m));
 }
 
-ManifoldPolygons* manifold_slice(const ManifoldManifold* m, double height) {
+ManifoldPolygons* manifold_slice(void* mem, ManifoldManifold* m,
+                                 double height) {
   auto poly = from_c(m)->Slice(height);
-  return to_c(new Polygons(poly));
+  return to_c(new (mem) Polygons(poly));
 }
 
-ManifoldPolygons* manifold_project(const ManifoldManifold* m) {
+ManifoldPolygons* manifold_project(void* mem, ManifoldManifold* m) {
   auto poly = from_c(m)->Project();
-  return to_c(new Polygons(poly));
+  return to_c(new (mem) Polygons(poly));
 }
 
-ManifoldManifold* manifold_hull(const ManifoldManifold* m) {
+ManifoldManifold* manifold_hull(void* mem, ManifoldManifold* m) {
   auto hulled = from_c(m)->Hull();
-  return to_c(new Manifold(hulled));
+  return to_c(new (mem) Manifold(hulled));
 }
 
-ManifoldManifold* manifold_batch_hull(const ManifoldManifoldVec* ms) {
+ManifoldManifold* manifold_batch_hull(void* mem, ManifoldManifoldVec* ms) {
   auto hulled = Manifold::Hull(*from_c(ms));
-  return to_c(new Manifold(hulled));
+  return to_c(new (mem) Manifold(hulled));
 }
 
-ManifoldManifold* manifold_hull_pts(const ManifoldVec3* ps, size_t length) {
+ManifoldManifold* manifold_hull_pts(void* mem, ManifoldVec3* ps,
+                                    size_t length) {
   std::vector<vec3> vec(length);
   for (size_t i = 0; i < length; ++i) {
     vec[i] = {ps[i].x, ps[i].y, ps[i].z};
   }
   auto hulled = Manifold::Hull(vec);
-  return to_c(new Manifold(hulled));
+  return to_c(new (mem) Manifold(hulled));
 }
 
-ManifoldManifold* manifold_translate(const ManifoldManifold* m, double x,
+ManifoldManifold* manifold_translate(void* mem, ManifoldManifold* m, double x,
                                      double y, double z) {
   auto v = vec3(x, y, z);
   auto translated = from_c(m)->Translate(v);
-  return to_c(new Manifold(translated));
+  return to_c(new (mem) Manifold(translated));
 }
 
-ManifoldManifold* manifold_rotate(const ManifoldManifold* m, double x, double y,
-                                  double z) {
+ManifoldManifold* manifold_rotate(void* mem, ManifoldManifold* m, double x,
+                                  double y, double z) {
   auto rotated = from_c(m)->Rotate(x, y, z);
-  return to_c(new Manifold(rotated));
+  return to_c(new (mem) Manifold(rotated));
 }
 
-ManifoldManifold* manifold_scale(const ManifoldManifold* m, double x, double y,
-                                 double z) {
+ManifoldManifold* manifold_scale(void* mem, ManifoldManifold* m, double x,
+                                 double y, double z) {
   auto s = vec3(x, y, z);
   auto scaled = from_c(m)->Scale(s);
-  return to_c(new Manifold(scaled));
+  return to_c(new (mem) Manifold(scaled));
 }
 
-ManifoldManifold* manifold_transform(const ManifoldManifold* m, double x1,
+ManifoldManifold* manifold_transform(void* mem, ManifoldManifold* m, double x1,
                                      double y1, double z1, double x2, double y2,
                                      double z2, double x3, double y3, double z3,
                                      double x4, double y4, double z4) {
   auto mat = mat3x4({x1, y1, z1}, {x2, y2, z2}, {x3, y3, z3}, {x4, y4, z4});
   auto transformed = from_c(m)->Transform(mat);
-  return to_c(new Manifold(transformed));
+  return to_c(new (mem) Manifold(transformed));
 }
 
-ManifoldManifold* manifold_mirror(const ManifoldManifold* m, double nx,
+ManifoldManifold* manifold_mirror(void* mem, ManifoldManifold* m, double nx,
                                   double ny, double nz) {
   auto mirrored = from_c(m)->Mirror({nx, ny, nz});
-  return to_c(new Manifold(mirrored));
+  return to_c(new (mem) Manifold(mirrored));
 }
 
-ManifoldManifold* manifold_warp(const ManifoldManifold* m,
+ManifoldManifold* manifold_warp(void* mem, ManifoldManifold* m,
                                 ManifoldVec3 (*fun)(double, double, double,
                                                     void*),
                                 void* ctx) {
@@ -290,96 +292,114 @@ ManifoldManifold* manifold_warp(const ManifoldManifold* m,
     v = from_c(f3(v.x, v.y, v.z));
   };
   auto warped = from_c(m)->Warp(warp);
-  return to_c(new Manifold(warped));
+  return to_c(new (mem) Manifold(warped));
 }
 
 ManifoldManifold* manifold_level_set(
-    double (*sdf)(double, double, double, void*), const ManifoldBox* bounds,
-    double edge_length, double level, double tolerance, void* ctx) {
-  return level_set(sdf, bounds, edge_length, level, tolerance, false, ctx);
+    void* mem, double (*sdf)(double, double, double, void*),
+    ManifoldBox* bounds, double edge_length, double level, double tolerance,
+    void* ctx) {
+  return level_set(mem, sdf, bounds, edge_length, level, tolerance, false, ctx);
 }
 
 ManifoldManifold* manifold_level_set_seq(
-    double (*sdf)(double, double, double, void*), const ManifoldBox* bounds,
-    double edge_length, double level, double tolerance, void* ctx) {
-  return level_set(sdf, bounds, edge_length, level, tolerance, true, ctx);
+    void* mem, double (*sdf)(double, double, double, void*),
+    ManifoldBox* bounds, double edge_length, double level, double tolerance,
+    void* ctx) {
+  return level_set(mem, sdf, bounds, edge_length, level, tolerance, true, ctx);
 }
 
-ManifoldManifold* manifold_smooth_by_normals(const ManifoldManifold* m,
+ManifoldManifold* manifold_smooth_by_normals(void* mem, ManifoldManifold* m,
                                              int normalIdx) {
   auto smoothed = from_c(m)->SmoothByNormals(normalIdx);
-  return to_c(new Manifold(smoothed));
+  return to_c(new (mem) Manifold(smoothed));
 }
 
-ManifoldManifold* manifold_refine(const ManifoldManifold* m, int refine) {
+ManifoldManifold* manifold_smooth_out(void* mem, ManifoldManifold* m,
+                                      double minSharpAngle,
+                                      double minSmoothness) {
+  auto smoothed = from_c(m)->SmoothOut(minSharpAngle, minSmoothness);
+  return to_c(new (mem) Manifold(smoothed));
+}
+
+ManifoldManifold* manifold_refine(void* mem, ManifoldManifold* m, int refine) {
   auto refined = from_c(m)->Refine(refine);
-  return to_c(new Manifold(refined));
+  return to_c(new (mem) Manifold(refined));
 }
 
-ManifoldManifold* manifold_refine_to_length(const ManifoldManifold* m,
+ManifoldManifold* manifold_refine_to_length(void* mem, ManifoldManifold* m,
                                             double length) {
   auto refined = from_c(m)->RefineToLength(length);
-  return to_c(new Manifold(refined));
+  return to_c(new (mem) Manifold(refined));
 }
 
-ManifoldManifold* manifold_refine_to_tolerance(const ManifoldManifold* m,
+ManifoldManifold* manifold_refine_to_tolerance(void* mem, ManifoldManifold* m,
                                                double tolerance) {
   auto refined = from_c(m)->RefineToTolerance(tolerance);
-  return to_c(new Manifold(refined));
+  return to_c(new (mem) Manifold(refined));
 }
 
-ManifoldManifold* manifold_simplify(const ManifoldManifold* m,
+ManifoldManifold* manifold_set_tolerance(void* mem, ManifoldManifold* m,
+                                         double tolerance) {
+  auto result = from_c(m)->SetTolerance(tolerance);
+  return to_c(new (mem) Manifold(result));
+}
+
+ManifoldManifold* manifold_simplify(void* mem, ManifoldManifold* m,
                                     double tolerance) {
   auto simplified = from_c(m)->Simplify(tolerance);
-  return to_c(new Manifold(simplified));
+  return to_c(new (mem) Manifold(simplified));
 }
 
-ManifoldManifold* manifold_empty() { return to_c(new Manifold()); }
-
-ManifoldManifold* manifold_copy(const ManifoldManifold* m) {
-  return to_c(new Manifold(*from_c(m)));
+ManifoldManifold* manifold_empty(void* mem) {
+  return to_c(new (mem) Manifold());
 }
 
-ManifoldManifold* manifold_tetrahedron() {
+ManifoldManifold* manifold_copy(void* mem, ManifoldManifold* m) {
+  return to_c(new (mem) Manifold(*from_c(m)));
+}
+
+ManifoldManifold* manifold_tetrahedron(void* mem) {
   auto m = Manifold::Tetrahedron();
-  return to_c(new Manifold(m));
+  return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold* manifold_cube(double x, double y, double z, int center) {
+ManifoldManifold* manifold_cube(void* mem, double x, double y, double z,
+                                int center) {
   auto size = vec3(x, y, z);
   auto m = Manifold::Cube(size, center);
-  return to_c(new Manifold(m));
+  return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold* manifold_cylinder(double height, double radius_low,
+ManifoldManifold* manifold_cylinder(void* mem, double height, double radius_low,
                                     double radius_high, int circular_segments,
                                     int center) {
   auto m = Manifold::Cylinder(height, radius_low, radius_high,
                               circular_segments, center);
-  return to_c(new Manifold(m));
+  return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold* manifold_sphere(double radius, int circular_segments) {
+ManifoldManifold* manifold_sphere(void* mem, double radius,
+                                  int circular_segments) {
   auto m = Manifold::Sphere(radius, circular_segments);
-  return to_c(new Manifold(m));
+  return to_c(new (mem) Manifold(m));
 }
 
-ManifoldMeshGL* manifold_meshgl(const float* vert_props, size_t n_verts,
-                                size_t n_props, const uint32_t* tri_verts,
+ManifoldMeshGL* manifold_meshgl(void* mem, float* vert_props, size_t n_verts,
+                                size_t n_props, uint32_t* tri_verts,
                                 size_t n_tris) {
-  auto mesh = new MeshGL();
+  auto mesh = new (mem) MeshGL();
   mesh->numProp = n_props;
   mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
   mesh->triVerts = vector_of_array(tri_verts, n_tris * 3);
   return to_c(mesh);
 }
 
-ManifoldMeshGL* manifold_meshgl_w_tangents(const float* vert_props,
+ManifoldMeshGL* manifold_meshgl_w_tangents(void* mem, float* vert_props,
                                            size_t n_verts, size_t n_props,
-                                           const uint32_t* tri_verts,
-                                           size_t n_tris,
-                                           const float* halfedge_tangent) {
-  auto mesh = new MeshGL();
+                                           uint32_t* tri_verts, size_t n_tris,
+                                           float* halfedge_tangent) {
+  auto mesh = new (mem) MeshGL();
   mesh->numProp = n_props;
   mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
   mesh->triVerts = vector_of_array(tri_verts, n_tris * 3);
@@ -387,11 +407,11 @@ ManifoldMeshGL* manifold_meshgl_w_tangents(const float* vert_props,
   return to_c(mesh);
 }
 
-ManifoldMeshGL* manifold_meshgl_w_options(
-    const float* vert_props, size_t n_verts, size_t n_props,
-    const uint32_t* tri_verts, size_t n_tris,
-    const ManifoldMeshGLOptions* options) {
-  auto mesh = new MeshGL();
+ManifoldMeshGL* manifold_meshgl_w_options(void* mem, float* vert_props,
+                                          size_t n_verts, size_t n_props,
+                                          uint32_t* tri_verts, size_t n_tris,
+                                          ManifoldMeshGLOptions* options) {
+  auto mesh = new (mem) MeshGL();
   mesh->numProp = n_props;
   mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
   mesh->triVerts = vector_of_array(tri_verts, n_tris * 3);
@@ -424,22 +444,22 @@ ManifoldMeshGL* manifold_meshgl_w_options(
   return to_c(mesh);
 }
 
-ManifoldMeshGL64* manifold_meshgl64(const double* vert_props, size_t n_verts,
-                                    size_t n_props, const uint64_t* tri_verts,
-                                    size_t n_tris) {
-  auto mesh = new MeshGL64();
+ManifoldMeshGL64* manifold_meshgl64(void* mem, double* vert_props,
+                                    size_t n_verts, size_t n_props,
+                                    uint64_t* tri_verts, size_t n_tris) {
+  auto mesh = new (mem) MeshGL64();
   mesh->numProp = n_props;
   mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
   mesh->triVerts = vector_of_array(tri_verts, n_tris * 3);
   return to_c(mesh);
 }
 
-ManifoldMeshGL64* manifold_meshgl64_w_tangents(const double* vert_props,
+ManifoldMeshGL64* manifold_meshgl64_w_tangents(void* mem, double* vert_props,
                                                size_t n_verts, size_t n_props,
-                                               const uint64_t* tri_verts,
+                                               uint64_t* tri_verts,
                                                size_t n_tris,
-                                               const double* halfedge_tangent) {
-  auto mesh = new MeshGL64();
+                                               double* halfedge_tangent) {
+  auto mesh = new (mem) MeshGL64();
   mesh->numProp = n_props;
   mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
   mesh->triVerts = vector_of_array(tri_verts, n_tris * 3);
@@ -448,10 +468,9 @@ ManifoldMeshGL64* manifold_meshgl64_w_tangents(const double* vert_props,
 }
 
 ManifoldMeshGL64* manifold_meshgl64_w_options(
-    const double* vert_props, size_t n_verts, size_t n_props,
-    const uint64_t* tri_verts, size_t n_tris,
-    const ManifoldMeshGL64Options* options) {
-  auto mesh = new MeshGL64();
+    void* mem, double* vert_props, size_t n_verts, size_t n_props,
+    uint64_t* tri_verts, size_t n_tris, ManifoldMeshGL64Options* options) {
+  auto mesh = new (mem) MeshGL64();
   mesh->numProp = n_props;
   mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
   mesh->triVerts = vector_of_array(tri_verts, n_tris * 3);
@@ -484,317 +503,346 @@ ManifoldMeshGL64* manifold_meshgl64_w_options(
   return to_c(mesh);
 }
 
-ManifoldManifold* manifold_of_meshgl(const ManifoldMeshGL* mesh) {
-  auto m = Manifold(*from_c(mesh));
-  return to_c(new Manifold(m));
+ManifoldManifold* manifold_smooth(void* mem, ManifoldMeshGL* mesh,
+                                  size_t* half_edges, double* smoothness,
+                                  size_t n_edges) {
+  auto smooth = std::vector<Smoothness>();
+  for (size_t i = 0; i < n_edges; ++i) {
+    smooth.push_back({half_edges[i], smoothness[i]});
+  }
+  auto m = Manifold::Smooth(*from_c(mesh), smooth);
+  return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold* manifold_of_meshgl64(const ManifoldMeshGL64* mesh) {
-  auto m = Manifold(*from_c(mesh));
-  return to_c(new Manifold(m));
+ManifoldManifold* manifold_smooth64(void* mem, ManifoldMeshGL64* mesh,
+                                    size_t* half_edges, double* smoothness,
+                                    size_t n_edges) {
+  auto smooth = std::vector<Smoothness>();
+  for (size_t i = 0; i < n_edges; ++i) {
+    smooth.push_back({half_edges[i], smoothness[i]});
+  }
+  auto m = Manifold::Smooth(*from_c(mesh), smooth);
+  return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold* manifold_extrude(const ManifoldPolygons* cs, double height,
-                                   int slices, double twist_degrees,
-                                   double scale_x, double scale_y) {
+ManifoldManifold* manifold_of_meshgl(void* mem, ManifoldMeshGL* mesh) {
+  auto m = Manifold(*from_c(mesh));
+  return to_c(new (mem) Manifold(m));
+}
+
+ManifoldManifold* manifold_of_meshgl64(void* mem, ManifoldMeshGL64* mesh) {
+  auto m = Manifold(*from_c(mesh));
+  return to_c(new (mem) Manifold(m));
+}
+
+ManifoldManifold* manifold_extrude(void* mem, ManifoldPolygons* cs,
+                                   double height, int slices,
+                                   double twist_degrees, double scale_x,
+                                   double scale_y) {
   auto scale = vec2(scale_x, scale_y);
   auto m = Manifold::Extrude(*from_c(cs), height, slices, twist_degrees, scale);
-  return to_c(new Manifold(m));
+  return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold* manifold_revolve(const ManifoldPolygons* cs,
+ManifoldManifold* manifold_revolve(void* mem, ManifoldPolygons* cs,
                                    int circular_segments,
                                    double revolve_degrees) {
   auto m = Manifold::Revolve(*from_c(cs), circular_segments, revolve_degrees);
-  return to_c(new Manifold(m));
+  return to_c(new (mem) Manifold(m));
 }
 
-ManifoldManifold* manifold_compose(const ManifoldManifoldVec* ms) {
+ManifoldManifold* manifold_compose(void* mem, ManifoldManifoldVec* ms) {
   auto composed = Manifold::BatchBoolean(*from_c(ms), OpType::Add);
-  return to_c(new Manifold(composed));
+  return to_c(new (mem) Manifold(composed));
 }
 
-ManifoldManifoldVec* manifold_decompose(const ManifoldManifold* m) {
-  return to_c(new std::vector<Manifold>(from_c(m)->Decompose()));
+ManifoldManifoldVec* manifold_decompose(void* mem, ManifoldManifold* m) {
+  auto comps = from_c(m)->Decompose();
+  return to_c(new (mem) std::vector<Manifold>(comps));
 }
 
-ManifoldMeshGL* manifold_get_meshgl(const ManifoldManifold* m) {
-  return to_c(new MeshGL(from_c(m)->GetMeshGL()));
+ManifoldMeshGL* manifold_get_meshgl(void* mem, ManifoldManifold* m) {
+  auto mesh = from_c(m)->GetMeshGL();
+  return to_c(new (mem) MeshGL(mesh));
 }
 
-ManifoldMeshGL* manifold_get_meshgl_w_normals(const ManifoldManifold* m,
+ManifoldMeshGL* manifold_get_meshgl_w_normals(void* mem, ManifoldManifold* m,
                                               int32_t normalIdx) {
-  return to_c(new MeshGL(from_c(m)->GetMeshGL(normalIdx)));
+  auto mesh = from_c(m)->GetMeshGL(normalIdx);
+  return to_c(new (mem) MeshGL(mesh));
 }
 
-ManifoldMeshGL* manifold_meshgl_copy(const ManifoldMeshGL* m) {
-  return to_c(new MeshGL(*from_c(m)));
+ManifoldMeshGL* manifold_meshgl_copy(void* mem, ManifoldMeshGL* m) {
+  return to_c(new (mem) MeshGL(*from_c(m)));
 }
 
-ManifoldMeshGL* manifold_meshgl_merge(const ManifoldMeshGL* m,
-                                      float tolerance) {
-  return to_c(new MeshGL(from_c(m)->Merge(tolerance)));
+ManifoldMeshGL* manifold_meshgl_merge(void* mem, ManifoldMeshGL* m) {
+  auto duplicate = new (mem) MeshGL(*from_c(m));
+  duplicate->Merge();
+  return to_c(duplicate);
 }
 
-ManifoldMeshGL64* manifold_get_meshgl64(const ManifoldManifold* m) {
-  return to_c(new MeshGL64(from_c(m)->GetMeshGL64()));
+ManifoldMeshGL64* manifold_get_meshgl64(void* mem, ManifoldManifold* m) {
+  auto mesh = from_c(m)->GetMeshGL64();
+  return to_c(new (mem) MeshGL64(mesh));
 }
 
-ManifoldMeshGL64* manifold_get_meshgl64_w_normals(const ManifoldManifold* m,
+ManifoldMeshGL64* manifold_get_meshgl64_w_normals(void* mem,
+                                                  ManifoldManifold* m,
                                                   int32_t normalIdx) {
-  return to_c(new MeshGL64(from_c(m)->GetMeshGL64(normalIdx)));
+  auto mesh = from_c(m)->GetMeshGL64(normalIdx);
+  return to_c(new (mem) MeshGL64(mesh));
 }
 
-ManifoldMeshGL64* manifold_meshgl64_copy(const ManifoldMeshGL64* m) {
-  return to_c(new MeshGL64(*from_c(m)));
+ManifoldMeshGL64* manifold_meshgl64_copy(void* mem, ManifoldMeshGL64* m) {
+  return to_c(new (mem) MeshGL64(*from_c(m)));
 }
 
-ManifoldMeshGL64* manifold_meshgl64_merge(const ManifoldMeshGL64* m,
-                                          double tolerance) {
-  return to_c(new MeshGL64(from_c(m)->Merge(tolerance)));
+ManifoldMeshGL64* manifold_meshgl64_merge(void* mem, ManifoldMeshGL64* m) {
+  auto duplicate = new (mem) MeshGL64(*from_c(m));
+  duplicate->Merge();
+  return to_c(duplicate);
 }
 
-size_t manifold_meshgl_num_prop(const ManifoldMeshGL* m) {
+size_t manifold_meshgl_num_prop(ManifoldMeshGL* m) {
   return from_c(m)->numProp;
 }
-size_t manifold_meshgl_num_vert(const ManifoldMeshGL* m) {
+size_t manifold_meshgl_num_vert(ManifoldMeshGL* m) {
   return from_c(m)->NumVert();
 }
-size_t manifold_meshgl_num_tri(const ManifoldMeshGL* m) {
+size_t manifold_meshgl_num_tri(ManifoldMeshGL* m) {
   return from_c(m)->NumTri();
 }
 
-size_t manifold_meshgl_vert_properties_length(const ManifoldMeshGL* m) {
+size_t manifold_meshgl_vert_properties_length(ManifoldMeshGL* m) {
   return from_c(m)->vertProperties.size();
 }
 
-size_t manifold_meshgl_tri_length(const ManifoldMeshGL* m) {
+size_t manifold_meshgl_tri_length(ManifoldMeshGL* m) {
   return from_c(m)->triVerts.size();
 }
 
-size_t manifold_meshgl_merge_length(const ManifoldMeshGL* m) {
+size_t manifold_meshgl_merge_length(ManifoldMeshGL* m) {
   return from_c(m)->mergeFromVert.size();
 }
 
-size_t manifold_meshgl_run_index_length(const ManifoldMeshGL* m) {
+size_t manifold_meshgl_run_index_length(ManifoldMeshGL* m) {
   return from_c(m)->runIndex.size();
 }
 
-size_t manifold_meshgl_run_original_id_length(const ManifoldMeshGL* m) {
+size_t manifold_meshgl_run_original_id_length(ManifoldMeshGL* m) {
   return from_c(m)->runOriginalID.size();
 }
 
-size_t manifold_meshgl_run_transform_length(const ManifoldMeshGL* m) {
+size_t manifold_meshgl_run_transform_length(ManifoldMeshGL* m) {
   return from_c(m)->runTransform.size();
 }
 
-size_t manifold_meshgl_face_id_length(const ManifoldMeshGL* m) {
+size_t manifold_meshgl_face_id_length(ManifoldMeshGL* m) {
   return from_c(m)->faceID.size();
 }
 
-size_t manifold_meshgl_tangent_length(const ManifoldMeshGL* m) {
+size_t manifold_meshgl_tangent_length(ManifoldMeshGL* m) {
   return from_c(m)->halfedgeTangent.size();
 }
 
-const float* manifold_meshgl_vert_properties(const ManifoldMeshGL* m) {
-  return from_c(m)->vertProperties.data();
+float* manifold_meshgl_vert_properties(void* mem, ManifoldMeshGL* m) {
+  return copy_data(mem, from_c(m)->vertProperties);
 }
 
-const uint32_t* manifold_meshgl_tri_verts(const ManifoldMeshGL* m) {
-  return from_c(m)->triVerts.data();
+uint32_t* manifold_meshgl_tri_verts(void* mem, ManifoldMeshGL* m) {
+  return copy_data(mem, from_c(m)->triVerts);
 }
 
-const uint32_t* manifold_meshgl_merge_from_vert(const ManifoldMeshGL* m) {
-  return from_c(m)->mergeFromVert.data();
+uint32_t* manifold_meshgl_merge_from_vert(void* mem, ManifoldMeshGL* m) {
+  return copy_data(mem, from_c(m)->mergeFromVert);
 }
 
-const uint32_t* manifold_meshgl_merge_to_vert(const ManifoldMeshGL* m) {
-  return from_c(m)->mergeToVert.data();
+uint32_t* manifold_meshgl_merge_to_vert(void* mem, ManifoldMeshGL* m) {
+  return copy_data(mem, from_c(m)->mergeToVert);
 }
 
-const uint32_t* manifold_meshgl_run_index(const ManifoldMeshGL* m) {
-  return from_c(m)->runIndex.data();
+uint32_t* manifold_meshgl_run_index(void* mem, ManifoldMeshGL* m) {
+  return copy_data(mem, from_c(m)->runIndex);
 }
 
-const uint32_t* manifold_meshgl_run_original_id(const ManifoldMeshGL* m) {
-  return from_c(m)->runOriginalID.data();
+uint32_t* manifold_meshgl_run_original_id(void* mem, ManifoldMeshGL* m) {
+  return copy_data(mem, from_c(m)->runOriginalID);
 }
 
-const float* manifold_meshgl_run_transform(const ManifoldMeshGL* m) {
-  return from_c(m)->runTransform.data();
+float* manifold_meshgl_run_transform(void* mem, ManifoldMeshGL* m) {
+  return copy_data(mem, from_c(m)->runTransform);
 }
 
-const uint32_t* manifold_meshgl_face_id(const ManifoldMeshGL* m) {
-  return from_c(m)->faceID.data();
+uint32_t* manifold_meshgl_face_id(void* mem, ManifoldMeshGL* m) {
+  return copy_data(mem, from_c(m)->faceID);
 }
 
-const float* manifold_meshgl_halfedge_tangent(const ManifoldMeshGL* m) {
-  return from_c(m)->halfedgeTangent.data();
+float* manifold_meshgl_halfedge_tangent(void* mem, ManifoldMeshGL* m) {
+  return copy_data(mem, from_c(m)->halfedgeTangent);
 }
 
-size_t manifold_meshgl_run_flags_length(const ManifoldMeshGL* m) {
+float manifold_meshgl_tolerance(ManifoldMeshGL* m) {
+  return from_c(m)->tolerance;
+}
+
+size_t manifold_meshgl_run_flags_length(ManifoldMeshGL* m) {
   return from_c(m)->runFlags.size();
 }
 
-const uint8_t* manifold_meshgl_run_flags(const ManifoldMeshGL* m) {
-  return from_c(m)->runFlags.data();
+uint8_t* manifold_meshgl_run_flags(void* mem, ManifoldMeshGL* m) {
+  return copy_data(mem, from_c(m)->runFlags);
 }
 
-size_t manifold_meshgl_num_run(const ManifoldMeshGL* m) {
+size_t manifold_meshgl_num_run(ManifoldMeshGL* m) {
   return from_c(m)->NumRun();
 }
 
-int manifold_meshgl_backside(const ManifoldMeshGL* m, size_t run) {
+int manifold_meshgl_backside(ManifoldMeshGL* m, size_t run) {
   return from_c(m)->Backside(run) ? 1 : 0;
 }
 
-int manifold_meshgl_has_normals(const ManifoldMeshGL* m, size_t run) {
+int manifold_meshgl_has_normals(ManifoldMeshGL* m, size_t run) {
   return from_c(m)->HasNormals(run) ? 1 : 0;
 }
 
-size_t manifold_meshgl64_num_prop(const ManifoldMeshGL64* m) {
+size_t manifold_meshgl64_num_prop(ManifoldMeshGL64* m) {
   return from_c(m)->numProp;
 }
-size_t manifold_meshgl64_num_vert(const ManifoldMeshGL64* m) {
+size_t manifold_meshgl64_num_vert(ManifoldMeshGL64* m) {
   return from_c(m)->NumVert();
 }
-size_t manifold_meshgl64_num_tri(const ManifoldMeshGL64* m) {
+size_t manifold_meshgl64_num_tri(ManifoldMeshGL64* m) {
   return from_c(m)->NumTri();
 }
-size_t manifold_meshgl64_vert_properties_length(const ManifoldMeshGL64* m) {
+size_t manifold_meshgl64_vert_properties_length(ManifoldMeshGL64* m) {
   return from_c(m)->vertProperties.size();
 }
-size_t manifold_meshgl64_tri_length(const ManifoldMeshGL64* m) {
+size_t manifold_meshgl64_tri_length(ManifoldMeshGL64* m) {
   return from_c(m)->triVerts.size();
 }
-size_t manifold_meshgl64_merge_length(const ManifoldMeshGL64* m) {
+size_t manifold_meshgl64_merge_length(ManifoldMeshGL64* m) {
   return from_c(m)->mergeFromVert.size();
 }
-size_t manifold_meshgl64_run_index_length(const ManifoldMeshGL64* m) {
+size_t manifold_meshgl64_run_index_length(ManifoldMeshGL64* m) {
   return from_c(m)->runIndex.size();
 }
-size_t manifold_meshgl64_run_original_id_length(const ManifoldMeshGL64* m) {
+size_t manifold_meshgl64_run_original_id_length(ManifoldMeshGL64* m) {
   return from_c(m)->runOriginalID.size();
 }
-size_t manifold_meshgl64_run_transform_length(const ManifoldMeshGL64* m) {
+size_t manifold_meshgl64_run_transform_length(ManifoldMeshGL64* m) {
   return from_c(m)->runTransform.size();
 }
-size_t manifold_meshgl64_face_id_length(const ManifoldMeshGL64* m) {
+size_t manifold_meshgl64_face_id_length(ManifoldMeshGL64* m) {
   return from_c(m)->faceID.size();
 }
-size_t manifold_meshgl64_tangent_length(const ManifoldMeshGL64* m) {
+size_t manifold_meshgl64_tangent_length(ManifoldMeshGL64* m) {
   return from_c(m)->halfedgeTangent.size();
 }
-const double* manifold_meshgl64_vert_properties(const ManifoldMeshGL64* m) {
-  return from_c(m)->vertProperties.data();
+double* manifold_meshgl64_vert_properties(void* mem, ManifoldMeshGL64* m) {
+  return copy_data(mem, from_c(m)->vertProperties);
 }
-const uint64_t* manifold_meshgl64_tri_verts(const ManifoldMeshGL64* m) {
-  return from_c(m)->triVerts.data();
+uint64_t* manifold_meshgl64_tri_verts(void* mem, ManifoldMeshGL64* m) {
+  return copy_data(mem, from_c(m)->triVerts);
 }
-const uint64_t* manifold_meshgl64_merge_from_vert(const ManifoldMeshGL64* m) {
-  return from_c(m)->mergeFromVert.data();
+uint64_t* manifold_meshgl64_merge_from_vert(void* mem, ManifoldMeshGL64* m) {
+  return copy_data(mem, from_c(m)->mergeFromVert);
 }
-const uint64_t* manifold_meshgl64_merge_to_vert(const ManifoldMeshGL64* m) {
-  return from_c(m)->mergeToVert.data();
+uint64_t* manifold_meshgl64_merge_to_vert(void* mem, ManifoldMeshGL64* m) {
+  return copy_data(mem, from_c(m)->mergeToVert);
 }
-const uint64_t* manifold_meshgl64_run_index(const ManifoldMeshGL64* m) {
-  return from_c(m)->runIndex.data();
+uint64_t* manifold_meshgl64_run_index(void* mem, ManifoldMeshGL64* m) {
+  return copy_data(mem, from_c(m)->runIndex);
 }
-const uint32_t* manifold_meshgl64_run_original_id(const ManifoldMeshGL64* m) {
-  return from_c(m)->runOriginalID.data();
+uint32_t* manifold_meshgl64_run_original_id(void* mem, ManifoldMeshGL64* m) {
+  return copy_data(mem, from_c(m)->runOriginalID);
 }
-const double* manifold_meshgl64_run_transform(const ManifoldMeshGL64* m) {
-  return from_c(m)->runTransform.data();
+double* manifold_meshgl64_run_transform(void* mem, ManifoldMeshGL64* m) {
+  return copy_data(mem, from_c(m)->runTransform);
 }
-const uint64_t* manifold_meshgl64_face_id(const ManifoldMeshGL64* m) {
-  return from_c(m)->faceID.data();
+uint64_t* manifold_meshgl64_face_id(void* mem, ManifoldMeshGL64* m) {
+  return copy_data(mem, from_c(m)->faceID);
 }
-const double* manifold_meshgl64_halfedge_tangent(const ManifoldMeshGL64* m) {
-  return from_c(m)->halfedgeTangent.data();
+double* manifold_meshgl64_halfedge_tangent(void* mem, ManifoldMeshGL64* m) {
+  return copy_data(mem, from_c(m)->halfedgeTangent);
 }
 
-size_t manifold_meshgl64_run_flags_length(const ManifoldMeshGL64* m) {
+double manifold_meshgl64_tolerance(ManifoldMeshGL64* m) {
+  return from_c(m)->tolerance;
+}
+
+size_t manifold_meshgl64_run_flags_length(ManifoldMeshGL64* m) {
   return from_c(m)->runFlags.size();
 }
 
-const uint8_t* manifold_meshgl64_run_flags(const ManifoldMeshGL64* m) {
-  return from_c(m)->runFlags.data();
+uint8_t* manifold_meshgl64_run_flags(void* mem, ManifoldMeshGL64* m) {
+  return copy_data(mem, from_c(m)->runFlags);
 }
 
-size_t manifold_meshgl64_num_run(const ManifoldMeshGL64* m) {
+size_t manifold_meshgl64_num_run(ManifoldMeshGL64* m) {
   return from_c(m)->NumRun();
 }
 
-int manifold_meshgl64_backside(const ManifoldMeshGL64* m, size_t run) {
+int manifold_meshgl64_backside(ManifoldMeshGL64* m, size_t run) {
   return from_c(m)->Backside(run) ? 1 : 0;
 }
 
-int manifold_meshgl64_has_normals(const ManifoldMeshGL64* m, size_t run) {
+int manifold_meshgl64_has_normals(ManifoldMeshGL64* m, size_t run) {
   return from_c(m)->HasNormals(run) ? 1 : 0;
 }
 
-ManifoldManifold* manifold_as_original(const ManifoldManifold* m, int id) {
-  auto orig = from_c(m)->AsOriginal(id);
-  return to_c(new Manifold(orig));
+ManifoldManifold* manifold_as_original(void* mem, ManifoldManifold* m) {
+  auto orig = from_c(m)->AsOriginal();
+  return to_c(new (mem) Manifold(orig));
 }
 
-int manifold_original_id(const ManifoldManifold* m) {
+int manifold_original_id(ManifoldManifold* m) {
   return from_c(m)->OriginalID();
 }
 
-int manifold_is_empty(const ManifoldManifold* m) {
-  return from_c(m)->IsEmpty();
-}
+int manifold_is_empty(ManifoldManifold* m) { return from_c(m)->IsEmpty(); }
 
-ManifoldError manifold_status(const ManifoldManifold* m) {
+ManifoldError manifold_status(ManifoldManifold* m) {
   auto error = from_c(m)->Status();
   return to_c(error);
 }
 
-ManifoldManifold* manifold_with_context(const ManifoldManifold* m,
-                                        const ManifoldExecutionContext* ctx) {
+ManifoldManifold* manifold_with_context(void* mem, ManifoldManifold* m,
+                                        ManifoldExecutionContext* ctx) {
   auto attached = from_c(m)->WithContext(*from_c(ctx));
-  return to_c(new Manifold(attached));
+  return to_c(new (mem) Manifold(attached));
 }
 
-size_t manifold_num_vert(const ManifoldManifold* m) {
-  return from_c(m)->NumVert();
-}
-size_t manifold_num_edge(const ManifoldManifold* m) {
-  return from_c(m)->NumEdge();
-}
-size_t manifold_num_tri(const ManifoldManifold* m) {
-  return from_c(m)->NumTri();
-}
-size_t manifold_num_prop(const ManifoldManifold* m) {
-  return from_c(m)->NumProp();
-};
-int manifold_genus(const ManifoldManifold* m) { return from_c(m)->Genus(); }
+size_t manifold_num_vert(ManifoldManifold* m) { return from_c(m)->NumVert(); }
+size_t manifold_num_edge(ManifoldManifold* m) { return from_c(m)->NumEdge(); }
+size_t manifold_num_tri(ManifoldManifold* m) { return from_c(m)->NumTri(); }
+size_t manifold_num_prop(ManifoldManifold* m) { return from_c(m)->NumProp(); };
+int manifold_genus(ManifoldManifold* m) { return from_c(m)->Genus(); }
 
-double manifold_surface_area(const ManifoldManifold* m) {
+double manifold_surface_area(ManifoldManifold* m) {
   return from_c(m)->SurfaceArea();
 }
-double manifold_volume(const ManifoldManifold* m) {
-  return from_c(m)->Volume();
-}
+double manifold_volume(ManifoldManifold* m) { return from_c(m)->Volume(); }
 
-ManifoldBox* manifold_bounding_box(const ManifoldManifold* m) {
+ManifoldBox* manifold_bounding_box(void* mem, ManifoldManifold* m) {
   auto box = from_c(m)->BoundingBox();
-  return to_c(new Box(box));
+  return to_c(new (mem) Box(box));
 }
 
-double manifold_epsilon(const ManifoldManifold* m) {
-  return from_c(m)->GetEpsilon();
+double manifold_epsilon(ManifoldManifold* m) { return from_c(m)->GetEpsilon(); }
+
+double manifold_get_tolerance(ManifoldManifold* m) {
+  return from_c(m)->GetTolerance();
 }
 
-size_t manifold_num_prop_vert(const ManifoldManifold* m) {
+size_t manifold_num_prop_vert(ManifoldManifold* m) {
   return from_c(m)->NumPropVert();
 }
 
 uint32_t manifold_reserve_ids(uint32_t n) { return Manifold::ReserveIDs(n); }
 
 ManifoldManifold* manifold_set_properties(
-    const ManifoldManifold* m, int num_prop,
+    void* mem, ManifoldManifold* m, int num_prop,
     void (*fun)(double* new_prop, ManifoldVec3 position, const double* old_prop,
                 void* ctx),
     void* ctx) {
@@ -807,118 +855,113 @@ ManifoldManifold* manifold_set_properties(
         return (f3(new_prop, to_c(v), old_prop));
       };
   auto man = from_c(m)->SetProperties(num_prop, f);
-  return to_c(new Manifold(man));
+  return to_c(new (mem) Manifold(man));
 };
 
-ManifoldManifold* manifold_calculate_curvature(const ManifoldManifold* m,
+ManifoldManifold* manifold_calculate_curvature(void* mem, ManifoldManifold* m,
                                                int gaussian_idx, int mean_idx) {
   auto man = from_c(m)->CalculateCurvature(gaussian_idx, mean_idx);
-  return to_c(new Manifold(man));
+  return to_c(new (mem) Manifold(man));
 }
 
-double manifold_min_gap(const ManifoldManifold* m,
-                        const ManifoldManifold* other, double searchLength) {
+double manifold_min_gap(ManifoldManifold* m, ManifoldManifold* other,
+                        double searchLength) {
   return from_c(m)->MinGap(*from_c(other), searchLength);
 }
 
-ManifoldRayHitVec* manifold_ray_cast(const ManifoldManifold* m, double origin_x,
-                                     double origin_y, double origin_z,
-                                     double end_x, double end_y, double end_z) {
+ManifoldRayHitVec* manifold_ray_cast(void* mem, ManifoldManifold* m,
+                                     double origin_x, double origin_y,
+                                     double origin_z, double end_x,
+                                     double end_y, double end_z) {
   auto hits = from_c(m)->RayCast(vec3(origin_x, origin_y, origin_z),
                                  vec3(end_x, end_y, end_z));
-  return to_c(new RayHitVec(std::move(hits)));
+  return to_c(new (mem) RayHitVec(std::move(hits)));
 }
 
-size_t manifold_ray_hit_vec_length(const ManifoldRayHitVec* v) {
+size_t manifold_ray_hit_vec_length(ManifoldRayHitVec* v) {
   return from_c(v)->size();
 }
 
-ManifoldRayHit manifold_ray_hit_vec_get(const ManifoldRayHitVec* v,
-                                        size_t idx) {
+ManifoldRayHit manifold_ray_hit_vec_get(ManifoldRayHitVec* v, size_t idx) {
   const auto& hit = (*from_c(v))[idx];
-  return {hit.faceID, hit.distance, to_c(hit.position), to_c(hit.normal),
-          hit.crossing};
+  return {hit.faceID, hit.distance, to_c(hit.position), to_c(hit.normal)};
 }
 
-int manifold_winding_number(const ManifoldManifold* m, double x, double y,
-                            double z) {
-  const auto result = from_c(m)->WindingNumber({{x, y, z}});
-  return result.empty() ? 0 : result[0];
-}
-
-ManifoldExecutionContext* manifold_execution_context() {
-  return to_c(new ExecutionContext());
+ManifoldExecutionContext* manifold_execution_context(void* mem) {
+  return to_c(new (mem) ExecutionContext());
 }
 
 void manifold_execution_context_cancel(ManifoldExecutionContext* ctx) {
   from_c(ctx)->Cancel();
 }
 
-int manifold_execution_context_cancelled(const ManifoldExecutionContext* ctx) {
+int manifold_execution_context_cancelled(ManifoldExecutionContext* ctx) {
   return from_c(ctx)->Cancelled() ? 1 : 0;
 }
 
-double manifold_execution_context_progress(
-    const ManifoldExecutionContext* ctx) {
+double manifold_execution_context_progress(ManifoldExecutionContext* ctx) {
   return from_c(ctx)->Progress();
 }
 
-// ctx-aware static factories: the FromMeshGL / LevelSet ops have no
+// ctx-aware static factories: the FromMeshGL / LevelSet / Smooth ops have no
 // source Manifold to attach via manifold_with_context, so they run directly on
 // the ExecutionContext. Each mirrors its plain factory but observes progress /
 // cancellation. `sdf_context` is the SDF callback's user-data (distinct from
 // the ExecutionContext `ec`).
 ManifoldManifold* manifold_execution_context_level_set(
-    ManifoldExecutionContext* ec, double (*sdf)(double, double, double, void*),
-    const ManifoldBox* bounds, double edge_length, double level,
-    double tolerance, void* sdf_context) {
-  return level_set(sdf, bounds, edge_length, level, tolerance, false,
+    void* mem, ManifoldExecutionContext* ec,
+    double (*sdf)(double, double, double, void*), ManifoldBox* bounds,
+    double edge_length, double level, double tolerance, void* sdf_context) {
+  return level_set(mem, sdf, bounds, edge_length, level, tolerance, false,
                    sdf_context, from_c(ec));
 }
 
 ManifoldManifold* manifold_execution_context_level_set_seq(
-    ManifoldExecutionContext* ec, double (*sdf)(double, double, double, void*),
-    const ManifoldBox* bounds, double edge_length, double level,
-    double tolerance, void* sdf_context) {
-  return level_set(sdf, bounds, edge_length, level, tolerance, true,
+    void* mem, ManifoldExecutionContext* ec,
+    double (*sdf)(double, double, double, void*), ManifoldBox* bounds,
+    double edge_length, double level, double tolerance, void* sdf_context) {
+  return level_set(mem, sdf, bounds, edge_length, level, tolerance, true,
                    sdf_context, from_c(ec));
 }
 
 ManifoldManifold* manifold_execution_context_of_meshgl(
-    ManifoldExecutionContext* ec, const ManifoldMeshGL* mesh) {
-  return to_c(new Manifold(from_c(ec)->FromMeshGL(*from_c(mesh))));
+    void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL* mesh) {
+  return to_c(new (mem) Manifold(from_c(ec)->FromMeshGL(*from_c(mesh))));
 }
 
 ManifoldManifold* manifold_execution_context_of_meshgl64(
-    ManifoldExecutionContext* ec, const ManifoldMeshGL64* mesh) {
-  return to_c(new Manifold(from_c(ec)->FromMeshGL(*from_c(mesh))));
+    void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL64* mesh) {
+  return to_c(new (mem) Manifold(from_c(ec)->FromMeshGL(*from_c(mesh))));
 }
 
-ManifoldManifold* manifold_calculate_normals(const ManifoldManifold* m,
+ManifoldManifold* manifold_execution_context_smooth(
+    void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL* mesh,
+    size_t* half_edges, double* smoothness, size_t n_edges) {
+  auto smooth = std::vector<Smoothness>();
+  for (size_t i = 0; i < n_edges; ++i) {
+    smooth.push_back({half_edges[i], smoothness[i]});
+  }
+  return to_c(new (mem) Manifold(from_c(ec)->Smooth(*from_c(mesh), smooth)));
+}
+
+ManifoldManifold* manifold_execution_context_smooth64(
+    void* mem, ManifoldExecutionContext* ec, ManifoldMeshGL64* mesh,
+    size_t* half_edges, double* smoothness, size_t n_edges) {
+  auto smooth = std::vector<Smoothness>();
+  for (size_t i = 0; i < n_edges; ++i) {
+    smooth.push_back({half_edges[i], smoothness[i]});
+  }
+  return to_c(new (mem) Manifold(from_c(ec)->Smooth(*from_c(mesh), smooth)));
+}
+
+ManifoldManifold* manifold_calculate_normals(void* mem, ManifoldManifold* m,
                                              int normal_idx,
                                              double min_sharp_angle) {
   auto man = from_c(m)->CalculateNormals(normal_idx, min_sharp_angle);
-  return to_c(new Manifold(man));
-}
-
-// Version
-
-void manifold_version(int version[3]) {
-  const auto v = manifold::Version();
-  version[0] = v[0];
-  version[1] = v[1];
-  version[2] = v[2];
+  return to_c(new (mem) Manifold(man));
 }
 
 // Static Quality Globals
-
-void manifold_set_relative_precision(double precision) {
-  Quality::SetRelativePrecision(precision);
-}
-
-double manifold_get_relative_precision() {
-  return Quality::GetRelativePrecision();
-}
 
 void manifold_set_min_circular_angle(double degrees) {
   Quality::SetMinCircularAngle(degrees);
@@ -926,14 +969,6 @@ void manifold_set_min_circular_angle(double degrees) {
 
 void manifold_set_min_circular_edge_length(double length) {
   Quality::SetMinCircularEdgeLength(length);
-}
-
-double manifold_get_min_circular_angle() {
-  return Quality::GetMinCircularAngle();
-}
-
-double manifold_get_min_circular_edge_length() {
-  return Quality::GetMinCircularEdgeLength();
 }
 
 void manifold_set_circular_segments(int number) {
@@ -946,23 +981,78 @@ int manifold_get_circular_segments(double radius) {
 
 void manifold_reset_to_circular_defaults() { Quality::ResetToDefaults(); }
 
-ManifoldTriangulation* manifold_triangulate(const ManifoldPolygons* ps,
+ManifoldTriangulation* manifold_triangulate(void* mem, ManifoldPolygons* ps,
                                             double epsilon) {
   auto triangulation = manifold::Triangulate(*from_c(ps), epsilon);
-  auto buffer = new std::vector<int>;
-  buffer->reserve(triangulation.size() * 3);
-  for (int i = 0; i < triangulation.size(); i++)
-    for (int j : {0, 1, 2}) buffer->push_back(triangulation[i][j]);
-  return to_c(buffer);
+  return to_c(new (mem) std::vector<ivec3>(triangulation));
 }
 
-size_t manifold_triangulation_num_tri(const ManifoldTriangulation* m) {
-  return from_c(m)->size() / 3;
+size_t manifold_triangulation_num_tri(ManifoldTriangulation* m) {
+  return from_c(m)->size();
 }
 
-const int* manifold_triangulation_tri_verts(const ManifoldTriangulation* m) {
-  auto& triangulation = *from_c(m);
-  return triangulation.data();
+int* manifold_triangulation_tri_verts(void* mem, ManifoldTriangulation* m) {
+  return reinterpret_cast<int*>(copy_data<ivec3>(mem, *from_c(m)));
+}
+
+// memory size
+size_t manifold_cross_section_size() { return sizeof(CrossSection); }
+size_t manifold_cross_section_vec_size() {
+  return sizeof(std::vector<CrossSection>);
+}
+size_t manifold_ray_hit_vec_size() { return sizeof(RayHitVec); }
+size_t manifold_simple_polygon_size() { return sizeof(SimplePolygon); }
+size_t manifold_polygons_size() { return sizeof(Polygons); }
+size_t manifold_manifold_size() { return sizeof(Manifold); }
+size_t manifold_manifold_vec_size() { return sizeof(std::vector<Manifold>); }
+size_t manifold_manifold_pair_size() { return sizeof(ManifoldManifoldPair); }
+size_t manifold_meshgl_size() { return sizeof(MeshGL); }
+size_t manifold_meshgl64_size() { return sizeof(MeshGL64); }
+size_t manifold_box_size() { return sizeof(Box); }
+size_t manifold_rect_size() { return sizeof(Rect); }
+size_t manifold_triangulation_size() { return sizeof(std::vector<ivec3>); }
+size_t manifold_execution_context_size() { return sizeof(ExecutionContext); }
+
+// allocation
+//
+// Returns raw uninitialized storage. Callers must placement-new into it
+// via one of the constructor functions (e.g. manifold_cube) before any
+// use or before passing to manifold_destruct_* / manifold_delete_*.
+// Using `new T` here would silently leak the default-constructed object
+// every time a constructor function placement-new'd over it (see
+// Manifold's pNode_ and CrossSection's paths_ shared_ptrs).
+ManifoldManifold* manifold_alloc_manifold() {
+  return to_c(alloc_raw<manifold::Manifold>());
+}
+ManifoldManifoldVec* manifold_alloc_manifold_vec() {
+  return to_c(alloc_raw<std::vector<manifold::Manifold>>());
+}
+ManifoldCrossSection* manifold_alloc_cross_section() {
+  return to_c(alloc_raw<CrossSection>());
+}
+ManifoldCrossSectionVec* manifold_alloc_cross_section_vec() {
+  return to_c(alloc_raw<std::vector<CrossSection>>());
+}
+ManifoldRayHitVec* manifold_alloc_ray_hit_vec() {
+  return to_c(alloc_raw<RayHitVec>());
+}
+ManifoldSimplePolygon* manifold_alloc_simple_polygon() {
+  return to_c(alloc_raw<SimplePolygon>());
+}
+ManifoldPolygons* manifold_alloc_polygons() {
+  return to_c(alloc_raw<std::vector<SimplePolygon>>());
+}
+ManifoldMeshGL* manifold_alloc_meshgl() { return to_c(alloc_raw<MeshGL>()); }
+ManifoldMeshGL64* manifold_alloc_meshgl64() {
+  return to_c(alloc_raw<MeshGL64>());
+}
+ManifoldBox* manifold_alloc_box() { return to_c(alloc_raw<Box>()); }
+ManifoldRect* manifold_alloc_rect() { return to_c(alloc_raw<Rect>()); }
+ManifoldTriangulation* manifold_alloc_triangulation() {
+  return to_c(alloc_raw<std::vector<ivec3>>());
+}
+ManifoldExecutionContext* manifold_alloc_execution_context() {
+  return to_c(alloc_raw<ExecutionContext>());
 }
 
 // pointer free + destruction
@@ -992,22 +1082,51 @@ void manifold_delete_execution_context(ManifoldExecutionContext* ctx) {
   delete from_c(ctx);
 }
 
+// destruction
+void manifold_destruct_cross_section(ManifoldCrossSection* cs) {
+  from_c(cs)->~CrossSection();
+}
+void manifold_destruct_cross_section_vec(ManifoldCrossSectionVec* csv) {
+  from_c(csv)->~CrossSectionVec();
+}
+void manifold_destruct_ray_hit_vec(ManifoldRayHitVec* v) {
+  from_c(v)->~RayHitVec();
+}
+void manifold_destruct_simple_polygon(ManifoldSimplePolygon* p) {
+  from_c(p)->~SimplePolygon();
+}
+void manifold_destruct_polygons(ManifoldPolygons* p) { from_c(p)->~Polygons(); }
+void manifold_destruct_manifold(ManifoldManifold* m) { from_c(m)->~Manifold(); }
+void manifold_destruct_manifold_vec(ManifoldManifoldVec* ms) {
+  from_c(ms)->~ManifoldVec();
+}
+void manifold_destruct_meshgl(ManifoldMeshGL* m) { from_c(m)->~MeshGL(); }
+void manifold_destruct_meshgl64(ManifoldMeshGL64* m) { from_c(m)->~MeshGL64(); }
+void manifold_destruct_box(ManifoldBox* b) { from_c(b)->~Box(); }
+void manifold_destruct_rect(ManifoldRect* r) { from_c(r)->~Rect(); }
+void manifold_destruct_triangulation(ManifoldTriangulation* m) {
+  from_c(m)->~vector<ivec3>();
+}
+void manifold_destruct_execution_context(ManifoldExecutionContext* ctx) {
+  from_c(ctx)->~ExecutionContext();
+}
+
 // IO
 
 #ifndef MANIFOLD_NO_IOSTREAM
-ManifoldManifold* manifold_read_obj(const char* obj_file) {
+ManifoldManifold* manifold_read_obj(void* mem, char* obj_file) {
   std::istringstream iss(obj_file);
   Manifold m = Manifold::ReadOBJ(iss);
-  return to_c(new Manifold(m));
+  return to_c(new (mem) Manifold(m));
 }
 
-ManifoldMeshGL64* manifold_meshgl64_read_obj(const char* obj_file) {
+ManifoldMeshGL64* manifold_meshgl64_read_obj(void* mem, char* obj_file) {
   std::istringstream iss(obj_file);
   MeshGL64 m = ReadOBJ(iss);
-  return to_c(new MeshGL64(std::move(m)));
+  return to_c(new (mem) MeshGL64(std::move(m)));
 }
 
-void manifold_write_obj(const ManifoldManifold* manifold,
+void manifold_write_obj(ManifoldManifold* manifold,
                         void (*callback)(char*, void*), void* args) {
   std::stringstream ss;
   const Manifold* m = from_c(manifold);
@@ -1015,7 +1134,7 @@ void manifold_write_obj(const ManifoldManifold* manifold,
   callback(ss.str().data(), args);
 }
 
-void manifold_meshgl64_write_obj(const ManifoldMeshGL64* mesh,
+void manifold_meshgl64_write_obj(ManifoldMeshGL64* mesh,
                                  void (*callback)(char*, void*), void* args) {
   std::stringstream ss;
   const MeshGL64* m = from_c(mesh);

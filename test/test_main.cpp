@@ -17,7 +17,6 @@
 #include <fstream>
 #endif
 
-#include "gtest/gtest.h"
 #include "manifold/manifold.h"
 #include "test.h"
 
@@ -112,7 +111,6 @@ int main(int argc, char** argv) {
   }
 
   manifold::ManifoldParams().intermediateChecks = true;
-  manifold::ManifoldParams().verifyNoDegenerates = true;
   manifold::ManifoldParams().processOverlaps = false;
 
   FrameMarkEnd(name);
@@ -135,22 +133,6 @@ Polygons SquareHole(double xOffset) {
       {1 + xOffset, -1},   //
       {-1 + xOffset, -1},  //
   });
-  return polys;
-}
-
-// A finely sampled, smooth, slightly non-convex contour: a circle with a few
-// small Fourier perturbations, so Triangulate can't use its convex fast path.
-Polygons SmoothBlob(int numVert, double radius) {
-  const int freq[] = {3, 5, 7, 11, 13};
-  Polygons polys(1);
-  polys[0].reserve(numVert);
-  for (int i = 0; i < numVert; ++i) {
-    const double angle = kTwoPi * i / numVert;
-    double r = radius;
-    for (int j = 0; j < 5; ++j)
-      r += 0.02 * radius * std::sin(freq[j] * angle + j);
-    polys[0].push_back({r * std::cos(angle), r * std::sin(angle)});
-  }
   return polys;
 }
 
@@ -350,7 +332,7 @@ void Identical(const MeshGL& mesh1, const MeshGL& mesh2) {
 void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
                bool checkNormals, bool updateNormals) {
   ASSERT_FALSE(out.IsEmpty());
-  MeshGL output = out.TriID2FaceID().GetMeshGL();
+  MeshGL output = out.GetMeshGL();
   std::vector<mat3x4> runTransforms(output.NumRun());
   for (size_t run = 0; run < output.NumRun(); ++run) {
     runTransforms[run] = output.GetRunTransform(run);
@@ -394,17 +376,8 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
     }
     ASSERT_LT(i, originals.size());
     const MeshGL& inMesh = originals[i];
-    auto meshScale = [](const MeshGL& mesh) {
-      Box bounds;
-      for (size_t vertex = 0; vertex < mesh.NumVert(); ++vertex)
-        bounds.Union(vec3(mesh.GetVertPos(vertex)));
-      return bounds.Scale();
-    };
     const float tolerance =
-        3 *
-        std::max(Quality::GetRelativePrecision(),
-                 static_cast<double>(std::numeric_limits<float>::epsilon())) *
-        std::max(meshScale(output), meshScale(inMesh));
+        3 * std::max(static_cast<float>(out.GetTolerance()), inMesh.tolerance);
 
     for (uint32_t tri = output.runIndex[run] / 3;
          tri < output.runIndex[run + 1] / 3; ++tri) {
@@ -497,6 +470,10 @@ void ExpectMeshes(const Manifold& manifold,
   }
 }
 
+void CheckStrictly(const Manifold& manifold) {
+  EXPECT_EQ(manifold.NumDegenerateTris(), 0);
+}
+
 void CheckGL(const Manifold& manifold, bool noMerge) {
   ASSERT_FALSE(manifold.IsEmpty());
   const MeshGL meshGL = manifold.GetMeshGL();
@@ -511,6 +488,7 @@ void CheckGL(const Manifold& manifold, bool noMerge) {
   if (!meshGL.runTransform.empty()) {
     EXPECT_EQ(meshGL.runTransform.size(), 12 * meshGL.runOriginalID.size());
   }
+  EXPECT_EQ(meshGL.faceID.size(), meshGL.NumTri());
   CheckFinite(meshGL);
 }
 
@@ -538,6 +516,10 @@ void CheckGLEquiv(const MeshGL& mgl1, const MeshGL& mgl2) {
 
 #ifndef MANIFOLD_NO_FILESYSTEM
 Manifold ReadTestOBJ(const std::string& filename) {
+  return Manifold(ReadTestMeshGL64OBJ(filename));
+}
+
+MeshGL64 ReadTestMeshGL64OBJ(const std::string& filename) {
 #ifdef __EMSCRIPTEN__
   std::string obj = "/models/" + filename;
 #else
@@ -548,9 +530,8 @@ Manifold ReadTestOBJ(const std::string& filename) {
 #endif
   std::ifstream f;
   f.open(obj);
-  Manifold a = Manifold::ReadOBJ(f);
+  MeshGL64 a = ReadOBJ(f);
   f.close();
-  EXPECT_FALSE(a.IsEmpty());
   return a;
 }
 

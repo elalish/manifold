@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "gtest/gtest.h"
 #include "manifold/manifold.h"
 #include "samples.h"
 #include "test.h"
@@ -176,55 +175,6 @@ TEST(Hull, FailingTest2) {
   EXPECT_TRUE(isMeshConvex(hull, 2.13966e-05));
 }
 
-TEST(Hull, CoplanarClusters) {
-  // A convex polygon swept by an octahedron (a Minkowski sum): every corner
-  // of the polygon shifted by each octahedron vertex. Large exactly coplanar
-  // clusters; the visibility test used to remove faces the new point merely
-  // lay on, leaving inward-facing faces and points far outside the hull.
-  const std::vector<vec3> hullPts = {
-      {2.2965078353881836, 1.8417460918426514, 2.041705846786499},
-      {2.3199396133422852, 1.8417460918426514, 2.041705846786499},
-      {2.3082237243652344, 1.8300302028656006, 2.041705846786499},
-      {2.3082237243652344, 1.8534619808197021, 2.041705846786499},
-      {2.3082237243652344, 1.8417460918426514, 2.0299899578094482},
-      {2.3082237243652344, 1.8417460918426514, 2.0534217357635498},
-      {2.2965078353881836, 1.7583343982696533, 2.041705846786499},
-      {2.3199396133422852, 1.7583343982696533, 2.041705846786499},
-      {2.3082237243652344, 1.7466185092926025, 2.041705846786499},
-      {2.3082237243652344, 1.7700502872467041, 2.041705846786499},
-      {2.3082237243652344, 1.7583343982696533, 2.0299899578094482},
-      {2.3082237243652344, 1.7583343982696533, 2.0534217357635498},
-      {2.8965883255004883, 1.1582539081573486, 2.6417863368988037},
-      {2.9200201034545898, 1.1582539081573486, 2.6417863368988037},
-      {2.9083042144775391, 1.1465380191802979, 2.6417863368988037},
-      {2.9083042144775391, 1.1699697971343994, 2.6417863368988037},
-      {2.9083042144775391, 1.1582539081573486, 2.6300704479217529},
-      {2.9083042144775391, 1.1582539081573486, 2.6535022258758545},
-      {2.9465782642364502, 1.1582539081573486, 2.6917762756347656},
-      {2.9700100421905518, 1.1582539081573486, 2.6917762756347656},
-      {2.958294153213501, 1.1465380191802979, 2.6917762756347656},
-      {2.958294153213501, 1.1699697971343994, 2.6917762756347656},
-      {2.958294153213501, 1.1582539081573486, 2.6800603866577148},
-      {2.958294153213501, 1.1582539081573486, 2.7034921646118164},
-      {2.9465782642364502, 1.2416656017303467, 2.6917762756347656},
-      {2.9700100421905518, 1.2416656017303467, 2.6917762756347656},
-      {2.958294153213501, 1.2299497127532959, 2.6917762756347656},
-      {2.958294153213501, 1.2533814907073975, 2.6917762756347656},
-      {2.958294153213501, 1.2416656017303467, 2.6800603866577148},
-      {2.958294153213501, 1.2416656017303467, 2.7034921646118164},
-      {2.3464977741241455, 1.8417460918426514, 2.0916957855224609},
-      {2.3699295520782471, 1.8417460918426514, 2.0916957855224609},
-      {2.3582136631011963, 1.8300302028656006, 2.0916957855224609},
-      {2.3582136631011963, 1.8534619808197021, 2.0916957855224609},
-      {2.3582136631011963, 1.8417460918426514, 2.0799798965454102},
-      {2.3582136631011963, 1.8417460918426514, 2.1034116744995117},
-  };
-  auto hull = Manifold::Hull(hullPts);
-  if (options.exportModels) WriteTestOBJ("coplanar_clusters.obj", hull);
-  EXPECT_TRUE(isMeshConvex(hull));
-  EXPECT_NEAR(hull.Volume(), 0.002259329608, 1e-12);
-}
-
 TEST(Hull, DisabledFaceTest) {
   // 101213.stl
   const std::vector<vec3> hullPts = {
@@ -256,7 +206,17 @@ TEST(Hull, Degenerate2D) {
       {0.5, 0.0, 0.0},
       {0.5, 0.0, 1.0},
   });
-  EXPECT_TRUE(hull.IsEmpty());
+  EXPECT_TRUE(!hull.IsEmpty());
+
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.x, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.y, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.z, 0.0);
+
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.x, 0.5);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.y, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.z, 1.0);
+
+  EXPECT_FLOAT_EQ(hull.Volume(), 0.0);
 }
 
 TEST(Hull, Degenerate1D) {
@@ -267,7 +227,17 @@ TEST(Hull, Degenerate1D) {
       {0.5, 0.0, 0.0},
       {0.5, 0.0, 0.0},
   });
-  EXPECT_TRUE(hull.IsEmpty());
+  EXPECT_TRUE(!hull.IsEmpty());
+
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.x, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.y, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.z, 0.0);
+
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.x, 0.5);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.y, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.z, 0.0);
+
+  EXPECT_FLOAT_EQ(hull.Volume(), 0.0);
 }
 
 TEST(Hull, NotEnoughPoints) {
@@ -275,7 +245,17 @@ TEST(Hull, NotEnoughPoints) {
       {0.0, 0.0, 0.0},
       {0.5, 0.0, 0.0},
   });
-  EXPECT_TRUE(hull.IsEmpty());
+  EXPECT_TRUE(!hull.IsEmpty());
+
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.x, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.y, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().min.z, 0.0);
+
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.x, 0.5);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.y, 0.0);
+  EXPECT_FLOAT_EQ(hull.BoundingBox().max.z, 0.0);
+
+  EXPECT_FLOAT_EQ(hull.Volume(), 0.0);
 }
 
 TEST(Hull, EmptyHull) {

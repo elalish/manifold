@@ -1,0 +1,283 @@
+# This is a basic workflow to help you get started with Actions
+
+name: CI
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+# events but only for the master branch
+on:
+  push:
+    branches:
+      - '*'
+    tags:
+      - '*'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
+
+jobs:
+  build_mac_java_x86:
+    name: JAVA Mac x86_64
+    timeout-minutes: 30
+    runs-on: macos-15
+    steps:
+    - name: Install common dependencies
+      run: |
+        pip install trimesh pytest maven
+    - name: Build googletest for x86_64
+      run: |
+        git clone https://github.com/google/googletest.git
+        cd googletest
+        mkdir build && cd build
+        cmake -DCMAKE_OSX_ARCHITECTURES=x86_64 -DCMAKE_BUILD_TYPE=Release ..
+        make
+        sudo make install
+    - uses: actions/checkout@v4
+    - uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: 4.0.2
+    - name: Install Java and Maven
+      run: |
+        wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-fx-jdk25.0.2-macosx_x64.tar.gz
+        tar -xzf zulu25.32.21-ca-fx-jdk25.0.2-macosx_x64.tar.gz
+        echo "JAVA_HOME=$(pwd)/zulu25.32.21-ca-fx-jdk25.0.2-macosx_x64" >> $GITHUB_ENV
+        echo "PATH=$(pwd)/zulu25.32.21-ca-fx-jdk25.0.2-macosx_x64/bin:$PATH" >> $GITHUB_ENV
+    - name: Build
+      run: |
+        bash bindings/java/scripts/macos/buildC.sh
+    - name: Upload native libraries
+      uses: actions/upload-artifact@v4
+      with:
+        name: native-libs-mac-x86_64
+        path: bindings/java/src/main/resources/manifold3d/natives/
+  build_mac_java:
+    name: JAVA Mac arm64
+    timeout-minutes: 30
+    runs-on: macos-15
+    steps:
+    - name: Install common dependencies
+      run: |
+        pip install trimesh pytest maven
+    - name: Build googletest for arm64
+      run: |
+        git clone https://github.com/google/googletest.git
+        cd googletest
+        mkdir build && cd build
+        cmake -DCMAKE_OSX_ARCHITECTURES=arm64 -DCMAKE_BUILD_TYPE=Release ..
+        make
+        sudo make install
+    - uses: actions/checkout@v4
+    - uses: jwlawson/actions-setup-cmake@v2
+      with:
+        cmake-version: 4.0.2
+    - name: Install Java and Maven
+      run: |
+        wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-fx-jdk25.0.2-macosx_aarch64.tar.gz
+        tar -xzf zulu25.32.21-ca-fx-jdk25.0.2-macosx_aarch64.tar.gz
+        echo "JAVA_HOME=$(pwd)/zulu25.32.21-ca-fx-jdk25.0.2-macosx_aarch64" >> $GITHUB_ENV
+        echo "PATH=$(pwd)/zulu25.32.21-ca-fx-jdk25.0.2-macosx_aarch64/bin:$PATH" >> $GITHUB_ENV
+    - name: Build
+      run: |
+        bash bindings/java/scripts/macos/buildC-arm.sh
+    - name: Upload native libraries
+      uses: actions/upload-artifact@v4
+      with:
+        name: native-libs-mac-arm64
+        path: bindings/java/src/main/resources/manifold3d/natives/
+  build_linux_java_ARM:
+    name: JAVA Linux_ARM Build
+    timeout-minutes: 45
+    runs-on: ubuntu-24.04-arm
+    env:
+      CC: gcc-14
+      CXX: g++-14
+    steps:
+    - uses: actions/checkout@v6
+    - uses: lukka/get-cmake@v4.2.3
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'
+        cache: 'pip'
+    - name: Install dependencies
+      uses: awalsh128/cache-apt-pkgs-action@v1.6.0
+      with:
+        packages: libgtest-dev libassimp-dev git libtbb-dev pkg-config libpython3-dev
+    - run: pip install -U trimesh pytest
+    - name: Pull a JavaFX JDK
+      run: wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-fx-jdk25.0.2-linux_aarch64.tar.gz
+
+    - name: Set Java
+      uses: actions/setup-java@v1
+      with:
+        java-version: 25
+        jdkFile: ./zulu25.32.21-ca-fx-jdk25.0.2-linux_aarch64.tar.gz
+    - name: Build With parallelization
+      run: |
+         bash bindings/java/scripts/linux/buildC-arm.sh
+    - name: Upload native libraries
+      uses: actions/upload-artifact@v4
+      with:
+        name: native-libs-linux-arm64
+        path: bindings/java/src/main/resources/manifold3d/natives/
+  build_linux_java_x86:
+    name: JAVA Linux_x86 Build
+    timeout-minutes: 45
+    runs-on: ubuntu-24.04
+    container:
+      image: ubuntu:20.04
+      options: --user root
+    env:
+      CC: gcc
+      CXX: g++
+    steps:
+    - run: |
+        apt-get update
+        DEBIAN_FRONTEND=noninteractive apt-get install -y \
+            unzip \
+            curl \
+            wget \
+            ca-certificates \
+            lsb-release \
+            gnupg \
+            git \
+            file \
+            xz-utils \
+            openjdk-11-jdk \
+            gcc \
+            g++ \
+            make \
+            maven
+    - uses: actions/checkout@v6
+    - uses: lukka/get-cmake@v4.2.3
+    - name: Install dependencies
+      uses: awalsh128/cache-apt-pkgs-action@v1.6.0
+      with:
+        packages: libgtest-dev libtbb-dev pkg-config 
+    - name: Pull a JavaFX JDK
+      run: wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-fx-jdk25.0.2-linux_x64.tar.gz
+    - name: Set Java
+      uses: actions/setup-java@v1
+      with:
+        java-version: 25
+        jdkFile: ./zulu25.32.21-ca-fx-jdk25.0.2-linux_x64.tar.gz
+    - name: Build With parallelization
+      run: |
+        bash bindings/java/scripts/linux/buildC.sh
+    - name: Upload native libraries
+      uses: actions/upload-artifact@v4
+      with:
+        name: native-libs-linux-x86
+        path: bindings/java/src/main/resources/manifold3d/natives/
+  build_windows_java_x86:
+    name: JAVA Windows x86
+    timeout-minutes: 30
+    runs-on: windows-2025
+    steps:
+    - uses: actions/checkout@v6
+    - uses: lukka/get-cmake@v4.2.3
+    - &clone-tbb-win
+      uses: ./.github/actions/git-clone
+      with:
+        name: tbb
+        url: https://github.com/oneapi-src/oneTBB.git
+        tag: v2022.3.0
+    - &clone-clipper2-win
+      uses: ./.github/actions/git-clone
+      with:
+        name: clipper2
+        url: https://github.com/AngusJohnson/Clipper2.git
+        rev: 46f639177fe418f9689e8ddb74f08a870c71f5b4
+    - &clone-nanobind-win
+      uses: ./.github/actions/git-clone
+      with:
+        name: nanobind
+        url: https://github.com/wjakob/nanobind.git
+        tag: v2.12.0
+    - &clone-gtest-win
+      uses: ./.github/actions/git-clone
+      with:
+        name: gtest
+        url: https://github.com/google/googletest.git
+        tag: v1.17.0
+    - uses: ilammy/msvc-dev-cmd@v1
+    - name: Pull a JavaFX JDK
+      run: curl -O https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-fx-jdk25.0.2-win_x64.zip
+
+    - name: Set Java
+      uses: actions/setup-java@v1
+      with:
+        java-version: 25
+        jdkFile: ./zulu25.32.21-ca-fx-jdk25.0.2-win_x64.zip
+    - name: Build for Java
+      shell: bash
+      run: |
+        bash bindings/java/scripts/windows/buildC.sh
+    - name: Upload native libraries
+      uses: actions/upload-artifact@v4
+      with:
+        name: native-libs-windows-x86
+        path: bindings/java/src/main/resources/manifold3d/natives/
+  deploy_java:
+      name: JAVA Deploy Jar to Clojars
+      runs-on: ubuntu-latest
+      if: startsWith(github.ref, 'refs/tags/')
+      needs: [build_mac_java_x86, build_linux_java_x86,build_linux_java_ARM,build_windows_java_x86 ,build_mac_java]
+      steps:
+      - uses: actions/checkout@v4
+      - name: Download native libraries
+        uses: actions/download-artifact@v4
+        with:
+          name: native-libs-mac-x86_64
+          path: bindings/java/src/main/resources/manifold3d/natives/
+      - name: Download native libraries
+        uses: actions/download-artifact@v4
+        with:
+          name: native-libs-mac-arm64
+          path: bindings/java/src/main/resources/manifold3d/natives/
+      - name: Download native libraries
+        uses: actions/download-artifact@v4
+        with:
+          name: native-libs-linux-arm64
+          path: bindings/java/src/main/resources/manifold3d/natives/
+      - name: Download native libraries
+        uses: actions/download-artifact@v4
+        with:
+          name: native-libs-windows-x86
+          path: bindings/java/src/main/resources/manifold3d/natives/
+      - name: Download native libraries
+        uses: actions/download-artifact@v4
+        with:
+          name: native-libs-linux-x86
+          path: bindings/java/src/main/resources/manifold3d/natives/
+      - name: List shared libraries
+        run: |
+          ls -al bindings/java/src/main/resources/manifold3d/natives/
+          ls -al bindings/java/src/main/resources/manifold3d/natives/linux-x86_64
+          ls -al bindings/java/src/main/resources/manifold3d/natives/linux-arm64
+          ls -al bindings/java/src/main/resources/manifold3d/natives/win-x86_64
+          ls -al bindings/java/src/main/resources/manifold3d/natives/mac-arm64
+      - name: Pull a JavaFX JDK
+        run: wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-fx-jdk25.0.2-linux_x64.tar.gz
+
+      - name: Set Java
+        uses: actions/setup-java@v1
+        with:
+          java-version: 25
+          jdkFile: ./zulu25.32.21-ca-fx-jdk25.0.2-linux_x64.tar.gz
+          maven-version: '3.8.7'
+
+      - name: Install Maven 3.8.7
+        run: |
+          wget https://archive.apache.org/dist/maven/maven-3/3.8.7/binaries/apache-maven-3.8.7-bin.tar.gz
+          tar -xzf apache-maven-3.8.7-bin.tar.gz
+          echo "$PWD/apache-maven-3.8.7/bin" >> $GITHUB_PATH
+      - name: Check Maven version
+        run: mvn --version
+      - name: Build Jar
+        run: |
+          bash bindings/java/scripts/findVersion.sh
+          ls -al bindings/java/scripts/
+          bash bindings/java/scripts/clojar.sh $(bash bindings/java/scripts/findVersion.sh)
+        env:
+          CLOJARS_USERNAME: ${{ secrets.CLOJARS_USERNAME }}
+          CLOJARS_TOKEN: ${{ secrets.CLOJARS_TOKEN }}

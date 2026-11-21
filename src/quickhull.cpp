@@ -388,11 +388,7 @@ void QuickHull::createConvexHalfedgeMesh() {
         const Plane& P = pvf.P;
         pvf.visibilityCheckedOnIteration = iter;
         const double d = la::dot(P.N, activePoint) + P.D;
-        // Visible only if the point is more than epsilon above the face, the
-        // same test addPointToFace() uses. A face the point lies on (within
-        // rounding) must stay: replacing it builds the new face from three
-        // nearly collinear points, whose normal can point anywhere.
-        if (d > 0 && d * d > epsilonSquared * P.sqrNLength) {
+        if (d > 0) {
           pvf.isVisibleFaceOnCurrentIteration = 1;
           pvf.horizonEdgesOnCurrentIteration = 0;
           visibleFaces.push_back(faceData.faceIndex);
@@ -853,9 +849,8 @@ void Manifold::Impl::Hull(VecView<const vec3> vertPos,
     return;
   }
   CalculateBBox();
+  SetEpsilon();
   InitializeOriginal();
-  SetFaceAndVertNormals();
-  RemoveDegenerates();
   SortGeometry(ctx);
   // SortGeometry returns silently on cancel, leaving the Impl in a
   // partial state; catch that here so SetNormalsAndCoplanar doesn't
@@ -864,7 +859,7 @@ void Manifold::Impl::Hull(VecView<const vec3> vertPos,
     MakeEmpty(Error::Cancelled);
     return;
   }
-  InitializeOriginal();
+  SetNormalsAndCoplanar();
 }
 
 }  // namespace manifold

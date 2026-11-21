@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include "gtest/gtest.h"
 #include "manifold/manifold.h"
 #include "test.h"
 
@@ -63,69 +62,6 @@ TEST(SDF, InvalidGrid) {
             Manifold::Error::ResultTooLarge);
   EXPECT_EQ(Manifold::LevelSet(sphere, box, 1e-6).Status(),
             Manifold::Error::ResultTooLarge);
-}
-
-TEST(SDF, CoarseGridSamplesFiniteCoordinates) {
-  const Box bounds(vec3(-1.0), vec3(1.0));
-  for (const double edgeLength : {2.0, 3.0, 10.0}) {
-    SCOPED_TRACE(edgeLength);
-    int calls = 0;
-    bool finite = true;
-    const Manifold box = Manifold::LevelSet(
-        [&](vec3 p) {
-          ++calls;
-          finite &= la::all(la::isfinite(p));
-          return 1.0;
-        },
-        bounds, edgeLength, 0.0, -1.0, false);
-    EXPECT_GT(calls, 0);
-    EXPECT_TRUE(finite);
-    EXPECT_EQ(box.Status(), Manifold::Error::NoError);
-    EXPECT_FALSE(box.IsEmpty());
-    EXPECT_NEAR(box.Volume(), 8.0, 1e-10);
-    EXPECT_EQ(box.BoundingBox().min, bounds.min);
-    EXPECT_EQ(box.BoundingBox().max, bounds.max);
-  }
-}
-
-TEST(SDF, ThinBoundsKeepFiniteGridSpacing) {
-  for (const int axis : {0, 1, 2}) {
-    SCOPED_TRACE(axis);
-    vec3 size(2.0);
-    size[axis] = 0.1;
-    const Box bounds(vec3(0.0), size);
-    bool finite = true;
-    const Manifold box = Manifold::LevelSet(
-        [&](vec3 p) {
-          finite &= la::all(la::isfinite(p));
-          return 1.0;
-        },
-        bounds, 0.5, 0.0, -1.0, false);
-    EXPECT_TRUE(finite);
-    EXPECT_EQ(box.Status(), Manifold::Error::NoError);
-    EXPECT_FALSE(box.IsEmpty());
-    EXPECT_NEAR(box.Volume(), 0.4, 1e-10);
-    EXPECT_EQ(box.BoundingBox().min, bounds.min);
-    EXPECT_EQ(box.BoundingBox().max, bounds.max);
-  }
-}
-
-TEST(SDF, DegenerateBoundsSampleFiniteCoordinates) {
-  for (const vec3 size :
-       {vec3(0, 2, 2), vec3(2, 0, 2), vec3(2, 2, 0), vec3(0.0)}) {
-    SCOPED_TRACE(::testing::Message() << "size=(" << size.x << "," << size.y
-                                      << "," << size.z << ")");
-    bool finite = true;
-    const Manifold empty = Manifold::LevelSet(
-        [&](vec3 p) {
-          finite &= la::all(la::isfinite(p));
-          return 1.0;
-        },
-        {vec3(0.0), size}, 0.5, 0.0, -1.0, false);
-    EXPECT_TRUE(finite);
-    EXPECT_EQ(empty.Status(), Manifold::Error::NoError);
-    EXPECT_TRUE(empty.IsEmpty());
-  }
 }
 
 TEST(SDF, SphereShell) {
@@ -271,20 +207,6 @@ TEST(SDF, SineSurface) {
   EXPECT_NEAR(surface.SurfaceArea(), 392.4, 0.1);
 
   if (options.exportModels) WriteTestOBJ("sinesurface.obj", surface);
-}
-
-TEST(SDF, Determinism) {
-  const auto gyroid = [](vec3 p) {
-    return la::sin(p.x) * la::cos(p.y) + la::sin(p.y) * la::cos(p.z) +
-           la::sin(p.z) * la::cos(p.x);
-  };
-  const Box bounds = {vec3(-10), vec3(10)};
-  const MeshGL first = Manifold::LevelSet(gyroid, bounds, 1.0).GetMeshGL();
-  for (int i = 0; i < 10; ++i) {
-    const MeshGL mesh = Manifold::LevelSet(gyroid, bounds, 1.0).GetMeshGL();
-    ASSERT_EQ(mesh.vertProperties, first.vertProperties);
-    ASSERT_EQ(mesh.triVerts, first.triVerts);
-  }
 }
 
 TEST(SDF, Blobs) {

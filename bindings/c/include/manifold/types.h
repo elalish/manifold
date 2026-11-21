@@ -95,7 +95,6 @@ typedef struct ManifoldRayHit {
   double distance;
   ManifoldVec3 position;
   ManifoldVec3 normal;
-  int crossing;
 } ManifoldRayHit;
 
 // enums
@@ -123,6 +122,13 @@ typedef enum ManifoldError {
   MANIFOLD_INVALID_TANGENTS,
   MANIFOLD_CANCELLED,
 } ManifoldError;
+
+typedef enum ManifoldFillRule {
+  MANIFOLD_FILL_RULE_EVEN_ODD,
+  MANIFOLD_FILL_RULE_NON_ZERO,
+  MANIFOLD_FILL_RULE_POSITIVE,
+  MANIFOLD_FILL_RULE_NEGATIVE
+} ManifoldFillRule;
 
 typedef enum ManifoldJoinType {
   MANIFOLD_JOIN_TYPE_SQUARE,

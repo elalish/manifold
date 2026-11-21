@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #pragma once
-#include <array>
 #include <cstdint>  // uint32_t, uint64_t
 #include <functional>
 #include <memory>  // needed for shared_ptr
@@ -24,13 +23,6 @@
 #include "manifold/vec_view.h"
 
 namespace manifold {
-
-/**
- * @brief Returns the version of the Manifold library.
- *
- * @return Version as {major, minor, patch}.
- */
-std::array<int, 3> Version();
 
 /**
  * @ingroup Debug
@@ -162,7 +154,7 @@ class Manifold {
   /// not currently observe attached ctx.
   ///
   /// Deferred ops (Boolean operators, Translate / Rotate / Scale / Transform
-  /// / Mirror / Warp / Simplify, BatchBoolean, the
+  /// / Mirror / Warp / SetTolerance / Simplify, BatchBoolean, the
   /// vector-of-Manifold Hull) ignore any attached ctx and produce a result
   /// with no attached ctx. Inputs are not mutated. The idiom for observing a
   /// deferred tree is therefore:
@@ -186,6 +178,7 @@ class Manifold {
   size_t NumPropVert() const;
   Box BoundingBox() const;
   int Genus() const;
+  double GetTolerance() const;
   ///@}
 
   /** @name Measurement
@@ -195,7 +188,6 @@ class Manifold {
   double Volume() const;
   double MinGap(const Manifold& other, double searchLength) const;
   std::vector<RayHit> RayCast(vec3 origin, vec3 endpoint) const;
-  std::vector<int> WindingNumber(const std::vector<vec3>& points) const;
   ///@}
 
   /** @name Mesh ID
@@ -204,7 +196,7 @@ class Manifold {
    */
   ///@{
   int OriginalID() const;
-  Manifold AsOriginal(int id = -1) const;
+  Manifold AsOriginal() const;
   static uint32_t ReserveIDs(uint32_t);
   ///@}
 
@@ -219,8 +211,8 @@ class Manifold {
   Manifold Transform(const mat3x4&) const;
   Manifold Warp(std::function<void(vec3&)>) const;
   Manifold WarpBatch(std::function<void(VecView<vec3>)>) const;
+  Manifold SetTolerance(double) const;
   Manifold Simplify(double tolerance = 0) const;
-  Manifold RemoveDegenerates() const;
   ///@}
 
   /** @name Boolean
@@ -266,6 +258,12 @@ class Manifold {
   Manifold RefineToLength(double) const;
   Manifold RefineToTolerance(double) const;
   Manifold SmoothByNormals(int normalIdx = 0) const;
+  Manifold SmoothOut(double minSharpAngle = 52.5,
+                     double minSmoothness = 0) const;
+  static Manifold Smooth(const MeshGL&,
+                         const std::vector<Smoothness>& sharpenedEdges = {});
+  static Manifold Smooth(const MeshGL64&,
+                         const std::vector<Smoothness>& sharpenedEdges = {});
   ///@}
 
   /** @name Convex Hull
@@ -321,10 +319,8 @@ class Manifold {
    */
   ///@{
   bool MatchesTriNormals() const;
-  bool HasSimpleProps() const;
   size_t NumDegenerateTris() const;
   double GetEpsilon() const;
-  Manifold TriID2FaceID() const;
   ///@}
 
   struct Impl;
@@ -348,16 +344,16 @@ class Manifold {
   // Propagates through copy ctor / op= (raw copy preserves the attachment).
   // Manifold-returning ops do *not* propagate it: derived Manifolds get a
   // null ctx_. Eager ops (Status, Refine family) snapshot ctx_ to observe
-  // their in-call work; the snapshot uses an atomic load, which pins the
+  // their in-call work; the snapshot uses std::atomic_load, which pins the
   // Impl across long-running evaluations even if a concurrent op= reseats
   // ctx_ mid-eval.
   //
-  // Accessed only atomically (AtomicLoadShared/AtomicStoreShared): no const
-  // method mutates ctx_, but op= and the copy ctor write it on a Manifold that
+  // Accessed only via std::atomic_load / std::atomic_store: no const method
+  // mutates ctx_, but op= and the copy ctor write it on a Manifold that
   // may be concurrently observed by const methods on other threads. The
   // atomic-shared-ptr free functions give a torn-read-free snapshot
   // without taking a lock. (pNode_ uses a mutex instead because lazy CSG
-  // eval mutates it through const methods, which an atomic load can't model.)
+  // eval mutates it through const methods, which atomic_load can't model.)
   std::shared_ptr<ExecutionContext::Impl> ctx_;
 
   std::shared_ptr<CsgNode> LoadPNode() const;

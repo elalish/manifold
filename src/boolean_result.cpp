@@ -502,41 +502,38 @@ void AppendWholeEdges(Manifold::Impl& outR, Vec<int>& facePtrR,
                          inP.halfedge_, i03, vP2R, faceP2R, forward});
 }
 
+struct MapTriRef {
+  VecView<const TriRef> triRefP;
+  VecView<const TriRef> triRefQ;
+  const int offsetQ;
+
+  void operator()(TriRef& triRef) {
+    const int tri = triRef.faceID;
+    const bool PQ = triRef.meshID == 0;
+    triRef = PQ ? triRefP[tri] : triRefQ[tri];
+    if (!PQ) triRef.meshID += offsetQ;
+  }
+};
+
 void UpdateReference(Manifold::Impl& outR, const Manifold::Impl& inP,
                      const Manifold::Impl& inQ, bool invertQ,
                      ExecutionContext::Impl* ctx) {
   // Invariant: every ctx-passing parallel op is followed by IsCancelled to
   // keep partial output from feeding unconditional downstream consumers.
   const int offsetQ = Manifold::Impl::meshIDCounter_;
-  // Both inputs may use meshID 0 with different relations (e.g. only one has
-  // normals); Q's must then get its own ID so it isn't overwritten by P's.
-  const auto& relP = inP.meshRelation_.meshIDtransform;
-  const auto& relQ = inQ.meshRelation_.meshIDtransform;
-  const auto p0 = relP.find(0);
-  const auto q0 = relQ.find(0);
-  const bool splitQ0 = p0 != relP.end() && q0 != relQ.end() &&
-                       p0->second.hasNormals != q0->second.hasNormals;
-  for_each_n(autoPolicy(outR.NumTri(), 1e5), outR.meshRelation_.triRef.begin(),
-             outR.NumTri(), ctx,
-             [&inP, &inQ, offsetQ, splitQ0](TriRef& triRef) {
-               const int tri = triRef.faceID;
-               const bool PQ = triRef.meshID == 0;
-               triRef = PQ ? inP.meshRelation_.triRef[tri]
-                           : inQ.meshRelation_.triRef[tri];
-               if (!PQ && (triRef.meshID != 0 || splitQ0))
-                 triRef.meshID += offsetQ;
-             });
+  for_each_n(
+      autoPolicy(outR.NumTri(), 1e5), outR.meshRelation_.triRef.begin(),
+      outR.NumTri(), ctx,
+      MapTriRef({inP.meshRelation_.triRef, inQ.meshRelation_.triRef, offsetQ}));
   if (IsCancelled(ctx)) return;
 
   for (const auto& pair : inP.meshRelation_.meshIDtransform) {
     outR.meshRelation_.meshIDtransform[pair.first] = pair.second;
   }
   for (const auto& pair : inQ.meshRelation_.meshIDtransform) {
-    if (pair.first != 0 || splitQ0) {
-      outR.meshRelation_.meshIDtransform[pair.first + offsetQ] = pair.second;
-      outR.meshRelation_.meshIDtransform[pair.first + offsetQ].backSide ^=
-          invertQ;
-    }
+    outR.meshRelation_.meshIDtransform[pair.first + offsetQ] = pair.second;
+    outR.meshRelation_.meshIDtransform[pair.first + offsetQ].backSide ^=
+        invertQ;
   }
 }
 
@@ -832,6 +829,9 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     return outR;
   }
 
+  outR.epsilon_ = std::max(inP_.epsilon_, inQ_.epsilon_);
+  outR.tolerance_ = std::max(inP_.tolerance_, inQ_.tolerance_);
+
   outR.vertPos_.resize_nofill(numVertR);
   // Add vertices, duplicating for inclusion numbers not in [-1, 1].
   // Retained vertices from P and Q:
@@ -930,8 +930,6 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   vP2R.clear();
   vQ2R.clear();
 
-  outR.CalculateBBox();
-
   // Level 6
   outR.Face2Tri(faceEdge, faceHalfedges, halfedgeRef, /*allowConvex=*/false,
                 ctx_);
@@ -952,18 +950,14 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   UpdateReference(outR, inP_, inQ_, invertQ, ctx_);
   if (auto c = phase(__LINE__)) return *c;
 
-  outR.RemoveDegenerates(nPv + nQv);
+  outR.SimplifyTopology(nPv + nQv);
   outR.RemoveUnreferencedVerts();
 
-  if (ManifoldParams().intermediateChecks) {
+  if (ManifoldParams().intermediateChecks)
     DEBUG_ASSERT(outR.Is2Manifold(), logicErr,
                  "simplified mesh is not 2-manifold!");
-  }
-  if (ManifoldParams().verifyNoDegenerates) {
-    DEBUG_ASSERT(outR.NumDegenerateTris() == 0, logicErr,
-                 "simplified mesh has degenerate triangles!");
-  }
 
+  outR.CalculateBBox();
   outR.SortGeometry(ctx_);
   outR.IncrementMeshIDs();
   if (auto c = phase(__LINE__)) return *c;
@@ -973,7 +967,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   // ctx attached); this keeps the result-size summary, tagged with the same uid
   // so it groups with this boolean's phase lines.
   if (ManifoldParams().verbose >= 2) {
-    std::cout << "  [op" << phaseTiming.uid << "] " << outR.NumVert()
+    std::cout << "  [b" << phaseTiming.uid << "] " << outR.NumVert()
               << " verts and " << outR.NumTri() << " tris" << std::endl;
   }
 #endif
