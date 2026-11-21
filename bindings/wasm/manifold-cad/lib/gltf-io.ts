@@ -446,22 +446,37 @@ function writePlainIndices(
 export function disposeMesh(mesh: GLTFTransform.Mesh) {
   if (!mesh) return;
   const primitives = mesh.listPrimitives();
+  const accessors = new Set<GLTFTransform.Accessor>();
   for (const primitive of primitives) {
-    primitive.getIndices()?.dispose();
-    for (const accessor of primitive.listAttributes()) {
-      accessor.dispose();
-    }
+    const indices = primitive.getIndices();
+    if (indices) accessors.add(indices);
+    for (const accessor of primitive.listAttributes()) accessors.add(accessor);
   }
 
   const manifoldPrimitive =
       mesh.getExtension('EXT_mesh_manifold') as ManifoldPrimitive;
   if (manifoldPrimitive) {
-    manifoldPrimitive.getIndices()?.dispose();
-    manifoldPrimitive.getMergeIndices()?.dispose();
-    manifoldPrimitive.getMergeValues()?.dispose();
+    for (const accessor
+             of [manifoldPrimitive.getIndices(),
+                 manifoldPrimitive.getMergeIndices(),
+                 manifoldPrimitive.getMergeValues()]) {
+      if (accessor) accessors.add(accessor);
+    }
   }
 
   mesh.dispose();
+  // Detach only objects owned by this mesh. Shared primitives and accessors
+  // may still carry geometry for another mesh in the same document.
+  for (const primitive of primitives) {
+    if (primitive.listParents().length === 0) primitive.dispose();
+  }
+  if (manifoldPrimitive && manifoldPrimitive.listParents().length === 0)
+    manifoldPrimitive.dispose();
+  for (const accessor of accessors) {
+    if (accessor.listParents().every(
+            parent => parent.propertyType === GLTFTransform.PropertyType.ROOT))
+      accessor.dispose();
+  }
 }
 
 /**
