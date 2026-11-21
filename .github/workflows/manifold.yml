@@ -596,9 +596,7 @@ jobs:
         LDFLAGS=-Wl,-rpath,/usr/local/lib ./scripts/test-pkgconfig.sh
 
   build_nix:
-    # Usually 2-8 minutes, but a slow download of the emscripten toolchain
-    # from the Nix cache has taken over 20.
-    timeout-minutes: 45
+    timeout-minutes: 30
     strategy:
       matrix:
         variant: [manifold-none, manifold-tbb, manifold-js, manifold-js-tbb, manifold3d]
@@ -607,6 +605,17 @@ jobs:
     - uses: actions/checkout@v7
     - uses: DeterminateSystems/nix-installer-action@main
     - uses: DeterminateSystems/magic-nix-cache-action@main
+    # Downloads from the Nix cache, like the emscripten toolchain, have
+    # stalled for over 20 minutes. Fetch the build inputs on their own so a
+    # stalled download can be retried without retrying the build. The store
+    # keeps whatever was already fetched.
+    - name: Fetch build inputs
+      run: |
+        for attempt in 1 2 3; do
+          timeout 6m nix develop '.?submodules=1#${{matrix.variant}}' --command true && exit 0
+          echo "Fetch attempt $attempt failed or stalled"
+        done
+        exit 1
     - run: nix build -L '.?submodules=1#${{matrix.variant}}'
 
   determinism_check:
