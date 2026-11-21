@@ -50,24 +50,6 @@ typedef struct ManifoldVec3 {
   double z;
 } ManifoldVec3;
 
-typedef struct ManifoldIVec3 {
-  int x;
-  int y;
-  int z;
-} ManifoldIVec3;
-
-typedef struct ManifoldVec4 {
-  double x;
-  double y;
-  double z;
-  double w;
-} ManifoldVec4;
-
-typedef struct ManifoldProperties {
-  double surface_area;
-  double volume;
-} ManifoldProperties;
-
 typedef struct ManifoldMeshGLOptions {
   // Set struct_size to sizeof(ManifoldMeshGLOptions), for example with the
   // initializer. Smaller values make manifold_meshgl_w_options abort.
