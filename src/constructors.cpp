@@ -464,9 +464,7 @@ std::vector<Manifold> Manifold::Decompose() const {
   const int numComponents = uf.connectedComponents(componentIndices);
 
   if (numComponents == 1) {
-    std::vector<Manifold> meshes(1);
-    meshes[0] = *this;
-    return meshes;
+    return {Manifold(LoadPNode())};
   }
   const auto& vertLabel = componentIndices;
   const int numVert = NumVert();
