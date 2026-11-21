@@ -161,10 +161,12 @@ class Manifold {
   /// that force evaluation (`Volume`, `GetMeshGL`, `BoundingBox`, etc.) do
   /// not currently observe attached ctx.
   ///
-  /// Deferred ops (Boolean operators, Translate / Rotate / Scale / Transform
-  /// / Mirror / Warp / Simplify, BatchBoolean, the
-  /// vector-of-Manifold Hull) ignore any attached ctx and produce a result
-  /// with no attached ctx. Inputs are not mutated. The idiom for observing a
+  /// Every other op that returns a Manifold ignores any attached ctx and
+  /// produces a result with no attached ctx. That includes the deferred ops
+  /// (Boolean operators, Translate / Rotate / Scale / Transform / Mirror,
+  /// BatchBoolean, the vector-of-Manifold Hull) and the ones that evaluate
+  /// their input right away (Warp, Simplify, Split, SetProperties, etc.).
+  /// Inputs are not mutated. The idiom for observing a
   /// deferred tree is therefore:
   ///
   ///   (a + b - c).WithContext(ctx).Status();
@@ -347,9 +349,9 @@ class Manifold {
   // the user's ExecutionContext if a ctx-attached Manifold survives it.
   // Propagates through copy ctor / op= (raw copy preserves the attachment).
   // Manifold-returning ops do *not* propagate it: derived Manifolds get a
-  // null ctx_. Eager ops (Status, Refine family) snapshot ctx_ to observe
-  // their in-call work; the snapshot uses an atomic load, which pins the
-  // Impl across long-running evaluations even if a concurrent op= reseats
+  // null ctx_. Eager ops (Status, Refine family, Hull, Minkowski) snapshot ctx_
+  // to observe their in-call work; the snapshot uses an atomic load, which pins
+  // the Impl across long-running evaluations even if a concurrent op= reseats
   // ctx_ mid-eval.
   //
   // Accessed only atomically (AtomicLoadShared/AtomicStoreShared): no const

@@ -17,6 +17,8 @@
 #ifndef MANIFOLD_NO_IOSTREAM
 #include <sstream>
 #endif
+#include <cstdio>
+#include <cstdlib>
 #include <vector>
 
 #include "conv.h"
@@ -48,16 +50,55 @@ ManifoldManifold* level_set(double (*sdf_context)(double, double, double,
   return to_c(new Manifold(result));
 }
 
-// Raw uninitialized storage for a T — callers must placement-new into it
-// before any use or before passing to manifold_destruct_* / manifold_delete_*.
-// Pairs with `delete T*`, which uses the plain `::operator delete` for
-// types with default alignment.
-template <typename T>
-T* alloc_raw() {
-  static_assert(alignof(T) <= __STDCPP_DEFAULT_NEW_ALIGNMENT__,
-                "over-aligned types need the aligned operator new/delete "
-                "pair; extend this helper if a binding type ever needs it");
-  return static_cast<T*>(::operator new(sizeof(T)));
+template <typename Mesh, typename Float, typename Index, typename Options>
+Mesh* meshgl_w_options(const Float* vert_props, size_t n_verts, size_t n_props,
+                       const Index* tri_verts, size_t n_tris,
+                       const Options* options) {
+  if (options != nullptr && options->struct_size < sizeof(Options)) {
+    std::fprintf(stderr,
+                 "manifold: options struct_size %zu is smaller than %zu\n",
+                 options->struct_size, sizeof(Options));
+    std::abort();
+  }
+
+  auto mesh = new Mesh();
+  mesh->numProp = n_props;
+  mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
+  mesh->triVerts = vector_of_array(tri_verts, n_tris * 3);
+  if (options == nullptr) return mesh;
+
+  if (options->halfedge_tangents != nullptr) {
+    mesh->halfedgeTangent =
+        vector_of_array(options->halfedge_tangents, n_tris * 3 * 4);
+  }
+  if (options->run_indices != nullptr) {
+    mesh->runIndex =
+        vector_of_array(options->run_indices, options->run_indices_length);
+  }
+  if (options->run_original_ids != nullptr) {
+    mesh->runOriginalID = vector_of_array(options->run_original_ids,
+                                          options->run_original_ids_length);
+  }
+  if (options->merge_from_vert != nullptr) {
+    mesh->mergeFromVert =
+        vector_of_array(options->merge_from_vert, options->merge_verts_length);
+  }
+  if (options->merge_to_vert != nullptr) {
+    mesh->mergeToVert =
+        vector_of_array(options->merge_to_vert, options->merge_verts_length);
+  }
+  if (options->run_transform != nullptr) {
+    mesh->runTransform =
+        vector_of_array(options->run_transform, options->run_transform_length);
+  }
+  if (options->run_flags != nullptr) {
+    mesh->runFlags =
+        vector_of_array(options->run_flags, options->run_flags_length);
+  }
+  if (options->face_id != nullptr) {
+    mesh->faceID = vector_of_array(options->face_id, n_tris);
+  }
+  return mesh;
 }
 }  // namespace
 
@@ -391,37 +432,8 @@ ManifoldMeshGL* manifold_meshgl_w_options(
     const float* vert_props, size_t n_verts, size_t n_props,
     const uint32_t* tri_verts, size_t n_tris,
     const ManifoldMeshGLOptions* options) {
-  auto mesh = new MeshGL();
-  mesh->numProp = n_props;
-  mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
-  mesh->triVerts = vector_of_array(tri_verts, n_tris * 3);
-
-  if (options->halfedge_tangents != nullptr) {
-    mesh->halfedgeTangent =
-        vector_of_array(options->halfedge_tangents, n_tris * 3 * 4);
-  }
-
-  if (options->run_indices != nullptr) {
-    mesh->runIndex =
-        vector_of_array(options->run_indices, options->run_indices_length);
-  }
-
-  if (options->run_original_ids != nullptr) {
-    mesh->runOriginalID = vector_of_array(options->run_original_ids,
-                                          options->run_original_ids_length);
-  }
-
-  if (options->merge_from_vert != nullptr) {
-    mesh->mergeFromVert =
-        vector_of_array(options->merge_from_vert, options->merge_verts_length);
-  }
-
-  if (options->merge_to_vert != nullptr) {
-    mesh->mergeToVert =
-        vector_of_array(options->merge_to_vert, options->merge_verts_length);
-  }
-
-  return to_c(mesh);
+  return to_c(meshgl_w_options<MeshGL>(vert_props, n_verts, n_props, tri_verts,
+                                       n_tris, options));
 }
 
 ManifoldMeshGL64* manifold_meshgl64(const double* vert_props, size_t n_verts,
@@ -451,37 +463,8 @@ ManifoldMeshGL64* manifold_meshgl64_w_options(
     const double* vert_props, size_t n_verts, size_t n_props,
     const uint64_t* tri_verts, size_t n_tris,
     const ManifoldMeshGL64Options* options) {
-  auto mesh = new MeshGL64();
-  mesh->numProp = n_props;
-  mesh->vertProperties = vector_of_array(vert_props, n_verts * n_props);
-  mesh->triVerts = vector_of_array(tri_verts, n_tris * 3);
-
-  if (options->halfedge_tangents != nullptr) {
-    mesh->halfedgeTangent =
-        vector_of_array(options->halfedge_tangents, n_tris * 3 * 4);
-  }
-
-  if (options->run_indices != nullptr) {
-    mesh->runIndex =
-        vector_of_array(options->run_indices, options->run_indices_length);
-  }
-
-  if (options->run_original_ids != nullptr) {
-    mesh->runOriginalID = vector_of_array(options->run_original_ids,
-                                          options->run_original_ids_length);
-  }
-
-  if (options->merge_from_vert != nullptr) {
-    mesh->mergeFromVert =
-        vector_of_array(options->merge_from_vert, options->merge_verts_length);
-  }
-
-  if (options->merge_to_vert != nullptr) {
-    mesh->mergeToVert =
-        vector_of_array(options->merge_to_vert, options->merge_verts_length);
-  }
-
-  return to_c(mesh);
+  return to_c(meshgl_w_options<MeshGL64>(vert_props, n_verts, n_props,
+                                         tri_verts, n_tris, options));
 }
 
 ManifoldManifold* manifold_of_meshgl(const ManifoldMeshGL* mesh) {
@@ -798,6 +781,9 @@ ManifoldManifold* manifold_set_properties(
     void (*fun)(double* new_prop, ManifoldVec3 position, const double* old_prop,
                 void* ctx),
     void* ctx) {
+  if (fun == nullptr) {
+    return to_c(new Manifold(from_c(m)->SetProperties(num_prop, nullptr)));
+  }
   // Bind function with context argument to one without
   using namespace std::placeholders;
   std::function<void(double*, ManifoldVec3, const double*)> f3 =
@@ -817,8 +803,8 @@ ManifoldManifold* manifold_calculate_curvature(const ManifoldManifold* m,
 }
 
 double manifold_min_gap(const ManifoldManifold* m,
-                        const ManifoldManifold* other, double searchLength) {
-  return from_c(m)->MinGap(*from_c(other), searchLength);
+                        const ManifoldManifold* other, double search_length) {
+  return from_c(m)->MinGap(*from_c(other), search_length);
 }
 
 ManifoldRayHitVec* manifold_ray_cast(const ManifoldManifold* m, double origin_x,

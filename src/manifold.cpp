@@ -219,10 +219,11 @@ Manifold& Manifold::operator=(const Manifold& other) {
 
 /**
  * Returns a copy of this Manifold with the given ExecutionContext attached.
- * The attachment is consumed by the next eager op on the result (Status,
- * Refine family). Deferred ops produce a result with no attached ctx; raw
- * copy preserves the attachment. See ExecutionContext in common.h for the
- * full model.
+ * The attachment is consumed by the eager ops on the result (Status, the
+ * Refine family, Hull, MinkowskiSum / MinkowskiDifference). Every other op
+ * that returns a Manifold produces a result with no attached ctx. A raw copy
+ * preserves the attachment. See ExecutionContext in common.h for the full
+ * model.
  */
 Manifold Manifold::WithContext(const ExecutionContext& ctx) const {
   Manifold result = *this;
