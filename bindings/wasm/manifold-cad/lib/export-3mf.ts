@@ -120,35 +120,34 @@ export interface Export3MFOptions extends ExportOptions {
  * Exported for unit tests.
  */
 export const toposort = (unsorted: Component3MF[]): Component3MF[] => {
-  // Create a local graph.  We will destroy it by removing edges and do not want
-  // to introduce any side effects.
-  let graph: Array<[Component3MF, Component3MF]> = [];
+  const byID = new Map(unsorted.map(component => [component.id, component]));
+  const children = new Map<Component3MF, Set<Component3MF>>();
+  const incoming = new Map(unsorted.map(component => [component, 0]));
   for (const parent of unsorted) {
+    const dependencies = new Set<Component3MF>();
     for (const {objectID} of parent.children) {
-      const child = unsorted.find(c => c.id === objectID);
-      if (child) graph.push([parent, child]);
+      const child = byID.get(objectID);
+      if (child) dependencies.add(child);
     }
+    children.set(parent, dependencies);
+    for (const child of dependencies)
+      incoming.set(child, incoming.get(child)! + 1);
   }
 
-  const isRoot = (child: Component3MF): boolean =>
-      graph.filter(([, c]) => c.id === child.id).length === 0;
-  const children = (parent: Component3MF): Component3MF[] =>
-      graph.filter(([p]) => p.id === parent.id).map(([, c]) => c);
-  const disown = (parent: Component3MF, child: Component3MF) => graph =
-      graph.filter(([p, c]) => !(p.id === parent.id && c.id === child.id));
-
-  const roots = unsorted.filter(isRoot);
-  const sorted = [];
-
-  let root;
-  while (root = roots.shift()) {  // For each root node...
-    sorted.unshift(root);         // ...insert before potential ancestors.
-    for (const child of children(root)) {  // For each child....
-      disown(root, child);  // ...remove the parent-child edge from the graph.
-      if (isRoot(child)) roots.push(child);  // Enqueue new root nodes.
+  const roots = unsorted.filter(component => incoming.get(component) === 0);
+  const sorted: Component3MF[] = [];
+  for (let next = 0; next < roots.length; ++next) {
+    const parent = roots[next];
+    sorted.push(parent);
+    for (const child of children.get(parent)!) {
+      const count = incoming.get(child)! - 1;
+      incoming.set(child, count);
+      if (count === 0) roots.push(child);
     }
   }
-
+  if (sorted.length !== unsorted.length)
+    throw new Error('3MF component graph contains a cycle');
+  sorted.reverse();
   return sorted;
 };
 
