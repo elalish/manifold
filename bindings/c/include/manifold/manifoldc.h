@@ -207,11 +207,15 @@ ManifoldManifold* manifold_as_original(const ManifoldManifold* m, int id);
 int manifold_is_empty(const ManifoldManifold* m);
 ManifoldError manifold_status(const ManifoldManifold* m);
 // Returns a copy of the manifold with the given ExecutionContext attached.
-// The attachment is consumed by the next eager op invoked on the result —
-// manifold_status, or one of the manifold_refine* family. Deferred ops
-// (Boolean operators, transforms, batch ops) ignore any attached ctx and
-// produce a result with no attached ctx. See ExecutionContext in common.h
-// for the full model.
+// Only manifold_status and the eager ops (the manifold_refine* family,
+// manifold_hull, manifold_minkowski_sum and manifold_minkowski_difference)
+// observe it, reporting progress and cancellation through it. Other queries
+// that force evaluation, such as manifold_volume or manifold_get_meshgl, do
+// not. Every other op that returns a manifold ignores the attached ctx and
+// returns a result with no attached ctx. Copies (manifold_copy and the
+// manifold_manifold_vec get/set/push_back calls) keep the attachment. See
+// Manifold::WithContext in manifold.h and ExecutionContext in common.h for
+// the full model.
 ManifoldManifold* manifold_with_context(const ManifoldManifold* m,
                                         const ManifoldExecutionContext* ctx);
 size_t manifold_num_vert(const ManifoldManifold* m);
@@ -252,9 +256,9 @@ int manifold_winding_number(const ManifoldManifold* m, double x, double y,
                             double z);
 
 // ExecutionContext: observe progress and request cancellation of a
-// long-running Manifold evaluation. Attach to a manifold via
-// manifold_with_context; subsequent operations on that manifold observe
-// the context. Safe to read/write from any thread. See the ExecutionContext
+// long-running Manifold evaluation. Attach it with manifold_with_context,
+// then call manifold_status or one of the eager ops listed there on the
+// result. Safe to read/write from any thread. See the ExecutionContext
 // class in common.h for full semantics (sticky cancel, per-boolean
 // granularity).
 ManifoldExecutionContext* manifold_execution_context(void);
