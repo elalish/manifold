@@ -377,8 +377,10 @@ function importTransform(doc: GLTFTransform.Document): GLTFTransform.Document {
     if (nodes.length === 1) {
       // If there's just one node, transform it in place.
       const [node] = nodes;
+      const [x, y, z] = node.getTranslation();
+      node.setTranslation([x * scale, -z * scale, y * scale]);
       node.setScale(node.getScale().map(n => n * scale) as GLTFTransform.vec3);
-      node.setRotation(multiplyQuat(node.getRotation(), rotate));
+      node.setRotation(multiplyQuat(rotate, node.getRotation()));
 
     } else {
       // If there's more than one node, create a parent node and transform that.
