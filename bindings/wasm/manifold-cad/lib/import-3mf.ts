@@ -236,6 +236,7 @@ function parse3mfXml(xml: string): GLTFTransform.Document {
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '',
+    removeNSPrefix: true,
     trimValues: true,
     parseTagValue: false,
     parseAttributeValue: false
