@@ -1194,6 +1194,10 @@ double Manifold::MinGap(const Manifold& other, double searchLength) const {
   auto intersect = *this ^ other;
   if (!intersect.IsEmpty()) return 0.0;
 
+  // Build query bounds for the smaller mesh and traverse the larger mesh's BVH.
+  if (impl->NumTri() < otherImpl->NumTri()) {
+    return otherImpl->MinGap(*impl, searchLength);
+  }
   return impl->MinGap(*otherImpl, searchLength);
 }
 
