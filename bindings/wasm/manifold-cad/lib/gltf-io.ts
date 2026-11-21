@@ -483,9 +483,14 @@ function writeProperties(
   const array = accessor.getArray()!;
   const size = accessor.getElementSize();
   const numVert = accessor.getCount();
+  const normalized = accessor.getNormalized();
+  const componentType = accessor.getComponentType();
   for (let i = 0; i < numVert; ++i) {
     for (let j = 0; j < size; ++j) {
-      vertProperties[numProp * i + offset + j] = array[i * size + j];
+      const value = array[i * size + j];
+      vertProperties[numProp * i + offset + j] = normalized ?
+          GLTFTransform.MathUtils.decodeNormalizedInt(value, componentType) :
+          value;
     }
   }
 }
