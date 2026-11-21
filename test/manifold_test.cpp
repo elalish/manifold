@@ -2013,6 +2013,115 @@ TEST(Manifold, Invalid) {
   EXPECT_EQ(Manifold::Revolve(empty_sq.ToPolygons()).Status(), invalid);
 }
 
+TEST(Manifold, NonFiniteCubeIsInvalid) {
+  const double inf = std::numeric_limits<double>::infinity();
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  for (double value : {nan, inf, -inf}) {
+    for (int axis = 0; axis < 3; ++axis) {
+      for (bool center : {false, true}) {
+        SCOPED_TRACE(testing::Message()
+                     << value << ", axis=" << axis << ", center=" << center);
+        vec3 size(1);
+        size[axis] = value;
+        const Manifold cube = Manifold::Cube(size, center);
+        EXPECT_EQ(cube.Status(), Manifold::Error::InvalidConstruction);
+        EXPECT_TRUE(cube.IsEmpty());
+      }
+    }
+  }
+}
+
+TEST(Manifold, NonFiniteSphereIsInvalid) {
+  const double inf = std::numeric_limits<double>::infinity();
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  for (double radius : {nan, inf, -inf}) {
+    for (int segments : {0, 8}) {
+      SCOPED_TRACE(testing::Message() << radius << ", segments=" << segments);
+      const Manifold sphere = Manifold::Sphere(radius, segments);
+      EXPECT_EQ(sphere.Status(), Manifold::Error::InvalidConstruction);
+      EXPECT_TRUE(sphere.IsEmpty());
+    }
+  }
+}
+
+TEST(Manifold, NonFiniteCylinderIsInvalid) {
+  const double inf = std::numeric_limits<double>::infinity();
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const auto expectInvalid = [](const Manifold& cylinder) {
+    EXPECT_EQ(cylinder.Status(), Manifold::Error::InvalidConstruction);
+    EXPECT_TRUE(cylinder.IsEmpty());
+  };
+  for (double value : {nan, inf, -inf}) {
+    for (bool center : {false, true}) {
+      SCOPED_TRACE(testing::Message() << value << ", center=" << center);
+      EXPECT_NO_THROW(
+          expectInvalid(Manifold::Cylinder(value, 1, 1, 8, center)));
+      EXPECT_NO_THROW(
+          expectInvalid(Manifold::Cylinder(1, value, 1, 8, center)));
+      EXPECT_NO_THROW(
+          expectInvalid(Manifold::Cylinder(1, 1, value, 8, center)));
+      EXPECT_NO_THROW(
+          expectInvalid(Manifold::Cylinder(1, 0, value, 8, center)));
+    }
+  }
+}
+
+TEST(Manifold, NonFiniteRevolveCoordinatesAreInvalid) {
+  const double inf = std::numeric_limits<double>::infinity();
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const SimplePolygon square{{1, 0}, {2, 0}, {2, 1}, {1, 1}};
+  for (double value : {nan, inf, -inf}) {
+    for (int axis : {0, 1}) {
+      for (int segments : {0, 16}) {
+        for (double degrees : {180.0, -180.0, 360.0}) {
+          SCOPED_TRACE(testing::Message()
+                       << value << ", axis=" << axis
+                       << ", segments=" << segments << ", degrees=" << degrees);
+          SimplePolygon invalid = square;
+          invalid[1][axis] = value;
+          const Manifold result =
+              Manifold::Revolve({invalid}, segments, degrees);
+          EXPECT_EQ(result.Status(), Manifold::Error::InvalidConstruction);
+          EXPECT_TRUE(result.IsEmpty());
+        }
+      }
+    }
+    // Validate before clipping too: a contour entirely left of the axis
+    // must not conceal a non-finite coordinate beside a valid contour.
+    SimplePolygon clipped{{-2, 0}, {-1, 0}, {-1, 1}, {-2, 1}};
+    clipped[1].y = value;
+    EXPECT_EQ(Manifold::Revolve({square, clipped}, 16).Status(),
+              Manifold::Error::InvalidConstruction);
+  }
+}
+
+TEST(Manifold, RevolveStillIgnoresShortContours) {
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const double inf = std::numeric_limits<double>::infinity();
+  const SimplePolygon square{{1, 0}, {2, 0}, {2, 1}, {1, 1}};
+  for (double degrees : {180.0, -180.0, 360.0}) {
+    const Manifold expected = Manifold::Revolve({square}, 16, degrees);
+    const Manifold result = Manifold::Revolve(
+        {square, {}, {{nan, inf}}, {{inf, nan}, {-inf, nan}}}, 16, degrees);
+    EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+    EXPECT_DOUBLE_EQ(result.Volume(), expected.Volume());
+    EXPECT_EQ(result.NumVert(), expected.NumVert());
+    EXPECT_EQ(result.NumTri(), expected.NumTri());
+  }
+}
+
+TEST(Manifold, CylinderFiniteNegativeTopRadiusUsesBottomRadius) {
+  const Manifold expected = Manifold::Cylinder(2, 3, 3, 8);
+  for (double radiusHigh : {-1.0, -2.0}) {
+    const Manifold cylinder = Manifold::Cylinder(2, 3, radiusHigh, 8);
+    EXPECT_EQ(cylinder.Status(), Manifold::Error::NoError);
+    EXPECT_FALSE(cylinder.IsEmpty());
+    EXPECT_DOUBLE_EQ(cylinder.Volume(), expected.Volume());
+    EXPECT_EQ(cylinder.NumVert(), expected.NumVert());
+    EXPECT_EQ(cylinder.NumTri(), expected.NumTri());
+  }
+}
+
 TEST(Manifold, MergeDegenerates) {
   MeshGL cube = Manifold::Cube(vec3(1), true).GetMeshGL();
   MeshGL squash;
