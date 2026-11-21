@@ -3126,6 +3126,29 @@ TEST(CrossSection, HullDegenerateInputIsEmpty) {
   EXPECT_TRUE(CrossSection::Hull(SimplePolygon{{0, 0}, {1, 1}}).IsEmpty());
 }
 
+TEST(CrossSection, HullRawContoursPreservesInput) {
+  const Polygons contours = {
+      {}, {{4, 3}, {0, 0}, {2, 1}, {0, 0}}, {}, {{0, 3}, {4, 0}, {2, 2}}};
+  const Polygons original = contours;
+  const CrossSection hull = CrossSection::Hull(contours);
+  EXPECT_EQ(hull.NumVert(), 4);
+  EXPECT_DOUBLE_EQ(hull.Area(), 12.0);
+  EXPECT_EQ(
+      hull.ToPolygons(),
+      CrossSection::Hull(
+          SimplePolygon{{4, 3}, {0, 0}, {2, 1}, {0, 0}, {0, 3}, {4, 0}, {2, 2}})
+          .ToPolygons());
+  EXPECT_EQ(contours, original);
+
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  for (const Polygons& degenerate :
+       {Polygons{}, Polygons{{}, {}}, Polygons{{{0, 0}}, {{1, 1}}},
+        Polygons{{{0, 0}, {2, 2}}, {}, {{1, 1}, {0, 0}}},
+        Polygons{{{0, 0}, {1, 0}}, {{nan, 1}}}}) {
+    EXPECT_TRUE(CrossSection::Hull(degenerate).IsEmpty());
+  }
+}
+
 TEST(CrossSection, TransformNonFiniteIsNoOp) {
   const double nan = std::numeric_limits<double>::quiet_NaN();
   CrossSection sq = CrossSection::Square({10, 10}, true);
