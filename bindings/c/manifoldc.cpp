@@ -781,6 +781,9 @@ ManifoldManifold* manifold_set_properties(
     void (*fun)(double* new_prop, ManifoldVec3 position, const double* old_prop,
                 void* ctx),
     void* ctx) {
+  if (fun == nullptr) {
+    return to_c(new Manifold(from_c(m)->SetProperties(num_prop, nullptr)));
+  }
   // Bind function with context argument to one without
   using namespace std::placeholders;
   std::function<void(double*, ManifoldVec3, const double*)> f3 =

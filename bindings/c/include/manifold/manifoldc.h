@@ -231,6 +231,7 @@ double manifold_volume(const ManifoldManifold* m);
 int manifold_get_circular_segments(double radius);
 int manifold_original_id(const ManifoldManifold* m);
 uint32_t manifold_reserve_ids(uint32_t n);
+// A NULL fun sets the new properties to zero.
 ManifoldManifold* manifold_set_properties(
     const ManifoldManifold* m, int num_prop,
     void (*fun)(double* new_prop, ManifoldVec3 position, const double* old_prop,
