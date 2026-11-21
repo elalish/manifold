@@ -510,6 +510,8 @@ void Manifold::Impl::FillRetainedVerts(Vec<Barycentric>& vertBary) const {
  */
 Vec<Barycentric> Manifold::Impl::Subdivide(
     std::function<int(vec3, vec4, vec4)> edgeDivisions, bool keepInterior) {
+  // halfedge_ can still share storage with the input. Keep it read-only until
+  // CreateHalfedges replaces it below; element setters do not check uniqueness.
   Vec<TmpEdge> edges = CreateTmpEdges(halfedge_);
   const int numVert = NumVert();
   const int numEdge = edges.size();
