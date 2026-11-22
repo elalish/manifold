@@ -66,6 +66,19 @@ export function setMinCircularAngle(angle: number): void;
 export function setMinCircularEdgeLength(length: number): void;
 
 /**
+ * Returns the configured minimum angle in degrees between circular segments.
+ * This is the angle constraint, even when {@link setCircularSegments} overrides
+ * it.
+ */
+export function getMinCircularAngle(): number;
+
+/**
+ * Returns the configured minimum length of circular segments. This is the
+ * length constraint, even when {@link setCircularSegments} overrides it.
+ */
+export function getMinCircularEdgeLength(): number;
+
+/**
  * Sets the default number of circular segments for the
  * {@link CrossSection.circle}, {@link Manifold.cylinder}, {@link
  * Manifold.sphere}, and
@@ -993,21 +1006,9 @@ export class Manifold {
   // Topological Operations
 
   /**
-   * Constructs a new manifold from a list of other manifolds. This is a purely
-   * topological operation, so care should be taken to avoid creating
-   * overlapping results. It is the inverse operation of Decompose().
-   *
-   * @param manifolds A list of Manifolds to lazy-union together.
-   * @deprecated Please use {@link add} or {@link union} instead.
-   * @group Constructors
-   */
-  static compose(manifolds: readonly Manifold[]): Manifold;
-
-  /**
    * This operation returns a vector of Manifolds that are topologically
    * disconnected. If everything is connected, the vector is length one,
-   * containing a copy of the original. It is the inverse operation of
-   * Compose().
+   * containing a copy of the original.
    *
    * @group Constructors
    */
@@ -1416,8 +1417,8 @@ export class Mesh {
    * Behavior is undefined when a single propVert is shared by triangles
    * from runs that disagree - the slot has one interpretation, and a
    * transform rotates it for hasNormals=true and clobbers any
-   * hasNormals=false sharer. Standard `calculateNormals` / boolean /
-   * compose outputs never produce that shape.
+   * hasNormals=false sharer. Standard `calculateNormals` and boolean
+   * outputs never produce that shape.
    *
    * @param run triangle run index.
    */

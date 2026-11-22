@@ -217,7 +217,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_LevelSet", &man_js::LevelSet);
   function("_Merge", &js::Merge);
   function("_ReserveIDs", &Manifold::ReserveIDs);
-  function("_manifoldCompose", &man_js::UnionN);
   function("_manifoldUnionN", &man_js::UnionN);
   function("_manifoldDifferenceN", &man_js::DifferenceN);
   function("_manifoldIntersectionN", &man_js::IntersectionN);
@@ -231,6 +230,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("getRelativePrecision", &Quality::GetRelativePrecision);
   function("setMinCircularAngle", &Quality::SetMinCircularAngle);
   function("setMinCircularEdgeLength", &Quality::SetMinCircularEdgeLength);
+  function("getMinCircularAngle", &Quality::GetMinCircularAngle);
+  function("getMinCircularEdgeLength", &Quality::GetMinCircularEdgeLength);
   function("setCircularSegments", &Quality::SetCircularSegments);
   function("getCircularSegments", &Quality::GetCircularSegments);
   function("resetToCircularDefaults", &Quality::ResetToDefaults);

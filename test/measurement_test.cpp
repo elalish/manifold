@@ -228,6 +228,32 @@ TEST(Measurement, MinGapCubeSphereOverlapping) {
   EXPECT_FLOAT_EQ(distance, 0);
 }
 
+TEST(Measurement, MinGapUnequalResolutionOperands) {
+  const Manifold cube = Manifold::Cube();
+  for (int segments : {16, 64}) {
+    const Manifold sphere =
+        Manifold::Sphere(1, segments).Translate({4, 0.5, 0.5});
+    ASSERT_LT(cube.NumTri(), sphere.NumTri());
+    for (double limit : {0.0, -0.25, 1.0, 2.01, 3.0}) {
+      const double expected = std::min(2.0, std::abs(limit));
+      EXPECT_NEAR(cube.MinGap(sphere, limit), expected, 1e-12);
+      EXPECT_NEAR(sphere.MinGap(cube, limit), expected, 1e-12);
+    }
+  }
+}
+
+TEST(Measurement, MinGapRetessellatedOperands) {
+  const Manifold cube = Manifold::Cube();
+  for (int divisions : {2, 8}) {
+    const Manifold dense = cube.Refine(divisions).Translate({3, 4, 0});
+    ASSERT_LT(cube.NumTri(), dense.NumTri());
+    // Retessellation leaves the cube unchanged: its closest corners are at
+    // axis separations 2 and 3, regardless of which mesh supplies the queries.
+    EXPECT_NEAR(cube.MinGap(dense, 4), std::sqrt(13.0), 1e-12);
+    EXPECT_NEAR(dense.MinGap(cube, 4), std::sqrt(13.0), 1e-12);
+  }
+}
+
 TEST(Measurement, MinGapSphereSphere) {
   auto a = Manifold::Sphere(1);
   auto b = Manifold::Sphere(1).Translate({2, 2, 0});
@@ -420,6 +446,52 @@ TEST(Measurement, TriangleDistanceOverlapping) {
   float distance = DistanceTriangleTriangleSquared(p, q);
 
   EXPECT_FLOAT_EQ(distance, 0);
+}
+
+TEST(Measurement, NearParallelEdgeDistance) {
+  for (double angle : {1e-4, 1e-6, 1e-8}) {
+    for (double scale : {1.0, 1e6}) {
+      SCOPED_TRACE(angle);
+      SCOPED_TRACE(scale);
+      const double gap = angle / 10;
+      const vec3 p = vec3(-0.5, 0, 0) * scale;
+      const vec3 a = vec3(1, 0, 0) * scale;
+      const vec3 q = vec3(-0.5, -angle / 2, gap) * scale;
+      const vec3 b = vec3(1, angle, 0) * scale;
+      vec3 x, y;
+      // The two segments cross at their midpoints when projected onto XY.
+      EdgeEdgeDist(x, y, p, a, q, b);
+      EXPECT_NEAR(la::length(x - y) / (gap * scale), 1.0, 1e-9);
+      EXPECT_NEAR(x.x / scale, 0.0, 1e-9);
+      EXPECT_NEAR(y.x / scale, 0.0, 1e-9);
+      EdgeEdgeDist(y, x, q, b, p, a);
+      EXPECT_NEAR(la::length(x - y) / (gap * scale), 1.0, 1e-9);
+    }
+  }
+}
+
+TEST(Measurement, MinGapNearParallelEdges) {
+  for (double scale : {1.0, 1e6}) {
+    SCOPED_TRACE(scale);
+    const double angle = 1e-8;
+    const double gap = angle / 10;
+    // One tetrahedron lies at z <= 0, the other at z >= gap. Their boundary
+    // edges cross in XY at (0, 0), so the exact solid-to-solid gap is gap.
+    const Manifold a =
+        Manifold::Hull(std::vector<vec3>{
+                           {-0.5, 0, 0}, {0.5, 0, 0}, {0, 1, -1}, {0, -1, -1}})
+            .Scale(vec3(scale));
+    const Manifold b = Manifold::Hull(std::vector<vec3>{{-0.5, -angle / 2, gap},
+                                                        {0.5, angle / 2, gap},
+                                                        {0, 1, 1 + gap},
+                                                        {0, -1, 1 + gap}})
+                           .Scale(vec3(scale));
+    ASSERT_EQ(a.Status(), Manifold::Error::NoError);
+    ASSERT_EQ(b.Status(), Manifold::Error::NoError);
+    EXPECT_NEAR(a.MinGap(b, 1e-3 * scale) / (gap * scale), 1.0, 1e-7);
+    EXPECT_NEAR(b.MinGap(a, 1e-3 * scale) / (gap * scale), 1.0, 1e-7);
+    EXPECT_NEAR(a.MinGap(b, gap * scale / 2) / (gap * scale), 0.5, 1e-7);
+  }
 }
 
 // A tall box where the query point is far below the top face. The +Z ray from

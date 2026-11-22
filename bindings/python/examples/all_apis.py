@@ -72,7 +72,6 @@ def all_manifold():
     m = m.calculate_curvature(4, 5)
     m = m.calculate_normals()
     m = m.smooth_by_normals()
-    m = Manifold.compose([m, m.translate((5, 0, 0))])
     m = Manifold.cube((1, 1, 1))
     m = Manifold.cylinder(1, 1)
     ms = m.decompose()

@@ -2655,6 +2655,64 @@ TEST(CrossSection, NonFiniteInputReturnsEmpty) {
   EXPECT_TRUE(constructed.IsEmpty());
 }
 
+TEST(CrossSection, NonFiniteCircleIsEmpty) {
+  const double inf = std::numeric_limits<double>::infinity();
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const CrossSection valid = CrossSection::Square({2, 3});
+  for (double radius : {nan, inf, -inf}) {
+    for (int segments : {0, 8}) {
+      SCOPED_TRACE(testing::Message() << radius << ", segments=" << segments);
+      const CrossSection circle = CrossSection::Circle(radius, segments);
+      EXPECT_TRUE(circle.IsEmpty());
+      EXPECT_EQ(circle.NumVert(), 0);
+      EXPECT_DOUBLE_EQ(circle.Area(), 0);
+      EXPECT_DOUBLE_EQ((valid + circle).Area(), 6);
+    }
+  }
+}
+
+TEST(CrossSection, NonFiniteSquareIsEmpty) {
+  const double inf = std::numeric_limits<double>::infinity();
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const CrossSection valid = CrossSection::Square({2, 3});
+  for (double value : {nan, inf, -inf}) {
+    for (int axis = 0; axis < 2; ++axis) {
+      for (bool center : {false, true}) {
+        SCOPED_TRACE(testing::Message()
+                     << value << ", axis=" << axis << ", center=" << center);
+        vec2 size(1);
+        size[axis] = value;
+        const CrossSection square = CrossSection::Square(size, center);
+        EXPECT_TRUE(square.IsEmpty());
+        EXPECT_EQ(square.NumVert(), 0);
+        EXPECT_DOUBLE_EQ(square.Area(), 0);
+        EXPECT_DOUBLE_EQ((valid + square).Area(), 6);
+      }
+    }
+  }
+}
+
+TEST(CrossSection, NonFiniteRectangleIsEmpty) {
+  const double inf = std::numeric_limits<double>::infinity();
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const CrossSection valid = CrossSection::Square({2, 3});
+  for (double value : {nan, inf, -inf}) {
+    for (int axis = 0; axis < 2; ++axis) {
+      for (bool upper : {false, true}) {
+        SCOPED_TRACE(testing::Message()
+                     << value << ", axis=" << axis << ", upper=" << upper);
+        Rect rect({0, 0}, {1, 1});
+        (upper ? rect.max : rect.min)[axis] = value;
+        const CrossSection section(rect);
+        EXPECT_TRUE(section.IsEmpty());
+        EXPECT_EQ(section.NumVert(), 0);
+        EXPECT_DOUBLE_EQ(section.Area(), 0);
+        EXPECT_DOUBLE_EQ((valid + section).Area(), 6);
+      }
+    }
+  }
+}
+
 // Position-inclusive eps scales with the absolute coordinate (matching
 // Boolean3), so Offset is intentionally NOT invariant under a large
 // translation: at 1e12 the round-join arc falls below eps and collapses, while
@@ -3066,6 +3124,29 @@ TEST(CrossSection, HullDegenerateInputIsEmpty) {
   EXPECT_TRUE(
       CrossSection::Hull(SimplePolygon{{5, 5}, {5, 5}, {5, 5}}).IsEmpty());
   EXPECT_TRUE(CrossSection::Hull(SimplePolygon{{0, 0}, {1, 1}}).IsEmpty());
+}
+
+TEST(CrossSection, HullRawContoursPreservesInput) {
+  const Polygons contours = {
+      {}, {{4, 3}, {0, 0}, {2, 1}, {0, 0}}, {}, {{0, 3}, {4, 0}, {2, 2}}};
+  const Polygons original = contours;
+  const CrossSection hull = CrossSection::Hull(contours);
+  EXPECT_EQ(hull.NumVert(), 4);
+  EXPECT_DOUBLE_EQ(hull.Area(), 12.0);
+  EXPECT_EQ(
+      hull.ToPolygons(),
+      CrossSection::Hull(
+          SimplePolygon{{4, 3}, {0, 0}, {2, 1}, {0, 0}, {0, 3}, {4, 0}, {2, 2}})
+          .ToPolygons());
+  EXPECT_EQ(contours, original);
+
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  for (const Polygons& degenerate :
+       {Polygons{}, Polygons{{}, {}}, Polygons{{{0, 0}}, {{1, 1}}},
+        Polygons{{{0, 0}, {2, 2}}, {}, {{1, 1}, {0, 0}}},
+        Polygons{{{0, 0}, {1, 0}}, {{nan, 1}}}}) {
+    EXPECT_TRUE(CrossSection::Hull(degenerate).IsEmpty());
+  }
 }
 
 TEST(CrossSection, TransformNonFiniteIsNoOp) {

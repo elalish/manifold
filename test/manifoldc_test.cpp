@@ -19,6 +19,19 @@ TEST(CBIND, version) {
   EXPECT_EQ(version[2], MANIFOLD_VERSION_PATCH);
 }
 
+TEST(CBIND, circular_constraints_restore) {
+  const double angle = manifold_get_min_circular_angle();
+  const double length = manifold_get_min_circular_edge_length();
+  manifold_set_min_circular_angle(22.5);
+  manifold_set_min_circular_edge_length(0.125);
+  EXPECT_DOUBLE_EQ(manifold_get_min_circular_angle(), 22.5);
+  EXPECT_DOUBLE_EQ(manifold_get_min_circular_edge_length(), 0.125);
+  manifold_set_min_circular_angle(angle);
+  manifold_set_min_circular_edge_length(length);
+  EXPECT_DOUBLE_EQ(manifold_get_min_circular_angle(), angle);
+  EXPECT_DOUBLE_EQ(manifold_get_min_circular_edge_length(), length);
+}
+
 TEST(CBIND, meshgl_no_props) {
   const float vertProps[] = {0, 0, 0};
   ManifoldMeshGL* mesh = manifold_meshgl(vertProps, 1, 0, NULL, 0);
@@ -390,13 +403,13 @@ TEST(CBIND, extrude) {
   manifold_delete_polygons(polys);
 }
 
-TEST(CBIND, compose_decompose) {
+TEST(CBIND, batch_boolean_decompose) {
   ManifoldManifold* s1 = manifold_sphere(1.0, 100);
   ManifoldManifold* s2 = manifold_translate(s1, 2., 2., 2.);
   ManifoldManifoldVec* ss = manifold_manifold_vec(2);
   manifold_manifold_vec_set(ss, 0, s1);
   manifold_manifold_vec_set(ss, 1, s2);
-  ManifoldManifold* composed = manifold_compose(ss);
+  ManifoldManifold* composed = manifold_batch_boolean(ss, MANIFOLD_ADD);
 
   ManifoldManifoldVec* decomposed = manifold_decompose(composed);
 

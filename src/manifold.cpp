@@ -96,6 +96,12 @@ void Quality::SetMinCircularAngle(double angle) {
 }
 
 /**
+ * Returns the configured minimum angle in degrees between circular segments.
+ * This is the angle constraint, even when SetCircularSegments() overrides it.
+ */
+double Quality::GetMinCircularAngle() { return circularAngle_; }
+
+/**
  * Sets a length constraint the default number of circular segments for the
  * CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and
  * Manifold::Revolve() constructors. The number of segments will be rounded up
@@ -108,6 +114,12 @@ void Quality::SetMinCircularEdgeLength(double length) {
   if (!(length > 0)) return;  // also rejects NaN
   circularEdgeLength_ = length;
 }
+
+/**
+ * Returns the configured minimum length of circular segments. This is the
+ * length constraint, even when SetCircularSegments() overrides it.
+ */
+double Quality::GetMinCircularEdgeLength() { return circularEdgeLength_; }
 
 /**
  * Sets the default number of circular segments for the
@@ -912,15 +924,15 @@ Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
  * Perform the given boolean operation on a list of Manifolds. In case of
  * Subtract, all Manifolds in the tail are differenced from the head. The
  * empty-input case returns a default-constructed Manifold; the
- * single-input case returns the input unchanged (a no-op identity, including
- * any attached ExecutionContext on that single input).
+ * single-input case returns the input unchanged, without any attached
+ * ExecutionContext.
  */
 Manifold Manifold::BatchBoolean(const std::vector<Manifold>& manifolds,
                                 OpType op) {
   if (manifolds.size() == 0)
     return Manifold();
   else if (manifolds.size() == 1)
-    return manifolds[0];
+    return Manifold(manifolds[0].LoadPNode());
   std::vector<std::shared_ptr<CsgNode>> children;
   children.reserve(manifolds.size());
   for (const auto& m : manifolds) children.push_back(m.LoadPNode());
@@ -1160,6 +1172,10 @@ double Manifold::MinGap(const Manifold& other, double searchLength) const {
   auto intersect = *this ^ other;
   if (!intersect.IsEmpty()) return 0.0;
 
+  // Build query bounds for the smaller mesh and traverse the larger mesh's BVH.
+  if (impl->NumTri() < otherImpl->NumTri()) {
+    return otherImpl->MinGap(*impl, searchLength);
+  }
   return impl->MinGap(*otherImpl, searchLength);
 }
 

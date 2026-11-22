@@ -155,7 +155,7 @@ void MergeMeshGLP(MeshGLP<Precision, I>& mesh, Precision requestedTolerance) {
 
   const auto numOpenVert = openVerts.size();
 
-  Vec<Precision> vertPropD(mesh.vertProperties);
+  const VecView<const Precision> vertPropD(mesh.vertProperties);
   Box bBox;
   for (const int i : {0, 1, 2}) {
     auto iPos =

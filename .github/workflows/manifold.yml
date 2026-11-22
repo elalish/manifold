@@ -605,6 +605,18 @@ jobs:
     - uses: actions/checkout@v7
     - uses: DeterminateSystems/nix-installer-action@main
     - uses: DeterminateSystems/magic-nix-cache-action@main
+    # One cache download has taken over 20 minutes. Fetch the build inputs
+    # on their own so that phase can be retried. Fully fetched store paths
+    # carry over to the next attempt, but an interrupted one starts over.
+    - name: Fetch build inputs
+      run: |
+        for attempt in 1 2 3; do
+          if timeout --kill-after=30s 6m nix develop '.?submodules=1#${{matrix.variant}}' --command true; then
+            exit 0
+          fi
+          echo "Fetch attempt $attempt failed or stalled"
+        done
+        exit 1
     - run: nix build -L '.?submodules=1#${{matrix.variant}}'
 
   determinism_check:

@@ -191,7 +191,6 @@ ManifoldManifold* manifold_extrude(const ManifoldPolygons* cs, double height,
 ManifoldManifold* manifold_revolve(const ManifoldPolygons* cs,
                                    int circular_segments,
                                    double revolve_degrees);
-ManifoldManifold* manifold_compose(const ManifoldManifoldVec* ms);
 ManifoldManifoldVec* manifold_decompose(const ManifoldManifold* m);
 
 // id: the original ID to assign; pass a negative value (e.g. -1) for a new one.
@@ -426,6 +425,8 @@ void manifold_set_relative_precision(double precision);
 double manifold_get_relative_precision();
 void manifold_set_min_circular_angle(double degrees);
 void manifold_set_min_circular_edge_length(double length);
+double manifold_get_min_circular_angle();
+double manifold_get_min_circular_edge_length();
 void manifold_set_circular_segments(int number);
 void manifold_reset_to_circular_defaults();
 

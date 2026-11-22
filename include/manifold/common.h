@@ -674,6 +674,8 @@ class Quality {
   static void SetMinCircularEdgeLength(double length);
   static void SetCircularSegments(int number);
   static double GetRelativePrecision();
+  static double GetMinCircularAngle();
+  static double GetMinCircularEdgeLength();
   static int GetCircularSegments(double radius);
   static void ResetToDefaults();
 };
@@ -705,9 +707,6 @@ struct ExecutionParams {
   /// Suppresses printed errors regarding CW triangles. Has no effect if
   /// processOverlaps is true.
   bool suppressErrors = false;
-  /// Deprecated! This value no longer has any effect, as cleanup now only
-  /// occurs on intersected triangles.
-  bool cleanupTriangles = true;
   /// Verbose level:
   /// - 0 for no verbose output
   /// - 1 for Boolean debug dumps on failures and invalid intermediate meshes.

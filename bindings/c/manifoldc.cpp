@@ -508,11 +508,6 @@ ManifoldManifold* manifold_revolve(const ManifoldPolygons* cs,
   return to_c(new Manifold(m));
 }
 
-ManifoldManifold* manifold_compose(const ManifoldManifoldVec* ms) {
-  auto composed = Manifold::BatchBoolean(*from_c(ms), OpType::Add);
-  return to_c(new Manifold(composed));
-}
-
 ManifoldManifoldVec* manifold_decompose(const ManifoldManifold* m) {
   return to_c(new std::vector<Manifold>(from_c(m)->Decompose()));
 }
@@ -914,6 +909,14 @@ void manifold_set_min_circular_angle(double degrees) {
 
 void manifold_set_min_circular_edge_length(double length) {
   Quality::SetMinCircularEdgeLength(length);
+}
+
+double manifold_get_min_circular_angle() {
+  return Quality::GetMinCircularAngle();
+}
+
+double manifold_get_min_circular_edge_length() {
+  return Quality::GetMinCircularEdgeLength();
 }
 
 void manifold_set_circular_segments(int number) {
