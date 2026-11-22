@@ -674,7 +674,6 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       // Single topological unit needs 2 faces added to be split
       const int newVert = vertPos_.size();
       vertPos_.push_back(vertPos_[endVert]);
-      if (vertNormal_.size() > 0) vertNormal_.push_back(vertNormal_[endVert]);
       current = halfedge_.Pair(NextHalfedge(current));
       const int opposite = halfedge_.Pair(nextEdge);
 
@@ -715,7 +714,6 @@ void Manifold::Impl::DedupeEdge(const int edge) {
     // Separate topological unit needs no new faces to be split
     const int newVert = vertPos_.size();
     vertPos_.push_back(vertPos_[endVert]);
-    if (vertNormal_.size() > 0) vertNormal_.push_back(vertNormal_[endVert]);
 
     ForVert(NextHalfedge(current), [this, newVert](int e) {
       halfedge_.SetStart(e, newVert);
@@ -738,7 +736,6 @@ void Manifold::Impl::DedupeEdge(const int edge) {
     // Split the pinched vert the previous split created.
     const int newVert = vertPos_.size();
     vertPos_.push_back(vertPos_[endVert]);
-    if (vertNormal_.size() > 0) vertNormal_.push_back(vertNormal_[endVert]);
 
     ForVert(NextHalfedge(current), [this, newVert](int e) {
       halfedge_.SetStart(e, newVert);
@@ -803,9 +800,6 @@ bool Manifold::Impl::SplitQuad(int edge, bool nextDiag) {
     return false;
   const int m = vertPos_.size();
   vertPos_.push_back(ps + t * edgeVec);
-  if (vertNormal_.size() > 0)
-    vertNormal_.push_back(SafeNormalize(vertNormal_[edgeStart] * (1 - t) +
-                                        vertNormal_[edgeEnd] * t));
 
   // Gather everything needed before halfedges are overwritten.
   const int extC0 = halfedge_.Pair(prevP0);  // c -> edgeEnd
