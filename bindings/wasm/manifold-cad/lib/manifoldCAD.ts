@@ -39,7 +39,6 @@ import type {ManifoldToplevel} from 'manifold-3d';
 
 import * as debug from './debug.ts';
 import {garbageCollectFunction, garbageCollectManifold} from './garbage-collector.ts';
-import {applyLevelOfDetail} from './level-of-detail.ts';
 import * as material from './material.ts';
 import {getManifoldModule} from './wasm.ts';
 
@@ -47,12 +46,12 @@ export {getAnimationDuration, getAnimationFPS, getAnimationMode, setMorphEnd, se
 export type {GLTFAttribute, GLTFMaterial} from './gltf-node.ts';
 export {CrossSectionGLTFNode, GLTFNode, VisualizationGLTFNode} from './gltf-node.ts';
 export {importManifold, importModel} from './import-model.ts';
-export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from './level-of-detail.ts';
 
 const manifoldWasm: ManifoldToplevel =
-    applyLevelOfDetail(garbageCollectManifold(await getManifoldModule()));
+    garbageCollectManifold(await getManifoldModule());
 
-const {Mesh, Manifold, CrossSection, triangulate} = manifoldWasm;
+const {Mesh, Manifold, CrossSection, triangulate, segmentsFor, forDivisions} =
+    manifoldWasm;
 
 // These methods are not intrinsic to manifold itself, but provided by the scene
 // builder.
@@ -71,6 +70,8 @@ export {
   Manifold,
   CrossSection,
   triangulate,
+  segmentsFor,
+  forDivisions,
   show,
   only,
   setMaterial,
