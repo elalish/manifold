@@ -562,6 +562,17 @@ TEST(CBIND, ray_cast) {
   EXPECT_EQ(manifold_ray_hit_vec_length(miss), 0);
   manifold_delete_ray_hit_vec(miss);
 
+  ManifoldManifold* orig = manifold_as_original(cube, -1);
+  ManifoldRayHitVec* origHits =
+      manifold_ray_cast(orig, 0.0, 0.0, -5.0, 0.0, 0.0, 5.0);
+  ASSERT_EQ(manifold_ray_hit_vec_length(origHits), 2);
+  ManifoldRayHit h2 = manifold_ray_hit_vec_get(origHits, 0);
+  EXPECT_EQ(h2.original_id, (uint32_t)manifold_original_id(orig));
+  EXPECT_GT(h2.original_id, 0u);
+  EXPECT_EQ(h2.face_id, 0u);
+  manifold_delete_ray_hit_vec(origHits);
+  manifold_delete_manifold(orig);
+
   manifold_delete_manifold(cube);
 }
 

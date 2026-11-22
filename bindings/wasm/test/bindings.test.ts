@@ -107,6 +107,15 @@ suite('Manifold Bindings', () => {
     expect(hits[1].crossing).toEqual(-1);
   });
 
+  test('rayCast reports originalID and faceID', () => {
+    const cube = manifoldModule.Manifold.cube([1, 1, 1], true).asOriginal(-1);
+    const hits = cube.rayCast([0, 0, -5], [0, 0, 5]);
+    expect(hits).toHaveLength(2);
+    expect(hits[0].originalID).toEqual(cube.originalID());
+    expect(hits[0].originalID).toBeGreaterThan(0);
+    expect(hits[0].faceID).toEqual(0);
+  });
+
   test('rayCast returns empty on miss', () => {
     const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
     const hits = cube.rayCast([10, 10, -5], [10, 10, 5]);
