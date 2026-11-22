@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 
 #include "atomic_compat.h"
@@ -73,9 +74,11 @@ static std::atomic<double> circularEdgeLength_ = DEFAULT_LENGTH;
  *
  * @param p The relative precision value. The default is 1e-12 for double
  * precision, and smaller values will be clamped to this minimum.
+ * NaN and positive infinity leave the previous precision unchanged.
  */
 void Quality::SetRelativePrecision(double p) {
-  relativePrecision_ = std::max(p, kPrecision);
+  const double precision = std::max(p, kPrecision);
+  if (std::isfinite(precision)) relativePrecision_ = precision;
 }
 
 double Quality::GetRelativePrecision() { return relativePrecision_; }

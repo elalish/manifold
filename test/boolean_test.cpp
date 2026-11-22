@@ -1235,6 +1235,49 @@ TEST(Boolean, Precision3) {
   Quality::ResetToDefaults();
 }
 
+TEST(Boolean, RelativePrecisionRejectsNonFinite) {
+  struct RestorePrecision {
+    double value = Quality::GetRelativePrecision();
+    ~RestorePrecision() { Quality::SetRelativePrecision(value); }
+  } restore;
+  const double precision = 1e-7;
+  for (const double invalid : {std::numeric_limits<double>::quiet_NaN(),
+                               std::numeric_limits<double>::infinity()}) {
+    SCOPED_TRACE(invalid);
+    Quality::SetRelativePrecision(precision);
+    Quality::SetRelativePrecision(invalid);
+    EXPECT_DOUBLE_EQ(Quality::GetRelativePrecision(), precision);
+
+    const Manifold cube = Manifold::Cube();
+    const Manifold shifted = cube.Translate({0.5, 0, 0});
+    const Manifold combined = cube + shifted;
+    const Manifold overlap = cube ^ shifted;
+    EXPECT_DOUBLE_EQ(cube.GetEpsilon(), precision);
+    EXPECT_EQ(combined.Status(), Manifold::Error::NoError);
+    EXPECT_EQ(overlap.Status(), Manifold::Error::NoError);
+    EXPECT_NEAR(combined.Volume(), 1.5, 1e-12);
+    EXPECT_NEAR(overlap.Volume(), 0.5, 1e-12);
+    EXPECT_EQ(combined.BoundingBox().min, vec3(0.0));
+    EXPECT_EQ(combined.BoundingBox().max, vec3(1.5, 1, 1));
+    EXPECT_EQ(overlap.BoundingBox().min, vec3(0.5, 0, 0));
+    EXPECT_EQ(overlap.BoundingBox().max, vec3(1.0));
+    for (const auto& result : {combined, overlap}) {
+      for (const double coordinate : result.GetMeshGL64().vertProperties) {
+        EXPECT_TRUE(std::isfinite(coordinate));
+      }
+    }
+  }
+
+  // Keep the existing minimum clamp, including negative infinity.
+  for (const double small :
+       {0.0, -1.0, 1e-30, -std::numeric_limits<double>::infinity()}) {
+    Quality::SetRelativePrecision(small);
+    EXPECT_DOUBLE_EQ(Quality::GetRelativePrecision(), kPrecision);
+  }
+  Quality::SetRelativePrecision(precision);
+  EXPECT_DOUBLE_EQ(Quality::GetRelativePrecision(), precision);
+}
+
 TEST(Boolean, SimpleCubeRegression) {
   ManifoldParamGuard guard;
   ManifoldParams().selfIntersectionChecks = true;
