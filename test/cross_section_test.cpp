@@ -3063,7 +3063,7 @@ TEST(CrossSection, PublicRoundOffsetRoundTripsMismatchCount) {
 
 TEST(CrossSection, OffsetRoundNonFiniteAndHugeDelta) {
   // Round offset derives its default segment count from |delta| via
-  // Quality::GetCircularSegments, whose internal 2*pi*r/edge -> int conversion
+  // CircularQuality::SegmentsFor, whose internal 2*pi*r/edge -> int conversion
   // would be undefined for non-finite or very large radii; it is guarded at the
   // source (double, not int, intermediate). Non-finite delta is rejected by
   // Offset (empty); huge finite delta still yields a finite bounded result.

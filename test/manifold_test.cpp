@@ -17,7 +17,9 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <limits>
+#include <random>
 #include <stdexcept>
 #include <thread>
 #include <tuple>
@@ -1228,86 +1230,141 @@ TEST(Manifold, Sphere) {
 // Native-only: the WASM build is single-threaded (no pthread), so std::thread
 // construction throws, which aborts under -fno-exceptions.
 #ifndef __EMSCRIPTEN__
-TEST(Manifold, CircularSegmentsWhileReset) {
-  // Both states of the setting give 8 segments for radius 1, so any other
-  // result means the reader saw a mix of the two.
-  std::atomic<bool> stop{false};
+TEST(Manifold, CircularQualityPerThread) {
+  // Each thread builds with its own quality, so neither can see the other's.
+  const CircularQuality coarse{0, 90.0};
+  const CircularQuality fine{0, 5.0, 0.01};
+  const size_t coarseTri = Manifold::Sphere(10, coarse).NumTri();
+  const size_t fineTri = Manifold::Sphere(10, fine).NumTri();
+  ASSERT_NE(coarseTri, fineTri);
   std::atomic<int> wrong{0};
-  std::thread writer([&] {
-    while (!stop) {
-      Quality::SetCircularSegments(8);
-      Quality::SetCircularSegments(0);
-    }
-  });
-  std::vector<std::thread> readers;
-  for (int i = 0; i < 3; ++i) {
-    readers.emplace_back([&] {
-      while (!stop) {
-        if (Quality::GetCircularSegments(1.0) != 8) ++wrong;
+  std::vector<std::thread> threads;
+  for (int i = 0; i < 4; ++i) {
+    threads.emplace_back([&, i] {
+      const CircularQuality& q = i % 2 ? fine : coarse;
+      const size_t expected = i % 2 ? fineTri : coarseTri;
+      for (int j = 0; j < 20; ++j) {
+        if (Manifold::Sphere(10, q).NumTri() != expected) ++wrong;
       }
     });
   }
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  stop = true;
-  writer.join();
-  for (auto& t : readers) t.join();
-  Quality::ResetToDefaults();
+  for (auto& t : threads) t.join();
   EXPECT_EQ(wrong.load(), 0);
 }
 #endif
 
-TEST(Manifold, CircularConstraintsRestore) {
-  Quality::ResetToDefaults();
-  EXPECT_DOUBLE_EQ(Quality::GetMinCircularAngle(), DEFAULT_ANGLE);
-  EXPECT_DOUBLE_EQ(Quality::GetMinCircularEdgeLength(), DEFAULT_LENGTH);
+TEST(Manifold, CircularQualitySegmentsFor) {
+  const CircularQuality defaults;
+  EXPECT_EQ(defaults.segments, 0);
+  EXPECT_DOUBLE_EQ(defaults.minAngle, 10.0);
+  EXPECT_DOUBLE_EQ(defaults.minEdgeLength, 1.0);
+  EXPECT_EQ(defaults.SegmentsFor(1.0), 8);
+  EXPECT_EQ(defaults.SegmentsFor(100.0), 36);
 
-  Quality::SetMinCircularAngle(22.5);
-  Quality::SetMinCircularEdgeLength(0.125);
-  const double angle = Quality::GetMinCircularAngle();
-  const double length = Quality::GetMinCircularEdgeLength();
-  const int segments = Quality::GetCircularSegments(2.0);
-  EXPECT_DOUBLE_EQ(angle, 22.5);
-  EXPECT_DOUBLE_EQ(length, 0.125);
-  EXPECT_EQ(segments, 16);
-
-  Quality::SetCircularSegments(12);
-  EXPECT_DOUBLE_EQ(Quality::GetMinCircularAngle(), angle);
-  EXPECT_DOUBLE_EQ(Quality::GetMinCircularEdgeLength(), length);
-  Quality::SetCircularSegments(0);
-
-  Quality::SetMinCircularAngle(5);
-  Quality::SetMinCircularEdgeLength(0.25);
-  EXPECT_NE(Quality::GetCircularSegments(2.0), segments);
-  Quality::SetMinCircularAngle(angle);
-  Quality::SetMinCircularEdgeLength(length);
-  EXPECT_EQ(Quality::GetCircularSegments(2.0), segments);
-
-  for (const double invalid : {0.0, -1.0, static_cast<double>(NAN)}) {
-    Quality::SetMinCircularAngle(invalid);
-    Quality::SetMinCircularEdgeLength(invalid);
-    EXPECT_DOUBLE_EQ(Quality::GetMinCircularAngle(), angle);
-    EXPECT_DOUBLE_EQ(Quality::GetMinCircularEdgeLength(), length);
+  const CircularQuality q{0, 22.5, 0.125};
+  EXPECT_EQ(q.SegmentsFor(2.0), 16);
+  EXPECT_EQ((CircularQuality{12, 22.5, 0.125}.SegmentsFor(2.0)), 12);
+  EXPECT_NE((CircularQuality{0, 5, 0.25}.SegmentsFor(2.0)), 16);
+  // segments below 3 apply no constraint.
+  for (const int segments : {-1, 1, 2}) {
+    EXPECT_EQ((CircularQuality{segments, 22.5, 0.125}.SegmentsFor(2.0)), 16);
   }
-  Quality::ResetToDefaults();
-  EXPECT_DOUBLE_EQ(Quality::GetMinCircularAngle(), DEFAULT_ANGLE);
-  EXPECT_DOUBLE_EQ(Quality::GetMinCircularEdgeLength(), DEFAULT_LENGTH);
+
+  // A non-positive or NaN angle or edge length uses the default.
+  for (const double invalid : {0.0, -1.0, static_cast<double>(NAN)}) {
+    for (const double r : {1.0, 2.0, 100.0}) {
+      EXPECT_EQ((CircularQuality{0, invalid, 0.125}.SegmentsFor(r)),
+                (CircularQuality{0, 10.0, 0.125}.SegmentsFor(r)));
+      EXPECT_EQ((CircularQuality{0, 22.5, invalid}.SegmentsFor(r)),
+                (CircularQuality{0, 22.5, 1.0}.SegmentsFor(r)));
+    }
+  }
+}
+
+TEST(Manifold, CircularQualityFactories) {
+  const CircularQuality q{0, 30.0, 0.1};
+  const int n = q.SegmentsFor(5);
+  EXPECT_EQ(n, 12);
+  EXPECT_EQ(CrossSection::Circle(5, q).NumVert(), n);
+  EXPECT_EQ(Manifold::Cylinder(2, 5, -1, q).NumVert(), 2 * n);
+  EXPECT_EQ(Manifold::Sphere(5, q).NumTri(), Manifold::Sphere(5, n).NumTri());
+  CrossSection ring = CrossSection::Square({1, 1}).Translate({4.5, 0});
+  EXPECT_EQ(Manifold::Revolve(ring.ToPolygons(), q).NumVert(),
+            Manifold::Revolve(ring.ToPolygons(), n).NumVert());
+  // A round offset of a point-like square adds n vertices per 360 degrees.
+  CrossSection tiny = CrossSection::Square({1e-3, 1e-3}, true);
+  EXPECT_EQ(tiny.Offset(5, CrossSection::JoinType::Round, 2, q).NumVert(),
+            tiny.Offset(5, CrossSection::JoinType::Round, 2, n).NumVert());
+
+  // Sphere takes any positive count, rounding it up to a multiple of four.
+  for (const int segments : {1, 2, 4}) {
+    EXPECT_EQ(Manifold::Sphere(5, segments).NumTri(), 8);
+    EXPECT_EQ(Manifold::Sphere(5, CircularQuality{segments, 30.0}).NumTri(), 8);
+  }
+  EXPECT_EQ(Manifold::Sphere(5, 5).NumTri(), 32);
+
+  // {} and an int both select the int overload, and match the defaults.
+  EXPECT_EQ(Manifold::Sphere(5, {}).NumTri(), Manifold::Sphere(5).NumTri());
+  EXPECT_EQ(Manifold::Sphere(5, {32}).NumTri(),
+            Manifold::Sphere(5, 32).NumTri());
+  EXPECT_EQ(CrossSection::Circle(5, {}).NumVert(),
+            CircularQuality{}.SegmentsFor(5));
+#if __cplusplus >= 202002L
+  EXPECT_EQ(
+      CrossSection::Circle(5, {.minAngle = 30, .minEdgeLength = 0.1}).NumVert(),
+      n);
+#endif
+}
+
+TEST(Manifold, RevolveDivisionsForAngle) {
+  // A partial revolve of a ring off the axis has 4 vertices per slice, and a
+  // full one shares its first and last slice.
+  const Polygons ring =
+      CrossSection::Square({1, 1}).Translate({4.5, 0}).ToPolygons();
+  auto numDivisions = [&](CircularQuality q, double degrees) {
+    const size_t numVert = Manifold::Revolve(ring, q, degrees).NumVert();
+    return static_cast<int>(numVert / 4) - (std::abs(degrees) < 360 ? 1 : 0);
+  };
+  EXPECT_EQ(numDivisions({30}, 90), 7);
+  EXPECT_EQ(Manifold::Revolve(ring, 30, 90).NumVert(),
+            Manifold::Revolve(ring, CircularQuality{30}, 90).NumVert());
+
+  for (const double degrees : {1.0, 45.0, 90.0, 179.0, 359.0, 360.0, 0.7,
+                               360.0 / 19, 7.5, 100.0 / 3, -90.0, 720.0}) {
+    for (int n = 1; n <= 40; ++n) {
+      const double d = std::min(std::abs(degrees), 360.0);
+      // The documented limits: a full revolution needs 3, 240 degrees 2.
+      const int fewest = d == 360 ? 3 : d >= 240 ? 2 : 1;
+      EXPECT_EQ(
+          numDivisions(CircularQuality::ForDivisions(n, degrees), degrees),
+          std::max(n, fewest))
+          << degrees << " degrees, " << n << " divisions";
+    }
+  }
+
+  // Randomized angles and counts.
+  std::mt19937 gen(12345);
+  std::uniform_real_distribution<double> angle(0.01, 360);
+  std::uniform_int_distribution<int> count(1, 300);
+  for (int i = 0; i < 1000; ++i) {
+    const double degrees = angle(gen);
+    const int n = count(gen);
+    const int fewest = degrees >= 240 ? 2 : 1;
+    EXPECT_EQ(numDivisions(CircularQuality::ForDivisions(n, degrees), degrees),
+              std::max(n, fewest))
+        << degrees << " degrees, " << n << " divisions";
+  }
+  EXPECT_EQ(CircularQuality::ForDivisions(5, 0).segments, 0);
+  EXPECT_EQ(CircularQuality::ForDivisions(5, NAN).segments, 0);
 }
 
 TEST(Manifold, CircularSegmentsTinyAngle) {
   // 360 / angle doesn't fit in an int here, so the edge length should decide.
-  Quality::SetMinCircularAngle(1e-9);
-  const int small = Quality::GetCircularSegments(1.0);
-  const int large = Quality::GetCircularSegments(100.0);
-  const int huge = Quality::GetCircularSegments(1e300);
-  Quality::ResetToDefaults();
-  Quality::SetMinCircularAngle(NAN);
-  Quality::SetMinCircularEdgeLength(NAN);
-  const int nan = Quality::GetCircularSegments(1.0);
-  Quality::ResetToDefaults();
-  EXPECT_EQ(nan, 8);
-  EXPECT_EQ(small, 8);
-  EXPECT_EQ(large, 628);
-  EXPECT_GT(huge, 1000000);
+  const CircularQuality tiny{0, 1e-9};
+  EXPECT_EQ(tiny.SegmentsFor(1.0), 8);
+  EXPECT_EQ(tiny.SegmentsFor(100.0), 628);
+  EXPECT_GT(tiny.SegmentsFor(1e300), 1000000);
+  EXPECT_EQ((CircularQuality{0, NAN, NAN}.SegmentsFor(1.0)), 8);
 }
 
 TEST(Manifold, AssignToMovedFrom) {
@@ -1565,6 +1622,35 @@ TEST(Manifold, RevolveSliceCountOverflow) {
     EXPECT_EQ(Manifold::Revolve({profile}, maxInt, degrees).Status(),
               Manifold::Error::ResultTooLarge);
   }
+  // A 15-gon with two triangular holes has 21 vertices and caps of 23
+  // triangles each, so this many divisions over 180 degrees makes
+  // 3 * (2 * 21 * 17043520 + 2 * 23) halfedges, just past INT_MAX.
+  Polygons holed(1);
+  for (int i = 0; i < 15; ++i) {
+    holed[0].push_back(vec2(20, 0) + 10.0 * vec2(cosd(24 * i), sind(24 * i)));
+  }
+  holed.push_back({{14, -2}, {16, 2}, {18, -2}});
+  holed.push_back({{22, -2}, {24, 2}, {26, -2}});
+  EXPECT_EQ(Manifold::Revolve(holed, 6, 180).NumTri(), 2 * 21 * 3 + 2 * 23);
+  EXPECT_EQ(Manifold::Revolve(holed,
+                              CircularQuality::ForDivisions(17043520, 180), 180)
+                .Status(),
+            Manifold::Error::ResultTooLarge);
+  // Few enough vertices, but too many halfedges.
+  const SimplePolygon triangle = {{0, 0}, {1, 1}, {0, 2}};
+  EXPECT_EQ(Manifold::Revolve({triangle}, maxInt - 2).Status(),
+            Manifold::Error::ResultTooLarge);
+}
+
+TEST(Manifold, RevolveAxisVerticesNotRepeated) {
+  // Vertices on the axis appear once, so this stays well under the index
+  // limit even though profile size times slices exceeds it.
+  SimplePolygon profile;
+  for (int i = 0; i < 10000; ++i) profile.push_back({0, i * 1e-4});
+  profile.push_back({1, 0.5});
+  const Manifold m = Manifold::Revolve({profile}, 220000);
+  EXPECT_EQ(m.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(m.NumVert(), 10000 + 220000);
 }
 
 TEST(Manifold, RevolveNegativeAngle) {

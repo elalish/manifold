@@ -818,7 +818,7 @@ TEST(CrossSectionComplex, OffsetRoundUsesRequestedSegments) {
   const int segments = 20;
   const double delta = 5.0;
 
-  Polygons rounded = Offset({square}, delta, JoinType::Round, 2.0, segments);
+  Polygons rounded = Offset({square}, delta, JoinType::Round, 2.0, {segments});
 
   ASSERT_EQ(rounded.size(), 1);
   EXPECT_EQ(rounded[0].size(), segments + 4);
@@ -828,7 +828,7 @@ TEST(CrossSectionComplex, OffsetRoundClampsHugeSegmentCount) {
   // An absurd requested count is clamped so the vertex count cannot blow up;
   // the clamp is kMaxRoundJoinSegments == 1 << 15 (file-local in offset.cpp).
   SimplePolygon square = {{0, 0}, {20, 0}, {20, 20}, {0, 20}};
-  Polygons rounded = Offset({square}, 5.0, JoinType::Round, 2.0, 1 << 20);
+  Polygons rounded = Offset({square}, 5.0, JoinType::Round, 2.0, {1 << 20});
   ASSERT_EQ(rounded.size(), 1);
   EXPECT_EQ(rounded[0].size(), (1 << 15) + 4);
 }

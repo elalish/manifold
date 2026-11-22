@@ -20,17 +20,26 @@ TEST(CBIND, version) {
   EXPECT_EQ(version[2], MANIFOLD_VERSION_PATCH);
 }
 
-TEST(CBIND, circular_constraints_restore) {
-  const double angle = manifold_get_min_circular_angle();
-  const double length = manifold_get_min_circular_edge_length();
-  manifold_set_min_circular_angle(22.5);
-  manifold_set_min_circular_edge_length(0.125);
-  EXPECT_DOUBLE_EQ(manifold_get_min_circular_angle(), 22.5);
-  EXPECT_DOUBLE_EQ(manifold_get_min_circular_edge_length(), 0.125);
-  manifold_set_min_circular_angle(angle);
-  manifold_set_min_circular_edge_length(length);
-  EXPECT_DOUBLE_EQ(manifold_get_min_circular_angle(), angle);
-  EXPECT_DOUBLE_EQ(manifold_get_min_circular_edge_length(), length);
+const ManifoldCircularQuality kQuality32 = {32, 10.0, 1.0};
+const ManifoldCircularQuality kQuality100 = {100, 10.0, 1.0};
+
+TEST(CBIND, circular_quality) {
+  const ManifoldCircularQuality q = {0, 22.5, 0.125};
+  EXPECT_EQ(manifold_circular_quality_segments_for(&q, 2.0), 16);
+  EXPECT_EQ(manifold_circular_quality_segments_for(NULL, 1.0), 8);
+  const ManifoldCircularQuality exact =
+      manifold_circular_quality_for_divisions(21, 0.7);
+  EXPECT_EQ(exact.segments, 11057);
+
+  ManifoldCrossSection* circle = manifold_cross_section_circle(2.0, &q);
+  EXPECT_EQ(manifold_cross_section_num_vert(circle), 16);
+  ManifoldCrossSection* defaults = manifold_cross_section_circle(1.0, NULL);
+  EXPECT_EQ(manifold_cross_section_num_vert(defaults), 8);
+  ManifoldManifold* cylinder = manifold_cylinder(1.0, 2.0, -1.0, &q, 0);
+  EXPECT_EQ(manifold_num_vert(cylinder), 32);
+  manifold_delete_cross_section(circle);
+  manifold_delete_cross_section(defaults);
+  manifold_delete_manifold(cylinder);
 }
 
 TEST(CBIND, meshgl_no_props) {
@@ -299,7 +308,8 @@ TEST(CBIND, meshgl_options_short_size_aborts) {
 
 TEST(CBIND, sphere) {
   int n = 25;
-  ManifoldManifold* sphere = manifold_sphere(1.0, 4 * n);
+  const ManifoldCircularQuality q = {4 * n, 10.0, 1.0};
+  ManifoldManifold* sphere = manifold_sphere(1.0, &q);
 
   EXPECT_EQ(manifold_status(sphere), MANIFOLD_NO_ERROR);
   EXPECT_EQ(manifold_num_tri(sphere), n * n * 8);
@@ -320,7 +330,7 @@ TEST(CBIND, warp_translation) {
         ManifoldVec3 v = {x + ((double*)ctx)[0], y, z};
         return v;
       };
-  ManifoldManifold* sphere = manifold_sphere(1.0, 100);
+  ManifoldManifold* sphere = manifold_sphere(1.0, &kQuality100);
   ManifoldManifold* trans = manifold_translate(sphere, 15., 0., 0.);
   ManifoldManifold* warped = manifold_warp(sphere, warp, NULL);
   ManifoldManifold* diff = manifold_difference(trans, warped);
@@ -684,7 +694,7 @@ TEST(CBIND, extrude) {
 }
 
 TEST(CBIND, batch_boolean_decompose) {
-  ManifoldManifold* s1 = manifold_sphere(1.0, 100);
+  ManifoldManifold* s1 = manifold_sphere(1.0, &kQuality100);
   ManifoldManifold* s2 = manifold_translate(s1, 2., 2., 2.);
   ManifoldManifoldVec* ss = manifold_manifold_vec(2);
   manifold_manifold_vec_set(ss, 0, s1);
@@ -857,7 +867,7 @@ TEST(CBIND, ray_cast) {
 }
 
 TEST(CBIND, simplify_smoke) {
-  ManifoldManifold* sphere = manifold_sphere(1.0, 100);
+  ManifoldManifold* sphere = manifold_sphere(1.0, &kQuality100);
 
   // Simplify should produce a valid manifold with fewer or equal triangles.
   ManifoldManifold* simplified = manifold_simplify(sphere, 0.1);
@@ -883,7 +893,7 @@ TEST(CBIND, meshgl_run_accessors) {
   // Create two shapes with original IDs so the boolean result has 2 runs.
   ManifoldManifold* cube_tmp = manifold_cube(1, 1, 1, 0);
   ManifoldManifold* cube = manifold_as_original(cube_tmp, -1);
-  ManifoldManifold* sphere_tmp = manifold_sphere(0.6, 32);
+  ManifoldManifold* sphere_tmp = manifold_sphere(0.6, &kQuality32);
   ManifoldManifold* sphere_trans =
       manifold_translate(sphere_tmp, 0.5, 0.5, 0.5);
   ManifoldManifold* sphere = manifold_as_original(sphere_trans, -1);
@@ -926,7 +936,7 @@ TEST(CBIND, run_flag_accessors) {
   // gets backside set. Exercise the C accessors for both bits.
   ManifoldManifold* oldCube = manifold_cube(2.0, 2.0, 2.0, 1);
   ManifoldManifold* cube = manifold_as_original(oldCube, -1);
-  ManifoldManifold* oldSphere = manifold_sphere(1.0, 32);
+  ManifoldManifold* oldSphere = manifold_sphere(1.0, &kQuality32);
   ManifoldManifold* sphere = manifold_as_original(oldSphere, -1);
   ManifoldManifold* cut = manifold_difference(cube, sphere);
   ManifoldManifold* with_normals = manifold_calculate_normals(cut, 60.0);

@@ -74,6 +74,32 @@ suite('CrossSection Bindings', () => {
   });
 });
 
+suite('Circular quality', () => {
+  test('factories take a count or a quality object', () => {
+    const {CrossSection, Manifold, segmentsFor} = manifoldModule;
+    expect(CrossSection.circle(5).numVert()).toEqual(32);
+    expect(CrossSection.circle(5, 7).numVert()).toEqual(7);
+    expect(CrossSection.circle(5, {minAngle: 30}).numVert()).toEqual(12);
+    expect(CrossSection.circle(5, {minAngle: undefined}).numVert()).toEqual(32);
+    expect(Manifold.cylinder(1, 5, -1, {minAngle: 30}).numVert()).toEqual(24);
+    expect(segmentsFor({minAngle: 30}, 5)).toEqual(12);
+    expect(segmentsFor(7, 5)).toEqual(7);
+  });
+
+  test('forDivisions gives exact revolve divisions', () => {
+    const {CrossSection, forDivisions} = manifoldModule;
+    const ring = CrossSection.square([1, 1]).translate([4.5, 0]);
+    // A partial revolve of this ring has 4 vertices per slice.
+    expect(ring.revolve(30, 90).numVert()).toEqual(4 * (7 + 1));
+    for (const degrees of [0.7, 360 / 19, 90, 239]) {
+      for (const n of [1, 5, 21]) {
+        expect(ring.revolve(forDivisions(n, degrees), degrees).numVert())
+            .toEqual(4 * (n + 1));
+      }
+    }
+  });
+});
+
 suite('Manifold Bindings', () => {
   test('Simplify supports default argument', () => {
     const manifold = manifoldModule.Manifold.sphere(1).simplify();
