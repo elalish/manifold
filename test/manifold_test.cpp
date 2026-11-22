@@ -611,27 +611,30 @@ TEST(Manifold, NormalsNormalizedPerRun) {
             newProp[1] = 0;
             newProp[2] = 2;
           });
-  const MeshGL gl =
-      (Manifold::Sphere(5, 32).CalculateNormals() + cube).GetMeshGL();
-  int flagged = 0;
-  int unflagged = 0;
-  for (size_t run = 0; run < gl.NumRun(); ++run) {
-    for (uint32_t i = gl.runIndex[run]; i < gl.runIndex[run + 1]; ++i) {
-      const uint32_t v = gl.triVerts[i];
-      const vec3 n(gl.vertProperties[v * gl.numProp + 3],
-                   gl.vertProperties[v * gl.numProp + 4],
-                   gl.vertProperties[v * gl.numProp + 5]);
-      if (gl.HasNormals(run)) {
-        ++flagged;
-        EXPECT_NEAR(la::length(n), 1, 1e-6) << v;
-      } else {
-        ++unflagged;
-        EXPECT_EQ(n, vec3(0, 0, 2)) << v;
+  const Manifold mixed = Manifold::Sphere(5, 32).CalculateNormals() + cube;
+  auto check = [](const auto& gl) {
+    int flagged = 0;
+    int unflagged = 0;
+    for (size_t run = 0; run < gl.NumRun(); ++run) {
+      for (size_t i = gl.runIndex[run]; i < gl.runIndex[run + 1]; ++i) {
+        const size_t v = gl.triVerts[i];
+        const vec3 n(gl.vertProperties[v * gl.numProp + 3],
+                     gl.vertProperties[v * gl.numProp + 4],
+                     gl.vertProperties[v * gl.numProp + 5]);
+        if (gl.HasNormals(run)) {
+          ++flagged;
+          EXPECT_NEAR(la::length(n), 1, 1e-6) << v;
+        } else {
+          ++unflagged;
+          EXPECT_NEAR(la::length(n - vec3(0, 0, 2)), 0, 1e-6) << v;
+        }
       }
     }
-  }
-  EXPECT_GT(flagged, 0);
-  EXPECT_GT(unflagged, 0);
+    EXPECT_GT(flagged, 0);
+    EXPECT_GT(unflagged, 0);
+  };
+  check(mixed.GetMeshGL());
+  check(mixed.GetMeshGL64());
 }
 
 TEST(Manifold, NormalsSharedPropVertMixedFlagsUndefined) {
@@ -753,6 +756,23 @@ TEST(Manifold, AsOriginalMixedNormalsKept) {
       gl, 5.0, 3, [](vec3 pos) { return la::normalize(pos); });
   EXPECT_GT(good, 0);
   EXPECT_EQ(bad, 0);
+}
+
+TEST(Manifold, MinkowskiKeepsNormals) {
+  // Minkowski unions the input with unflagged hulls and calls AsOriginal(0),
+  // so it keeps the input's normals under the any-run rule.
+  const Manifold nonConvex =
+      (Manifold::Cube(vec3(2), true) - Manifold::Sphere(0.75, 8))
+          .CalculateNormals();
+  const Manifold ball = Manifold::Sphere(0.1, 8);
+  for (const Manifold& m :
+       {nonConvex.MinkowskiSum(ball), nonConvex.MinkowskiDifference(ball)}) {
+    ASSERT_EQ(m.Status(), Manifold::Error::NoError);
+    const MeshGL gl = m.GetMeshGL();
+    ASSERT_EQ(gl.NumRun(), 1u);
+    EXPECT_TRUE(gl.HasNormals(0));
+    for (float x : gl.vertProperties) EXPECT_TRUE(std::isfinite(x));
+  }
 }
 
 TEST(Manifold, ComposeMixedNormalsPerMeshID) {
