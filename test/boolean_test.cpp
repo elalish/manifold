@@ -1269,9 +1269,9 @@ TEST(Boolean, RelativePrecisionRejectsNonFinite) {
   }
 
   // Keep the existing minimum clamp, including negative infinity.
-  for (const double small :
+  for (const double belowMinimum :
        {0.0, -1.0, 1e-30, -std::numeric_limits<double>::infinity()}) {
-    Quality::SetRelativePrecision(small);
+    Quality::SetRelativePrecision(belowMinimum);
     EXPECT_DOUBLE_EQ(Quality::GetRelativePrecision(), kPrecision);
   }
   Quality::SetRelativePrecision(precision);
