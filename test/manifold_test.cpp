@@ -2167,6 +2167,49 @@ TEST(Manifold, CylinderFiniteNegativeTopRadiusUsesBottomRadius) {
   }
 }
 
+TEST(Manifold, CylinderExtremeRadiusRatio) {
+  constexpr int segments = 8;
+  constexpr double height = 2;
+  // The first pair includes a subnormal radius; the second overflows the
+  // radius ratio even though both inputs are normal finite doubles. Include
+  // an ordinary frustum as a control.
+  for (const vec2 radii : {vec2(1e-310, 1), vec2(1e-300, 1e10), vec2(0.5, 1)}) {
+    const double expectedVolume =
+        segments * std::sin(2 * kPi / segments) * height / 6 *
+        (radii.x * radii.x + radii.x * radii.y + radii.y * radii.y);
+    for (bool reverse : {false, true}) {
+      for (bool center : {false, true}) {
+        SCOPED_TRACE(testing::Message()
+                     << radii.x << ", " << radii.y << ", reverse=" << reverse
+                     << ", center=" << center);
+        const double radiusLow = reverse ? radii.y : radii.x;
+        const double radiusHigh = reverse ? radii.x : radii.y;
+        const Manifold cylinder =
+            Manifold::Cylinder(height, radiusLow, radiusHigh, segments, center);
+        ASSERT_EQ(cylinder.Status(), Manifold::Error::NoError);
+        ASSERT_FALSE(cylinder.IsEmpty());
+        EXPECT_NEAR(cylinder.Volume() / expectedVolume, 1, 1e-12);
+        const Box bounds = cylinder.BoundingBox();
+        EXPECT_NEAR(bounds.min.x / radii.y, -1, 1e-12);
+        EXPECT_NEAR(bounds.max.x / radii.y, 1, 1e-12);
+        EXPECT_NEAR(bounds.min.y / radii.y, -1, 1e-12);
+        EXPECT_NEAR(bounds.max.y / radii.y, 1, 1e-12);
+        EXPECT_DOUBLE_EQ(bounds.min.z, center ? -height / 2 : 0);
+        EXPECT_DOUBLE_EQ(bounds.max.z, center ? height / 2 : height);
+        // A slice away from the midpoint distinguishes the two orientations.
+        const double quarterRadius = 0.75 * radiusLow + 0.25 * radiusHigh;
+        const double expectedArea = segments * std::sin(2 * kPi / segments) /
+                                    2 * quarterRadius * quarterRadius;
+        const CrossSection slice(cylinder.Slice(bounds.min.z + height / 4));
+        EXPECT_NEAR(slice.Area() / expectedArea, 1, 1e-10);
+        for (double coordinate : cylinder.GetMeshGL64().vertProperties) {
+          EXPECT_TRUE(std::isfinite(coordinate));
+        }
+      }
+    }
+  }
+}
+
 TEST(Manifold, MergeDegenerates) {
   MeshGL cube = Manifold::Cube(vec3(1), true).GetMeshGL();
   MeshGL squash;

@@ -156,13 +156,13 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
       !std::isfinite(radiusHigh) || height <= 0.0 || radiusLow < 0.0) {
     return Invalid();
   }
-  const bool flip = radiusLow == 0.0;
-  if (flip) {
-    if (radiusHigh <= 0.0) {
-      return Invalid();
-    }
-    std::swap(radiusLow, radiusHigh);
+  if (radiusLow == 0.0 && radiusHigh <= 0.0) {
+    return Invalid();
   }
+  // Build from the larger radius so the taper ratio cannot overflow, even
+  // when both radii are finite. Restore the requested orientation below.
+  const bool flip = radiusHigh > radiusLow;
+  if (flip) std::swap(radiusLow, radiusHigh);
   const double scale = radiusHigh >= 0.0 ? radiusHigh / radiusLow : 1.0;
   const double radius = fmax(radiusLow, radiusHigh);
   const int n = circularSegments > 2 ? circularSegments
