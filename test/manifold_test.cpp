@@ -791,22 +791,38 @@ TEST(Manifold, TransformMixedNormalsPerMeshID) {
 }
 
 TEST(Manifold, AsOriginalMixedNormalsKept) {
-  // AsOriginal of a mixed result keeps two runs under one ID: the sphere with
-  // normals, then the cube without. The sphere's normals still rotate, the
-  // cube's slots are left alone, and triID still matches the output order.
-  for (const int id : {-1, 0}) {
-    const Manifold original = MixedNormalsCubePlusSphere().AsOriginal(id);
-    const MeshGL gl = original.Rotate(90, 0, 0).GetMeshGL();
-    ASSERT_EQ(gl.NumRun(), 2u);
-    EXPECT_EQ(gl.runOriginalID[0], gl.runOriginalID[1]);
-    EXPECT_TRUE(gl.HasNormals(0));
-    EXPECT_FALSE(gl.HasNormals(1));
-    auto [good, bad] = CountSphereNormalAlignment(
-        gl, 5.0, 3, [](vec3 pos) { return la::normalize(pos); });
-    EXPECT_GT(good, 0);
-    EXPECT_EQ(bad, 0);
-    const MeshGL tri = original.TriID2FaceID().GetMeshGL();
-    for (size_t t = 0; t < tri.NumTri(); ++t) EXPECT_EQ(tri.faceID[t], t);
+  // AsOriginal of a mixed result keeps two runs under one ID, one with the
+  // sphere's normals and one for the cube without. The sphere's normals still
+  // rotate, triID still matches the output order, and a MeshGL round trip
+  // keeps both runs. The overlap interleaves the two kinds of triangles, and
+  // the IDs cover untracked, reserved, above the reserved range, and equal to
+  // the next reserved ID.
+  const Manifold sphere = Manifold::Sphere(5, 32).CalculateNormals();
+  const Manifold cube = Manifold::Cube(vec3(6), true).Translate({4, 0, 0});
+  for (const Manifold& mixed : {sphere + cube, cube + sphere}) {
+    for (const int id : {-1, 0, 1 << 29, -2}) {
+      const int useID =
+          id == -2 ? static_cast<int>(Manifold::ReserveIDs(1)) + 1 : id;
+      const Manifold original = mixed.AsOriginal(useID);
+      const MeshGL gl = original.GetMeshGL();
+      ASSERT_EQ(gl.NumRun(), 2u) << id;
+      EXPECT_EQ(gl.runOriginalID[0], gl.runOriginalID[1]) << id;
+      EXPECT_NE(gl.HasNormals(0), gl.HasNormals(1)) << id;
+      const MeshGL round = Manifold(gl).GetMeshGL();
+      ASSERT_EQ(round.NumRun(), 2u) << id;
+      EXPECT_NE(round.HasNormals(0), round.HasNormals(1)) << id;
+      auto outward = [](vec3 pos) { return la::normalize(pos); };
+      const auto expected = CountSphereNormalAlignment(
+          mixed.Rotate(90, 0, 0).GetMeshGL(), 5.0, 3, outward);
+      const auto actual = CountSphereNormalAlignment(
+          original.Rotate(90, 0, 0).GetMeshGL(), 5.0, 3, outward);
+      EXPECT_GT(actual.first, 0) << id;
+      EXPECT_EQ(actual, expected) << id;
+      const MeshGL tri = original.TriID2FaceID().GetMeshGL();
+      int mismatch = 0;
+      for (size_t t = 0; t < tri.NumTri(); ++t) mismatch += tri.faceID[t] != t;
+      EXPECT_EQ(mismatch, 0) << id;
+    }
   }
 }
 

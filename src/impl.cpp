@@ -186,9 +186,9 @@ void Manifold::Impl::InitializeOriginal(int id) {
   auto& triRef = meshRelation_.triRef;
   const int numTri = NumTri();
   // AsOriginal of a result where only some runs record normals keeps two
-  // runs under one originalID: the triangles with normals, then the rest.
-  // triID is the triangle's index in GetMeshGL's output order, which sorts an
-  // original with two relations by meshID.
+  // runs under one originalID, one for the triangles with normals and one for
+  // the rest. triID is the triangle's index in GetMeshGL's output order, which
+  // sorts an original with two relations by meshID.
   Vec<bool> hasN;
   if (triRef.size() == numTri && AnyHasNormals(meshRelation_)) {
     hasN.resize_nofill(numTri);
@@ -197,7 +197,9 @@ void Manifold::Impl::InitializeOriginal(int id) {
   }
   const int numN = std::count(hasN.begin(), hasN.end(), true);
   const bool split = numN > 0 && numN < numTri;
-  const int otherID = split ? ReserveIDs(1) : meshID;
+  int otherID = meshID;
+  // An explicit id can equal the next reserved one.
+  while (split && otherID == meshID) otherID = ReserveIDs(1);
   meshRelation_.meshIDtransform.clear();
   meshRelation_.meshIDtransform[meshID] = {meshID, la::identity, false,
                                            numN > 0};
@@ -206,9 +208,9 @@ void Manifold::Impl::InitializeOriginal(int id) {
                                               false};
   }
   triRef.resize_nofill(numTri);
-  // otherID > meshID except for id 0, so the run with normals sorts first
-  // unless the ID is 0.
-  const bool nFirst = otherID >= meshID;
+  // GetMeshGL sorts the runs by meshID, so the run with normals comes first
+  // unless an explicit id is above the reserved range.
+  const bool nFirst = otherID > meshID;
   int nextN = nFirst ? 0 : numTri - numN;
   int nextOther = nFirst ? numN : 0;
   for (int tri = 0; tri < numTri; ++tri) {

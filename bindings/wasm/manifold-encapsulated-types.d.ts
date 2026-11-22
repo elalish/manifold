@@ -1178,7 +1178,7 @@ export class Manifold {
    * Simplify().
    *
    * If only some of the input recorded normals, the result keeps two runs
-   * with this ID: the triangles with normals, then the rest.
+   * with this ID, one for the triangles with normals and one for the rest.
    *
    * @param id The ID to assign to this manifold. If negative (the default), a
    *     new ID is assigned. Use zero to match all default-constructed
