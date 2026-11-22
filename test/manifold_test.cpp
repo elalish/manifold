@@ -371,6 +371,44 @@ TEST(Manifold, InvalidInput64BitIndex) {
             Manifold::Error::MergeIndexOutOfBounds);
 }
 
+TEST(Manifold, InvalidInputPropertiesWrongLength) {
+  // vertProperties written with 4 floats per vertex, but numProp says 3.
+  const MeshGL tet = Manifold::Tetrahedron().GetMeshGL();
+  ASSERT_EQ(tet.numProp, 3);
+  MeshGL stride = tet;
+  stride.vertProperties.clear();
+  for (size_t v = 0; v < tet.NumVert(); ++v) {
+    for (int j = 0; j < 3; ++j)
+      stride.vertProperties.push_back(tet.vertProperties[3 * v + j]);
+    stride.vertProperties.push_back(0.5f);
+  }
+  EXPECT_EQ(Manifold(stride).Status(), Manifold::Error::PropertiesWrongLength);
+
+  // A trailing partial vertex, with numProp = 5.
+  MeshGL partial = TetGL();
+  partial.vertProperties.insert(partial.vertProperties.end(), {1, 1});
+  EXPECT_EQ(Manifold(partial).Status(), Manifold::Error::PropertiesWrongLength);
+
+  MeshGL64 partial64;
+  partial64.numProp = partial.numProp;
+  partial64.vertProperties.assign(partial.vertProperties.begin(),
+                                  partial.vertProperties.end());
+  partial64.triVerts.assign(partial.triVerts.begin(), partial.triVerts.end());
+  partial64.mergeFromVert.assign(partial.mergeFromVert.begin(),
+                                 partial.mergeFromVert.end());
+  partial64.mergeToVert.assign(partial.mergeToVert.begin(),
+                               partial.mergeToVert.end());
+  EXPECT_EQ(Manifold(partial64).Status(),
+            Manifold::Error::PropertiesWrongLength);
+
+  // Merge leaves a malformed MeshGL unchanged instead of reading the
+  // trailing float as a coordinate.
+  MeshGL unmerged = CubeSTL();
+  ASSERT_FALSE(unmerged.Merge().mergeFromVert.empty());
+  unmerged.vertProperties.push_back(1e7f);
+  EXPECT_TRUE(unmerged.Merge().mergeFromVert.empty());
+}
+
 TEST(Manifold, InvalidInput7) {
   MeshGL cube = CubeUV();
   cube.runIndex = {0, 1, static_cast<uint32_t>(cube.triVerts.size())};
