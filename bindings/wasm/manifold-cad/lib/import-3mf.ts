@@ -101,8 +101,17 @@ function asArray<T>(value?: T|Array<T>): Array<T> {
 }
 
 function toFiniteNumber(value: unknown): number|null {
+  if (value == null || (typeof value === 'string' && value.trim() === '')) {
+    return null;
+  }
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+function isVertexIndex(
+    index: number|null, vertexCount: number): index is number {
+  return index != null && Number.isInteger(index) && index >= 0 &&
+      index < vertexCount;
 }
 
 function parseUnitMeters(unit?: string): number {
@@ -157,11 +166,14 @@ function parseMesh(
 
   // --- vertices ---
   const positions: number[] = [];
-  for (const vertex of asArray(mesh.vertices?.vertex)) {
+  for (const [index, vertex] of asArray(mesh.vertices?.vertex).entries()) {
     const x = toFiniteNumber(vertex.x);
     const y = toFiniteNumber(vertex.y);
     const z = toFiniteNumber(vertex.z);
-    if (x == null || y == null || z == null) continue;
+    if (x == null || y == null || z == null) {
+      throw new Error(
+          `Invalid 3MF mesh: vertex ${index} has invalid coordinates`);
+    }
 
     positions.push(x, y, z);
   }
@@ -169,11 +181,16 @@ function parseMesh(
 
   // --- triangles ---
   const indices: number[] = [];
-  for (const tri of asArray(mesh.triangles?.triangle)) {
+  const vertexCount = positions.length / 3;
+  for (const [index, tri] of asArray(mesh.triangles?.triangle).entries()) {
     const v1 = toFiniteNumber(tri.v1);
     const v2 = toFiniteNumber(tri.v2);
     const v3 = toFiniteNumber(tri.v3);
-    if (v1 == null || v2 == null || v3 == null) continue;
+    if (!isVertexIndex(v1, vertexCount) || !isVertexIndex(v2, vertexCount) ||
+        !isVertexIndex(v3, vertexCount)) {
+      throw new Error(
+          `Invalid 3MF mesh: triangle ${index} has an invalid vertex index`);
+    }
     indices.push(v1, v2, v3);
   }
   if (!indices.length) return null;
