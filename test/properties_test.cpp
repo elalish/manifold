@@ -67,17 +67,17 @@ TEST(Properties, BooleanBarycentricWeightsRemainFinite) {
 
 TEST(Properties, Epsilon) {
   Manifold cube = Manifold::Cube();
-  EXPECT_FLOAT_EQ(cube.GetEpsilon(), Quality::GetRelativePrecision());
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), cube.GetPrecision());
   cube = cube.Scale({0.1, 1, 10});
-  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 10 * Quality::GetRelativePrecision());
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 10 * cube.GetPrecision());
   cube = cube.Translate({-100, -10, -1});
-  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 100 * Quality::GetRelativePrecision());
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 100 * cube.GetPrecision());
 }
 
 TEST(Properties, Epsilon2) {
   Manifold cube = Manifold::Cube();
   cube = cube.Translate({-0.5, 0, 0}).Scale({2, 1, 1});
-  EXPECT_FLOAT_EQ(cube.GetEpsilon(), Quality::GetRelativePrecision());
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), cube.GetPrecision());
 }
 
 TEST(Properties, Tolerance) {

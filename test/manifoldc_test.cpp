@@ -148,7 +148,7 @@ TEST(CBIND, meshgl_options_run_flags_rotate_normals) {
       manifold_meshgl_vert_properties(source), numVert, numProp,
       manifold_meshgl_tri_verts(source), numTri, &options);
 
-  ManifoldManifold* flaggedManifold = manifold_of_meshgl(flagged);
+  ManifoldManifold* flaggedManifold = manifold_of_meshgl(flagged, 0);
   ASSERT_EQ(manifold_status(flaggedManifold), MANIFOLD_NO_ERROR);
   ManifoldManifold* flaggedRotated = manifold_rotate(flaggedManifold, 90, 0, 0);
   ManifoldMeshGL* flaggedOut = manifold_get_meshgl(flaggedRotated);
@@ -171,7 +171,7 @@ TEST(CBIND, meshgl_options_run_flags_rotate_normals) {
   ManifoldMeshGL* plain = manifold_meshgl_w_options(
       manifold_meshgl_vert_properties(source), numVert, numProp,
       manifold_meshgl_tri_verts(source), numTri, &options);
-  ManifoldManifold* plainManifold = manifold_of_meshgl(plain);
+  ManifoldManifold* plainManifold = manifold_of_meshgl(plain, 0);
   ManifoldManifold* plainRotated = manifold_rotate(plainManifold, 90, 0, 0);
   ManifoldMeshGL* plainOut = manifold_get_meshgl(plainRotated);
   const float* plainProps = manifold_meshgl_vert_properties(plainOut);
@@ -798,12 +798,12 @@ TEST(CBIND, meshgl_merge_returns_mem) {
 
   // This mesh is already manifold, so Merge() returns an unchanged copy.
   // The bug: old code returned the input pointer instead of the output buffer.
-  ManifoldMeshGL* merged = manifold_meshgl_merge(original, 0.0f);
+  ManifoldMeshGL* merged = manifold_meshgl_merge(original, 0.0f, 0);
 
   EXPECT_NE(merged, original);
 
   // The merged mesh should still be valid — construct a Manifold from it.
-  ManifoldManifold* result = manifold_of_meshgl(merged);
+  ManifoldManifold* result = manifold_of_meshgl(merged, 0);
   EXPECT_EQ(manifold_status(result), MANIFOLD_NO_ERROR);
   EXPECT_NEAR(manifold_volume(result), 1.0, 0.0001);
 
@@ -817,17 +817,36 @@ TEST(CBIND, meshgl64_merge_returns_mem) {
   ManifoldManifold* cube = manifold_cube(1.0, 1.0, 1.0, 0);
   ManifoldMeshGL64* original = manifold_get_meshgl64(cube);
 
-  ManifoldMeshGL64* merged = manifold_meshgl64_merge(original, 0.0);
+  ManifoldMeshGL64* merged = manifold_meshgl64_merge(original, 0.0, 0);
 
   EXPECT_NE(merged, original);
 
-  ManifoldManifold* result = manifold_of_meshgl64(merged);
+  ManifoldManifold* result = manifold_of_meshgl64(merged, 0);
   EXPECT_EQ(manifold_status(result), MANIFOLD_NO_ERROR);
   EXPECT_NEAR(manifold_volume(result), 1.0, 0.0001);
 
   manifold_delete_manifold(result);
   manifold_delete_meshgl64(merged);
   manifold_delete_meshgl64(original);
+  manifold_delete_manifold(cube);
+}
+
+TEST(CBIND, precision) {
+  ManifoldManifold* cube = manifold_cube(1.0, 1.0, 1.0, 0);
+  ManifoldMeshGL64* mesh = manifold_get_meshgl64(cube);
+  ManifoldManifold* ingested = manifold_of_meshgl64(mesh, 1e-3);
+  EXPECT_EQ(manifold_get_precision(cube), 1e-12);
+  EXPECT_EQ(manifold_get_precision(ingested), 1e-3);
+  ManifoldManifold* stamped = manifold_with_precision(cube, 1e-2);
+  EXPECT_EQ(manifold_get_precision(stamped), 1e-2);
+  EXPECT_EQ(manifold_num_tri(stamped), manifold_num_tri(cube));
+  ManifoldManifold* reset = manifold_with_precision(stamped, 0);
+  EXPECT_EQ(manifold_get_precision(reset), 1e-12);
+
+  manifold_delete_manifold(reset);
+  manifold_delete_manifold(stamped);
+  manifold_delete_manifold(ingested);
+  manifold_delete_meshgl64(mesh);
   manifold_delete_manifold(cube);
 }
 

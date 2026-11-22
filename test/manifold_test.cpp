@@ -2106,6 +2106,140 @@ TEST(Manifold, MergeTolerance) {
   EXPECT_EQ(Manifold(mesh.Merge(1e-3f)).Status(), Manifold::Error::NoError);
 }
 
+TEST(Precision, Merge) {
+  MeshGL mesh = CubeSTL();
+  mesh.vertProperties[0] += 1e-4f;
+  EXPECT_EQ(Manifold(mesh.Merge()).Status(), Manifold::Error::NotManifold);
+  EXPECT_EQ(Manifold(mesh.Merge(0, 1e-3)).Status(), Manifold::Error::NoError);
+  EXPECT_EQ(Manifold(mesh.Merge(0, INFINITY)).Status(),
+            Manifold::Error::NotManifold);
+
+  const MeshGL stl = CubeSTL();
+  MeshGL64 mesh64;
+  mesh64.numProp = stl.numProp;
+  mesh64.vertProperties.assign(stl.vertProperties.begin(),
+                               stl.vertProperties.end());
+  mesh64.triVerts.assign(stl.triVerts.begin(), stl.triVerts.end());
+  mesh64.vertProperties[0] += 1e-9;
+  EXPECT_EQ(Manifold(mesh64.Merge()).Status(), Manifold::Error::NotManifold);
+  EXPECT_EQ(Manifold(mesh64.Merge(0, 1e-6)).Status(), Manifold::Error::NoError);
+}
+
+TEST(Precision, Ingest) {
+  const MeshGL64 mesh = Manifold::Sphere(1, {64}).GetMeshGL64();
+  EXPECT_EQ(Manifold(mesh).GetPrecision(), kDefaultRelativePrecision);
+  const Manifold coarse(mesh, 1e-3);
+  EXPECT_EQ(coarse.GetPrecision(), 1e-3);
+  EXPECT_DOUBLE_EQ(coarse.GetEpsilon(), 1e-3 * coarse.BoundingBox().Scale());
+  // Values below the default, including NaN, use the default.
+  EXPECT_EQ(Manifold(mesh, 0).GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_EQ(Manifold(mesh, NAN).GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_EQ(Manifold(mesh, INFINITY).GetPrecision(), kDefaultRelativePrecision);
+  // Transforms and single-input operations keep the precision.
+  EXPECT_EQ(coarse.Translate({10, 0, 0}).GetPrecision(), 1e-3);
+  EXPECT_DOUBLE_EQ(coarse.Translate({10, 0, 0}).GetEpsilon(), 1e-3 * 11);
+  EXPECT_EQ(coarse.Refine(2).GetPrecision(), 1e-3);
+  EXPECT_EQ(coarse.Hull().GetPrecision(), 1e-3);
+  EXPECT_EQ(coarse.TrimByPlane({0, 0, 1}, 0).GetPrecision(), 1e-3);
+  const auto halves = coarse.SplitByPlane({0, 0, 1}, 0);
+  EXPECT_EQ(halves.first.GetPrecision(), 1e-3);
+  EXPECT_EQ(halves.second.GetPrecision(), 1e-3);
+  for (const Manifold& part :
+       (coarse + coarse.Translate({5, 0, 0})).Decompose()) {
+    EXPECT_EQ(part.GetPrecision(), 1e-3);
+  }
+  // A part with an inner void is rebuilt by a separate Decompose path.
+  const Manifold hollow =
+      (Manifold::Cube(vec3(4), true) - Manifold::Cube(vec3(2), true))
+          .WithPrecision(1e-3);
+  for (const Manifold& part :
+       (hollow + coarse.Translate({10, 0, 0})).Decompose()) {
+    EXPECT_EQ(part.GetPrecision(), 1e-3);
+  }
+}
+
+TEST(Precision, WithPrecisionAffectsOnlyLaterOps) {
+  const Manifold fine =
+      Manifold::Sphere(1, {256}) - Manifold::Cube(vec3(1)).Rotate(10, 20, 30);
+  const size_t numTri = fine.NumTri();
+  const Manifold coarse = fine.WithPrecision(1e-2);
+  // The geometry is not recomputed.
+  EXPECT_EQ(coarse.NumTri(), numTri);
+  EXPECT_EQ(coarse.GetPrecision(), 1e-2);
+  EXPECT_DOUBLE_EQ(coarse.GetEpsilon(), 1e-2 * coarse.BoundingBox().Scale());
+  EXPECT_EQ(fine.GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_EQ(fine.WithPrecision(0).GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_EQ(fine.WithPrecision(INFINITY).GetPrecision(),
+            kDefaultRelativePrecision);
+  // Later operations use it.
+  const Manifold cutter = Manifold::Cube(vec3(3), true).Translate({2, 0, 0});
+  const Manifold coarseCut = coarse - cutter.WithPrecision(1e-2);
+  const Manifold fineCut = fine - cutter;
+  EXPECT_EQ(coarseCut.GetPrecision(), 1e-2);
+  EXPECT_LT(coarseCut.NumTri(), fineCut.NumTri());
+  EXPECT_EQ(fine.NumTri(), numTri);
+  EXPECT_EQ((fine - cutter).NumTri(), fineCut.NumTri());
+}
+
+TEST(Precision, SmallestKeepsFineDetail) {
+  const Manifold sphere = Manifold::Sphere(1, {256});
+  const Manifold cube = Manifold::Cube(vec3(1)).Rotate(10, 20, 30);
+  const Manifold allFine = sphere - cube;
+  const Manifold allCoarse =
+      sphere.WithPrecision(1e-2) - cube.WithPrecision(1e-2);
+  const Manifold mixed = sphere - cube.WithPrecision(1e-2);
+  EXPECT_EQ(allCoarse.GetPrecision(), 1e-2);
+  EXPECT_EQ(mixed.GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_LT(allCoarse.NumTri(), allFine.NumTri());
+  EXPECT_EQ(mixed.NumTri(), allFine.NumTri());
+  // An empty operand is ignored.
+  EXPECT_EQ((sphere.WithPrecision(1e-2) + Manifold()).GetPrecision(), 1e-2);
+  EXPECT_EQ((sphere.WithPrecision(1e-2) - Manifold()).GetPrecision(), 1e-2);
+  // Compose and Hull follow the same rule.
+  const Manifold far = cube.WithPrecision(1e-2).Translate({10, 0, 0});
+  EXPECT_EQ((sphere.WithPrecision(1e-3) + far).GetPrecision(), 1e-3);
+  EXPECT_EQ(Manifold::Hull({sphere.WithPrecision(1e-3), far}).GetPrecision(),
+            1e-3);
+  EXPECT_EQ(Manifold::Hull({Manifold(), far}).GetPrecision(), 1e-2);
+  EXPECT_EQ(sphere.WithPrecision(1e-3).MinkowskiSum(far).GetPrecision(), 1e-3);
+}
+
+TEST(Precision, UnionOrder) {
+  const Manifold a = Manifold::Sphere(1, {128}).WithPrecision(1e-2);
+  const Manifold b = Manifold::Cube(vec3(1)).Rotate(10, 20, 30);
+  const Manifold c =
+      Manifold::Cylinder(2, 0.3, 0.3, {64}).Translate({0.5, 0, -1});
+  const Manifold ab = a + b;
+  const Manifold ba = b + a;
+  EXPECT_EQ(ab.NumTri(), ba.NumTri());
+  EXPECT_EQ(ab.GetPrecision(), ba.GetPrecision());
+  const Manifold abc = Manifold::BatchBoolean({a, b, c}, OpType::Add);
+  const Manifold cba = Manifold::BatchBoolean({c, b, a}, OpType::Add);
+  EXPECT_EQ(abc.NumTri(), cba.NumTri());
+  EXPECT_EQ(abc.GetPrecision(), cba.GetPrecision());
+}
+
+TEST(Precision, SharedSubtree) {
+  auto build = []() {
+    return Manifold::Sphere(1, {256}).WithPrecision(1e-2) -
+           Manifold::Cube(vec3(1)).Rotate(10, 20, 30).WithPrecision(1e-2);
+  };
+  const size_t alone = build().NumTri();
+  EXPECT_EQ(build().GetPrecision(), 1e-2);
+
+  // Evaluated first as part of a finer tree, the subtree keeps its own
+  // precision.
+  const Manifold shared = build();
+  const Manifold parent = shared + Manifold::Cube(vec3(1)).Translate({5, 0, 0});
+  const Manifold parent2 = shared.Translate({0, 0, 3}) ^ Manifold::Sphere(5);
+  EXPECT_EQ(parent.GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_GT(parent2.NumTri(), 0);
+  EXPECT_EQ(shared.NumTri(), alone);
+  EXPECT_EQ(shared.GetPrecision(), 1e-2);
+  EXPECT_EQ(parent.NumTri(),
+            (build() + Manifold::Cube(vec3(1)).Translate({5, 0, 0})).NumTri());
+}
+
 TEST(Manifold, MergeCollapsedEdgeParity) {
   MeshGL mesh;
   mesh.vertProperties = {0, 0, 0,  //

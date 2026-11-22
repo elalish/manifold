@@ -1566,32 +1566,27 @@ TEST(BooleanComplex, OpenscadCrash) {
   EXPECT_EQ(m2.IsEmpty(), false);
 }
 
-struct FloatPrecisionGuard {
-  FloatPrecisionGuard() {
-    Quality::SetRelativePrecision(std::numeric_limits<float>::epsilon());
-  }
-  ~FloatPrecisionGuard() { Quality::ResetToDefaults(); }
-};
+constexpr double kFloatPrecision = std::numeric_limits<float>::epsilon();
 
 TEST(BooleanComplex, FloatPrecisionOffsetTriangulation) {
-  FloatPrecisionGuard precision;
-  Manifold result = ReadTestOBJ("Offset1.obj") + ReadTestOBJ("Offset2.obj");
+  Manifold result = ReadTestOBJ("Offset1.obj").WithPrecision(kFloatPrecision) +
+                    ReadTestOBJ("Offset2.obj").WithPrecision(kFloatPrecision);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   EXPECT_EQ(result.NumDegenerateTris(), 0);
 }
 
 TEST(BooleanComplex, FloatPrecisionInfiniteRecursion) {
-  FloatPrecisionGuard precision;
-  Manifold result = ReadTestOBJ("r1.obj") ^ ReadTestOBJ("r2.obj");
+  Manifold result = ReadTestOBJ("r1.obj").WithPrecision(kFloatPrecision) ^
+                    ReadTestOBJ("r2.obj").WithPrecision(kFloatPrecision);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   EXPECT_EQ(result.NumDegenerateTris(), 0);
 }
 
 TEST(BooleanComplex, FloatPrecisionOpenscadCrash) {
-  FloatPrecisionGuard precision;
   ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
-  Manifold m = ReadTestOBJ("openscad-nonmanifold-crash.obj");
+  Manifold m = ReadTestOBJ("openscad-nonmanifold-crash.obj")
+                   .WithPrecision(kFloatPrecision);
   Manifold result = m + m.Translate({0, 0.6, 0});
   EXPECT_FALSE(result.IsEmpty());
   EXPECT_EQ(result.NumDegenerateTris(), 0);
@@ -1600,7 +1595,6 @@ TEST(BooleanComplex, FloatPrecisionOpenscadCrash) {
 // Two copies of a box, the second rotated by about 1e-5 rad and shifted by a
 // few epsilon.
 TEST(BooleanComplex, FloatPrecisionNearlyCoincidentBoxes) {
-  FloatPrecisionGuard precision;
   const std::vector<double> vertA = {
       1.7625499370199436,   -0.17161847043922596, 0.59432777848069829,
       -0.1554500562645591,  -1.8589864326902399,  0.096257006184848976,
@@ -1635,7 +1629,7 @@ TEST(BooleanComplex, FloatPrecisionNearlyCoincidentBoxes) {
   a.triVerts = triA;
   b.vertProperties = vertB;
   b.triVerts = triB;
-  Manifold result = Manifold(a) + Manifold(b);
+  Manifold result = Manifold(a, kFloatPrecision) + Manifold(b, kFloatPrecision);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   EXPECT_EQ(result.NumDegenerateTris(), 0);
 }
@@ -1643,10 +1637,10 @@ TEST(BooleanComplex, FloatPrecisionNearlyCoincidentBoxes) {
 // Chained float-precision Booleans require cleanup to leave an input whose
 // stored projection charts and triangles are valid for the next operation.
 TEST(BooleanComplex, ChainUnion) {
-  FloatPrecisionGuard precision;
   const Manifold a =
       Manifold::Cylinder(2.570012185093316, 2.6802331136119388,
                          1.5474518193522202, {7}, true)
+          .WithPrecision(kFloatPrecision)
           .Rotate(236.24988144879671, 298.57111371984257, 49.932389749508381);
   const Manifold b =
       a.Rotate(2.0441345969329963e-05, -7.2050467977328956e-05, 0)
@@ -1663,10 +1657,10 @@ TEST(BooleanComplex, ChainUnion) {
 }
 
 TEST(BooleanComplex, ChainDifferenceIntersect) {
-  FloatPrecisionGuard precision;
   const Manifold a =
       Manifold::Cylinder(1.7955916755380565, 1.3315655749018656,
                          2.2124353514877702, {7}, true)
+          .WithPrecision(kFloatPrecision)
           .Rotate(299.46151847241464, 190.98152211548648, 266.68012554328135);
   const Manifold b =
       a.Rotate(-0.00010151977398783082, -2.3631099741431339e-05, 0)
@@ -1682,10 +1676,10 @@ TEST(BooleanComplex, ChainDifferenceIntersect) {
 }
 
 TEST(BooleanComplex, ChainBoxesDegenerate) {
-  FloatPrecisionGuard precision;
   const Manifold a =
       Manifold::Cube(
           {2.8871236605476445, 0.86496493615945869, 1.8659543234642821}, true)
+          .WithPrecision(kFloatPrecision)
           .Rotate(194.11577753749276, 240.14056559574527, 279.02818520829715);
   const Manifold b =
       a.Rotate(-2.554114167927299e-05, 7.6297687934467087e-05, 0)
@@ -1701,9 +1695,9 @@ TEST(BooleanComplex, ChainBoxesDegenerate) {
 }
 
 TEST(BooleanComplex, ChainConeCCW) {
-  FloatPrecisionGuard precision;
   const Manifold a =
       Manifold::Cylinder(1.7250583185247816, 2.4376133171205265, 0, {10})
+          .WithPrecision(kFloatPrecision)
           .Rotate(187.43802141475177, 221.23653237080785, 312.45720470388096);
   const Manifold b =
       a.Rotate(5.2402789020943373e-05, 1.9956950666393676e-05, 0)
@@ -1800,11 +1794,9 @@ TEST(BooleanComplex, CoincidentFaceDifferenceSurface) {
        2.4027834289042338,  0.50569026291683494, 1.1891332707636593,    //
        2.3880760387842037,  2.7161521418878753,  -0.22707884361013209,  //
        2.1715648359131081,  2.1444904665265327,  1.6592428315805863});
-  Quality::SetRelativePrecision(1e-3);
-  const Manifold result = Manifold(a) - Manifold(b);
+  const Manifold result = Manifold(a, 1e-3) - Manifold(b, 1e-3);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   EXPECT_LE(MaxDistToInputs(result, {a, b}), result.GetEpsilon());
-  Quality::ResetToDefaults();
 }
 
 // Union of a box and a near copy, rotated by about 1e-7 rad and shifted by
@@ -1830,12 +1822,10 @@ TEST(BooleanComplex, NearCopyBoxUnionSurface) {
        -0.99765371410082826, 0.21422057716622439,  1.0359139424885799});
   for (double precision :
        {1e-7, double(std::numeric_limits<float>::epsilon())}) {
-    Quality::SetRelativePrecision(precision);
-    const Manifold result = Manifold(a) + Manifold(b);
+    const Manifold result = Manifold(a, precision) + Manifold(b, precision);
     EXPECT_EQ(result.Status(), Manifold::Error::NoError);
     EXPECT_LE(MaxDistToInputs(result, {a, b}), result.GetEpsilon());
   }
-  Quality::ResetToDefaults();
 }
 
 // Union of two boxes with nearly coincident faces at relative precision 0.1.
@@ -1875,11 +1865,9 @@ TEST(BooleanComplex, SecondSwapPassStaysNearFlat) {
        -0.2724441964951716,  -2.0312218105997148,  -0.5682174444474275,   //
        1.7376247462542911,   -2.0889965529708121,  0.22128052657839192,   //
        0.32170199104068742,  -2.8049877716309952,  0.49217576662621604});
-  Quality::SetRelativePrecision(0.1);
-  const Manifold result = Manifold(a) + Manifold(b);
+  const Manifold result = Manifold(a, 0.1) + Manifold(b, 0.1);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   EXPECT_EQ(result.NumDegenerateTris(), 0);
-  Quality::ResetToDefaults();
 }
 
 // Union of two boxes with nearly coincident faces at relative precision 0.1.
@@ -1920,11 +1908,9 @@ TEST(BooleanComplex, NormalsReplacedAfterSecondSwapPass) {
        1.1629618136370967,    0.75150667270100158,  -0.10099763004614742,   //
        0.89939240810068433,   1.0591401156206002,   2.3091991910640299,     //
        1.7685461624693455,    0.3943835474757138,   1.9338696191730673});
-  Quality::SetRelativePrecision(0.1);
-  const Manifold result = Manifold(a) + Manifold(b);
+  const Manifold result = Manifold(a, 0.1) + Manifold(b, 0.1);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   EXPECT_EQ(result.NumDegenerateTris(), 0);
-  Quality::ResetToDefaults();
 }
 
 // Union of two boxes with nearly coincident faces at relative precision 0.1.
@@ -1934,7 +1920,6 @@ TEST(BooleanComplex, NormalsReplacedAfterSecondSwapPass) {
 // than epsilon. The operands are built from transforms because exporting them
 // as meshes does not reproduce the case.
 TEST(BooleanComplex, SplitBudgetKeepsSurface) {
-  Quality::SetRelativePrecision(0.1);
   const mat3x4 rotation(
       {0.94469804993758733, 0.31516241673115369, 0.090654539457759115},
       {-0.19640373756460847, 0.3223554968385498, 0.92601971119875426},
@@ -1946,9 +1931,11 @@ TEST(BooleanComplex, SplitBudgetKeepsSurface) {
       {-0.0093788001657158348, 0.012494701435631281, 0.99987795282398639},
       {0.013971172786187758, -0.018612789438371413, 0.0057713010099007533});
   Manifold a = Manifold::Cube(
-      {2.988304647333961, 1.3400567347535224, 1.4924493439680189});
+                   {2.988304647333961, 1.3400567347535224, 1.4924493439680189})
+                   .WithPrecision(0.1);
   Manifold b = Manifold::Cube(
                    {1.382874517622688, 1.7996093400356794, 1.4155875136609744})
+                   .WithPrecision(0.1)
                    .Translate({-0.80667370331071508, 0.36673950493424146, 0});
   b = b.Translate({0, 0, -b.BoundingBox().Size().z});
   b = b.Rotate(0, 0, 39.07068563785451)
@@ -1961,7 +1948,6 @@ TEST(BooleanComplex, SplitBudgetKeepsSurface) {
   EXPECT_EQ(result.NumDegenerateTris(), 0);
   EXPECT_LE(MaxDistToInputs(result, {a.GetMeshGL64(), b.GetMeshGL64()}),
             result.GetEpsilon());
-  Quality::ResetToDefaults();
 }
 
 // Union of a float mesh and a near copy of it at relative precision 0.1.
@@ -2185,13 +2171,11 @@ TEST(BooleanComplex, ShortEdgeAfterColinearKeepsSurface) {
     m.triVerts = tris;
     return m;
   };
-  Quality::SetRelativePrecision(0.1);
-  const Manifold a(mesh(aVerts, aTris));
-  const Manifold b(mesh(bVerts, bTris));
+  const Manifold a(mesh(aVerts, aTris), 0.1);
+  const Manifold b(mesh(bVerts, bTris), 0.1);
   const Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   EXPECT_EQ(result.NumDegenerateTris(), 0);
   EXPECT_LE(MaxDistToInputs(result, {a.GetMeshGL64(), b.GetMeshGL64()}),
             1.3 * result.GetEpsilon());
-  Quality::ResetToDefaults();
 }
