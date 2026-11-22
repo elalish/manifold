@@ -100,9 +100,9 @@ ManifoldCrossSection* manifold_cross_section_square(double x, double y,
   return to_c(new CrossSection(cs));
 }
 
-ManifoldCrossSection* manifold_cross_section_circle(double radius,
-                                                    int circular_segments) {
-  auto cs = CrossSection::Circle(radius, circular_segments);
+ManifoldCrossSection* manifold_cross_section_circle(
+    double radius, const ManifoldCircularQuality* quality) {
+  auto cs = CrossSection::Circle(radius, from_c(quality));
   return to_c(new CrossSection(cs));
 }
 
@@ -214,9 +214,9 @@ ManifoldCrossSection* manifold_cross_section_simplify(
 
 ManifoldCrossSection* manifold_cross_section_offset(
     const ManifoldCrossSection* cs, double delta, ManifoldJoinType jt,
-    double miter_limit, int circular_segments) {
+    double miter_limit, const ManifoldCircularQuality* quality) {
   auto offset =
-      from_c(cs)->Offset(delta, from_c(jt), miter_limit, circular_segments);
+      from_c(cs)->Offset(delta, from_c(jt), miter_limit, from_c(quality));
   return to_c(new CrossSection(offset));
 }
 

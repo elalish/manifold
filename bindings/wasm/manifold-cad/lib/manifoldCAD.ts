@@ -39,6 +39,7 @@ import type {ManifoldToplevel} from 'manifold-3d';
 
 import * as debug from './debug.ts';
 import {garbageCollectFunction, garbageCollectManifold} from './garbage-collector.ts';
+import {applyLevelOfDetail} from './level-of-detail.ts';
 import * as material from './material.ts';
 import {getManifoldModule} from './wasm.ts';
 
@@ -49,7 +50,7 @@ export {importManifold, importModel} from './import-model.ts';
 export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from './level-of-detail.ts';
 
 const manifoldWasm: ManifoldToplevel =
-    garbageCollectManifold(await getManifoldModule());
+    applyLevelOfDetail(garbageCollectManifold(await getManifoldModule()));
 
 const {Mesh, Manifold, CrossSection, triangulate} = manifoldWasm;
 

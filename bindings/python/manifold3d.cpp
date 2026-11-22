@@ -29,6 +29,7 @@
 #include "nanobind/stl/optional.h"
 #include "nanobind/stl/pair.h"
 #include "nanobind/stl/tuple.h"
+#include "nanobind/stl/variant.h"
 #include "nanobind/stl/vector.h"
 
 namespace nb = nanobind;
@@ -208,6 +209,19 @@ using namespace manifold_docstrings;
 // ExecutionContext, so another Python thread can cancel them.
 using release_gil = nb::call_guard<nb::gil_scoped_release>;
 
+// The factories take `quality=` (an int or a CircularQuality) or the int
+// keyword `circular_segments=`.
+using QualityArg = std::optional<std::variant<CircularQuality, int>>;
+CircularQuality ToQuality(const QualityArg& quality,
+                          std::optional<int> circularSegments) {
+  if (quality && circularSegments)
+    throw nb::type_error("pass quality or circular_segments, not both");
+  if (circularSegments) return {*circularSegments};
+  if (!quality) return {};
+  if (const int* segments = std::get_if<int>(&*quality)) return {*segments};
+  return std::get<CircularQuality>(*quality);
+}
+
 // strip original :params: and replace with ours
 const std::string manifold__rotate_xyz =
     manifold__rotate__x_degrees__y_degrees__z_degrees;
@@ -223,23 +237,24 @@ NB_MODULE(manifold3d, m) {
 
   m.def("get_relative_precision", Quality::GetRelativePrecision);
 
-  m.def("set_min_circular_angle", Quality::SetMinCircularAngle,
-        nb::arg("angle"), quality__set_min_circular_angle__angle);
-
-  m.def("set_min_circular_edge_length", Quality::SetMinCircularEdgeLength,
-        nb::arg("length"), quality__set_min_circular_edge_length__length);
-
-  m.def("get_min_circular_angle", Quality::GetMinCircularAngle,
-        quality__get_min_circular_angle);
-
-  m.def("get_min_circular_edge_length", Quality::GetMinCircularEdgeLength,
-        quality__get_min_circular_edge_length);
-
-  m.def("set_circular_segments", Quality::SetCircularSegments,
-        nb::arg("number"), quality__set_circular_segments__number);
-
-  m.def("get_circular_segments", Quality::GetCircularSegments,
-        nb::arg("radius"), quality__get_circular_segments__radius);
+  nb::class_<CircularQuality>(m, "CircularQuality")
+      .def(
+          "__init__",
+          [](CircularQuality* self, int segments, double minAngle,
+             double minEdgeLength) {
+            new (self) CircularQuality{segments, minAngle, minEdgeLength};
+          },
+          nb::arg("segments") = CircularQuality{}.segments,
+          nb::arg("min_angle") = CircularQuality{}.minAngle,
+          nb::arg("min_edge_length") = CircularQuality{}.minEdgeLength)
+      .def_rw("segments", &CircularQuality::segments)
+      .def_rw("min_angle", &CircularQuality::minAngle)
+      .def_rw("min_edge_length", &CircularQuality::minEdgeLength)
+      .def("segments_for", &CircularQuality::SegmentsFor, nb::arg("radius"),
+           circular_quality__segments_for__radius)
+      .def_static("for_divisions", &CircularQuality::ForDivisions,
+                  nb::arg("divisions"), nb::arg("degrees"),
+                  circular_quality__for_divisions__divisions__degrees);
 
   m.def("triangulate", &Triangulate, nb::arg("polygons"),
         nb::arg("epsilon") = -1, nb::arg("allow_convex") = true,
@@ -450,14 +465,16 @@ NB_MODULE(manifold3d, m) {
           manifold__extrude__cross_section__height__n_divisions__twist_degrees__scale_top)
       .def_static(
           "revolve",
-          [](const CrossSection& crossSection, int circularSegments,
-             double revolveDegrees) {
+          [](const CrossSection& crossSection, const QualityArg& quality,
+             double revolveDegrees, std::optional<int> circularSegments) {
             return Manifold::Revolve(crossSection.ToPolygons(),
-                                     circularSegments, revolveDegrees);
+                                     ToQuality(quality, circularSegments),
+                                     revolveDegrees);
           },
-          nb::arg("crossSection"), nb::arg("circular_segments") = 0,
-          nb::arg("revolve_degrees") = 360.0,
-          manifold__revolve__cross_section__circular_segments__revolve_degrees)
+          nb::arg("crossSection"), nb::arg("quality") = nb::none(),
+          nb::arg("revolve_degrees") = 360.0, nb::kw_only(),
+          nb::arg("circular_segments") = nb::none(),
+          manifold__revolve__cross_section__quality__revolve_degrees)
       .def_static(
           "level_set",
           [](const std::function<double(double, double, double)>& f,
@@ -479,13 +496,29 @@ NB_MODULE(manifold3d, m) {
           nb::arg("level") = 0.0, nb::arg("tolerance") = -1,
           manifold__level_set__sdf__bounds__edge_length__level__tolerance__can_parallel)
       .def_static(
-          "cylinder", &Manifold::Cylinder, nb::arg("height"),
-          nb::arg("radius_low"), nb::arg("radius_high") = -1.0f,
-          nb::arg("circular_segments") = 0, nb::arg("center") = false,
-          manifold__cylinder__height__radius_low__radius_high__circular_segments__center)
-      .def_static("sphere", &Manifold::Sphere, nb::arg("radius"),
-                  nb::arg("circular_segments") = 0,
-                  manifold__sphere__radius__circular_segments)
+          "cylinder",
+          [](double height, double radiusLow, double radiusHigh,
+             const QualityArg& quality, bool center,
+             std::optional<int> circularSegments) {
+            return Manifold::Cylinder(height, radiusLow, radiusHigh,
+                                      ToQuality(quality, circularSegments),
+                                      center);
+          },
+          nb::arg("height"), nb::arg("radius_low"),
+          nb::arg("radius_high") = -1.0f, nb::arg("quality") = nb::none(),
+          nb::arg("center") = false, nb::kw_only(),
+          nb::arg("circular_segments") = nb::none(),
+          manifold__cylinder__height__radius_low__radius_high__quality__center)
+      .def_static(
+          "sphere",
+          [](double radius, const QualityArg& quality,
+             std::optional<int> circularSegments) {
+            return Manifold::Sphere(radius,
+                                    ToQuality(quality, circularSegments));
+          },
+          nb::arg("radius"), nb::arg("quality") = nb::none(), nb::kw_only(),
+          nb::arg("circular_segments") = nb::none(),
+          manifold__sphere__radius__quality)
       .def_static("reserve_ids", Manifold::ReserveIDs, nb::arg("n"),
                   manifold__reserve_ids__n);
 
@@ -909,10 +942,18 @@ NB_MODULE(manifold3d, m) {
       .def("simplify", &CrossSection::Simplify, nb::arg("tolerance") = 0,
            cross_section__simplify__tolerance)
       .def(
-          "offset", &CrossSection::Offset, nb::arg("delta"),
+          "offset",
+          [](const CrossSection& self, double delta,
+             CrossSection::JoinType joinType, double miterLimit,
+             const QualityArg& quality, std::optional<int> circularSegments) {
+            return self.Offset(delta, joinType, miterLimit,
+                               ToQuality(quality, circularSegments));
+          },
+          nb::arg("delta"),
           nb::arg("join_type") = CrossSection::JoinType::Round,
-          nb::arg("miter_limit") = 2.0, nb::arg("circular_segments") = 0,
-          cross_section__offset__delta__jointype__miter_limit__circular_segments)
+          nb::arg("miter_limit") = 2.0, nb::arg("quality") = nb::none(),
+          nb::kw_only(), nb::arg("circular_segments") = nb::none(),
+          cross_section__offset__delta__jointype__miter_limit__quality)
       .def(nb::self + nb::self, cross_section__operator_plus__q)
       .def(nb::self - nb::self, cross_section__operator_minus__q)
       .def(nb::self ^ nb::self, cross_section__operator_xor__q)
@@ -945,18 +986,27 @@ NB_MODULE(manifold3d, m) {
           manifold__extrude__cross_section__height__n_divisions__twist_degrees__scale_top)
       .def(
           "revolve",
-          [](const CrossSection& self, int circularSegments,
-             double revolveDegrees) {
-            return Manifold::Revolve(self.ToPolygons(), circularSegments,
+          [](const CrossSection& self, const QualityArg& quality,
+             double revolveDegrees, std::optional<int> circularSegments) {
+            return Manifold::Revolve(self.ToPolygons(),
+                                     ToQuality(quality, circularSegments),
                                      revolveDegrees);
           },
-          nb::arg("circular_segments") = 0, nb::arg("revolve_degrees") = 360.0,
-          manifold__revolve__cross_section__circular_segments__revolve_degrees)
+          nb::arg("quality") = nb::none(), nb::arg("revolve_degrees") = 360.0,
+          nb::kw_only(), nb::arg("circular_segments") = nb::none(),
+          manifold__revolve__cross_section__quality__revolve_degrees)
 
       .def_static("square", &CrossSection::Square, nb::arg("size"),
                   nb::arg("center") = false,
                   cross_section__square__size__center)
-      .def_static("circle", &CrossSection::Circle, nb::arg("radius"),
-                  nb::arg("circular_segments") = 0,
-                  cross_section__circle__radius__circular_segments);
+      .def_static(
+          "circle",
+          [](double radius, const QualityArg& quality,
+             std::optional<int> circularSegments) {
+            return CrossSection::Circle(radius,
+                                        ToQuality(quality, circularSegments));
+          },
+          nb::arg("radius"), nb::arg("quality") = nb::none(), nb::kw_only(),
+          nb::arg("circular_segments") = nb::none(),
+          cross_section__circle__radius__quality);
 }

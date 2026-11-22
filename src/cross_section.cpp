@@ -375,18 +375,21 @@ CrossSection CrossSection::Square(const vec2 size, bool center) {
  *
  * @param radius Radius of the circle. Must be positive and finite; otherwise
  * returns an empty CrossSection.
- * @param circularSegments Number of segments along its diameter. Default is
- * calculated by the static Quality defaults according to the radius.
+ * @param quality Number of segments in a full circle, see CircularQuality.
+ * An int sets CircularQuality::segments.
  */
-CrossSection CrossSection::Circle(double radius, int circularSegments) {
+CrossSection CrossSection::Circle(double radius, CircularQuality quality) {
   if (radius <= 0.0 || !std::isfinite(radius)) return CrossSection();
-  const int n = circularSegments > 2 ? circularSegments
-                                     : Quality::GetCircularSegments(radius);
+  const int n = quality.SegmentsFor(radius);
   SimplePolygon circle(n);
   const double dPhi = 360.0 / n;
   for (int i = 0; i < n; ++i)
     circle[i] = {radius * cosd(dPhi * i), radius * sind(dPhi * i)};
   return CrossSection(shared_path(std::move(circle)));
+}
+
+CrossSection CrossSection::Circle(double radius, int circularSegments) {
+  return Circle(radius, CircularQuality{circularSegments});
 }
 
 /**
@@ -662,19 +665,25 @@ CrossSection CrossSection::Simplify(double tolerance) const {
  * minimum allowed). See the [Clipper2
  * MiterLimit](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)
  * page for a visual example.
- * @param circularSegments Number of segments per 360 degrees of
+ * @param quality Number of segments per 360 degrees of
  * <B>JoinType::Round</B> corners (roughly, the number of vertices that
- * will be added to each contour). Default is calculated by the static Quality
- * defaults according to the radius.
+ * will be added to each contour), see CircularQuality. An int sets
+ * CircularQuality::segments.
  */
 CrossSection CrossSection::Offset(double delta, JoinType jointype,
                                   double miterLimit,
-                                  int circularSegments) const {
+                                  CircularQuality quality) const {
   // Qualified: unqualified lookup inside the class finds this member and
   // hides the namespace-scope polygon offset.
   Polygons offset = manifold::Offset(GetPaths()->paths_, delta, jointype,
-                                     miterLimit, circularSegments);
+                                     miterLimit, quality);
   return CrossSection(shared_paths(std::move(offset)));
+}
+
+CrossSection CrossSection::Offset(double delta, JoinType jointype,
+                                  double miterLimit,
+                                  int circularSegments) const {
+  return Offset(delta, jointype, miterLimit, CircularQuality{circularSegments});
 }
 
 /**

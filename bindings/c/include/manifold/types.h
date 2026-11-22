@@ -114,6 +114,13 @@ static inline ManifoldMeshGL64Options manifold_meshgl64_options_init(void) {
   return options;
 }
 
+// Circular tessellation settings, see CircularQuality in common.h.
+typedef struct ManifoldCircularQuality {
+  int segments;
+  double min_angle;
+  double min_edge_length;
+} ManifoldCircularQuality;
+
 typedef struct ManifoldRayHit {
   uint32_t original_id;
   uint32_t face_id;

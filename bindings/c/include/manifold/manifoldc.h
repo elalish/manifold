@@ -179,17 +179,20 @@ ManifoldManifold* manifold_empty(void);
 ManifoldManifold* manifold_copy(const ManifoldManifold* m);
 ManifoldManifold* manifold_tetrahedron(void);
 ManifoldManifold* manifold_cube(double x, double y, double z, int center);
+// quality may be NULL for the default CircularQuality.
 ManifoldManifold* manifold_cylinder(double height, double radius_low,
-                                    double radius_high, int circular_segments,
+                                    double radius_high,
+                                    const ManifoldCircularQuality* quality,
                                     int center);
-ManifoldManifold* manifold_sphere(double radius, int circular_segments);
+ManifoldManifold* manifold_sphere(double radius,
+                                  const ManifoldCircularQuality* quality);
 ManifoldManifold* manifold_of_meshgl(const ManifoldMeshGL* mesh);
 ManifoldManifold* manifold_of_meshgl64(const ManifoldMeshGL64* mesh);
 ManifoldManifold* manifold_extrude(const ManifoldPolygons* cs, double height,
                                    int slices, double twist_degrees,
                                    double scale_x, double scale_y);
 ManifoldManifold* manifold_revolve(const ManifoldPolygons* cs,
-                                   int circular_segments,
+                                   const ManifoldCircularQuality* quality,
                                    double revolve_degrees);
 ManifoldManifoldVec* manifold_decompose(const ManifoldManifold* m);
 
@@ -222,7 +225,6 @@ size_t manifold_num_prop_vert(const ManifoldManifold* m);
 int manifold_genus(const ManifoldManifold* m);
 double manifold_surface_area(const ManifoldManifold* m);
 double manifold_volume(const ManifoldManifold* m);
-int manifold_get_circular_segments(double radius);
 int manifold_original_id(const ManifoldManifold* m);
 uint32_t manifold_reserve_ids(uint32_t n);
 // A NULL fun sets the new properties to zero.
@@ -294,8 +296,8 @@ ManifoldCrossSection* manifold_cross_section_non_zero_polygons(
     const ManifoldPolygons* p);
 ManifoldCrossSection* manifold_cross_section_square(double x, double y,
                                                     int center);
-ManifoldCrossSection* manifold_cross_section_circle(double radius,
-                                                    int circular_segments);
+ManifoldCrossSection* manifold_cross_section_circle(
+    double radius, const ManifoldCircularQuality* quality);
 ManifoldCrossSectionVec* manifold_cross_section_decompose(
     const ManifoldCrossSection* cs);
 
@@ -358,7 +360,7 @@ ManifoldCrossSection* manifold_cross_section_simplify(
     const ManifoldCrossSection* cs, double tolerance);
 ManifoldCrossSection* manifold_cross_section_offset(
     const ManifoldCrossSection* cs, double delta, ManifoldJoinType jt,
-    double miter_limit, int circular_segments);
+    double miter_limit, const ManifoldCircularQuality* quality);
 
 // CrossSection Info
 
@@ -428,12 +430,13 @@ void manifold_version(int version[3]);
 
 void manifold_set_relative_precision(double precision);
 double manifold_get_relative_precision(void);
-void manifold_set_min_circular_angle(double degrees);
-void manifold_set_min_circular_edge_length(double length);
-double manifold_get_min_circular_angle();
-double manifold_get_min_circular_edge_length();
-void manifold_set_circular_segments(int number);
-void manifold_reset_to_circular_defaults(void);
+
+// Circular Quality
+// quality may be NULL for the default CircularQuality.
+int manifold_circular_quality_segments_for(
+    const ManifoldCircularQuality* quality, double radius);
+ManifoldCircularQuality manifold_circular_quality_for_divisions(int divisions,
+                                                                double degrees);
 
 // Manifold Mesh Extraction
 

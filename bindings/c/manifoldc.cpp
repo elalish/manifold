@@ -397,15 +397,17 @@ ManifoldManifold* manifold_cube(double x, double y, double z, int center) {
 }
 
 ManifoldManifold* manifold_cylinder(double height, double radius_low,
-                                    double radius_high, int circular_segments,
+                                    double radius_high,
+                                    const ManifoldCircularQuality* quality,
                                     int center) {
-  auto m = Manifold::Cylinder(height, radius_low, radius_high,
-                              circular_segments, center);
+  auto m = Manifold::Cylinder(height, radius_low, radius_high, from_c(quality),
+                              center);
   return to_c(new Manifold(m));
 }
 
-ManifoldManifold* manifold_sphere(double radius, int circular_segments) {
-  auto m = Manifold::Sphere(radius, circular_segments);
+ManifoldManifold* manifold_sphere(double radius,
+                                  const ManifoldCircularQuality* quality) {
+  auto m = Manifold::Sphere(radius, from_c(quality));
   return to_c(new Manifold(m));
 }
 
@@ -490,9 +492,9 @@ ManifoldManifold* manifold_extrude(const ManifoldPolygons* cs, double height,
 }
 
 ManifoldManifold* manifold_revolve(const ManifoldPolygons* cs,
-                                   int circular_segments,
+                                   const ManifoldCircularQuality* quality,
                                    double revolve_degrees) {
-  auto m = Manifold::Revolve(*from_c(cs), circular_segments, revolve_degrees);
+  auto m = Manifold::Revolve(*from_c(cs), from_c(quality), revolve_degrees);
   return to_c(new Manifold(m));
 }
 
@@ -894,31 +896,16 @@ double manifold_get_relative_precision() {
   return Quality::GetRelativePrecision();
 }
 
-void manifold_set_min_circular_angle(double degrees) {
-  Quality::SetMinCircularAngle(degrees);
+int manifold_circular_quality_segments_for(
+    const ManifoldCircularQuality* quality, double radius) {
+  return from_c(quality).SegmentsFor(radius);
 }
 
-void manifold_set_min_circular_edge_length(double length) {
-  Quality::SetMinCircularEdgeLength(length);
+ManifoldCircularQuality manifold_circular_quality_for_divisions(
+    int divisions, double degrees) {
+  const CircularQuality q = CircularQuality::ForDivisions(divisions, degrees);
+  return {q.segments, q.minAngle, q.minEdgeLength};
 }
-
-double manifold_get_min_circular_angle() {
-  return Quality::GetMinCircularAngle();
-}
-
-double manifold_get_min_circular_edge_length() {
-  return Quality::GetMinCircularEdgeLength();
-}
-
-void manifold_set_circular_segments(int number) {
-  Quality::SetCircularSegments(number);
-}
-
-int manifold_get_circular_segments(double radius) {
-  return Quality::GetCircularSegments(radius);
-}
-
-void manifold_reset_to_circular_defaults() { Quality::ResetToDefaults(); }
 
 ManifoldTriangulation* manifold_triangulate(const ManifoldPolygons* ps,
                                             double epsilon) {

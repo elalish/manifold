@@ -24,7 +24,7 @@ namespace manifold {
  * @param edgeLength Distance between the corners.
  * @param radius Radius of the frame members.
  * @param circularSegments Number of segments in the cylinders and spheres.
- * Defaults to Quality.GetCircularSegments().
+ * Defaults to CircularQuality::SegmentsFor().
  */
 Manifold RoundedFrame(double edgeLength, double radius, int circularSegments) {
   Manifold edge = Manifold::Cylinder(edgeLength, radius, -1, circularSegments);

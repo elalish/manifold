@@ -92,6 +92,11 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .value("Miter", CrossSection::JoinType::Miter)
       .value("Bevel", CrossSection::JoinType::Bevel);
 
+  value_object<CircularQuality>("circularQuality")
+      .field("segments", &CircularQuality::segments)
+      .field("minAngle", &CircularQuality::minAngle)
+      .field("minEdgeLength", &CircularQuality::minEdgeLength);
+
   value_object<Rect>("rect").field("min", &Rect::min).field("max", &Rect::max);
   value_object<Box>("box").field("min", &Box::min).field("max", &Box::max);
 
@@ -149,7 +154,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_EvenOdd", &cross_js::EvenOdd);
   function("_NonZero", &cross_js::NonZero);
   function("_Square", &CrossSection::Square);
-  function("_Circle", &CrossSection::Circle);
+  function("_Circle", select_overload<CrossSection(double, CircularQuality)>(
+                          &CrossSection::Circle));
   function("_crossSectionUnionN", &cross_js::UnionN);
   function("_crossSectionDifferenceN", &cross_js::DifferenceN);
   function("_crossSectionIntersectionN", &cross_js::IntersectionN);
@@ -209,12 +215,18 @@ EMSCRIPTEN_BINDINGS(whatever) {
 
   // Manifold Static Methods
   function("_Cube", &Manifold::Cube);
-  function("_Cylinder", &Manifold::Cylinder);
-  function("_Sphere", &Manifold::Sphere);
+  function(
+      "_Cylinder",
+      select_overload<Manifold(double, double, double, CircularQuality, bool)>(
+          &Manifold::Cylinder));
+  function("_Sphere", select_overload<Manifold(double, CircularQuality)>(
+                          &Manifold::Sphere));
   function("_Tetrahedron", &Manifold::Tetrahedron);
   function("_Extrude", &Manifold::Extrude);
   function("_Triangulate", &Triangulate);
-  function("_Revolve", &Manifold::Revolve);
+  function("_Revolve",
+           select_overload<Manifold(const Polygons&, CircularQuality, double)>(
+               &Manifold::Revolve));
   function("_LevelSet", &man_js::LevelSet);
   function("_Merge", &js::Merge);
   function("_ReserveIDs", &Manifold::ReserveIDs);
@@ -229,13 +241,11 @@ EMSCRIPTEN_BINDINGS(whatever) {
   // Quality Globals
   function("setRelativePrecision", &Quality::SetRelativePrecision);
   function("getRelativePrecision", &Quality::GetRelativePrecision);
-  function("setMinCircularAngle", &Quality::SetMinCircularAngle);
-  function("setMinCircularEdgeLength", &Quality::SetMinCircularEdgeLength);
-  function("getMinCircularAngle", &Quality::GetMinCircularAngle);
-  function("getMinCircularEdgeLength", &Quality::GetMinCircularEdgeLength);
-  function("setCircularSegments", &Quality::SetCircularSegments);
-  function("getCircularSegments", &Quality::GetCircularSegments);
   function("resetToCircularDefaults", &Quality::ResetToDefaults);
+
+  function("_DefaultCircularQuality", &js::DefaultCircularQuality);
+  function("_SegmentsFor", &js::SegmentsFor);
+  function("_ForDivisions", &CircularQuality::ForDivisions);
 
   function("initTBB", &initTBB);
 }

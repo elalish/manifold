@@ -213,6 +213,11 @@ CrossSection::JoinType from_c(ManifoldJoinType join_type) {
   return jt;
 }
 
+CircularQuality from_c(const ManifoldCircularQuality* q) {
+  if (q == nullptr) return {};
+  return {q->segments, q->min_angle, q->min_edge_length};
+}
+
 manifold::Box* from_c(ManifoldBox* m) {
   return reinterpret_cast<manifold::Box*>(m);
 }

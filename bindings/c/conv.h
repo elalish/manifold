@@ -54,6 +54,8 @@ const manifold::MeshGL* from_c(const ManifoldMeshGL* m);
 const manifold::MeshGL64* from_c(const ManifoldMeshGL64* m);
 OpType from_c(ManifoldOpType op);
 CrossSection::JoinType from_c(ManifoldJoinType jt);
+// NULL gives the default CircularQuality.
+CircularQuality from_c(const ManifoldCircularQuality* q);
 manifold::Box* from_c(ManifoldBox* m);
 const manifold::Box* from_c(const ManifoldBox* m);
 manifold::Rect* from_c(ManifoldRect* r);

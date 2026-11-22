@@ -34,7 +34,7 @@ namespace manifold {
  * @param minorRadius Radius of the small cross-section of the imaginary donut.
  * @param threadRadius Radius of the small cross-section of the actual object.
  * @param circularSegments Number of linear segments making up the threadRadius
- * circle. Default is Quality.GetCircularSegments().
+ * circle. Default is CircularQuality::SegmentsFor().
  * @param linearSegments Number of segments along the length of the knot.
  * Default makes roughly square facets.
  */
@@ -44,8 +44,7 @@ Manifold TorusKnot(int p, int q, double majorRadius, double minorRadius,
   int kLoops = gcd(p, q);
   p /= kLoops;
   q /= kLoops;
-  int n = circularSegments > 2 ? circularSegments
-                               : Quality::GetCircularSegments(threadRadius);
+  int n = CircularQuality{circularSegments}.SegmentsFor(threadRadius);
   int m =
       linearSegments > 2 ? linearSegments : n * q * majorRadius / threadRadius;
 

@@ -24,10 +24,10 @@
  */
 
 export type * from './manifold-global-types';
-export type {MeshOptions, triangulate, setRelativePrecision, getRelativePrecision, setMinCircularAngle, setMinCircularEdgeLength, getMinCircularAngle, getMinCircularEdgeLength, setCircularSegments, getCircularSegments, resetToCircularDefaults} from './manifold-encapsulated-types';
+export type {MeshOptions, triangulate, setRelativePrecision, getRelativePrecision, segmentsFor, forDivisions, resetToCircularDefaults} from './manifold-encapsulated-types';
 export {CrossSection, Manifold, Mesh} from './manifold-encapsulated-types';
 
-import type {triangulate, setRelativePrecision, getRelativePrecision, setMinCircularAngle, setMinCircularEdgeLength, getMinCircularAngle, getMinCircularEdgeLength, setCircularSegments, getCircularSegments, resetToCircularDefaults} from './manifold-encapsulated-types';
+import type {triangulate, setRelativePrecision, getRelativePrecision, segmentsFor, forDivisions, resetToCircularDefaults} from './manifold-encapsulated-types';
 import {CrossSection, Manifold, Mesh} from './manifold-encapsulated-types';
 
 export interface ManifoldToplevel {
@@ -37,12 +37,8 @@ export interface ManifoldToplevel {
   triangulate: typeof triangulate;
   setRelativePrecision: typeof setRelativePrecision;
   getRelativePrecision: typeof getRelativePrecision;
-  setMinCircularAngle: typeof setMinCircularAngle;
-  setMinCircularEdgeLength: typeof setMinCircularEdgeLength;
-  getMinCircularAngle: typeof getMinCircularAngle;
-  getMinCircularEdgeLength: typeof getMinCircularEdgeLength;
-  setCircularSegments: typeof setCircularSegments;
-  getCircularSegments: typeof getCircularSegments;
+  segmentsFor: typeof segmentsFor;
+  forDivisions: typeof forDivisions;
   resetToCircularDefaults: typeof resetToCircularDefaults;
   setup: () => void;
 }
