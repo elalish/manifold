@@ -89,7 +89,7 @@ export type {
   Mat3, Mat4, Vec2, Vec3,
   Polygons, SimplePolygon, JoinType,
   Box, Rect, RayHit, ExecutionContext,
-  ErrorStatus
+  ErrorStatus, CircularQuality
 } from 'manifold-3d';
 
 /* See the Developer Guide for more detail on these: */
