@@ -348,13 +348,8 @@ double Manifold::GetEpsilon() const {
  * default.
  */
 Manifold Manifold::WithPrecision(double relPrecision) const {
-  auto leafImpl = GetCsgLeafNode(AtomicLoadShared(&ctx_).get()).GetImpl();
-  if (leafImpl->status_ != Error::NoError)
-    return PropagateStatus(leafImpl->status_);
-  auto impl = std::make_shared<Impl>(*leafImpl);
-  impl->relPrecision_ = ClampRelPrecision(relPrecision);
-  impl->epsilon_ = impl->relPrecision_ * impl->bBox_.Scale();
-  return Manifold(impl);
+  return Manifold(GetCsgLeafNode(AtomicLoadShared(&ctx_).get())
+                      .WithPrecision(ClampRelPrecision(relPrecision)));
 }
 
 /**
@@ -362,7 +357,7 @@ Manifold Manifold::WithPrecision(double relPrecision) const {
  * WithPrecision(), or taken from its inputs.
  */
 double Manifold::GetPrecision() const {
-  return GetCsgLeafNode().GetImpl()->relPrecision_;
+  return GetCsgLeafNode().RelPrecision();
 }
 
 /**

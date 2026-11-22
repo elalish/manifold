@@ -48,7 +48,8 @@ class CsgLeafNode final : public CsgNode {
  public:
   CsgLeafNode();
   CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_);
-  CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_, mat3x4 transform_);
+  CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_, mat3x4 transform_,
+              double relPrecision);
   // mutex_ is not copyable; snapshot the source under its lock.
   CsgLeafNode(const CsgLeafNode& other);
 
@@ -74,7 +75,11 @@ class CsgLeafNode final : public CsgNode {
   size_t NumVert() const;
 
   // Returns the relative precision without triggering eager transform.
-  double RelPrecision() const;
+  double RelPrecision() const { return relPrecision_; }
+
+  // Returns this leaf with the given relative precision, without copying the
+  // mesh. GetImpl() applies it along with any pending transform.
+  std::shared_ptr<CsgLeafNode> WithPrecision(double relPrecision) const;
 
  private:
   mutable std::shared_ptr<const Manifold::Impl> pImpl_;
@@ -82,6 +87,8 @@ class CsgLeafNode final : public CsgNode {
   // Lazy realization mutates these through const accessors on a shared node,
   // so every access takes mutex_.
   mutable std::mutex mutex_;
+  // Applied to pImpl_ by GetImpl(). Const, so it is read without mutex_.
+  const double relPrecision_;
 };
 
 class CsgOpNode final : public CsgNode {

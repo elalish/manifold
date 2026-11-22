@@ -91,16 +91,17 @@ std::shared_ptr<CsgNode> CsgNode::Rotate(double xDegrees, double yDegrees,
   return Transform(transform);
 }
 
-CsgLeafNode::CsgLeafNode() : pImpl_(std::make_shared<Manifold::Impl>()) {}
+CsgLeafNode::CsgLeafNode() : CsgLeafNode(std::make_shared<Manifold::Impl>()) {}
 
 CsgLeafNode::CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_)
-    : pImpl_(pImpl_) {}
+    : pImpl_(pImpl_), relPrecision_(pImpl_->relPrecision_) {}
 
 CsgLeafNode::CsgLeafNode(std::shared_ptr<const Manifold::Impl> pImpl_,
-                         mat3x4 transform_)
-    : pImpl_(pImpl_), transform_(transform_) {}
+                         mat3x4 transform_, double relPrecision)
+    : pImpl_(pImpl_), transform_(transform_), relPrecision_(relPrecision) {}
 
-CsgLeafNode::CsgLeafNode(const CsgLeafNode& other) {
+CsgLeafNode::CsgLeafNode(const CsgLeafNode& other)
+    : relPrecision_(other.relPrecision_) {
   std::lock_guard<std::mutex> lock(other.mutex_);
   pImpl_ = other.pImpl_;
   transform_ = other.transform_;
@@ -108,11 +109,23 @@ CsgLeafNode::CsgLeafNode(const CsgLeafNode& other) {
 
 std::shared_ptr<const Manifold::Impl> CsgLeafNode::GetImpl() const {
   std::lock_guard<std::mutex> lock(mutex_);
-  if (transform_ == mat3x4(la::identity)) return pImpl_;
-  pImpl_ =
-      std::make_shared<const Manifold::Impl>(pImpl_->Transform(transform_));
+  if (transform_ == mat3x4(la::identity) &&
+      pImpl_->relPrecision_ == relPrecision_)
+    return pImpl_;
+  auto impl = std::make_shared<Manifold::Impl>(pImpl_->Transform(transform_));
+  if (impl->relPrecision_ != relPrecision_) {
+    impl->relPrecision_ = relPrecision_;
+    impl->epsilon_ = relPrecision_ * impl->bBox_.Scale();
+  }
+  pImpl_ = impl;
   transform_ = la::identity;
   return pImpl_;
+}
+
+std::shared_ptr<CsgLeafNode> CsgLeafNode::WithPrecision(
+    double relPrecision) const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return std::make_shared<CsgLeafNode>(pImpl_, transform_, relPrecision);
 }
 
 std::shared_ptr<CsgLeafNode> CsgLeafNode::ToLeafNode(
@@ -122,7 +135,8 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::ToLeafNode(
 
 std::shared_ptr<CsgNode> CsgLeafNode::Transform(const mat3x4& m) const {
   std::lock_guard<std::mutex> lock(mutex_);
-  return std::make_shared<CsgLeafNode>(pImpl_, m * Mat4(transform_));
+  return std::make_shared<CsgLeafNode>(pImpl_, m * Mat4(transform_),
+                                       relPrecision_);
 }
 
 CsgNodeType CsgLeafNode::GetNodeType() const { return CsgNodeType::Leaf; }
@@ -157,11 +171,6 @@ Box CsgLeafNode::GetBoundingBox() const {
 size_t CsgLeafNode::NumVert() const {
   std::lock_guard<std::mutex> lock(mutex_);
   return pImpl_->NumVert();
-}
-
-double CsgLeafNode::RelPrecision() const {
-  std::lock_guard<std::mutex> lock(mutex_);
-  return pImpl_->relPrecision_;
 }
 
 std::shared_ptr<CsgLeafNode> ImplToLeaf(Manifold::Impl&& impl) {
@@ -256,7 +265,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
     }
     bbox = bbox.Union(node->GetBoundingBox());
     if (!node->pImpl_->IsEmpty())
-      relPrecision = std::min(relPrecision, node->pImpl_->relPrecision_);
+      relPrecision = std::min(relPrecision, node->relPrecision_);
 
     vertIndices.push_back(numVert);
     edgeIndices.push_back(numEdge * 2);
