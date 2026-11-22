@@ -79,7 +79,7 @@ template <typename Precision, typename I>
 void MergeMeshGLP(MeshGLP<Precision, I>& mesh, Precision requestedTolerance) {
   ZoneScoped;
 
-  if (mesh.numProp < 3 ||
+  if (mesh.numProp < 3 || mesh.vertProperties.size() % mesh.numProp != 0 ||
       mesh.mergeFromVert.size() != mesh.mergeToVert.size()) {
     return;
   }

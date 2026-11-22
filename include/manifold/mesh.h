@@ -112,7 +112,8 @@ struct MeshGLP {
   I numProp = 3;
   /// Flat, GL-style interleaved list of all vertex properties: propVal =
   /// vertProperties[vert * numProp + propIdx]. The first three properties are
-  /// always the position x, y, z. The stride of the array is numProp.
+  /// always the position x, y, z. The stride of the array is numProp, and its
+  /// length must be a multiple of numProp.
   std::vector<Precision> vertProperties;
   /// The vertex indices of the three triangle corners in CCW (from the outside)
   /// order, for each triangle.
