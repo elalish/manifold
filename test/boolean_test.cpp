@@ -94,7 +94,7 @@ TEST(Boolean, MeshGLRoundTrip) {
 TEST(Boolean, Normals) {
   const MeshGL cubeGL = CubeSTL().Merge();
   const Manifold cube(cubeGL);
-  const Manifold sphere = Manifold::Sphere(60).CalculateNormals(0).AsOriginal();
+  const Manifold sphere = Manifold::Sphere(60).CalculateNormals().AsOriginal();
   const MeshGL sphereGL = sphere.GetMeshGL();
 
   Manifold result =
@@ -118,8 +118,8 @@ TEST(Boolean, Normals) {
 TEST(Boolean, MissingNormals) {
   const Manifold noNormals = Manifold::Cube(vec3(1), true);
   const Manifold hasNormals =
-      Manifold::Cube(vec3(2), true).Translate({0, 0, -1}).CalculateNormals(0);
-  const MeshGL combo = (noNormals + hasNormals).GetMeshGL(0);
+      Manifold::Cube(vec3(2), true).Translate({0, 0, -1}).CalculateNormals();
+  const MeshGL combo = (noNormals + hasNormals).GetMeshGL();
   Manifold result(combo);
   EXPECT_FALSE(result.IsEmpty());
 }
@@ -454,7 +454,7 @@ TEST(Boolean, CreatePropertiesSlow) {
 }
 
 TEST(Boolean, SimpleProperties) {
-  Manifold cube = Manifold::Cube(vec3(2), true).CalculateNormals(0, 180);
+  Manifold cube = Manifold::Cube(vec3(2), true).CalculateNormals(180);
   EXPECT_TRUE(cube.HasSimpleProps());
   Manifold flange =
       Manifold::Extrude(cube.Slice(), 2, 0, 0, vec2(2)).AsOriginal();

@@ -84,7 +84,7 @@ suite('Manifold Bindings', () => {
     const {Manifold, Mesh} = manifoldModule;
     // Normals split the vertices, so the mesh without its merge vectors is
     // open and merge() builds them.
-    const cube = Manifold.cube().calculateNormals(0).getMesh();
+    const cube = Manifold.cube().calculateNormals().getMesh();
     const open = new Mesh({
       numProp: cube.numProp,
       vertProperties: cube.vertProperties,
@@ -198,9 +198,9 @@ suite('Manifold Bindings', () => {
     // edgeDivisions return 0 for *any* tolerance. This triggers longest == 0 in
     // the keepInterior block — the integer divide-by-zero that traps in WASM.
     const cube =
-        manifoldModule.Manifold.cube([10, 10, 10]).calculateNormals(0, 30);
+        manifoldModule.Manifold.cube([10, 10, 10]).calculateNormals(30);
     const smooth =
-        manifoldModule.Manifold.ofMesh(cube.getMesh(0)).smoothByNormals(0);
+        manifoldModule.Manifold.ofMesh(cube.getMesh()).smoothByNormals();
     // Before the fix, any tolerance value crashed: RuntimeError: divide by zero
     const refined = smooth.refineToTolerance(0.1);
     expect(refined.volume()).toBeGreaterThan(0);

@@ -305,9 +305,8 @@ ManifoldManifold* manifold_level_set_seq(
   return level_set(sdf, bounds, edge_length, level, tolerance, true, ctx);
 }
 
-ManifoldManifold* manifold_smooth_by_normals(const ManifoldManifold* m,
-                                             int normalIdx) {
-  auto smoothed = from_c(m)->SmoothByNormals(normalIdx);
+ManifoldManifold* manifold_smooth_by_normals(const ManifoldManifold* m) {
+  auto smoothed = from_c(m)->SmoothByNormals();
   return to_c(new Manifold(smoothed));
 }
 
@@ -517,11 +516,6 @@ ManifoldMeshGL* manifold_get_meshgl(const ManifoldManifold* m) {
   return to_c(new MeshGL(from_c(m)->GetMeshGL()));
 }
 
-ManifoldMeshGL* manifold_get_meshgl_w_normals(const ManifoldManifold* m,
-                                              int32_t normalIdx) {
-  return to_c(new MeshGL(from_c(m)->GetMeshGL(normalIdx)));
-}
-
 ManifoldMeshGL* manifold_meshgl_copy(const ManifoldMeshGL* m) {
   return to_c(new MeshGL(*from_c(m)));
 }
@@ -533,11 +527,6 @@ ManifoldMeshGL* manifold_meshgl_merge(const ManifoldMeshGL* m,
 
 ManifoldMeshGL64* manifold_get_meshgl64(const ManifoldManifold* m) {
   return to_c(new MeshGL64(from_c(m)->GetMeshGL64()));
-}
-
-ManifoldMeshGL64* manifold_get_meshgl64_w_normals(const ManifoldManifold* m,
-                                                  int32_t normalIdx) {
-  return to_c(new MeshGL64(from_c(m)->GetMeshGL64(normalIdx)));
 }
 
 ManifoldMeshGL64* manifold_meshgl64_copy(const ManifoldMeshGL64* m) {
@@ -890,9 +879,8 @@ ManifoldManifold* manifold_execution_context_of_meshgl64(
 }
 
 ManifoldManifold* manifold_calculate_normals(const ManifoldManifold* m,
-                                             int normal_idx,
                                              double min_sharp_angle) {
-  auto man = from_c(m)->CalculateNormals(normal_idx, min_sharp_angle);
+  auto man = from_c(m)->CalculateNormals(min_sharp_angle);
   return to_c(new Manifold(man));
 }
 

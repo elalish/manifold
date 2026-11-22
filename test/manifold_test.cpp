@@ -56,7 +56,7 @@ int NumUnique(const std::vector<T>& in) {
 // Impl::Transform / Compose / CreateProperties was added to support.
 Manifold MixedNormalsCubePlusSphere(double sphereRadius = 5.0) {
   return Manifold(CubeSTL().Merge()).Translate({20, 0, 0}) +
-         Manifold::Sphere(sphereRadius, 32).CalculateNormals(0);
+         Manifold::Sphere(sphereRadius, 32).CalculateNormals();
 }
 
 // Count verts on the sphere surface (|pos| ~ sphereRadius) whose stored
@@ -100,12 +100,12 @@ TEST(Manifold, GetMeshGL) {
 
 TEST(Manifold, SharedTopologyCopyIsolation) {
   const Manifold sphere =
-      Manifold::Sphere(1, 16).CalculateNormals(0, 180).SmoothByNormals();
-  const Manifold cube = Manifold::Cube().Refine(2).CalculateNormals(0, 30);
+      Manifold::Sphere(1, 16).CalculateNormals(180).SmoothByNormals();
+  const Manifold cube = Manifold::Cube().Refine(2).CalculateNormals(30);
   for (const Manifold& source : {sphere, cube}) {
     const MeshGL64 original = source.GetMeshGL64();
     const std::vector<std::function<Manifold(const Manifold&)>> operations = {
-        [](const Manifold& m) { return m.CalculateNormals(0, 30); },
+        [](const Manifold& m) { return m.CalculateNormals(30); },
         [](const Manifold& m) { return m.Refine(2); },
         [](const Manifold& m) { return m.Simplify(0.02); },
         [](const Manifold& m) { return m.RemoveDegenerates(); },
@@ -142,7 +142,7 @@ TEST(Manifold, SharedTopologyCopyIsolation) {
 #if (defined(__cpp_exceptions) || defined(_CPPUNWIND)) && \
     !defined(__EMSCRIPTEN__)
 TEST(Manifold, SharedTopologyThrowingCallbacks) {
-  const Manifold source = Manifold::Cube().CalculateNormals(0, 30);
+  const Manifold source = Manifold::Cube().CalculateNormals(30);
   const MeshGL64 original = source.GetMeshGL64();
   EXPECT_THROW(source.WarpBatch([](VecView<vec3> points) {
     points[0].x += 1;
@@ -163,14 +163,14 @@ TEST(Manifold, SharedTopologyThrowingCallbacks) {
 
 #ifndef __EMSCRIPTEN__
 TEST(Manifold, SharedTopologyConcurrentCopies) {
-  const Manifold source = Manifold::Sphere(1, 16).CalculateNormals(0, 180);
+  const Manifold source = Manifold::Sphere(1, 16).CalculateNormals(180);
   const MeshGL64 original = source.GetMeshGL64();
   std::atomic<bool> intact = true;
   std::vector<std::thread> threads;
   for (int i = 0; i < 4; ++i) {
     threads.emplace_back([&] {
       for (int iteration = 0; iteration < 10; ++iteration) {
-        const Manifold result = source.CalculateNormals(0, 30)
+        const Manifold result = source.CalculateNormals(30)
                                     .Refine(2)
                                     .Mirror({1, 2, 3})
                                     .SetProperties(1, nullptr);
@@ -527,17 +527,15 @@ TEST(Manifold, ErrorPropagationCalculateNormals) {
   in.vertProperties[2 * 3 + 1] = NAN;
   Manifold errored(in);
   ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
-  EXPECT_EQ(errored.CalculateNormals(0).Status(),
+  EXPECT_EQ(errored.CalculateNormals().Status(),
             Manifold::Error::NonFiniteVertex);
 }
 
-// CalculateNormals(idx) followed by GetMeshGL() (no idx) used to drop
-// the transform-on-export step, returning input-frame data.
 TEST(Manifold, NormalsCavity) {
   // The #1712 repro: inner-sphere normals from a Boolean diff should point
   // toward the origin (outward from the surrounding solid).
   MeshGL mesh = (Manifold::Sphere(10.0, 32) - Manifold::Sphere(3.0, 32))
-                    .CalculateNormals(0)
+                    .CalculateNormals()
                     .GetMeshGL();
   ASSERT_GE(mesh.numProp, 6);
   auto [good, bad] = CountSphereNormalAlignment(
@@ -551,7 +549,7 @@ TEST(Manifold, NormalsRotateBeforeCalc) {
   // rotated faceNormal_ and stores world-frame at slot 0.
   MeshGL mesh = Manifold::Sphere(10.0, 32)
                     .Rotate(45, 0, 0)
-                    .CalculateNormals(0)
+                    .CalculateNormals()
                     .GetMeshGL();
   auto [_, bad] = CountSphereNormalAlignment(
       mesh, 10.0, 3, [](vec3 pos) { return la::normalize(pos); });
@@ -575,7 +573,7 @@ TEST(Manifold, NormalsRotateAfterCalc) {
   // Rotation *after* CalculateNormals: Impl::Transform eager-transforms the
   // stored slot 0..2 so it tracks the new orientation.
   MeshGL mesh = Manifold::Sphere(10.0, 32)
-                    .CalculateNormals(0)
+                    .CalculateNormals()
                     .Rotate(45, 0, 0)
                     .GetMeshGL();
   auto [_, bad] = CountSphereNormalAlignment(
@@ -624,19 +622,11 @@ TEST(Manifold, NormalsSmoothByNormalsNoArg) {
   EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
 }
 
-TEST(Manifold, NormalsNonStandardSlotNotRecorded) {
-  // CalculateNormals(non-zero) does NOT set the per-run recording, since a
-  // non-standard slot can't be safely auto-substituted on GetMeshGL(-1).
-  MeshGL mesh = Manifold::Sphere(10.0, 32).CalculateNormals(3).GetMeshGL();
-  ASSERT_GT(mesh.NumRun(), 0u);
-  EXPECT_FALSE(mesh.HasNormals(0));
-}
-
 TEST(Manifold, NormalsDroppedWithChannels) {
   // With fewer than three properties left, the recorded normals no longer
   // exist, so export must not write them into the next vertex.
   const Manifold m = (Manifold::Cube(vec3(2), true) + Manifold::Sphere(5, 8))
-                         .CalculateNormals(0)
+                         .CalculateNormals()
                          .SetProperties(1, nullptr);
   const MeshGL64 mesh = m.GetMeshGL64();
   ASSERT_EQ(mesh.numProp, 4);
@@ -645,6 +635,44 @@ TEST(Manifold, NormalsDroppedWithChannels) {
   for (size_t v = 0; v < mesh.NumVert(); ++v)
     EXPECT_EQ(mesh.vertProperties[4 * v + 3], 0) << v;
   EXPECT_NEAR(Manifold(mesh).Volume(), m.Volume(), 1e-9);
+}
+
+TEST(Manifold, NormalsNormalizedPerRun) {
+  // GetMeshGL normalizes each run that records normals, even when other runs
+  // don't. The overlap makes the Boolean interpolate the sphere's normals to
+  // less than unit length. The cube's unflagged slot 0..2 is left alone.
+  const Manifold cube =
+      Manifold::Cube(vec3(6), true)
+          .Translate({4, 0, 0})
+          .SetProperties(3, [](double* newProp, vec3, const double*) {
+            newProp[0] = 0;
+            newProp[1] = 0;
+            newProp[2] = 2;
+          });
+  const Manifold mixed = Manifold::Sphere(5, 32).CalculateNormals() + cube;
+  auto check = [](const auto& gl) {
+    int flagged = 0;
+    int unflagged = 0;
+    for (size_t run = 0; run < gl.NumRun(); ++run) {
+      for (size_t i = gl.runIndex[run]; i < gl.runIndex[run + 1]; ++i) {
+        const size_t v = gl.triVerts[i];
+        const vec3 n(gl.vertProperties[v * gl.numProp + 3],
+                     gl.vertProperties[v * gl.numProp + 4],
+                     gl.vertProperties[v * gl.numProp + 5]);
+        if (gl.HasNormals(run)) {
+          ++flagged;
+          EXPECT_NEAR(la::length(n), 1, 1e-6) << v;
+        } else {
+          ++unflagged;
+          EXPECT_NEAR(la::length(n - vec3(0, 0, 2)), 0, 1e-6) << v;
+        }
+      }
+    }
+    EXPECT_GT(flagged, 0);
+    EXPECT_GT(unflagged, 0);
+  };
+  check(mixed.GetMeshGL());
+  check(mixed.GetMeshGL64());
 }
 
 TEST(Manifold, NormalsSharedPropVertMixedFlagsUndefined) {
@@ -698,60 +726,49 @@ TEST(Manifold, NormalsSharedPropVertMixedFlagsUndefined) {
   EXPECT_GT(run1Bad, 0);
 }
 
-TEST(Manifold, GetNormalLegacyContract) {
-  // Pre-#1718, slot N normals were stored in per-mesh frame and runTransform
-  // had to be applied on read - there was no runFlags bit 1 to mark
-  // world-frame storage. GetNormal must still honour that contract when
-  // reading a MeshGL without the bit set, or SmoothByNormals on legacy data
-  // produces wrong tangents.
-  //
-  // Build twins: take a CalculateNormals'd rotated cube, emit both as a
-  // modern MeshGL (world-frame + bit 1 set) and as a legacy MeshGL (the same
-  // normals inverse-rotated into per-mesh frame, bit 1 cleared). Both should
-  // produce the same SmoothByNormals.Refine output if GetNormal recomposes
-  // correctly.
+TEST(Manifold, GetNormalUnflaggedMeshFrame) {
+  // A hand-built MeshGL without hasNormals stores slot 0..2 in the mesh frame.
+  // Recompose those values with the run transform before smoothing.
   const Manifold rotated =
-      Manifold::Cube({1, 1, 1}, true).Rotate(30, 45, 0).CalculateNormals(0);
+      Manifold::Cube({1, 1, 1}, true).Rotate(30, 45, 0).CalculateNormals();
   MeshGL gl_modern = rotated.GetMeshGL();
   ASSERT_GT(gl_modern.NumRun(), 0u);
   ASSERT_TRUE(gl_modern.HasNormals(0));
 
-  MeshGL gl_legacy = gl_modern;
-  std::vector<bool> visited(gl_legacy.NumVert(), false);
-  for (size_t run = 0; run < gl_legacy.NumRun(); ++run) {
-    // Invert the per-run normal transform that the legacy GetNormal will
-    // apply on read, so the stored values look "per-mesh frame" again.
+  MeshGL gl_mesh_frame = gl_modern;
+  std::vector<bool> visited(gl_mesh_frame.NumVert(), false);
+  for (size_t run = 0; run < gl_mesh_frame.NumRun(); ++run) {
+    // Convert world-frame values to the input mesh frame for this run.
     const mat3 fwd =
-        la::inverse(la::transpose(mat3(gl_legacy.GetRunTransform(run)))) *
-        (gl_legacy.Backside(run) ? -1.0 : 1.0);
+        la::inverse(la::transpose(mat3(gl_mesh_frame.GetRunTransform(run)))) *
+        (gl_mesh_frame.Backside(run) ? -1.0 : 1.0);
     const mat3 inv = la::inverse(fwd);
-    // `data() + i` rather than `&v[i]`: the latter is UB when `i == size()`
-    // (one-past-the-end of the final run) and traps under libc++ fast
-    // hardening - see #1735.
-    for (uint32_t* itr = gl_legacy.triVerts.data() + gl_legacy.runIndex[run];
-         itr < gl_legacy.triVerts.data() + gl_legacy.runIndex[run + 1]; ++itr) {
+    for (uint32_t* itr =
+             gl_mesh_frame.triVerts.data() + gl_mesh_frame.runIndex[run];
+         itr < gl_mesh_frame.triVerts.data() + gl_mesh_frame.runIndex[run + 1];
+         ++itr) {
       const uint32_t v = *itr;
       if (visited[v]) continue;
       visited[v] = true;
-      vec3 n(gl_legacy.vertProperties[v * gl_legacy.numProp + 3],
-             gl_legacy.vertProperties[v * gl_legacy.numProp + 4],
-             gl_legacy.vertProperties[v * gl_legacy.numProp + 5]);
+      vec3 n(gl_mesh_frame.vertProperties[v * gl_mesh_frame.numProp + 3],
+             gl_mesh_frame.vertProperties[v * gl_mesh_frame.numProp + 4],
+             gl_mesh_frame.vertProperties[v * gl_mesh_frame.numProp + 5]);
       n = inv * n;
-      gl_legacy.vertProperties[v * gl_legacy.numProp + 3] = n.x;
-      gl_legacy.vertProperties[v * gl_legacy.numProp + 4] = n.y;
-      gl_legacy.vertProperties[v * gl_legacy.numProp + 5] = n.z;
+      gl_mesh_frame.vertProperties[v * gl_mesh_frame.numProp + 3] = n.x;
+      gl_mesh_frame.vertProperties[v * gl_mesh_frame.numProp + 4] = n.y;
+      gl_mesh_frame.vertProperties[v * gl_mesh_frame.numProp + 5] = n.z;
     }
-    gl_legacy.runFlags[run] &= ~uint8_t(2);
+    gl_mesh_frame.runFlags[run] &= ~uint8_t(2);
   }
-  ASSERT_FALSE(gl_legacy.HasNormals(0));
+  ASSERT_FALSE(gl_mesh_frame.HasNormals(0));
 
   Manifold m_modern(gl_modern);
-  Manifold m_legacy(gl_legacy);
+  Manifold m_mesh_frame(gl_mesh_frame);
 
-  Manifold sm_modern = m_modern.SmoothByNormals(0).Refine(4);
-  Manifold sm_legacy = m_legacy.SmoothByNormals(0).Refine(4);
-  EXPECT_NEAR(sm_modern.Volume(), sm_legacy.Volume(), 1e-4);
-  EXPECT_NEAR(sm_modern.SurfaceArea(), sm_legacy.SurfaceArea(), 1e-4);
+  Manifold sm_modern = m_modern.SmoothByNormals().Refine(4);
+  Manifold sm_mesh_frame = m_mesh_frame.SmoothByNormals().Refine(4);
+  EXPECT_NEAR(sm_modern.Volume(), sm_mesh_frame.Volume(), 1e-4);
+  EXPECT_NEAR(sm_modern.SurfaceArea(), sm_mesh_frame.SurfaceArea(), 1e-4);
 }
 
 TEST(Manifold, MixedNormalsDefaultIDRoundTrip) {
@@ -800,8 +817,7 @@ TEST(Manifold, UntrackedRunsGroupedByNormals) {
 }
 
 TEST(Manifold, TransformMixedNormalsPerMeshID) {
-  // Mixed Boolean output (no-normals + with-normals): the result's
-  // AllHaveNormals() is false (AND across meshIDs), but the with-normals
+  // Mixed Boolean output (no-normals + with-normals): the with-normals
   // meshIDs still hold world-frame normals at slot 0..2 that must rotate
   // with a subsequent Transform. Impl::Transform must per-meshID iterate,
   // not skip on the whole-impl flag.
@@ -812,11 +828,66 @@ TEST(Manifold, TransformMixedNormalsPerMeshID) {
   EXPECT_EQ(bad, 0);
 }
 
+TEST(Manifold, AsOriginalMixedNormalsKept) {
+  // AsOriginal of a mixed result keeps two runs under one ID, one with the
+  // sphere's normals and one for the cube without. The sphere's normals still
+  // rotate, triID still matches the output order, and a MeshGL round trip
+  // keeps both runs. The overlap interleaves the two kinds of triangles, and
+  // the IDs cover untracked, reserved, above the reserved range, and equal to
+  // the next reserved ID.
+  const Manifold sphere = Manifold::Sphere(5, 32).CalculateNormals();
+  const Manifold cube = Manifold::Cube(vec3(6), true).Translate({4, 0, 0});
+  for (const Manifold& mixed : {sphere + cube, cube + sphere}) {
+    for (const int id : {-1, 0, 1 << 29, -2}) {
+      const int useID =
+          id == -2 ? static_cast<int>(Manifold::ReserveIDs(1)) + 1 : id;
+      const Manifold original = mixed.AsOriginal(useID);
+      const MeshGL gl = original.GetMeshGL();
+      ASSERT_EQ(gl.NumRun(), 2u) << id;
+      EXPECT_EQ(gl.runOriginalID[0], gl.runOriginalID[1]) << id;
+      EXPECT_NE(gl.HasNormals(0), gl.HasNormals(1)) << id;
+      const MeshGL round = Manifold(gl).GetMeshGL();
+      ASSERT_EQ(round.NumRun(), 2u) << id;
+      EXPECT_NE(round.HasNormals(0), round.HasNormals(1)) << id;
+      auto outward = [](vec3 pos) { return la::normalize(pos); };
+      const auto expected = CountSphereNormalAlignment(
+          mixed.Rotate(90, 0, 0).GetMeshGL(), 5.0, 3, outward);
+      const auto actual = CountSphereNormalAlignment(
+          original.Rotate(90, 0, 0).GetMeshGL(), 5.0, 3, outward);
+      EXPECT_GT(actual.first, 0) << id;
+      EXPECT_EQ(actual, expected) << id;
+      const MeshGL tri = original.TriID2FaceID().GetMeshGL();
+      int mismatch = 0;
+      for (size_t t = 0; t < tri.NumTri(); ++t) mismatch += tri.faceID[t] != t;
+      EXPECT_EQ(mismatch, 0) << id;
+    }
+  }
+}
+
+TEST(Manifold, MinkowskiKeepsNormals) {
+  // Minkowski unions the input with hulls that have no normals and calls
+  // AsOriginal(0), so only the input's surviving triangles keep their normals.
+  const Manifold nonConvex =
+      (Manifold::Cube(vec3(2), true) - Manifold::Sphere(0.75, 8))
+          .CalculateNormals();
+  const Manifold ball = Manifold::Sphere(0.1, 8);
+  const MeshGL sum = nonConvex.MinkowskiSum(ball).GetMeshGL();
+  ASSERT_EQ(sum.NumRun(), 2u);
+  EXPECT_TRUE(sum.HasNormals(0));
+  EXPECT_FALSE(sum.HasNormals(1));
+  // Erosion keeps none of the input's triangles, so nothing records normals.
+  const MeshGL difference = nonConvex.MinkowskiDifference(ball).GetMeshGL();
+  ASSERT_EQ(difference.NumRun(), 1u);
+  EXPECT_FALSE(difference.HasNormals(0));
+  for (const MeshGL* gl : {&sum, &difference})
+    for (float x : gl->vertProperties) EXPECT_TRUE(std::isfinite(x));
+}
+
 TEST(Manifold, ComposeMixedNormalsPerMeshID) {
   // Compose's per-node eager-transform check is per-Relation, not whole-node.
   // Pass a mixed Manifold with a pending Rotate into a 3-input BatchBoolean,
   // forcing the disjoint Compose path where node->transform_ is non-identity
-  // and node->pImpl_->AllHaveNormals() is false (mixed). Sphere's normals
+  // and the node mixes meshIDs with and without normals. Sphere's normals
   // within the mixed input must still rotate.
   const Manifold mixed_rot = MixedNormalsCubePlusSphere().Rotate(90, 0, 0);
   const Manifold t1 = Manifold::Tetrahedron().Translate({-50, 0, 0});
@@ -842,30 +913,12 @@ TEST(Manifold, BooleanSubtractMixedQPerMeshIDNegation) {
   EXPECT_EQ(bad, 0);
 }
 
-TEST(Manifold, CalculateNormalsNonZeroIdxSurvivesTransform) {
-  // Non-zero normalIdx is the legacy deferred-transform path: SetNormals
-  // stores slot N in per-mesh frame, and GetMeshGL(N)'s legacy export
-  // applies the per-run runTransform to recover world-frame. This must
-  // survive transforms applied between CalculateNormals and GetMeshGL.
-  const int idx = 3;
-  MeshGL gl = Manifold::Sphere(5.0, 32)
-                  .Rotate(30)
-                  .CalculateNormals(idx)
-                  .Rotate(60)
-                  .GetMeshGL(idx);
-  ASSERT_GE(gl.numProp, 3 + idx + 3);
-  auto [good, bad] = CountSphereNormalAlignment(
-      gl, 5.0, 3 + idx, [](vec3 pos) { return la::normalize(pos); });
-  EXPECT_GT(good, 0);
-  EXPECT_EQ(bad, 0);
-}
-
 TEST(Manifold, ErrorPropagationSmoothByNormals) {
   MeshGL in = TetGL();
   in.vertProperties[2 * 3 + 1] = NAN;
   Manifold errored(in);
   ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
-  EXPECT_EQ(errored.SmoothByNormals(0).Status(),
+  EXPECT_EQ(errored.SmoothByNormals().Status(),
             Manifold::Error::NonFiniteVertex);
 }
 
@@ -1836,9 +1889,22 @@ TEST(Manifold, MeshRelationRefine) {
 }
 
 TEST(Manifold, MeshRelationRefinePrecision) {
-  MeshGL inGL = WithPositionColors(Csaszar()).GetMeshGL();
+  Manifold source = Manifold(Csaszar()).CalculateNormals(180);
+  const Box bbox = source.BoundingBox();
+  const vec3 size = bbox.Size();
+  const Manifold input = source.SetProperties(
+      6, [bbox, size](double* newProp, vec3 pos, const double* oldProp) {
+        for (const int i : {0, 1, 2}) {
+          newProp[i] = oldProp[i];
+          newProp[i + 3] = (pos[i] - bbox.min[i]) / size[i];
+        }
+      });
+  ASSERT_EQ(input.NumProp(), 6);
+  MeshGL inGL = input.GetMeshGL();
+  ASSERT_EQ(inGL.numProp, 9);
   const int id = inGL.runOriginalID[0];
-  Manifold csaszar = Manifold(inGL).CalculateNormals(3, 180).SmoothByNormals(3);
+  Manifold csaszar = Manifold(inGL).CalculateNormals(180).SmoothByNormals();
+  ASSERT_EQ(csaszar.NumProp(), 6);
 
   csaszar = csaszar.RefineToTolerance(0.05);
   ExpectMeshes(csaszar, {{2135, 4270, 6}});
@@ -2067,7 +2133,7 @@ TEST(Manifold, MirroredNormals) {
   // mirrored along with it, so the resulting mesh vertices do not get
   // duplicated. We check that the MeshGL vertex count remains the same, and
   // that the mirrored normals remain outward-pointing.
-  const Manifold s = Manifold::Sphere(1.0, 32).CalculateNormals(0, 180);
+  const Manifold s = Manifold::Sphere(1.0, 32).CalculateNormals(180);
   const MeshGL mesh = s.GetMeshGL();
   const MeshGL mirrored = s.Mirror({1, 0, 0}).GetMeshGL();
   EXPECT_EQ(mesh.NumVert(), mirrored.NumVert());
