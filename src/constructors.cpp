@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cmath>
 #include <limits>
 
 #include "csg_tree.h"
@@ -23,10 +24,11 @@
 
 namespace manifold {
 namespace {
-// Divisions a revolve of degrees, already in (0, 360], makes from a full-circle
-// segment count.
+// Divisions a revolve of degrees, already in (0, 360], makes from a positive
+// full-circle segment count, rounded up. The relative 1e-12 keeps
+// floating-point error from rounding a whole count up to the next one.
 int RevolveDivisions(int segments, double degrees) {
-  return std::max(1, static_cast<int>(segments * degrees / 360));
+  return static_cast<int>(std::ceil(segments * degrees / 360 * (1 - 1e-12)));
 }
 
 std::shared_ptr<Manifold::Impl> ExtrudeImpl(const Polygons& crossSection,
@@ -288,8 +290,8 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
  * @param crossSection A set of non-overlapping polygons to revolve.
  * @param quality Number of segments in a full circle, see CircularQuality. An
  * int sets CircularQuality::segments. A partial revolve uses the matching
- * fraction of it, rounded down, with at least one. For an exact number of
- * divisions, use CircularQuality::ForDivisions().
+ * fraction of it, rounded up. For an exact number of divisions, use
+ * CircularQuality::ForDivisions().
  * @param revolveDegrees Number of degrees to revolve. Must be finite and
  * nonzero. A negative value revolves the other way. Default is 360 degrees.
  */
@@ -458,11 +460,11 @@ Manifold Manifold::Revolve(const Polygons& crossSection,
 /**
  * Returns a quality that makes Manifold::Revolve() divide the given angle into
  * exactly this many divisions. Like Revolve, it uses the angle's magnitude,
- * clamped to 360 degrees. A full revolution needs at least three divisions, and
- * a revolve of 240 degrees or more at least two, and a tiny angle cannot get
- * more divisions than the largest int count allows. Past those limits it
- * returns the closest count Revolve allows. A non-finite or zero angle, which
- * Revolve rejects, gives the default quality.
+ * clamped to 360 degrees. A revolve of more than 120 degrees needs at least two
+ * divisions, and of more than 240 degrees at least three, and a tiny angle
+ * cannot get more divisions than the largest int count allows. Past those
+ * limits it returns the closest count Revolve allows. A non-finite or zero
+ * angle, which Revolve rejects, gives the default quality.
  *
  * @param divisions Number of divisions. Values below 1 are treated as 1.
  * @param degrees Angle Revolve will sweep.
@@ -473,7 +475,7 @@ CircularQuality CircularQuality::ForDivisions(int divisions, double degrees) {
   divisions = std::max(divisions, 1);
   // Aim for the middle of the range of counts that give these divisions, then
   // step once if rounding put it just outside.
-  const double target = std::round((divisions + 0.5) * 360 / degrees);
+  const double target = std::round((divisions - 0.5) * 360 / degrees);
   int segments = static_cast<int>(
       std::min(std::max(target, 3.0), double(std::numeric_limits<int>::max())));
   const int got = RevolveDivisions(segments, degrees);

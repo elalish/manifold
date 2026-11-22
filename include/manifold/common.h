@@ -672,9 +672,9 @@ enum class JoinType {
 struct CircularQuality {
   /// Number of segments in a full 360-degree circle, the same as passing an
   /// int to the factory. Partial revolves use the matching fraction of it,
-  /// rounded down, with at least one (see ForDivisions()). A Sphere rounds it
-  /// up to a multiple of four. Values below 3 apply no constraint, except that
-  /// Sphere takes any positive count.
+  /// rounded up (see ForDivisions()). A Sphere rounds it up to a multiple of
+  /// four. Values below 3 apply no constraint, except that Sphere takes any
+  /// positive count.
   int segments = 0;
   /// Minimum angle in degrees between consecutive segments. The angle
   /// increases if the segments hit the minimum edge length.

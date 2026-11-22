@@ -1323,16 +1323,50 @@ TEST(Manifold, RevolveDivisionsForAngle) {
     const size_t numVert = Manifold::Revolve(ring, q, degrees).NumVert();
     return static_cast<int>(numVert / 4) - (std::abs(degrees) < 360 ? 1 : 0);
   };
-  EXPECT_EQ(numDivisions({30}, 90), 7);
+  // A partial revolve rounds the matching fraction of a full circle up.
+  EXPECT_EQ(numDivisions({30}, 90), 8);
+  EXPECT_EQ(numDivisions({32}, 90), 8);
+  EXPECT_EQ(numDivisions({30}, 100), 9);
+  EXPECT_EQ(numDivisions({30}, 360), 30);
+  EXPECT_EQ(numDivisions({30}, 1), 1);
   EXPECT_EQ(Manifold::Revolve(ring, 30, 90).NumVert(),
             Manifold::Revolve(ring, CircularQuality{30}, 90).NumVert());
 
-  for (const double degrees : {1.0, 45.0, 90.0, 179.0, 359.0, 360.0, 0.7,
-                               360.0 / 19, 7.5, 100.0 / 3, -90.0, 720.0}) {
+  // An int, a struct, and a count derived from the angle and edge length all
+  // round the same way. The ring's outer radius 5.5 gets 36 by default.
+  const CircularQuality derived{0, 12.5, 0.1};
+  ASSERT_EQ(derived.SegmentsFor(5.5), 28);
+  ASSERT_EQ(CircularQuality{}.SegmentsFor(5.5), 36);
+  for (const double degrees : {10.0, 90.0, 100.0, 250.0, 359.0, 360.0}) {
+    const int expected = static_cast<int>(std::ceil(28 * degrees / 360));
+    EXPECT_EQ(Manifold::Revolve(ring, 28, degrees).NumVert(),
+              Manifold::Revolve(ring, CircularQuality{28}, degrees).NumVert())
+        << degrees;
+    EXPECT_EQ(numDivisions(CircularQuality{28}, degrees), expected) << degrees;
+    EXPECT_EQ(numDivisions(derived, degrees), expected) << degrees;
+    EXPECT_EQ(numDivisions({}, degrees),
+              static_cast<int>(std::ceil(36 * degrees / 360)))
+        << degrees;
+  }
+
+  // A count that is whole in exact arithmetic is not rounded up by
+  // floating-point error, here from k * 3.6 not being exact in binary (k = 19
+  // gives 19.000000000000004 without the tolerance).
+  for (int k = 1; k <= 100; ++k) {
+    ASSERT_EQ(numDivisions({100}, k * 3.6), k) << k;
+  }
+  for (int k = 1; k <= 19; ++k) {
+    ASSERT_EQ(numDivisions({19 * 7}, k * (360.0 / 19)), 7 * k) << k;
+  }
+
+  for (const double degrees :
+       {1.0, 45.0, 90.0, 120.0, 179.0, 240.0, 241.0, 359.0, 359.999999, 360.0,
+        0.7, 1e-4, 360.0 / 19, 7.5, 100.0 / 3, 0.1 * 3, -90.0, 720.0}) {
     for (int n = 1; n <= 40; ++n) {
       const double d = std::min(std::abs(degrees), 360.0);
-      // The documented limits: a full revolution needs 3, 240 degrees 2.
-      const int fewest = d == 360 ? 3 : d >= 240 ? 2 : 1;
+      // The documented limits: more than 120 degrees needs 2, more than 240
+      // needs 3.
+      const int fewest = d > 240 ? 3 : d > 120 ? 2 : 1;
       EXPECT_EQ(
           numDivisions(CircularQuality::ForDivisions(n, degrees), degrees),
           std::max(n, fewest))
@@ -1347,11 +1381,15 @@ TEST(Manifold, RevolveDivisionsForAngle) {
   for (int i = 0; i < 1000; ++i) {
     const double degrees = angle(gen);
     const int n = count(gen);
-    const int fewest = degrees >= 240 ? 2 : 1;
+    const int fewest = degrees > 240 ? 3 : degrees > 120 ? 2 : 1;
     EXPECT_EQ(numDivisions(CircularQuality::ForDivisions(n, degrees), degrees),
               std::max(n, fewest))
         << degrees << " degrees, " << n << " divisions";
   }
+  // A tiny angle gets no more divisions than the largest count gives.
+  const int maxInt = std::numeric_limits<int>::max();
+  EXPECT_EQ(CircularQuality::ForDivisions(40, 1e-6).segments, maxInt);
+  EXPECT_EQ(numDivisions({maxInt}, 1e-6), 6);
   EXPECT_EQ(CircularQuality::ForDivisions(5, 0).segments, 0);
   EXPECT_EQ(CircularQuality::ForDivisions(5, NAN).segments, 0);
 }

@@ -82,8 +82,9 @@ def test_quality_per_thread():
 def test_for_divisions():
     ring = CrossSection.square((1, 1)).translate((4.5, 0))
     # A partial revolve of this ring has 4 vertices per slice.
-    assert ring.revolve(30, 90).num_vert() == 4 * (7 + 1)
-    for degrees in [0.7, 360 / 19, 90, 239]:
+    # 30 per full circle over 90 degrees is 7.5, rounded up to 8.
+    assert ring.revolve(30, 90).num_vert() == 4 * (8 + 1)
+    for degrees in [0.7, 360 / 19, 90, 119]:
         for n in [1, 5, 21]:
             q = CircularQuality.for_divisions(n, degrees)
             assert ring.revolve(q, degrees).num_vert() == 4 * (n + 1)

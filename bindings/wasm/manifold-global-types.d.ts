@@ -130,8 +130,7 @@ export type JoinType = 'Square'|'Round'|'Miter'|'Bevel';
  *
  * - `segments`: Number of segments in a full 360-degree circle, the same as
  *   passing a number. Partial revolves use the matching fraction of it,
- *   rounded down, with at least one. A sphere rounds it up to a multiple of
- *   four.
+ *   rounded up. A sphere rounds it up to a multiple of four.
  *   Default is 0, meaning no constraint is applied.
  * - `minAngle`: Minimum angle in degrees between consecutive segments. Default
  *   is 10.

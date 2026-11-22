@@ -53,11 +53,11 @@ export function segmentsFor(quality: CircularQuality, radius: number): number;
 /**
  * Returns a quality that makes {@link Manifold.revolve} divide the given angle
  * into exactly this many divisions. Like revolve, it uses the angle's
- * magnitude, clamped to 360 degrees. A full revolution needs at least three
- * divisions, and a revolve of 240 degrees or more at least two, and a tiny
- * angle cannot get more divisions than the largest int count allows. Past
- * those limits it returns the closest count revolve allows. A non-finite or
- * zero angle, which revolve rejects, gives the default quality.
+ * magnitude, clamped to 360 degrees. A revolve of more than 120 degrees needs
+ * at least two divisions, and of more than 240 degrees at least three, and a
+ * tiny angle cannot get more divisions than the largest int count allows.
+ * Past those limits it returns the closest count revolve allows. A non-finite
+ * or zero angle, which revolve rejects, gives the default quality.
  *
  * @param divisions Number of divisions. Values below 1 are treated as 1.
  * @param degrees Angle revolve will sweep.
@@ -146,8 +146,8 @@ export class CrossSection {
    *
    * @param quality Number of segments in a full circle, see
    * {@link CircularQuality}. A partial revolve uses the matching fraction of
-   * it, rounded down, with at least one. For an exact number of divisions,
-   * use {@link forDivisions}.
+   * it, rounded up. For an exact number of divisions, use
+   * {@link forDivisions}.
    * @param revolveDegrees Number of degrees to revolve. Must be finite and
    * nonzero. A negative value revolves the other way. Default is 360 degrees.
    * @group Transformations
@@ -567,8 +567,8 @@ export class Manifold {
    * @param polygons A set of non-overlapping polygons to revolve.
    * @param quality Number of segments in a full circle, see
    * {@link CircularQuality}. A partial revolve uses the matching fraction of
-   * it, rounded down, with at least one. For an exact number of divisions,
-   * use {@link forDivisions}.
+   * it, rounded up. For an exact number of divisions, use
+   * {@link forDivisions}.
    * @param revolveDegrees Number of degrees to revolve. Must be finite and
    * nonzero. A negative value revolves the other way. Default is 360 degrees.
    * @group Polygons

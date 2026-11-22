@@ -29,7 +29,7 @@ TEST(CBIND, circular_quality) {
   EXPECT_EQ(manifold_circular_quality_segments_for(NULL, 1.0), 8);
   const ManifoldCircularQuality exact =
       manifold_circular_quality_for_divisions(21, 0.7);
-  EXPECT_EQ(exact.segments, 11057);
+  EXPECT_EQ(exact.segments, 10543);
 
   ManifoldCrossSection* circle = manifold_cross_section_circle(2.0, &q);
   EXPECT_EQ(manifold_cross_section_num_vert(circle), 16);
