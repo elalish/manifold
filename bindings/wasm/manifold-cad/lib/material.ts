@@ -51,7 +51,8 @@ export function cleanup() {
  * Return a shallow copy of the input manifold with the given material
  * properties applied. They will be carried along through operations.
  * This uses asOriginal(), which keeps the recorded normals if any operand of a
- * Boolean result had them.
+ * Boolean result had them. The first three extra property channels of the
+ * other operands are then treated as normals too.
  *
  * @param manifold The input object.
  * @param material A set of material properties to apply to this manifold.

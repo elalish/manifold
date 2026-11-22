@@ -42,7 +42,8 @@ struct Material {
   /// Gives the property index where the first normal channel
   /// can be found. 0 indicates the first three property channels following
   /// position. A negative value uses the recorded normals if every run of the
-  /// mesh has them (runFlags bit 1), and otherwise does not save normals.
+  /// mesh has them (runFlags bit 1), and otherwise does not save normals. Only
+  /// used when ExportOptions::faceted is false.
   int normalIdx = -1;
   /// Gives the property index where the first color channel
   /// can be found. 0 indicates the first three property channels following
@@ -58,8 +59,8 @@ struct Material {
  * These options only currently affect .glb and .gltf files.
  */
 struct ExportOptions {
-  /// When false, vertex normals are exported, causing the mesh to appear smooth
-  /// through normal interpolation.
+  /// When false, vertex normals are exported if normalIdx resolves to a normal
+  /// channel, causing the mesh to appear smooth through normal interpolation.
   bool faceted = true;
   /// PBR material properties.
   Material mat = {};

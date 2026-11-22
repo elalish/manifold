@@ -1177,6 +1177,10 @@ export class Manifold {
    * reset may allow triangles of flat faces to be further collapsed with
    * Simplify().
    *
+   * If any input run recorded normals, the result records them too, and the
+   * first three extra property channels of the other runs are treated as
+   * normals from then on.
+   *
    * @param id The ID to assign to this manifold. If negative (the default), a
    *     new ID is assigned. Use zero to match all default-constructed
    *     manifolds, thus not keeping track of the joints between input
