@@ -457,7 +457,7 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
       meshID = Impl::ReserveIDs(1);
     } else if (untrackedHasN < 0) {
       untrackedHasN = runHasN;
-    } else if (untrackedHasN != runHasN) {
+    } else if (untrackedHasN != static_cast<int>(runHasN)) {
       if (splitUntrackedID < 0) splitUntrackedID = Impl::ReserveIDs(1);
       meshID = splitUntrackedID;
     }
