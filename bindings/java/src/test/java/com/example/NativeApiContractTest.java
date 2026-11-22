@@ -1,3 +1,17 @@
+// Copyright 2026 The Manifold Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package com.example;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -96,75 +110,6 @@ class NativeApiContractTest {
 			mb.safeDelete(sphere);
 			mb.safeDelete(withProps);
 			mb.safeDelete(cleared);
-		}
-	}
-
-	// -------------------------------------------------------------------------
-	// smoothOut, ported onto CalculateNormals + SmoothByNormals
-	// -------------------------------------------------------------------------
-
-	@Test
-	void smoothOutKeepsGeometryAndProducesTangents() throws Throwable {
-		MemorySegment sphere = mb.sphere(1, 16);
-		MemorySegment smoothed = null;
-		MemorySegment plainRefined = null;
-		MemorySegment smoothRefined = null;
-		try {
-			double before = mb.volume(sphere);
-			smoothed = mb.smoothOut(sphere, 60, 1.0);
-
-			assertEquals(ManifoldError.NO_ERROR, mb.status(smoothed));
-			assertEquals(before, mb.volume(smoothed), 1e-9, "tangents do not move the existing geometry");
-			assertEquals(mb.numTri(sphere), mb.numTri(smoothed), "no refinement happens yet");
-
-			// Tangents are what makes refine() interpolate a curved surface.
-			plainRefined = mb.refine(sphere, 2);
-			smoothRefined = mb.refine(smoothed, 2);
-			assertTrue(mb.volume(smoothRefined) > mb.volume(plainRefined) * 1.01,
-					"refining with tangents must interpolate towards the smooth surface");
-		} finally {
-			mb.safeDelete(sphere);
-			mb.safeDelete(smoothed);
-			mb.safeDelete(plainRefined);
-			mb.safeDelete(smoothRefined);
-		}
-	}
-
-	@Test
-	void smoothOutLeavesPropertyCountUnchanged() throws Throwable {
-		MemorySegment sphere = mb.sphere(1, 16);
-		MemorySegment seeded = null;
-		MemorySegment smoothed = null;
-		try {
-			seeded = mb.setProperties(sphere, 5, (newProp, position, oldProp) -> {
-				MemorySegment dst = newProp.reinterpret(5L * Double.BYTES);
-				for (int i = 0; i < 3; i++)
-					dst.setAtIndex(ValueLayout.JAVA_DOUBLE, i, position.getAtIndex(ValueLayout.JAVA_DOUBLE, i));
-				dst.setAtIndex(ValueLayout.JAVA_DOUBLE, 4, 7.5);
-			});
-			assertEquals(5, mb.numProp(seeded));
-
-			smoothed = mb.smoothOut(seeded, 60, 1.0);
-			assertEquals(5, mb.numProp(smoothed), "temporary normal channels are removed again");
-			assertEquals(ManifoldError.NO_ERROR, mb.status(smoothed));
-		} finally {
-			mb.safeDelete(sphere);
-			mb.safeDelete(seeded);
-			mb.safeDelete(smoothed);
-		}
-	}
-
-	@Test
-	void smoothOutOnPropertylessManifoldStaysPropertyless() throws Throwable {
-		MemorySegment sphere = mb.sphere(1, 16);
-		MemorySegment smoothed = null;
-		try {
-			smoothed = mb.smoothOut(sphere, 60, 1.0);
-			assertEquals(0, mb.numProp(smoothed), "no property block existed, so none may be introduced");
-			assertEquals(ManifoldError.NO_ERROR, mb.status(smoothed));
-		} finally {
-			mb.safeDelete(sphere);
-			mb.safeDelete(smoothed);
 		}
 	}
 

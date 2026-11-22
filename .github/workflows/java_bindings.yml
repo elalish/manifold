@@ -39,10 +39,10 @@ jobs:
         cmake-version: 4.0.2
     - name: Install Java and Maven
       run: |
-        wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-fx-jdk25.0.2-macosx_x64.tar.gz
-        tar -xzf zulu25.32.21-ca-fx-jdk25.0.2-macosx_x64.tar.gz
-        echo "JAVA_HOME=$(pwd)/zulu25.32.21-ca-fx-jdk25.0.2-macosx_x64" >> $GITHUB_ENV
-        echo "PATH=$(pwd)/zulu25.32.21-ca-fx-jdk25.0.2-macosx_x64/bin:$PATH" >> $GITHUB_ENV
+        wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-jdk25.0.2-macosx_x64.tar.gz
+        tar -xzf zulu25.32.21-ca-jdk25.0.2-macosx_x64.tar.gz
+        echo "JAVA_HOME=$(pwd)/zulu25.32.21-ca-jdk25.0.2-macosx_x64" >> $GITHUB_ENV
+        echo "PATH=$(pwd)/zulu25.32.21-ca-jdk25.0.2-macosx_x64/bin:$PATH" >> $GITHUB_ENV
     - name: Build
       run: |
         bash bindings/java/scripts/macos/buildC.sh
@@ -73,10 +73,10 @@ jobs:
         cmake-version: 4.0.2
     - name: Install Java and Maven
       run: |
-        wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-fx-jdk25.0.2-macosx_aarch64.tar.gz
-        tar -xzf zulu25.32.21-ca-fx-jdk25.0.2-macosx_aarch64.tar.gz
-        echo "JAVA_HOME=$(pwd)/zulu25.32.21-ca-fx-jdk25.0.2-macosx_aarch64" >> $GITHUB_ENV
-        echo "PATH=$(pwd)/zulu25.32.21-ca-fx-jdk25.0.2-macosx_aarch64/bin:$PATH" >> $GITHUB_ENV
+        wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-jdk25.0.2-macosx_aarch64.tar.gz
+        tar -xzf zulu25.32.21-ca-jdk25.0.2-macosx_aarch64.tar.gz
+        echo "JAVA_HOME=$(pwd)/zulu25.32.21-ca-jdk25.0.2-macosx_aarch64" >> $GITHUB_ENV
+        echo "PATH=$(pwd)/zulu25.32.21-ca-jdk25.0.2-macosx_aarch64/bin:$PATH" >> $GITHUB_ENV
     - name: Build
       run: |
         bash bindings/java/scripts/macos/buildC-arm.sh
@@ -104,14 +104,14 @@ jobs:
       with:
         packages: libgtest-dev libassimp-dev git libtbb-dev pkg-config libpython3-dev
     - run: pip install -U trimesh pytest
-    - name: Pull a JavaFX JDK
-      run: wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-fx-jdk25.0.2-linux_aarch64.tar.gz
+    - name: Pull a JDK
+      run: wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-jdk25.0.2-linux_aarch64.tar.gz
 
     - name: Set Java
       uses: actions/setup-java@v1
       with:
         java-version: 25
-        jdkFile: ./zulu25.32.21-ca-fx-jdk25.0.2-linux_aarch64.tar.gz
+        jdkFile: ./zulu25.32.21-ca-jdk25.0.2-linux_aarch64.tar.gz
     - name: Build With parallelization
       run: |
          bash bindings/java/scripts/linux/buildC-arm.sh
@@ -154,13 +154,13 @@ jobs:
       uses: awalsh128/cache-apt-pkgs-action@v1.6.0
       with:
         packages: libgtest-dev libtbb-dev pkg-config 
-    - name: Pull a JavaFX JDK
-      run: wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-fx-jdk25.0.2-linux_x64.tar.gz
+    - name: Pull a JDK
+      run: wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-jdk25.0.2-linux_x64.tar.gz
     - name: Set Java
       uses: actions/setup-java@v1
       with:
         java-version: 25
-        jdkFile: ./zulu25.32.21-ca-fx-jdk25.0.2-linux_x64.tar.gz
+        jdkFile: ./zulu25.32.21-ca-jdk25.0.2-linux_x64.tar.gz
     - name: Build With parallelization
       run: |
         bash bindings/java/scripts/linux/buildC.sh
@@ -201,14 +201,14 @@ jobs:
         url: https://github.com/google/googletest.git
         tag: v1.17.0
     - uses: ilammy/msvc-dev-cmd@v1
-    - name: Pull a JavaFX JDK
-      run: curl -O https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-fx-jdk25.0.2-win_x64.zip
+    - name: Pull a JDK
+      run: curl -O https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-jdk25.0.2-win_x64.zip
 
     - name: Set Java
       uses: actions/setup-java@v1
       with:
         java-version: 25
-        jdkFile: ./zulu25.32.21-ca-fx-jdk25.0.2-win_x64.zip
+        jdkFile: ./zulu25.32.21-ca-jdk25.0.2-win_x64.zip
     - name: Build for Java
       shell: bash
       run: |
@@ -257,14 +257,14 @@ jobs:
           ls -al bindings/java/src/main/resources/manifold3d/natives/linux-arm64
           ls -al bindings/java/src/main/resources/manifold3d/natives/win-x86_64
           ls -al bindings/java/src/main/resources/manifold3d/natives/mac-arm64
-      - name: Pull a JavaFX JDK
-        run: wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-fx-jdk25.0.2-linux_x64.tar.gz
+      - name: Pull a JDK
+        run: wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-jdk25.0.2-linux_x64.tar.gz
 
       - name: Set Java
         uses: actions/setup-java@v1
         with:
           java-version: 25
-          jdkFile: ./zulu25.32.21-ca-fx-jdk25.0.2-linux_x64.tar.gz
+          jdkFile: ./zulu25.32.21-ca-jdk25.0.2-linux_x64.tar.gz
           maven-version: '3.8.7'
 
       - name: Install Maven 3.8.7

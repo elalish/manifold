@@ -1,3 +1,17 @@
+// Copyright 2026 The Manifold Authors.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package com.cadoodlecad.manifold;
 
 import java.io.File;
@@ -18,7 +32,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.zip.*;
 
-@SuppressWarnings("preview")
 public class ManifoldBindings {
 	public enum ManifoldError {
 		NO_ERROR, NON_FINITE_VERTEX, NOT_MANIFOLD, VERTEX_INDEX_OUT_OF_BOUNDS, PROPERTIES_WRONG_LENGTH,
@@ -57,12 +70,13 @@ public class ManifoldBindings {
 		}
 	}
 
-	private static boolean loaded = false;
+	private static volatile boolean loaded = false;
 
 	private static final Linker LINKER = Linker.nativeLinker();
 
 	private final SymbolLookup library;
 	private final Map<String, MethodHandle> functions = new HashMap<>();
+	private final List<String> missingFunctions = new ArrayList<>();
 
 	// ===== C struct layouts =====
 
@@ -109,7 +123,6 @@ public class ManifoldBindings {
 				arch = "x86_64";
 			if (arch.contains("aarch"))
 				arch = "arm64";
-			System.out.println("Loading Library for " + os + " on " + arch);
 			String platform;
 			String extension;
 			if (os.contains("win")) {
@@ -131,44 +144,62 @@ public class ManifoldBindings {
 			// Add library extension
 			String fullName = libName + extension;
 
-			// Copy libraries to lib directory
-			java.io.File libsDir = cacheDirectory == null ? Files.createTempDirectory("manifold3d").toFile()
-					: cacheDirectory;
+			java.io.File libsDir = nativeCacheDir(cacheDirectory);
 			if (cacheDirectory == null)
 				libsDir.deleteOnExit();
-			if (!libsDir.exists())
-				libsDir.mkdirs();
+			if (!libsDir.isDirectory() && !libsDir.mkdirs())
+				throw new RuntimeException("Cannot create native cache directory " + libsDir);
 
 			java.io.File libFile = new java.io.File(libsDir, fullName);
 
-			// Check timestamp, copy only newer
-			boolean needsCopy = !libFile.exists();
-			if (needsCopy) {
-
+			// The cache dir is version-keyed, so an existing file is this jar's own.
+			if (!libFile.exists()) {
 				try (java.io.InputStream in = ManifoldBindings.class
 						.getResourceAsStream("/manifold3d/natives/" + platform + "/" + fullName)) {
 					if (in == null)
 						throw new RuntimeException("Library not found: " + fullName + " for platform " + platform);
 
 					java.nio.file.Files.copy(in, libFile.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
-					System.out.println("Extracted to libs/: " + fullName);
 					if (cacheDirectory == null)
 						libFile.deleteOnExit();
 				}
-			} else {
-				System.out.println("Copy not performed, already in cache");
 			}
-			System.out.println("Loading library " + libFile.getAbsolutePath());
 			System.load(libFile.getAbsolutePath());
-			loaded = true;
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to load: " + libName, e);
 		}
 	}
 
-	public static void loadNativeLibrarys(File cacheDirectory) throws Exception {
+	/**
+	 * Directory the natives are extracted to. A caller-supplied root gets a
+	 * version-named subdirectory, so a jar upgrade never loads the previous jar's
+	 * binaries against the new descriptors; no root means a per-call temp
+	 * directory.
+	 */
+	static java.io.File nativeCacheDir(File cacheRoot) throws java.io.IOException {
+		return cacheRoot == null ? Files.createTempDirectory("manifold3d").toFile()
+				: new java.io.File(cacheRoot, cacheVersion());
+	}
+
+	/** Identifies this jar in the native cache path; "unknown" for a loose classpath. */
+	static String cacheVersion() {
+		Package pkg = ManifoldBindings.class.getPackage();
+		String version = pkg == null ? null : pkg.getImplementationVersion();
+		return version == null ? "unknown" : version;
+	}
+
+	/**
+	 * Loads both native libraries unless they are already loaded. The flag is
+	 * checked and set inside the lock so concurrent constructors neither load
+	 * twice nor see a half-loaded pair, and it is only set once both loads
+	 * succeed so a failure does not leave later callers believing they are ready.
+	 */
+	public static synchronized void loadNativeLibrarys(File cacheDirectory) throws Exception {
+		if (loaded)
+			return;
 		loadNativeLibrary("libmanifold", cacheDirectory);
 		loadNativeLibrary("libmanifoldc", cacheDirectory);
+		loaded = true;
 	}
 
 	public ManifoldBindings() throws Exception {
@@ -176,9 +207,7 @@ public class ManifoldBindings {
 	}
 
 	public ManifoldBindings(File cacheDirectory) throws Exception {
-		if (!isNativeLibraryLoaded()) {
-			loadNativeLibrarys(cacheDirectory);
-		}
+		loadNativeLibrarys(cacheDirectory);
 
 		this.library = SymbolLookup.loaderLookup();
 
@@ -580,28 +609,35 @@ public class ManifoldBindings {
 
 		// void manifold_delete_triangulation(ManifoldTriangulation* m);
 		loadVoid("manifold_delete_triangulation", ValueLayout.ADDRESS);
+
+		verifyAllFunctionsLoaded();
 	}
 
 	// ===== Native loader helpers =====
 
 	private void load(String name, MemoryLayout returnLayout, MemoryLayout... argLayouts) {
-		try {
-			MemorySegment symbol = library.find(name).orElseThrow();
-			FunctionDescriptor desc = FunctionDescriptor.of(returnLayout, argLayouts);
-			functions.put(name, LINKER.downcallHandle(symbol, desc));
-		} catch (Exception e) {
-			System.err.println("ERROR: Missing Manifold function " + name);
-		}
+		loadHandle(name, FunctionDescriptor.of(returnLayout, argLayouts));
 	}
 
 	private void loadVoid(String name, ValueLayout... argLayouts) {
-		try {
-			MemorySegment symbol = library.find(name).orElseThrow();
-			FunctionDescriptor desc = FunctionDescriptor.ofVoid(argLayouts);
-			functions.put(name, LINKER.downcallHandle(symbol, desc));
-		} catch (Exception e) {
-			System.err.println("ERROR: Missing Manifold function " + name);
-		}
+		loadHandle(name, FunctionDescriptor.ofVoid(argLayouts));
+	}
+
+	private void loadHandle(String name, FunctionDescriptor desc) {
+		library.find(name).ifPresentOrElse(symbol -> functions.put(name, LINKER.downcallHandle(symbol, desc)),
+				() -> missingFunctions.add(name));
+	}
+
+	/**
+	 * Fails if any function declared by the constructor is absent from the loaded
+	 * library. Collected rather than thrown from {@link #loadHandle} so one broken
+	 * build reports every renamed or dropped symbol at once, and so the failure
+	 * lands in tests instead of the first caller that happens to use the function.
+	 */
+	private void verifyAllFunctionsLoaded() {
+		if (!missingFunctions.isEmpty())
+			throw new IllegalStateException(
+					"Missing " + missingFunctions.size() + " native functions: " + String.join(", ", missingFunctions));
 	}
 
 	/**
@@ -679,64 +715,6 @@ public class ManifoldBindings {
 				stub = LINKER.upcallStub(bound, PROPERTY_UPDATER_DESC, arena);
 			}
 			return (MemorySegment) fn("manifold_set_properties").invoke(m, numProp, stub, ctx);
-		}
-	}
-
-	/**
-	 * Smooths the manifold by eliminating edges whose dihedral angle is below
-	 * {@code minSharpAngle} degrees. Edges above that threshold are kept sharp.
-	 *
-	 * {@code minSmoothness} blends the preserved sharp edges between fully sharp
-	 * (0.0) and fully smooth (1.0).
-	 *
-	 * <p>
-	 * Upstream removed {@code Manifold::SmoothOut} together with the
-	 * {@code Smoothness} tangent API, so the tangent field is rebuilt here from the
-	 * two primitives that survived: {@code CalculateNormals} records a normal per
-	 * vertex split by the same dihedral threshold, and {@code SmoothByNormals}
-	 * converts those normals into half-edge tangent vectors. The resulting tangent
-	 * field matches the threshold semantics; {@code minSmoothness} is applied by
-	 * widening the threshold as upstream documented (1.0 is equivalent to a
-	 * {@code minSharpAngle} of 180). The temporary normal channels are removed
-	 * afterwards so the property count is unchanged.
-	 *
-	 * Useful post-difference to dissolve thin sliver faces left by near-coincident
-	 * surfaces. A {@code minSharpAngle} of 30–60 degrees is a reasonable starting
-	 * point; increase it to dissolve more aggressive artifacts.
-	 *
-	 * @param m             the input manifold
-	 * @param minSharpAngle edges sharper than this (degrees) are preserved
-	 * @param minSmoothness smoothness at preserved edges [0.0 = sharp, 1.0 =
-	 *                      smooth]
-	 */
-	public MemorySegment smoothOut(MemorySegment m, double minSharpAngle, double minSmoothness) throws Throwable {
-		if (m == null)
-			throw new IllegalArgumentException("manifold segment must not be null");
-		int originalNumProp = (int) numProp(m);
-		double blend = Math.max(0.0, Math.min(1.0, minSmoothness));
-		double sharpAngle = minSharpAngle + (180.0 - minSharpAngle) * blend;
-
-		// Normals land in the first free channels so user properties stay put.
-		MemorySegment withNormals = calculateNormals(m, originalNumProp, sharpAngle);
-		MemorySegment smoothed;
-		try {
-			smoothed = smoothByNormals(withNormals, originalNumProp);
-		} finally {
-			safeDelete(withNormals);
-		}
-
-		// Drop the temporary normal channels again; tangents live on the Manifold
-		// itself and survive property changes.
-		try {
-			final int kept = originalNumProp;
-			return setProperties(smoothed, kept, kept == 0 ? null : (newProp, position, oldProp) -> {
-				MemorySegment src = oldProp.reinterpret(kept * (long) Double.BYTES);
-				MemorySegment dst = newProp.reinterpret(kept * (long) Double.BYTES);
-				for (int i = 0; i < kept; i++)
-					dst.setAtIndex(ValueLayout.JAVA_DOUBLE, i, src.getAtIndex(ValueLayout.JAVA_DOUBLE, i));
-			});
-		} finally {
-			safeDelete(smoothed);
 		}
 	}
 
@@ -1526,40 +1504,18 @@ public class ManifoldBindings {
 		}
 	}
 
-	public javafx.geometry.BoundingBox getJavaFXBounds(MemorySegment m) {
-		MemorySegment box = null;
+	/**
+	 * Returns the axis-aligned bounds of {@code m} as {@code {minX, minY, minZ,
+	 * maxX, maxY, maxZ}}.
+	 */
+	public double[] bounds(MemorySegment m) throws Throwable {
+		MemorySegment box = (MemorySegment) fn("manifold_bounding_box").invoke(m);
 		try (Arena arena = Arena.ofConfined()) {
-			box = (MemorySegment) fn("manifold_bounding_box").invoke(m);
-
 			MemorySegment min = (MemorySegment) fn("manifold_box_min").invoke(arena, box);
 			MemorySegment max = (MemorySegment) fn("manifold_box_max").invoke(arena, box);
-
-			double minX = min.get(ValueLayout.JAVA_DOUBLE, 0);
-			double minY = min.get(ValueLayout.JAVA_DOUBLE, 8);
-			double minZ = min.get(ValueLayout.JAVA_DOUBLE, 16);
-			double maxX = max.get(ValueLayout.JAVA_DOUBLE, 0);
-			double maxY = max.get(ValueLayout.JAVA_DOUBLE, 8);
-			double maxZ = max.get(ValueLayout.JAVA_DOUBLE, 16);
-
-			return new javafx.geometry.BoundingBox(minX, minY, minZ, maxX - minX, maxY - minY, maxZ - minZ);
-		} catch (Throwable e) {
-			e.printStackTrace();
-			return new javafx.geometry.BoundingBox(0, 0, 0, 0, 0, 0);
-		} finally {
-			safeDeleteBox(box);
-		}
-	}
-
-	public javafx.geometry.BoundingBox getBounds(MemorySegment m) throws Throwable {
-		MemorySegment box = (MemorySegment) fn("manifold_bounding_box").invoke(m);
-		try {
-			try (Arena arena = Arena.ofConfined()) {
-				MemorySegment dims = (MemorySegment) fn("manifold_box_dimensions").invoke(arena, box);
-				double w = dims.get(ValueLayout.JAVA_DOUBLE, 0);
-				double h = dims.get(ValueLayout.JAVA_DOUBLE, 8);
-				double d = dims.get(ValueLayout.JAVA_DOUBLE, 16);
-				return new javafx.geometry.BoundingBox(0, 0, 0, w, h, d);
-			}
+			return new double[] { min.get(ValueLayout.JAVA_DOUBLE, 0), min.get(ValueLayout.JAVA_DOUBLE, 8),
+					min.get(ValueLayout.JAVA_DOUBLE, 16), max.get(ValueLayout.JAVA_DOUBLE, 0),
+					max.get(ValueLayout.JAVA_DOUBLE, 8), max.get(ValueLayout.JAVA_DOUBLE, 16) };
 		} finally {
 			safeDeleteBox(box);
 		}
