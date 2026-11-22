@@ -125,6 +125,45 @@ suite('Manifold Bindings', () => {
     expect(new Manifold(merged).volume()).toBeCloseTo(1);
   });
 
+  test('precision is set at ingest and by withPrecision', () => {
+    const {Manifold} = manifoldModule;
+    const mesh = Manifold.sphere(1, 64).getMesh();
+    expect(Manifold.ofMesh(mesh).getPrecision()).toEqual(1e-12);
+    const coarse = Manifold.ofMesh(mesh, 1e-3);
+    expect(coarse.getPrecision()).toEqual(1e-3);
+    expect(new Manifold(mesh, 1e-3).getPrecision()).toEqual(1e-3);
+    const stamped = Manifold.cube().withPrecision(1e-2);
+    expect(stamped.getPrecision()).toEqual(1e-2);
+    expect(coarse.add(stamped).getPrecision()).toEqual(1e-3);
+    expect(Manifold.hull([coarse, stamped]).getPrecision()).toEqual(1e-3);
+  });
+
+  test('merge closes gaps up to its precision', () => {
+    const {Manifold, Mesh} = manifoldModule;
+    const cube = Manifold.cube().calculateNormals(0).getMesh();
+    const vertProperties = cube.vertProperties.slice();
+    vertProperties[0] += 1e-4;
+    const open = new Mesh(
+        {numProp: cube.numProp, vertProperties, triVerts: cube.triVerts});
+    expect(() => new Manifold(open.merge())).toThrow();
+    expect(new Manifold(open.merge(0, 1e-3)).status()).toEqual('NoError');
+  });
+
+  test('hull of Manifolds is computed at their smallest precision', () => {
+    const {Manifold} = manifoldModule;
+    const coarse = Manifold.sphere(1, 256).withPrecision(1e-2);
+    const hull = Manifold.hull([coarse]);
+    expect(hull.getPrecision()).toEqual(1e-2);
+    expect(hull.numTri()).toEqual(coarse.hull().numTri());
+    const withPoint = Manifold.hull([coarse, [2, 0, 0]]);
+    expect(withPoint.getPrecision()).toEqual(1e-2);
+    expect(withPoint.boundingBox().max[0]).toBeCloseTo(2);
+    const cube = Manifold.cube();
+    expect(Manifold.hull(cube, [2, 0, 0]).boundingBox().max[0]).toEqual(2);
+    expect(Manifold.hull(cube, [[3, 0, 0], [0, 3, 0], [0, 0, 3]]).volume())
+        .toBeCloseTo(4.5);
+  });
+
   test('rayCast returns hits through cube', () => {
     const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
     const hits = cube.rayCast([0, 0, -5], [0, 0, 5]);
