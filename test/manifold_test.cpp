@@ -2240,6 +2240,38 @@ TEST(Precision, SharedSubtree) {
             (build() + Manifold::Cube(vec3(1)).Translate({5, 0, 0})).NumTri());
 }
 
+TEST(Precision, WithPrecisionThenTransform) {
+  const Manifold cube = Manifold::Cube(vec3(1));
+  const Manifold moved = cube.WithPrecision(1e-3).Translate({10, 0, 0});
+  EXPECT_EQ(moved.GetPrecision(), 1e-3);
+  EXPECT_DOUBLE_EQ(moved.GetEpsilon(), 1e-3 * 11);
+  EXPECT_EQ(moved.Scale(vec3(2)).GetPrecision(), 1e-3);
+  EXPECT_EQ(cube.GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_DOUBLE_EQ(cube.GetEpsilon(), kDefaultRelativePrecision);
+}
+
+TEST(Precision, WithPrecisionOnError) {
+  const Manifold invalid(CubeSTL());
+  EXPECT_EQ(invalid.Status(), Manifold::Error::NotManifold);
+  const Manifold coarse = invalid.WithPrecision(1e-3);
+  EXPECT_EQ(coarse.Status(), Manifold::Error::NotManifold);
+  EXPECT_EQ(coarse.GetPrecision(), 1e-3);
+  EXPECT_EQ(invalid.GetPrecision(), kDefaultRelativePrecision);
+}
+
+TEST(Precision, BooleanTakesMin) {
+  const Manifold sphere = Manifold::Sphere(1, {64});
+  const Manifold cube = Manifold::Cube(vec3(1));
+  EXPECT_EQ((sphere.WithPrecision(1e-3) + cube).GetPrecision(),
+            kDefaultRelativePrecision);
+  EXPECT_EQ((cube - sphere.WithPrecision(1e-3)).GetPrecision(),
+            kDefaultRelativePrecision);
+  EXPECT_EQ((sphere.WithPrecision(1e-2).Translate({0.5, 0, 0}) ^
+             cube.WithPrecision(1e-3))
+                .GetPrecision(),
+            1e-3);
+}
+
 TEST(Manifold, MergeCollapsedEdgeParity) {
   MeshGL mesh;
   mesh.vertProperties = {0, 0, 0,  //
