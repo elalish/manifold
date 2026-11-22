@@ -162,6 +162,7 @@ struct Manifold::Impl {
   bool Is2Manifold() const;
   bool IsSelfIntersecting() const;
   bool MatchesTriNormals() const;
+  bool IsFlat(int tri, vec3 normal) const;
   int NumDegenerateTris() const;
   bool HasSimpleProps() const;
   bool IsConvex() const;
@@ -230,7 +231,7 @@ struct Manifold::Impl {
   void DedupeEdge(int edge);
   void CollapseDegenerate(int edge, Vec<int>& scratch);
   bool CollapseEdge(int edge, Vec<int>& scratch, const Merger& merger);
-  int SwapDegenerateEdges(Vec<int>& scratch);
+  int SwapDegenerateEdges(Vec<int>& scratch, bool nearFlatOnly);
   bool SplitQuad(int edge, bool nextDiag);
   void RemoveIfFolded(int edge);
   void PairUp(int edge0, int edge1);
