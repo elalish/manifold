@@ -21,6 +21,7 @@
  */
 
 import * as GLTFTransform from '@gltf-transform/core';
+import {transformMesh} from '@gltf-transform/functions';
 import {XMLParser} from 'fast-xml-parser';
 import {unzipSync} from 'fflate';
 
@@ -213,6 +214,37 @@ function parseBuildRefs(model: Model3MF): Array<ObjectRef3MF> {
   return refs;
 }
 
+function matchesTransform(node: GLTFTransform.Node, matrix: number[]): boolean {
+  const restored = node.getMatrix();
+  for (let column = 0; column < 4; column++) {
+    const start = column * 4;
+    const tolerance = 64 * Number.EPSILON *
+        Math.max(
+            Math.abs(matrix[start]), Math.abs(matrix[start + 1]),
+            Math.abs(matrix[start + 2]));
+    for (let row = 0; row < 4; row++) {
+      if (!(Math.abs(restored[start + row] - matrix[start + row]) <=
+            tolerance)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function multiplyTransforms(parent: number[], child: number[]): number[] {
+  const result = [...identityMatrix];
+  for (let column = 0; column < 4; column++) {
+    for (let row = 0; row < 3; row++) {
+      result[column * 4 + row] = parent[row] * child[column * 4] +
+          parent[row + 4] * child[column * 4 + 1] +
+          parent[row + 8] * child[column * 4 + 2] +
+          (column === 3 ? parent[row + 12] : 0);
+    }
+  }
+  return result;
+}
+
 function instantiateObjectNode(
     doc: GLTFTransform.Document, objects: Map<string, Object3MF>,
     ref: ObjectRef3MF, visiting: Set<string>): GLTFTransform.Node|null {
@@ -222,10 +254,25 @@ function instantiateObjectNode(
 
   visiting.add(object.id);
   const node = doc.createNode(object.name);
-  if (object.mesh) node.setMesh(object.mesh);
-  node.setMatrix(ref.transform as any);
+  node.setMatrix(ref.transform as GLTFTransform.mat4);
+  // glTF nodes store TRS, which cannot represent every 3MF affine matrix.
+  // Allow decomposition roundoff, but bake shear into this instance's mesh.
+  const bake = !matchesTransform(node, ref.transform);
+  if (bake) node.setMatrix(identityMatrix as GLTFTransform.mat4);
+  if (object.mesh) {
+    const mesh = bake ? object.mesh.clone() : object.mesh;
+    if (bake) transformMesh(mesh, ref.transform as GLTFTransform.mat4);
+    node.setMesh(mesh);
+  }
   for (const childRef of object.children) {
-    const childNode = instantiateObjectNode(doc, objects, childRef, visiting);
+    // An identity parent leaves its full affine transform to each child.
+    const transformedRef = bake ? {
+      ...childRef,
+      transform: multiplyTransforms(ref.transform, childRef.transform)
+    } :
+                                  childRef;
+    const childNode =
+        instantiateObjectNode(doc, objects, transformedRef, visiting);
     if (childNode) node.addChild(childNode);
   }
   visiting.delete(object.id);
