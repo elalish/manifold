@@ -472,9 +472,8 @@ int Manifold::OriginalID() const {
  * reset may allow triangles of flat faces to be further collapsed with
  * RemoveDegenerates().
  *
- * If any input run recorded normals, the result records them too, and the
- * first three extra property channels of the other runs are treated as normals
- * from then on.
+ * If only some of the input recorded normals, the result keeps two runs with
+ * this ID: the triangles with normals, then the rest.
  *
  * @param id The ID to assign to this manifold. If negative (the default), a new
  * ID is assigned. Use zero to match all default-constructed manifolds, thus not

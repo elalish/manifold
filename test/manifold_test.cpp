@@ -746,33 +746,42 @@ TEST(Manifold, TransformMixedNormalsPerMeshID) {
 }
 
 TEST(Manifold, AsOriginalMixedNormalsKept) {
-  // AsOriginal collapses a mixed result into one run. It keeps the recording
-  // when any input had normals, so the sphere's normals still rotate.
-  MeshGL gl =
-      MixedNormalsCubePlusSphere().AsOriginal().Rotate(90, 0, 0).GetMeshGL();
-  ASSERT_EQ(gl.NumRun(), 1u);
-  EXPECT_TRUE(gl.HasNormals(0));
-  auto [good, bad] = CountSphereNormalAlignment(
-      gl, 5.0, 3, [](vec3 pos) { return la::normalize(pos); });
-  EXPECT_GT(good, 0);
-  EXPECT_EQ(bad, 0);
+  // AsOriginal of a mixed result keeps two runs under one ID: the sphere with
+  // normals, then the cube without. The sphere's normals still rotate, the
+  // cube's slots are left alone, and triID still matches the output order.
+  for (const int id : {-1, 0}) {
+    const Manifold original = MixedNormalsCubePlusSphere().AsOriginal(id);
+    const MeshGL gl = original.Rotate(90, 0, 0).GetMeshGL();
+    ASSERT_EQ(gl.NumRun(), 2u);
+    EXPECT_EQ(gl.runOriginalID[0], gl.runOriginalID[1]);
+    EXPECT_TRUE(gl.HasNormals(0));
+    EXPECT_FALSE(gl.HasNormals(1));
+    auto [good, bad] = CountSphereNormalAlignment(
+        gl, 5.0, 3, [](vec3 pos) { return la::normalize(pos); });
+    EXPECT_GT(good, 0);
+    EXPECT_EQ(bad, 0);
+    const MeshGL tri = original.TriID2FaceID().GetMeshGL();
+    for (size_t t = 0; t < tri.NumTri(); ++t) EXPECT_EQ(tri.faceID[t], t);
+  }
 }
 
 TEST(Manifold, MinkowskiKeepsNormals) {
-  // Minkowski unions the input with unflagged hulls and calls AsOriginal(0),
-  // so it keeps the input's normals under the any-run rule.
+  // Minkowski unions the input with hulls that have no normals and calls
+  // AsOriginal(0), so only the input's surviving triangles keep their normals.
   const Manifold nonConvex =
       (Manifold::Cube(vec3(2), true) - Manifold::Sphere(0.75, 8))
           .CalculateNormals();
   const Manifold ball = Manifold::Sphere(0.1, 8);
-  for (const Manifold& m :
-       {nonConvex.MinkowskiSum(ball), nonConvex.MinkowskiDifference(ball)}) {
-    ASSERT_EQ(m.Status(), Manifold::Error::NoError);
-    const MeshGL gl = m.GetMeshGL();
-    ASSERT_EQ(gl.NumRun(), 1u);
-    EXPECT_TRUE(gl.HasNormals(0));
-    for (float x : gl.vertProperties) EXPECT_TRUE(std::isfinite(x));
-  }
+  const MeshGL sum = nonConvex.MinkowskiSum(ball).GetMeshGL();
+  ASSERT_EQ(sum.NumRun(), 2u);
+  EXPECT_TRUE(sum.HasNormals(0));
+  EXPECT_FALSE(sum.HasNormals(1));
+  // Erosion keeps none of the input's triangles, so nothing records normals.
+  const MeshGL difference = nonConvex.MinkowskiDifference(ball).GetMeshGL();
+  ASSERT_EQ(difference.NumRun(), 1u);
+  EXPECT_FALSE(difference.HasNormals(0));
+  for (const MeshGL* gl : {&sum, &difference})
+    for (float x : gl->vertProperties) EXPECT_TRUE(std::isfinite(x));
 }
 
 TEST(Manifold, ComposeMixedNormalsPerMeshID) {

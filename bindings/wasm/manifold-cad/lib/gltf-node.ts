@@ -75,8 +75,7 @@ export interface GLTFMaterial {
    *
    * Normals follow transforms only when they come from `calculateNormals()` or
    * a MeshGL input whose corresponding runFlags bit 1 is set. Values supplied
-   * by `setProperties()` remain ordinary properties, unless `setMaterial()` is
-   * applied to a result where some other operand recorded normals.
+   * by `setProperties()` remain ordinary properties.
    *
    * Some properties such as `TEXCOORD_0` or `COLOR_0` may be set when importing
    * a model that has a texture or material.

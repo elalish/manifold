@@ -549,8 +549,8 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(
   std::vector<int> triNew2Old(numTri);
   std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
   VecView<const TriRef> triRef = impl.meshRelation_.triRef;
-  // Don't sort originals - keep them in order
-  if (!isOriginal) {
+  // Keep originals in order, unless AsOriginal split them into two runs
+  if (!isOriginal || impl.meshRelation_.meshIDtransform.size() > 1) {
     std::stable_sort(triNew2Old.begin(), triNew2Old.end(),
                      [triRef](int a, int b) {
                        return triRef[a].originalID == triRef[b].originalID

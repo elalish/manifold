@@ -184,19 +184,40 @@ void Manifold::Impl::InitializeOriginal(int id) {
   const int meshID = id < 0 ? ReserveIDs(1) : id;
   meshRelation_.originalID = meshID;
   auto& triRef = meshRelation_.triRef;
-  triRef.resize_nofill(NumTri());
-  for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
-             [meshID, &triRef](const int tri) {
-               triRef[tri] = {meshID, meshID, -1, tri};
-             });
-  // AsOriginal collapses every old Relation into one run, so keep the
-  // recording if any of them had normals. Unflagged triangles then carry
-  // their slot 0..2 values (usually zero padding, which counts as a missing
-  // normal) as normals. Primitives start with an empty map, so no normals.
-  const bool hadNormals = AnyHasNormals(meshRelation_);
+  const int numTri = NumTri();
+  // AsOriginal of a result where only some runs record normals keeps two
+  // runs under one originalID: the triangles with normals, then the rest.
+  // triID is the triangle's index in GetMeshGL's output order, which sorts an
+  // original with two relations by meshID.
+  Vec<bool> hasN;
+  if (triRef.size() == numTri && AnyHasNormals(meshRelation_)) {
+    hasN.resize_nofill(numTri);
+    for (int tri = 0; tri < numTri; ++tri)
+      hasN[tri] = TriHasNormals(meshRelation_, tri);
+  }
+  const int numN = std::count(hasN.begin(), hasN.end(), true);
+  const bool split = numN > 0 && numN < numTri;
+  const int otherID = split ? ReserveIDs(1) : meshID;
   meshRelation_.meshIDtransform.clear();
   meshRelation_.meshIDtransform[meshID] = {meshID, la::identity, false,
-                                           hadNormals};
+                                           numN > 0};
+  if (split) {
+    meshRelation_.meshIDtransform[otherID] = {meshID, la::identity, false,
+                                              false};
+  }
+  triRef.resize_nofill(numTri);
+  // otherID > meshID except for id 0, so the run with normals sorts first
+  // unless the ID is 0.
+  const bool nFirst = otherID >= meshID;
+  int nextN = nFirst ? 0 : numTri - numN;
+  int nextOther = nFirst ? numN : 0;
+  for (int tri = 0; tri < numTri; ++tri) {
+    if (split && !hasN[tri]) {
+      triRef[tri] = {otherID, meshID, -1, nextOther++};
+    } else {
+      triRef[tri] = {meshID, meshID, -1, split ? nextN++ : tri};
+    }
+  }
 }
 
 void Manifold::Impl::SetFaceAndVertNormals() {
