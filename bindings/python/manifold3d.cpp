@@ -726,6 +726,7 @@ NB_MODULE(manifold3d, m) {
            mesh_gl__merge__tolerance);
 
   nb::class_<RayHit>(m, "RayHit")
+      .def_ro("original_id", &RayHit::originalID)
       .def_ro("face_id", &RayHit::faceID)
       .def_ro("distance", &RayHit::distance)
       .def_ro("position", &RayHit::position)

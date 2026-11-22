@@ -96,6 +96,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   value_object<Box>("box").field("min", &Box::min).field("max", &Box::max);
 
   value_object<RayHit>("rayHit")
+      .field("originalID", &RayHit::originalID)
       .field("faceID", &RayHit::faceID)
       .field("distance", &RayHit::distance)
       .field("position", &RayHit::position)

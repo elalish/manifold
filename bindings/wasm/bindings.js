@@ -344,6 +344,7 @@ Module.setup = function() {
     const vec = this._RayCast(vararg2vec3([origin]), vararg2vec3([endpoint]));
     const result =
         fromVec(vec, hit => ({
+                       originalID: hit.originalID,
                        faceID: hit.faceID,
                        distance: hit.distance,
                        position: ['x', 'y', 'z'].map(f => hit.position[f]),
