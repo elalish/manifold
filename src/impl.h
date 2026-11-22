@@ -439,14 +439,28 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
     MakeEmpty(Error::RunIndexWrongLength);
     return;
   }
+  // Untracked runs (originalID 0) share meshID 0, but the relation also
+  // records hasNormals. Like the Boolean's split of meshID 0, give the
+  // untracked runs that disagree with the first one their own meshID so a
+  // later run doesn't overwrite the first one's flag.
+  int untrackedHasN = -1;
+  int splitUntrackedID = -1;
   for (size_t i = 0; i < runOriginalID.size(); ++i) {
     const int originalID = runOriginalID[i];
-    const int meshID = originalID == 0 ? 0 : Impl::ReserveIDs(1);
     const bool backside = meshGL.Backside(i);
     // Per-run hasNormals (runFlags bit 1). Defensively require numProp >= 3
     // so a caller setting the bit on a too-small MeshGL doesn't make us read
     // past the property bounds.
     const bool runHasN = meshGL.HasNormals(i) && numProp >= 3;
+    int meshID = 0;
+    if (originalID != 0) {
+      meshID = Impl::ReserveIDs(1);
+    } else if (untrackedHasN < 0) {
+      untrackedHasN = runHasN;
+    } else if (untrackedHasN != runHasN) {
+      if (splitUntrackedID < 0) splitUntrackedID = Impl::ReserveIDs(1);
+      meshID = splitUntrackedID;
+    }
     for (size_t tri = runIndex[i] / 3; tri < runIndex[i + 1] / 3; ++tri) {
       TriRef& ref = triRef[tri];
       ref.meshID = meshID;
