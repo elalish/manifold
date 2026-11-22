@@ -716,6 +716,51 @@ TEST(Manifold, GetNormalLegacyContract) {
   EXPECT_NEAR(sm_modern.SurfaceArea(), sm_legacy.SurfaceArea(), 1e-4);
 }
 
+TEST(Manifold, MixedNormalsDefaultIDRoundTrip) {
+  // Both operands use the default originalID 0, but only the sphere records
+  // normals. A MeshGL round trip must keep that per run, in either operand
+  // order, so the sphere's normals still rotate afterward.
+  const Manifold sphere = Manifold::Sphere(5, 32).CalculateNormals();
+  const Manifold overlap = Manifold::Cube(vec3(6), true).Translate({4, 0, 0});
+  const Manifold apart = Manifold::Cube(vec3(6), true).Translate({20, 0, 0});
+  for (const Manifold& mixed :
+       {sphere + overlap, overlap + sphere, sphere + apart, apart + sphere}) {
+    const MeshGL gl = mixed.GetMeshGL();
+    const MeshGL round = Manifold(gl).GetMeshGL();
+    ASSERT_EQ(round.NumRun(), gl.NumRun());
+    for (size_t run = 0; run < gl.NumRun(); ++run) {
+      EXPECT_EQ(round.runIndex[run + 1], gl.runIndex[run + 1]);
+      EXPECT_EQ(round.HasNormals(run), gl.HasNormals(run));
+    }
+    // The overlapping cube has verts at the sphere's radius, so compare with
+    // the result that skipped the round trip instead of expecting no misses.
+    auto outward = [](vec3 pos) { return la::normalize(pos); };
+    const auto expected = CountSphereNormalAlignment(
+        mixed.Rotate(90, 0, 0).GetMeshGL(), 5.0, 3, outward);
+    const auto actual = CountSphereNormalAlignment(
+        Manifold(gl).Rotate(90, 0, 0).GetMeshGL(), 5.0, 3, outward);
+    EXPECT_GT(expected.first, 0);
+    EXPECT_EQ(actual, expected);
+  }
+}
+
+TEST(Manifold, UntrackedRunsGroupedByNormals) {
+  // Untracked runs that agree on normals share one relation, so only a
+  // disagreeing run is split off.
+  MeshGL gl = Manifold::Cube().CalculateNormals().GetMeshGL();
+  ASSERT_EQ(gl.NumTri(), 12u);
+  gl.runOriginalID = {0, 0, 0};
+  gl.runIndex = {0, 12, 24, 36};
+  gl.runFlags = {2, 0, 2};
+  gl.runTransform.clear();
+  const MeshGL out = Manifold(gl).GetMeshGL();
+  ASSERT_EQ(out.NumRun(), 2u);
+  for (size_t run = 0; run < out.NumRun(); ++run) {
+    const uint32_t numTri = (out.runIndex[run + 1] - out.runIndex[run]) / 3;
+    EXPECT_EQ(numTri, out.HasNormals(run) ? 8u : 4u);
+  }
+}
+
 TEST(Manifold, TransformMixedNormalsPerMeshID) {
   // Mixed Boolean output (no-normals + with-normals): the result's
   // AllHaveNormals() is false (AND across meshIDs), but the with-normals
