@@ -27,7 +27,7 @@ Here is an incomplete list of our users, whose integrations may be anywhere from
 | [Bracket Engineer](https://bracket.engineer) | [Nodillo](https://nodillo3d.com) | [CaDoodle CAD](https://cadoodlecad.com/) |
 | [Bridge Designer](https://www.asce.org/career-growth/pre-college-outreach/bridge-designer) |[AdaShape](https://adashape.com)| [PyVista](https://github.com/pyvista/pyvista-manifold) |
 | [Nasscad 4.7.0](https://www.nasscad.com) | [SolidSKeleton](https://github.com/FerroIT/SolidSKeleton) | [Piecad (Python-based)](https://github.com/briansturgill/Piecad) |
-| [3D Model Print Simple Edit](https://www.huragankodu.com/3defaulthk) 
+| [3D Model Print Simple Edit](https://www.huragankodu.com/3defaulthk) | [VormCraft](https://vormcraft.app) | |
 
 ### Bindings & Packages
 
