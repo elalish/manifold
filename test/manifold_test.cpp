@@ -744,6 +744,23 @@ TEST(Manifold, MixedNormalsDefaultIDRoundTrip) {
   }
 }
 
+TEST(Manifold, UntrackedRunsGroupedByNormals) {
+  // Untracked runs that agree on normals share one relation, so only a
+  // disagreeing run is split off.
+  MeshGL gl = Manifold::Cube().CalculateNormals().GetMeshGL();
+  ASSERT_EQ(gl.NumTri(), 12u);
+  gl.runOriginalID = {0, 0, 0};
+  gl.runIndex = {0, 12, 24, 36};
+  gl.runFlags = {2, 0, 2};
+  gl.runTransform.clear();
+  const MeshGL out = Manifold(gl).GetMeshGL();
+  ASSERT_EQ(out.NumRun(), 2u);
+  for (size_t run = 0; run < out.NumRun(); ++run) {
+    const uint32_t numTri = (out.runIndex[run + 1] - out.runIndex[run]) / 3;
+    EXPECT_EQ(numTri, out.HasNormals(run) ? 8u : 4u);
+  }
+}
+
 TEST(Manifold, TransformMixedNormalsPerMeshID) {
   // Mixed Boolean output (no-normals + with-normals): the result's
   // AllHaveNormals() is false (AND across meshIDs), but the with-normals
