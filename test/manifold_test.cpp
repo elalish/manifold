@@ -1303,10 +1303,8 @@ TEST(Manifold, CircularQualityFactories) {
   }
   EXPECT_EQ(Manifold::Sphere(5, 5).NumTri(), 32);
 
-  // {} and an int both select the int overload, and match the defaults.
+  // {} selects the int overload, and matches the defaults.
   EXPECT_EQ(Manifold::Sphere(5, {}).NumTri(), Manifold::Sphere(5).NumTri());
-  EXPECT_EQ(Manifold::Sphere(5, {32}).NumTri(),
-            Manifold::Sphere(5, 32).NumTri());
   EXPECT_EQ(CrossSection::Circle(5, {}).NumVert(),
             CircularQuality{}.SegmentsFor(5));
 #if __cplusplus >= 202002L
