@@ -1,5 +1,7 @@
 var searchData=
 [
-  ['selfintersectionchecks_0',['selfIntersectionChecks',['../group___debug.html#aca3506c8f5774ba33cd774fd54b20d4a',1,'manifold::ExecutionParams']]],
-  ['suppresserrors_1',['suppressErrors',['../group___debug.html#a48b673772893c29c426e98f8c84f0206',1,'manifold::ExecutionParams']]]
+  ['runflags_0',['runFlags',['../structmanifold_1_1_mesh_g_l_p.html#a4bce13a5930d514634403ea7b105d370',1,'manifold::MeshGLP']]],
+  ['runindex_1',['runIndex',['../structmanifold_1_1_mesh_g_l_p.html#a3d13347a121827c135c328194009b264',1,'manifold::MeshGLP']]],
+  ['runoriginalid_2',['runOriginalID',['../structmanifold_1_1_mesh_g_l_p.html#aa67d01a9b240154a754945eca9fca3e0',1,'manifold::MeshGLP']]],
+  ['runtransform_3',['runTransform',['../structmanifold_1_1_mesh_g_l_p.html#a4a2f4e21de0e8026daf67353dfd3458b',1,'manifold::MeshGLP']]]
 ];

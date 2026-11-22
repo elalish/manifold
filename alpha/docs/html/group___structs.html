@@ -193,11 +193,19 @@ ID or index into another vertex vector. </td></tr>
 </div><table class="fieldtable">
 <tr><th colspan="3">Class Members</th></tr>
 <tr><td class="fieldtype">
-<a id="a46de78de02bc26b0f04d09b055b9ff4c" name="a46de78de02bc26b0f04d09b055b9ff4c"></a>uint64_t</td>
+<a id="af1ad6bcae23c39b0b181b4ab163f70c4" name="af1ad6bcae23c39b0b181b4ab163f70c4"></a>uint32_t</td>
+<td class="fieldname">
+originalID = 0</td>
+<td class="fielddoc">
+<p>The originalID of the input mesh the hit triangle came from, as in <a class="el" href="structmanifold_1_1_mesh_g_l_p.html#aa67d01a9b240154a754945eca9fca3e0">MeshGL::runOriginalID</a>. It is 0 if that mesh was not tracked, e.g. a primitive that never went through AsOriginal(). </p>
+</td></tr>
+<tr><td class="fieldtype">
+<a id="a43667640aa9749bc6c610638e01b0bc8" name="a43667640aa9749bc6c610638e01b0bc8"></a>uint32_t</td>
 <td class="fieldname">
 faceID = 0</td>
 <td class="fielddoc">
-The triangle index that was hit. </td></tr>
+<p>The faceID the hit triangle got from its input mesh, as in <a class="el" href="structmanifold_1_1_mesh_g_l_p.html#ad1ba52e9b88c6ad61e719a7ae1b0f66b">MeshGL::faceID</a>. It is 0 if that mesh had no faceID. </p>
+</td></tr>
 <tr><td class="fieldtype">
 <a id="a79b8e036dca6911e3295a47d99f21f43" name="a79b8e036dca6911e3295a47d99f21f43"></a>double</td>
 <td class="fieldname">
@@ -222,7 +230,7 @@ The geometric face normal at the hit. </td></tr>
 <td class="fieldname">
 crossing = 0</td>
 <td class="fielddoc">
-<p>+1 if the ray enters the solid here, -1 if it exits. Summing these along the ray gives the change in winding number from origin to endpoint. Prefer this over the sign of dot(normal, direction), which can disagree with the mesh's internal crossing in degenerate cases. A ray grazing a vertex or edge can return a +1/-1 pair at the same distance; such ties are ordered by faceID. </p>
+<p>+1 if the ray enters the solid here, -1 if it exits. Summing these along the ray gives the change in winding number from origin to endpoint. Prefer this over the sign of dot(normal, direction), which can disagree with the mesh's internal crossing in degenerate cases. A ray grazing a vertex or edge can return a +1/-1 pair at the same distance. Such ties are returned in a deterministic order. </p>
 </td></tr>
 </table>
 

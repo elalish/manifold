@@ -162,13 +162,14 @@ var NAVTREEINDEX0 =
 "group___scalar.html#gacbb1fe7fd1a4e41a0754ed80abaa593d":[1,0,1,0,3],
 "group___scalar.html#gad3c065a3fc8ae345aaa374879017854a":[1,0,1,0,0],
 "group___structs.html":[1,0,2],
-"group___structs.html#a2807b9fb4b79e01dfde022b613d2575f":[1,0,2,1,2],
-"group___structs.html#a46de78de02bc26b0f04d09b055b9ff4c":[1,0,2,1,0],
-"group___structs.html#a79b8e036dca6911e3295a47d99f21f43":[1,0,2,1,1],
-"group___structs.html#a7f9900a7305f0a389e52eb9aef7b1f13":[1,0,2,1,3],
+"group___structs.html#a2807b9fb4b79e01dfde022b613d2575f":[1,0,2,1,3],
+"group___structs.html#a43667640aa9749bc6c610638e01b0bc8":[1,0,2,1,1],
+"group___structs.html#a79b8e036dca6911e3295a47d99f21f43":[1,0,2,1,2],
+"group___structs.html#a7f9900a7305f0a389e52eb9aef7b1f13":[1,0,2,1,4],
 "group___structs.html#a8b2c7ec938814a57e13bd292f12f3a40":[1,0,2,0,0],
 "group___structs.html#ae40354a1051342eb5a9db005715dcfa9":[1,0,2,0,1],
-"group___structs.html#af0ce4c760b3a1b6642b4c67f02108b14":[1,0,2,1,4],
+"group___structs.html#af0ce4c760b3a1b6642b4c67f02108b14":[1,0,2,1,5],
+"group___structs.html#af1ad6bcae23c39b0b181b4ab163f70c4":[1,0,2,1,0],
 "group___structs.html#ga0ed30505d756fcdf62b6492ae1c57ed6":[1,0,2,10],
 "group___structs.html#ga60a66d8ddacc086bb45d8afc37f646d1":[1,0,2,9],
 "group___structs.html#ga92d9998d052288cbed5f13396261e3ee":[1,0,2,7],
@@ -248,6 +249,5 @@ var NAVTREEINDEX0 =
 "group__vec__algebra.html#gaee21f91e6491b605605877fb9c292f43":[1,0,1,1,1,15],
 "group__vec__algebra.html#gaf95c4ba484d6efe575e8fe8225f7203f":[1,0,1,1,1,6],
 "group__vec__algebra.html#gafa2e270a2bd944eef65542243670f65f":[1,0,1,1,1,9],
-"hierarchy.html":[2,1],
-"index.html":[]
+"hierarchy.html":[2,1]
 };

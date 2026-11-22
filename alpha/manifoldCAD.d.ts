@@ -1731,7 +1731,17 @@ export declare function only(manifold: Manifold): Manifold;
 
 export declare type Polygons = SimplePolygon|SimplePolygon[];
 
+/**
+ * One hit of {@link Manifold.rayCast}.
+ *
+ * @property originalID The originalID of the input mesh the hit triangle came
+ * from, as in Mesh.runOriginalID. It is 0 if that mesh was not tracked, e.g. a
+ * primitive that never went through asOriginal().
+ * @property faceID The faceID the hit triangle got from its input mesh, as in
+ * Mesh.faceID. It is 0 if that mesh had no faceID.
+ */
 export declare type RayHit = {
+    originalID: number,
     faceID: number,
     distance: number,
     position: Vec3,

@@ -1,7 +1,6 @@
 var searchData=
 [
-  ['runflags_0',['runFlags',['../structmanifold_1_1_mesh_g_l_p.html#a4bce13a5930d514634403ea7b105d370',1,'manifold::MeshGLP']]],
-  ['runindex_1',['runIndex',['../structmanifold_1_1_mesh_g_l_p.html#a3d13347a121827c135c328194009b264',1,'manifold::MeshGLP']]],
-  ['runoriginalid_2',['runOriginalID',['../structmanifold_1_1_mesh_g_l_p.html#aa67d01a9b240154a754945eca9fca3e0',1,'manifold::MeshGLP']]],
-  ['runtransform_3',['runTransform',['../structmanifold_1_1_mesh_g_l_p.html#a4a2f4e21de0e8026daf67353dfd3458b',1,'manifold::MeshGLP']]]
+  ['pos_0',['pos',['../group___structs.html#a8b2c7ec938814a57e13bd292f12f3a40',1,'manifold::PolyVert']]],
+  ['position_1',['position',['../group___structs.html#a2807b9fb4b79e01dfde022b613d2575f',1,'manifold::RayHit']]],
+  ['processoverlaps_2',['processOverlaps',['../group___debug.html#a7166fd3caef3744f7241075f21f76af3',1,'manifold::ExecutionParams']]]
 ];

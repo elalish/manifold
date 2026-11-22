@@ -37,5 +37,6 @@ var searchData=
   ['optype_34',['OpType',['../group___structs.html#ga0ed30505d756fcdf62b6492ae1c57ed6',1,'manifold']]],
   ['ord_35',['ord',['../structlinalg_1_1detail_1_1ord.html',1,'linalg::detail']]],
   ['org_36',['&lt;a href=&quot;https://manifoldcad.org&quot;&gt;ManifoldCAD.org&lt;/a&gt;',['../index.html#autotoc_md4',1,'']]],
-  ['originalid_37',['OriginalID',['../classmanifold_1_1_manifold.html#a65b3ff79efc694738a4f56270cc608e6',1,'manifold::Manifold']]]
+  ['originalid_37',['OriginalID',['../classmanifold_1_1_manifold.html#a65b3ff79efc694738a4f56270cc608e6',1,'manifold::Manifold']]],
+  ['originalid_38',['originalID',['../group___structs.html#af1ad6bcae23c39b0b181b4ab163f70c4',1,'manifold::RayHit']]]
 ];
