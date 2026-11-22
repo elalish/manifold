@@ -144,8 +144,8 @@ Input &amp; Output</h2></td></tr>
 </td></tr>
 <tr class="memitem:a7bbdc9ecbc563edb1fa67828c747b0ae" id="r_a7bbdc9ecbc563edb1fa67828c747b0ae"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#a7bbdc9ecbc563edb1fa67828c747b0ae">Manifold</a> (const MeshGL &amp;)</td></tr>
 <tr class="memitem:a5295e63030e90f0e138d8548ad4e87b5" id="r_a5295e63030e90f0e138d8548ad4e87b5"><td class="memItemLeft">&#160;</td><td class="memItemRight"><a class="el" href="#a5295e63030e90f0e138d8548ad4e87b5">Manifold</a> (const MeshGL64 &amp;)</td></tr>
-<tr class="memitem:a70f13b1aa67f6face29ade0b74777ee5" id="r_a70f13b1aa67f6face29ade0b74777ee5"><td class="memItemLeft">MeshGL&#160;</td><td class="memItemRight"><a class="el" href="#a70f13b1aa67f6face29ade0b74777ee5">GetMeshGL</a> (int normalIdx=-1) const</td></tr>
-<tr class="memitem:a5f9fe692814946154356ceed4dae46fa" id="r_a5f9fe692814946154356ceed4dae46fa"><td class="memItemLeft">MeshGL64&#160;</td><td class="memItemRight"><a class="el" href="#a5f9fe692814946154356ceed4dae46fa">GetMeshGL64</a> (int normalIdx=-1) const</td></tr>
+<tr class="memitem:a1417d4f6b8e85cb40cabf15e0ce4f7d5" id="r_a1417d4f6b8e85cb40cabf15e0ce4f7d5"><td class="memItemLeft">MeshGL&#160;</td><td class="memItemRight"><a class="el" href="#a1417d4f6b8e85cb40cabf15e0ce4f7d5">GetMeshGL</a> () const</td></tr>
+<tr class="memitem:a3ae04c33113b5134d4fba6859e3b5b33" id="r_a3ae04c33113b5134d4fba6859e3b5b33"><td class="memItemLeft">MeshGL64&#160;</td><td class="memItemRight"><a class="el" href="#a3ae04c33113b5134d4fba6859e3b5b33">GetMeshGL64</a> () const</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-member-group" class="groupheader"><a id="member-group" name="member-group"></a>
 Constructors</h2></td></tr>
@@ -234,7 +234,7 @@ Properties</h2></td></tr>
 </td></tr>
 <tr class="memitem:ab2942ad196fd238a45667fda1f33ec0e" id="r_ab2942ad196fd238a45667fda1f33ec0e"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#ab2942ad196fd238a45667fda1f33ec0e">SetProperties</a> (int numProp, std::function&lt; void(double *, vec3, const double *)&gt; propFunc) const</td></tr>
 <tr class="memitem:a19abb297f7b7b43f5c84562bcc7df705" id="r_a19abb297f7b7b43f5c84562bcc7df705"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a19abb297f7b7b43f5c84562bcc7df705">CalculateCurvature</a> (int gaussianIdx, int meanIdx) const</td></tr>
-<tr class="memitem:aa3d47c1d38cbbebcee9f6e697c65a286" id="r_aa3d47c1d38cbbebcee9f6e697c65a286"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals</a> (int normalIdx=0, double minSharpAngle=52.5) const</td></tr>
+<tr class="memitem:a7f6e8c31bd3602fcbfa93bfb349c1457" id="r_a7f6e8c31bd3602fcbfa93bfb349c1457"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a7f6e8c31bd3602fcbfa93bfb349c1457">CalculateNormals</a> (double minSharpAngle=52.5) const</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-member-group" class="groupheader"><a id="member-group" name="member-group"></a>
 Smoothing</h2></td></tr>
@@ -243,7 +243,7 @@ Smoothing</h2></td></tr>
 <tr class="memitem:a5d9227a2d10d8ad7b005555213ecd1ac" id="r_a5d9227a2d10d8ad7b005555213ecd1ac"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a5d9227a2d10d8ad7b005555213ecd1ac">Refine</a> (int) const</td></tr>
 <tr class="memitem:a1381728e52975862d954032f717106d5" id="r_a1381728e52975862d954032f717106d5"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a1381728e52975862d954032f717106d5">RefineToLength</a> (double) const</td></tr>
 <tr class="memitem:a723efa99b25f74d4099f004a47313be1" id="r_a723efa99b25f74d4099f004a47313be1"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a723efa99b25f74d4099f004a47313be1">RefineToTolerance</a> (double) const</td></tr>
-<tr class="memitem:ae3f30feea958dad00591d5fb4db4b7f3" id="r_ae3f30feea958dad00591d5fb4db4b7f3"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#ae3f30feea958dad00591d5fb4db4b7f3">SmoothByNormals</a> (int normalIdx=0) const</td></tr>
+<tr class="memitem:af97abee92407e3c97e721c80eb10d057" id="r_af97abee92407e3c97e721c80eb10d057"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#af97abee92407e3c97e721c80eb10d057">SmoothByNormals</a> () const</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-member-group" class="groupheader"><a id="member-group" name="member-group"></a>
 Convex Hull</h2></td></tr>
@@ -266,7 +266,7 @@ I/O</h2></td></tr>
 <div class="line">  }</div>
 <div class="line">  ifile.close();</div>
 <div class="line">}</div>
-<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:358</div></div>
+<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:346</div></div>
 <div class="ttc" id="aclassmanifold_1_1_manifold_html_ad5f60691d05e3402630122740cdf3a0b"><div class="ttname"><a href="#ad5f60691d05e3402630122740cdf3a0b">manifold::Manifold::Manifold</a></div><div class="ttdeci">Manifold()</div><div class="ttdef"><b>Definition</b> manifold.cpp:174</div></div>
 </div><!-- fragment --><p>Writing: </p><div class="fragment"><div class="line">std::ofstream ofile;</div>
 <div class="line">ofile.open(filename);</div>
@@ -367,8 +367,8 @@ Testing Hooks</h2></td></tr>
 </div>
 </div>
 <a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
-<a id="a70f13b1aa67f6face29ade0b74777ee5" name="a70f13b1aa67f6face29ade0b74777ee5"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a70f13b1aa67f6face29ade0b74777ee5">&#9670;&#160;</a></span>GetMeshGL()</h2>
+<a id="a1417d4f6b8e85cb40cabf15e0ce4f7d5" name="a1417d4f6b8e85cb40cabf15e0ce4f7d5"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1417d4f6b8e85cb40cabf15e0ce4f7d5">&#9670;&#160;</a></span>GetMeshGL()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -376,23 +376,19 @@ Testing Hooks</h2></td></tr>
         <tr>
           <td class="memname">MeshGL GetMeshGL </td>
           <td>(</td>
-          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>normalIdx</em></span><span class="paramdefsep"> = </span><span class="paramdefval">-1</span></td><td>)</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
           <td> const</td>
         </tr>
       </table>
 </div><div class="memdoc">
 <p>Returns a MeshGL that is designed to easily push into a renderer, including all interleaved vertex properties that may have been input. It also includes relations to all the input meshes that form a part of this result and the transforms applied to each.</p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">normalIdx</td><td>If this manifold has properties corresponding to normal vectors, you can specify the first of the three consecutive property channels forming the (x, y, z) normals, which will cause this output MeshGL to automatically update these normals according to the applied transforms and front/back side. normalIdx + 3 must be &lt;= numProp, and all original meshes must use the same channels for their normals. Default is -1: if <span class="tt"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals()</a></span> recorded normals at the standard slot, that slot is used automatically; otherwise no normals are applied. If normals are selected, the runTransform matrices will be removed from the output, to avoid them being double-applied when round-tripped. Passing a non-negative <span class="tt">normalIdx</span> is the legacy interface from before <span class="tt"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals</a></span> recorded the slot on the <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> itself; prefer the no-arg form after <span class="tt">CalculateNormals(0)</span>. The explicit-idx path will be removed in a future release. </td></tr>
-  </table>
-  </dd>
-</dl>
+<p>For each run that records normals (runFlags bit 1), the first three extra property channels contain world-frame normals. Non-original results normalize them for graphics output. Their run transforms are retained as metadata and must not be applied again to the normal channels.</p>
+<p>Unflagged values in those channels are ordinary properties. To have normals follow transforms, calculate them on every operand or import a MeshGL with runFlags bit 1 set. </p>
 
 </div>
 </div>
-<a id="a5f9fe692814946154356ceed4dae46fa" name="a5f9fe692814946154356ceed4dae46fa"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a5f9fe692814946154356ceed4dae46fa">&#9670;&#160;</a></span>GetMeshGL64()</h2>
+<a id="a3ae04c33113b5134d4fba6859e3b5b33" name="a3ae04c33113b5134d4fba6859e3b5b33"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3ae04c33113b5134d4fba6859e3b5b33">&#9670;&#160;</a></span>GetMeshGL64()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -400,18 +396,14 @@ Testing Hooks</h2></td></tr>
         <tr>
           <td class="memname">MeshGL64 GetMeshGL64 </td>
           <td>(</td>
-          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>normalIdx</em></span><span class="paramdefsep"> = </span><span class="paramdefval">-1</span></td><td>)</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
           <td> const</td>
         </tr>
       </table>
 </div><div class="memdoc">
 <p>Returns a MeshGL64 that is designed to easily push into a renderer, including all interleaved vertex properties that may have been input. It also includes relations to all the input meshes that form a part of this result and the transforms applied to each.</p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">normalIdx</td><td>If this manifold has properties corresponding to normal vectors, you can specify the first of the three consecutive property channels forming the (x, y, z) normals, which will cause this output MeshGL to automatically update these normals according to the applied transforms and front/back side. normalIdx + 3 must be &lt;= numProp, and all original meshes must use the same channels for their normals. Default is -1: if <span class="tt"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals()</a></span> recorded normals at the standard slot, that slot is used automatically; otherwise no normals are applied. If normals are selected, the runTransform matrices will be removed from the output, to avoid them being double-applied when round-tripped. Same deprecation note as <span class="tt"><a class="el" href="#a70f13b1aa67f6face29ade0b74777ee5">GetMeshGL</a></span>: prefer the no-arg form after <span class="tt">CalculateNormals(0)</span>. </td></tr>
-  </table>
-  </dd>
-</dl>
+<p>For each run that records normals (runFlags bit 1), the first three extra property channels contain world-frame normals. Non-original results normalize them for graphics output. Their run transforms are retained as metadata and must not be applied again to the normal channels.</p>
+<p>Unflagged values in those channels are ordinary properties. To have normals follow transforms, calculate them on every operand or import a MeshGL with runFlags bit 1 set. </p>
 
 </div>
 </div>
@@ -816,7 +808,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Returns a copy of this <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with the given <a class="el" href="classmanifold_1_1_execution_context.html" title="Observe and control a long-running Manifold evaluation.">ExecutionContext</a> attached. The attachment is consumed only by <span class="tt"><a class="el" href="#a423e2f2a67ccc0662a97e018b2c3886d">Status()</a></span> (for deferred CSG trees) and the eager ops (<span class="tt"><a class="el" href="#a5d9227a2d10d8ad7b005555213ecd1ac">Refine</a></span> / <span class="tt"><a class="el" href="#a1381728e52975862d954032f717106d5">RefineToLength</a></span> / <span class="tt"><a class="el" href="#a723efa99b25f74d4099f004a47313be1">RefineToTolerance</a></span>, <span class="tt"><a class="el" href="#a9dc9e00112e2b063cfa6fe8482b1afe8">Hull</a></span>, <span class="tt"><a class="el" href="#ae174a8240802779eca5a0416af7ea78b">MinkowskiSum</a></span> / <span class="tt"><a class="el" href="#a47715067c292eeaafdc48aab3a604829">MinkowskiDifference</a></span>); those snapshot the ctx and report progress / observe cancellation through it. Other queries that force evaluation (<span class="tt"><a class="el" href="#a678f606b1ff10c8959240d2985e022ad">Volume</a></span>, <span class="tt"><a class="el" href="#a70f13b1aa67f6face29ade0b74777ee5">GetMeshGL</a></span>, <span class="tt"><a class="el" href="#a3d711d458596b520edd4cd7948a53e67">BoundingBox</a></span>, etc.) do not currently observe attached ctx.</p>
+<p>Returns a copy of this <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with the given <a class="el" href="classmanifold_1_1_execution_context.html" title="Observe and control a long-running Manifold evaluation.">ExecutionContext</a> attached. The attachment is consumed only by <span class="tt"><a class="el" href="#a423e2f2a67ccc0662a97e018b2c3886d">Status()</a></span> (for deferred CSG trees) and the eager ops (<span class="tt"><a class="el" href="#a5d9227a2d10d8ad7b005555213ecd1ac">Refine</a></span> / <span class="tt"><a class="el" href="#a1381728e52975862d954032f717106d5">RefineToLength</a></span> / <span class="tt"><a class="el" href="#a723efa99b25f74d4099f004a47313be1">RefineToTolerance</a></span>, <span class="tt"><a class="el" href="#a9dc9e00112e2b063cfa6fe8482b1afe8">Hull</a></span>, <span class="tt"><a class="el" href="#ae174a8240802779eca5a0416af7ea78b">MinkowskiSum</a></span> / <span class="tt"><a class="el" href="#a47715067c292eeaafdc48aab3a604829">MinkowskiDifference</a></span>); those snapshot the ctx and report progress / observe cancellation through it. Other queries that force evaluation (<span class="tt"><a class="el" href="#a678f606b1ff10c8959240d2985e022ad">Volume</a></span>, <span class="tt"><a class="el" href="#a1417d4f6b8e85cb40cabf15e0ce4f7d5">GetMeshGL</a></span>, <span class="tt"><a class="el" href="#a3d711d458596b520edd4cd7948a53e67">BoundingBox</a></span>, etc.) do not currently observe attached ctx.</p>
 <p>Deferred ops (Boolean operators, Translate / Rotate / Scale / Transform / Mirror / Warp / Simplify, BatchBoolean, the vector-of-Manifold Hull) ignore any attached ctx and produce a result with no attached ctx. Inputs are not mutated. The idiom for observing a deferred tree is therefore:</p>
 <p>(a + b - c).WithContext(ctx).<a class="el" href="#a423e2f2a67ccc0662a97e018b2c3886d">Status()</a>;</p>
 <p>while the idiom for observing an eager op is:</p>
@@ -1124,6 +1116,7 @@ Testing Hooks</h2></td></tr>
 <p>This removes all relations (originalID, faceID, transform) to ancestor meshes and this new <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> is marked an original. It also recreates faces</p><ul>
 <li>these don't get joined at boundaries where originalID changes, so the reset may allow triangles of flat faces to be further collapsed with <a class="el" href="#a10c9279f88f8ef7a396a04baad480076">RemoveDegenerates()</a>.</li>
 </ul>
+<p>If only some of the input recorded normals, the result keeps two runs with this ID, one for the triangles with normals and one for the rest.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">id</td><td>The ID to assign to this manifold. If negative (the default), a new ID is assigned. Use zero to match all default-constructed manifolds, thus not keeping track of the joints between input manifolds. </td></tr>
@@ -1308,7 +1301,7 @@ Testing Hooks</h2></td></tr>
       </table>
 </div><div class="memdoc">
 <p>This function does not change the topology, but allows the vertices to be moved according to any arbitrary input function. It is easy to create a function that warps a geometrically valid object into one which overlaps, but that is not checked here, so it is up to the user to choose their function with discretion.</p>
-<p>Any normals recording set by <span class="tt"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals()</a></span> is preserved across the Warp, but the stored values reflect the pre-warp surface and may no longer match the new geometry. Re-call <span class="tt"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals()</a></span> if accurate normals matter after a non-rigid warp.</p>
+<p>Any normals recording set by <span class="tt"><a class="el" href="#a7f6e8c31bd3602fcbfa93bfb349c1457">CalculateNormals()</a></span> is preserved across the Warp, but the stored values reflect the pre-warp surface and may no longer match the new geometry. Re-call <span class="tt"><a class="el" href="#a7f6e8c31bd3602fcbfa93bfb349c1457">CalculateNormals()</a></span> if accurate normals matter after a non-rigid warp.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">warpFunc</td><td>A function that modifies a given vertex position. </td></tr>
@@ -1332,7 +1325,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Same as <a class="el" href="#a5366f7082adcbb2be63fcf2b4c57eb51">Manifold::Warp</a> but calls warpFunc with a <a class="el" href="classmanifold_1_1_vec_view.html">VecView</a> which is roughly equivalent to std::span pointing to all vec3 elements to be modified in-place. Like Warp, this preserves any normals recording without updating the stored values; re-call <span class="tt"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals()</a></span> if accurate normals matter after a non-rigid warp.</p>
+<p>Same as <a class="el" href="#a5366f7082adcbb2be63fcf2b4c57eb51">Manifold::Warp</a> but calls warpFunc with a <a class="el" href="classmanifold_1_1_vec_view.html">VecView</a> which is roughly equivalent to std::span pointing to all vec3 elements to be modified in-place. Like Warp, this preserves any normals recording without updating the stored values; re-call <span class="tt"><a class="el" href="#a7f6e8c31bd3602fcbfa93bfb349c1457">CalculateNormals()</a></span> if accurate normals matter after a non-rigid warp.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">warpFunc</td><td>A function that modifies multiple vertex positions. </td></tr>
@@ -1703,7 +1696,7 @@ Testing Hooks</h2></td></tr>
 </div><div class="memdoc">
 <p>Create a new copy of this manifold with updated vertex properties by supplying a function that takes the existing position and properties as input. You may specify any number of output properties, allowing creation and removal of channels. Note: undefined behavior will result if you read past the number of input properties or write past the number of output properties.</p>
 <p>If propFunc is a nullptr, this function will just set the channel to zeroes.</p>
-<p>Any normals recording set by <span class="tt"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals()</a></span> is preserved if numProp is at least 3, and dropped otherwise. If the new properties overwrite slot 0..2 with non-normal data, the recording becomes stale; re-call <span class="tt"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals()</a></span> (or use a numProp &lt; 3 call followed by CalculateNormals) to reset.</p>
+<p>Any normals recording set by <span class="tt"><a class="el" href="#a7f6e8c31bd3602fcbfa93bfb349c1457">CalculateNormals()</a></span> is preserved if numProp is at least 3, and dropped otherwise. If the new properties overwrite slot 0..2 with non-normal data, the recording becomes stale; re-call <span class="tt"><a class="el" href="#a7f6e8c31bd3602fcbfa93bfb349c1457">CalculateNormals()</a></span> (or use a numProp &lt; 3 call followed by CalculateNormals) to reset.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">numProp</td><td>The new number of properties per vertex. </td></tr>
@@ -1743,8 +1736,8 @@ Testing Hooks</h2></td></tr>
 
 </div>
 </div>
-<a id="aa3d47c1d38cbbebcee9f6e697c65a286" name="aa3d47c1d38cbbebcee9f6e697c65a286"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#aa3d47c1d38cbbebcee9f6e697c65a286">&#9670;&#160;</a></span>CalculateNormals()</h2>
+<a id="a7f6e8c31bd3602fcbfa93bfb349c1457" name="a7f6e8c31bd3602fcbfa93bfb349c1457"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a7f6e8c31bd3602fcbfa93bfb349c1457">&#9670;&#160;</a></span>CalculateNormals()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1752,19 +1745,16 @@ Testing Hooks</h2></td></tr>
         <tr>
           <td class="memname"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> CalculateNormals </td>
           <td>(</td>
-          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>normalIdx</em></span><span class="paramdefsep"> = </span><span class="paramdefval">0</span>, </td>
-        </tr>
-        <tr>
-          <td class="paramkey"></td>
-          <td></td>
-          <td class="paramtype">double</td>          <td class="paramname"><span class="paramname"><em>minSharpAngle</em></span><span class="paramdefsep"> = </span><span class="paramdefval">52.5</span>&#160;) const</td>
+          <td class="paramtype">double</td>          <td class="paramname"><span class="paramname"><em>minSharpAngle</em></span><span class="paramdefsep"> = </span><span class="paramdefval">52.5</span></td><td>)</td>
+          <td> const</td>
         </tr>
       </table>
 </div><div class="memdoc">
 <p>Fills in vertex properties for normal vectors, calculated from the mesh geometry.</p>
+<p>Normals are stored in the first three extra property channels (MeshGL channels 3, 4, 5). The <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> records them per mesh ID so subsequent <span class="tt"><a class="el" href="#a1417d4f6b8e85cb40cabf15e0ce4f7d5">GetMeshGL()</a></span> and <span class="tt"><a class="el" href="#a3ae04c33113b5134d4fba6859e3b5b33">GetMeshGL64()</a></span> return world-frame normals and mark each output run via runFlags bit 1.</p>
+<p>Normals written with <span class="tt"><a class="el" href="#ab2942ad196fd238a45667fda1f33ec0e">SetProperties()</a></span> are not recorded. Call this method on every operand before a transform when those values must follow the geometry.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">normalIdx</td><td>The property channel in which to store the X values of the normals. The X, Y, and Z channels will be sequential. The property set will be automatically expanded such that NumProp will be at least normalIdx + 3. Default is 0, the standard slot (MeshGL channels 3, 4, 5); the <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> records the recording per-meshID in that case so subsequent <span class="tt"><a class="el" href="#a70f13b1aa67f6face29ade0b74777ee5">GetMeshGL()</a></span> / <span class="tt"><a class="el" href="#a5f9fe692814946154356ceed4dae46fa">GetMeshGL64()</a></span> without an explicit normalIdx will return world-frame normals and mark each output run via runFlags bit 1. Non-zero values are retained for compatibility and will not be supported in a future release.</td></tr>
     <tr><td class="paramname">minSharpAngle</td><td>Any edges with angles greater than this value will remain sharp, getting different normal vector properties on each side of the edge. By default, no edges are sharp and all normals are shared. With a value of zero, the model is faceted and all normals match their triangle normals, but in this case it would be better not to calculate normals at all. </td></tr>
   </table>
   </dd>
@@ -1786,7 +1776,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Increase the density of the mesh by splitting every edge into n pieces. For instance, with n = 2, each triangle will be split into 4 triangles. Quads will ignore their interior triangle bisector. These will all be coplanar (and will not be immediately collapsed) unless the Mesh/Manifold has halfedgeTangents specified (e.g. from the Smooth() constructor), in which case the new vertices will be moved to the interpolated surface according to their barycentric coordinates. Any normals recording set by <span class="tt"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals()</a></span> is preserved; the new verts get linearly-interpolated normals, which are less precise than recomputed ones but still meaningful.</p>
+<p>Increase the density of the mesh by splitting every edge into n pieces. For instance, with n = 2, each triangle will be split into 4 triangles. Quads will ignore their interior triangle bisector. These will all be coplanar (and will not be immediately collapsed) unless the Mesh/Manifold has halfedgeTangents specified (e.g. from the Smooth() constructor), in which case the new vertices will be moved to the interpolated surface according to their barycentric coordinates. Any normals recording set by <span class="tt"><a class="el" href="#a7f6e8c31bd3602fcbfa93bfb349c1457">CalculateNormals()</a></span> is preserved; the new verts get linearly-interpolated normals, which are less precise than recomputed ones but still meaningful.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">n</td><td>The number of pieces to split every edge into. Must be &gt; 1. </td></tr>
@@ -1810,7 +1800,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Increase the density of the mesh by splitting each edge into pieces of roughly the input length. Interior verts are added to keep the rest of the triangulation edges also of roughly the same length. If halfedgeTangents are present (e.g. from the Smooth() constructor), the new vertices will be moved to the interpolated surface according to their barycentric coordinates. Quads will ignore their interior triangle bisector. Any normals recording set by <span class="tt"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals()</a></span> is preserved; the new verts get linearly-interpolated normals, which are less precise than recomputed ones but still meaningful.</p>
+<p>Increase the density of the mesh by splitting each edge into pieces of roughly the input length. Interior verts are added to keep the rest of the triangulation edges also of roughly the same length. If halfedgeTangents are present (e.g. from the Smooth() constructor), the new vertices will be moved to the interpolated surface according to their barycentric coordinates. Quads will ignore their interior triangle bisector. Any normals recording set by <span class="tt"><a class="el" href="#a7f6e8c31bd3602fcbfa93bfb349c1457">CalculateNormals()</a></span> is preserved; the new verts get linearly-interpolated normals, which are less precise than recomputed ones but still meaningful.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">length</td><td>The length that edges will be broken down to. Its sign is ignored, and zero or NaN is an error. </td></tr>
@@ -1834,7 +1824,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Increase the density of the mesh by splitting each edge into pieces such that any point on the resulting triangles is roughly within tolerance of the smoothly curved surface defined by the tangent vectors. This means tightly curving regions will be divided more finely than smoother regions. If halfedgeTangents are not present, the result will simply be a copy of the original. Quads will ignore their interior triangle bisector. Any normals recording set by <span class="tt"><a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals()</a></span> is preserved; the new verts get linearly-interpolated normals.</p>
+<p>Increase the density of the mesh by splitting each edge into pieces such that any point on the resulting triangles is roughly within tolerance of the smoothly curved surface defined by the tangent vectors. This means tightly curving regions will be divided more finely than smoother regions. If halfedgeTangents are not present, the result will simply be a copy of the original. Quads will ignore their interior triangle bisector. Any normals recording set by <span class="tt"><a class="el" href="#a7f6e8c31bd3602fcbfa93bfb349c1457">CalculateNormals()</a></span> is preserved; the new verts get linearly-interpolated normals.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">tolerance</td><td>The desired maximum distance between the faceted mesh produced and the exact smoothly curving surface. All vertices are exactly on the surface, within rounding error. Its sign is ignored, and zero or NaN is an error. </td></tr>
@@ -1844,8 +1834,8 @@ Testing Hooks</h2></td></tr>
 
 </div>
 </div>
-<a id="ae3f30feea958dad00591d5fb4db4b7f3" name="ae3f30feea958dad00591d5fb4db4b7f3"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ae3f30feea958dad00591d5fb4db4b7f3">&#9670;&#160;</a></span>SmoothByNormals()</h2>
+<a id="af97abee92407e3c97e721c80eb10d057" name="af97abee92407e3c97e721c80eb10d057"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#af97abee92407e3c97e721c80eb10d057">&#9670;&#160;</a></span>SmoothByNormals()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1853,18 +1843,13 @@ Testing Hooks</h2></td></tr>
         <tr>
           <td class="memname"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> SmoothByNormals </td>
           <td>(</td>
-          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>normalIdx</em></span><span class="paramdefsep"> = </span><span class="paramdefval">0</span></td><td>)</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
           <td> const</td>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Smooths out the <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> by filling in the halfedgeTangent vectors. The geometry will remain unchanged until Refine, RefineToLength, or RefineToTolerance is called to interpolate the surface. This version uses the supplied vertex normal properties to define the tangent vectors. Zero-length normals are considered missing and will defer to their neighboring normals instead. If all normals are missing, the vertex pseudonormal will be used.</p>
-<dl class="params"><dt>Parameters</dt><dd>
-  <table class="params">
-    <tr><td class="paramname">normalIdx</td><td>The first property channel of the normals. Channels past NumProp count as missing normals. Any vertex where multiple normals exist and don't agree will result in a sharp edge. Default is 0, the standard slot. Non-zero values are retained for compatibility and will not be supported in a future release. </td></tr>
-  </table>
-  </dd>
-</dl>
+<p>Smooths out the <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> by filling in the halfedgeTangent vectors. The geometry will remain unchanged until Refine, RefineToLength, or RefineToTolerance is called to interpolate the surface. This version uses the standard vertex normal properties to define the tangent vectors. Zero-length normals are considered missing and will defer to their neighboring normals instead. If all normals are missing, the vertex pseudonormal will be used.</p>
+<p>Fewer than three properties count as missing normals. Any vertex where multiple normals exist and don't agree will result in a sharp edge. </p>
 
 </div>
 </div>
@@ -1982,7 +1967,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Returns true if properties are shared everywhere except across mesh boundaries. This is not true in general, but only because an input mesh may have property discontinuities. For simple input meshes where properties are 1:1 with verts, this HasSimpleProps condition should still be true after any combination of boolean operations and simplifications. <a class="el" href="#aa3d47c1d38cbbebcee9f6e697c65a286">CalculateNormals()</a> will cause this to be false anytime the mesh contains a sharp edge. </p>
+<p>Returns true if properties are shared everywhere except across mesh boundaries. This is not true in general, but only because an input mesh may have property discontinuities. For simple input meshes where properties are 1:1 with verts, this HasSimpleProps condition should still be true after any combination of boolean operations and simplifications. <a class="el" href="#a7f6e8c31bd3602fcbfa93bfb349c1457">CalculateNormals()</a> will cause this to be false anytime the mesh contains a sharp edge. </p>
 
 </div>
 </div>

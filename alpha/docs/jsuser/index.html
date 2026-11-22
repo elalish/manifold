@@ -93,7 +93,9 @@ result, while ghosting out the final result in transparent gray. Helpful for
 debugging as it allows you to see objects that may be hidden in the interior
 of the result. Multiple objects marked <code>only()</code> will all be shown.</p>
 </div></dd><dt class="tsd-member-summary" id="setmaterial"><span class="tsd-member-summary-name"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Function"><use href="assets/icons.svg#icon-64"></use></svg><a href="functions/setMaterial.html">setMaterial</a><a href="#setmaterial" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></span></dt><dd class="tsd-member-summary"><div class="tsd-comment tsd-typography"><p>Return a shallow copy of the input manifold with the given material
-properties applied. They will be carried along through operations.</p>
+properties applied. They will be carried along through operations.
+This uses asOriginal(), which keeps the recorded normals of the operands that
+had them.</p>
 </div></dd><dt class="tsd-member-summary" id="show"><span class="tsd-member-summary-name"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Function"><use href="assets/icons.svg#icon-64"></use></svg><a href="functions/show.html">show</a><a href="#show" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></span></dt><dd class="tsd-member-summary"><div class="tsd-comment tsd-typography"><p>Wrap any shape object with this method to display it and any copies in
 transparent red. This is particularly useful for debugging <code>subtract()</code> as it
 will allow you find the object even if it doesn't currently intersect the

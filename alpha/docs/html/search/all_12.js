@@ -34,7 +34,7 @@ var searchData=
   ['size_31',['Size',['../structmanifold_1_1_box.html#abfdbdbb0e4c3b36182fa38bf8ae34eb6',1,'manifold::Box::Size()'],['../structmanifold_1_1_rect.html#a6eea4bf264c80146b7f56fa78b97b218',1,'manifold::Rect::Size()']]],
   ['slerp_32',['slerp',['../group__vec__algebra.html#ga865d3c559380616dc94880a819dc295f',1,'linalg']]],
   ['slice_33',['Slice',['../classmanifold_1_1_manifold.html#ad03837de2290a269fa14e0773c9913fa',1,'manifold::Manifold']]],
-  ['smoothbynormals_34',['SmoothByNormals',['../classmanifold_1_1_manifold.html#ae3f30feea958dad00591d5fb4db4b7f3',1,'manifold::Manifold']]],
+  ['smoothbynormals_34',['SmoothByNormals',['../classmanifold_1_1_manifold.html#af97abee92407e3c97e721c80eb10d057',1,'manifold::Manifold']]],
   ['smoothstep_35',['smoothstep',['../group___scalar.html#ga00273b42cfe2139addb80c5af08ebbdb',1,'manifold']]],
   ['sphere_36',['Sphere',['../classmanifold_1_1_manifold.html#a606301a59534ef00a89dc7d7a132abe6',1,'manifold::Manifold']]],
   ['split_37',['Split',['../classmanifold_1_1_manifold.html#a60e241b8a56d334b3d2d3dbd2fc808ba',1,'manifold::Manifold']]],

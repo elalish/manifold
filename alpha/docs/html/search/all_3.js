@@ -1,7 +1,7 @@
 var searchData=
 [
   ['calculatecurvature_0',['CalculateCurvature',['../classmanifold_1_1_manifold.html#a19abb297f7b7b43f5c84562bcc7df705',1,'manifold::Manifold']]],
-  ['calculatenormals_1',['CalculateNormals',['../classmanifold_1_1_manifold.html#aa3d47c1d38cbbebcee9f6e697c65a286',1,'manifold::Manifold']]],
+  ['calculatenormals_1',['CalculateNormals',['../classmanifold_1_1_manifold.html#a7f6e8c31bd3602fcbfa93bfb349c1457',1,'manifold::Manifold']]],
   ['cancel_2',['Cancel',['../classmanifold_1_1_execution_context.html#a98fd5d588027adeb8d4545c78347cd26',1,'manifold::ExecutionContext']]],
   ['cancelled_3',['Cancelled',['../classmanifold_1_1_execution_context.html#a7b9d2d5a6c6b3639b65a808c0e1cfc75',1,'manifold::ExecutionContext']]],
   ['center_4',['Center',['../structmanifold_1_1_box.html#a42f55f9d4117366b9113bec425aa8a45',1,'manifold::Box::Center()'],['../structmanifold_1_1_rect.html#a7744b21a5a08bbb68242a497473bba81',1,'manifold::Rect::Center()']]],
