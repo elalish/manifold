@@ -200,11 +200,20 @@ void ExportMesh(const std::string& filename, const MeshGL& mesh,
   aiScene* scene = CreateScene(options);
   aiMesh* mesh_out = scene->mMeshes[0];
 
+  // Default to the recorded normals when every run has them.
+  int normalIdx = options.mat.normalIdx;
+  if (normalIdx < 0 && mesh.NumRun() > 0) {
+    bool allNormals = true;
+    for (size_t run = 0; run < mesh.NumRun(); ++run)
+      allNormals &= mesh.HasNormals(run);
+    if (allNormals) normalIdx = 0;
+  }
+
   mesh_out->mNumVertices = mesh.NumVert();
   mesh_out->mVertices = new aiVector3D[mesh_out->mNumVertices];
   if (!options.faceted) {
-    const bool validChannels = options.mat.normalIdx >= 0 &&
-                               options.mat.normalIdx + 6 <= (int)mesh.numProp;
+    const bool validChannels =
+        normalIdx >= 0 && normalIdx + 6 <= (int)mesh.numProp;
     DEBUG_ASSERT(
         validChannels, userErr,
         "When faceted is false, valid normalChannels must be supplied.");
@@ -229,8 +238,7 @@ void ExportMesh(const std::string& filename, const MeshGL& mesh,
     if (!options.faceted) {
       vec3 n;
       for (int j : {0, 1, 2})
-        n[j] = mesh.vertProperties[i * mesh.numProp + 3 +
-                                   options.mat.normalIdx + j];
+        n[j] = mesh.vertProperties[i * mesh.numProp + 3 + normalIdx + j];
       mesh_out->mNormals[i] =
           isYup ? aiVector3D(n.y, n.z, n.x) : aiVector3D(n.x, n.y, n.z);
     }

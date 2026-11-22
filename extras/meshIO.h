@@ -41,7 +41,8 @@ struct Material {
   double alpha = 1.0;
   /// Gives the property index where the first normal channel
   /// can be found. 0 indicates the first three property channels following
-  /// position. A negative value does not save normals.
+  /// position. A negative value uses the recorded normals if every run of the
+  /// mesh has them (runFlags bit 1), and otherwise does not save normals.
   int normalIdx = -1;
   /// Gives the property index where the first color channel
   /// can be found. 0 indicates the first three property channels following

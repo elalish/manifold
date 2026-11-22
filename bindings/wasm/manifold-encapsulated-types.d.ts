@@ -1158,11 +1158,12 @@ export class Manifold {
    * includes relations to all the input meshes that form a part of this result
    * and the transforms applied to each.
    *
-   * If every run records normals, the first three extra property channels
-   * contain world-frame normals. Non-original results normalize them for
-   * graphics output. Unflagged values in those channels are ordinary
-   * properties. To have normals follow transforms, call calculateNormals() on
-   * every operand or import a MeshGL with runFlags bit 1 set.
+   * For each run that records normals (runFlags bit 1), the first three extra
+   * property channels contain world-frame normals. Non-original results
+   * normalize them for graphics output. Unflagged values in those channels are
+   * ordinary properties. To have normals follow transforms, call
+   * calculateNormals() on every operand or import a MeshGL with runFlags bit 1
+   * set.
    * @group Input & Output
    */
   getMesh(): Mesh;

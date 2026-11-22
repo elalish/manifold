@@ -90,15 +90,12 @@ struct Manifold::Impl {
       int halfedge, std::function<T(int halfedge)> transform,
       std::function<void(int halfedge, const T& here, T& next)> binaryOp) const;
 
-  // True only when every meshID carries normals in slots 0..2. This guards
-  // GetMeshGLImpl's shared-slot normalization for non-original output; a mixed
-  // result keeps bit 1 on only the runs that carry normals.
-  bool AllHaveNormals() const {
-    if (meshRelation_.meshIDtransform.empty()) return false;
-    for (const auto& m : meshRelation_.meshIDtransform) {
-      if (!m.second.hasNormals) return false;
+  // True when any meshID carries normals in slots 0..2.
+  static bool AnyHasNormals(const MeshRelationD& meshRelation) {
+    for (const auto& m : meshRelation.meshIDtransform) {
+      if (m.second.hasNormals) return true;
     }
-    return true;
+    return false;
   }
 
   // True iff the meshID owning `tri` has hasNormals set. Returns false when
@@ -541,7 +538,6 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(
   const int numTri = impl.NumTri();
 
   const bool isOriginal = impl.meshRelation_.originalID >= 0;
-  const bool updateNormals = !isOriginal && impl.AllHaveNormals();
 
   MeshGLP<Precision, I> out;
   out.numProp = 3 + numProp;
@@ -674,9 +670,10 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(
           out.vertProperties.push_back(impl.properties_[prop * numProp + p]);
         }
 
-        // All runs record world-frame normals in the standard property slot.
-        // Normalize them for graphics output without applying run transforms.
-        if (updateNormals) {
+        // Runs flagged with runFlags bit 1 record world-frame normals in the
+        // standard property slot. Normalize them for graphics output without
+        // applying run transforms.
+        if (!isOriginal && (out.runFlags[run] & 2)) {
           vec3 normal;
           const int start = out.vertProperties.size() - out.numProp;
           for (int i : {0, 1, 2}) {

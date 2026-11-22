@@ -299,10 +299,10 @@ Manifold::Manifold(const MeshGL64& meshGL64)
  * that may have been input. It also includes relations to all the input meshes
  * that form a part of this result and the transforms applied to each.
  *
- * If every run records normals, the first three extra property channels
- * contain world-frame normals. Non-original results normalize them for graphics
- * output. Their run transforms are retained as metadata and must not be applied
- * again to the normal channels.
+ * For each run that records normals (runFlags bit 1), the first three extra
+ * property channels contain world-frame normals. Non-original results
+ * normalize them for graphics output. Their run transforms are retained as
+ * metadata and must not be applied again to the normal channels.
  *
  * Unflagged values in those channels are ordinary properties. To have normals
  * follow transforms, calculate them on every operand or import a MeshGL with
@@ -319,10 +319,10 @@ MeshGL Manifold::GetMeshGL() const {
  * that may have been input. It also includes relations to all the input meshes
  * that form a part of this result and the transforms applied to each.
  *
- * If every run records normals, the first three extra property channels
- * contain world-frame normals. Non-original results normalize them for graphics
- * output. Their run transforms are retained as metadata and must not be applied
- * again to the normal channels.
+ * For each run that records normals (runFlags bit 1), the first three extra
+ * property channels contain world-frame normals. Non-original results
+ * normalize them for graphics output. Their run transforms are retained as
+ * metadata and must not be applied again to the normal channels.
  *
  * Unflagged values in those channels are ordinary properties. To have normals
  * follow transforms, calculate them on every operand or import a MeshGL with
@@ -471,6 +471,10 @@ int Manifold::OriginalID() const {
  * - these don't get joined at boundaries where originalID changes, so the
  * reset may allow triangles of flat faces to be further collapsed with
  * RemoveDegenerates().
+ *
+ * If any input run recorded normals, the result records them too, and the
+ * first three extra property channels of the other runs are treated as normals
+ * from then on.
  *
  * @param id The ID to assign to this manifold. If negative (the default), a new
  * ID is assigned. Use zero to match all default-constructed manifolds, thus not

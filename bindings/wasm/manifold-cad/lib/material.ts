@@ -50,9 +50,8 @@ export function cleanup() {
 /**
  * Return a shallow copy of the input manifold with the given material
  * properties applied. They will be carried along through operations.
- * This uses asOriginal(), so it does not record normals on a mixed Boolean
- * result. Call calculateNormals() on every operand when normals must follow
- * later transforms.
+ * This uses asOriginal(), which keeps the recorded normals if any operand of a
+ * Boolean result had them.
  *
  * @param manifold The input object.
  * @param material A set of material properties to apply to this manifold.

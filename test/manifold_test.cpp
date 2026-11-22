@@ -599,6 +599,41 @@ TEST(Manifold, NormalsDroppedWithChannels) {
   EXPECT_NEAR(Manifold(mesh).Volume(), m.Volume(), 1e-9);
 }
 
+TEST(Manifold, NormalsNormalizedPerRun) {
+  // GetMeshGL normalizes each run that records normals, even when other runs
+  // don't. The overlap makes the Boolean interpolate the sphere's normals to
+  // less than unit length. The cube's unflagged slot 0..2 is left alone.
+  const Manifold cube =
+      Manifold::Cube(vec3(6), true)
+          .Translate({4, 0, 0})
+          .SetProperties(3, [](double* newProp, vec3, const double*) {
+            newProp[0] = 0;
+            newProp[1] = 0;
+            newProp[2] = 2;
+          });
+  const MeshGL gl =
+      (Manifold::Sphere(5, 32).CalculateNormals() + cube).GetMeshGL();
+  int flagged = 0;
+  int unflagged = 0;
+  for (size_t run = 0; run < gl.NumRun(); ++run) {
+    for (uint32_t i = gl.runIndex[run]; i < gl.runIndex[run + 1]; ++i) {
+      const uint32_t v = gl.triVerts[i];
+      const vec3 n(gl.vertProperties[v * gl.numProp + 3],
+                   gl.vertProperties[v * gl.numProp + 4],
+                   gl.vertProperties[v * gl.numProp + 5]);
+      if (gl.HasNormals(run)) {
+        ++flagged;
+        EXPECT_NEAR(la::length(n), 1, 1e-6) << v;
+      } else {
+        ++unflagged;
+        EXPECT_EQ(n, vec3(0, 0, 2)) << v;
+      }
+    }
+  }
+  EXPECT_GT(flagged, 0);
+  EXPECT_GT(unflagged, 0);
+}
+
 TEST(Manifold, NormalsSharedPropVertMixedFlagsUndefined) {
   // hasNormals is per-run, but a single propVert holds one slot 0..2
   // value. If a hand-built MeshGL shares a propVert between a
@@ -696,8 +731,7 @@ TEST(Manifold, GetNormalUnflaggedMeshFrame) {
 }
 
 TEST(Manifold, TransformMixedNormalsPerMeshID) {
-  // Mixed Boolean output (no-normals + with-normals): the result's
-  // AllHaveNormals() is false (AND across meshIDs), but the with-normals
+  // Mixed Boolean output (no-normals + with-normals): the with-normals
   // meshIDs still hold world-frame normals at slot 0..2 that must rotate
   // with a subsequent Transform. Impl::Transform must per-meshID iterate,
   // not skip on the whole-impl flag.
@@ -708,11 +742,24 @@ TEST(Manifold, TransformMixedNormalsPerMeshID) {
   EXPECT_EQ(bad, 0);
 }
 
+TEST(Manifold, AsOriginalMixedNormalsKept) {
+  // AsOriginal collapses a mixed result into one run. It keeps the recording
+  // when any input had normals, so the sphere's normals still rotate.
+  MeshGL gl =
+      MixedNormalsCubePlusSphere().AsOriginal().Rotate(90, 0, 0).GetMeshGL();
+  ASSERT_EQ(gl.NumRun(), 1u);
+  EXPECT_TRUE(gl.HasNormals(0));
+  auto [good, bad] = CountSphereNormalAlignment(
+      gl, 5.0, 3, [](vec3 pos) { return la::normalize(pos); });
+  EXPECT_GT(good, 0);
+  EXPECT_EQ(bad, 0);
+}
+
 TEST(Manifold, ComposeMixedNormalsPerMeshID) {
   // Compose's per-node eager-transform check is per-Relation, not whole-node.
   // Pass a mixed Manifold with a pending Rotate into a 3-input BatchBoolean,
   // forcing the disjoint Compose path where node->transform_ is non-identity
-  // and node->pImpl_->AllHaveNormals() is false (mixed). Sphere's normals
+  // and the node mixes meshIDs with and without normals. Sphere's normals
   // within the mixed input must still rotate.
   const Manifold mixed_rot = MixedNormalsCubePlusSphere().Rotate(90, 0, 0);
   const Manifold t1 = Manifold::Tetrahedron().Translate({-50, 0, 0});

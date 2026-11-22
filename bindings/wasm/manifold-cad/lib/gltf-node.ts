@@ -73,10 +73,9 @@ export interface GLTFMaterial {
    * 0-2 for position, 3-5 for surface normal, 6-7 for texture, ignores 8-9,
    * and uses 10-12 for color.
    *
-   * Normals follow transforms only when they come from `calculateNormals()` on
-   * every operand or a MeshGL input whose corresponding runFlags bit 1 is set.
-   * Values supplied by `setProperties()`, and unflagged values after
-   * `setMaterial()` on mixed Boolean results, remain ordinary properties.
+   * Normals follow transforms only when they come from `calculateNormals()` or
+   * a MeshGL input whose corresponding runFlags bit 1 is set. Values supplied
+   * by `setProperties()` remain ordinary properties.
    *
    * Some properties such as `TEXCOORD_0` or `COLOR_0` may be set when importing
    * a model that has a texture or material.

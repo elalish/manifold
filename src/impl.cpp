@@ -153,17 +153,9 @@ void Manifold::Impl::EagerTransformPropNormals(
     const Halfedges& halfedge, const MeshRelationD& meshRelation,
     const mat3& normalTransform, Vec<double>& properties, int numPropVert,
     int stride, int offset) {
-  // Short-circuit when no meshID carries normals. OR semantics (any has
-  // it), unlike AllHaveNormals() - mixed inputs still need the per-meshID
-  // iteration below to rotate the with-normals subset.
-  bool anyHasNormals = false;
-  for (const auto& m : meshRelation.meshIDtransform) {
-    if (m.second.hasNormals) {
-      anyHasNormals = true;
-      break;
-    }
-  }
-  if (!anyHasNormals) return;
+  // Short-circuit when no meshID carries normals. Mixed inputs still need the
+  // per-meshID iteration below to rotate the with-normals subset.
+  if (!AnyHasNormals(meshRelation)) return;
   Vec<bool> propVisited(numPropVert, false);
   for (size_t e = 0; e < halfedge.size(); ++e) {
     if (!TriHasNormals(meshRelation, e / 3)) continue;
@@ -197,10 +189,11 @@ void Manifold::Impl::InitializeOriginal(int id) {
              [meshID, &triRef](const int tri) {
                triRef[tri] = {meshID, meshID, -1, tri};
              });
-  // Preserve the AND-across-old-Relations state so AsOriginal keeps the
-  // recording when it builds a fresh Relation. Primitives start with an
-  // empty map, which AllHaveNormals() returns false for.
-  const bool hadNormals = AllHaveNormals();
+  // AsOriginal collapses every old Relation into one run, so keep the
+  // recording if any of them had normals. Unflagged triangles then carry
+  // their slot 0..2 values (usually zero padding, which counts as a missing
+  // normal) as normals. Primitives start with an empty map, so no normals.
+  const bool hadNormals = AnyHasNormals(meshRelation_);
   meshRelation_.meshIDtransform.clear();
   meshRelation_.meshIDtransform[meshID] = {meshID, la::identity, false,
                                            hadNormals};
