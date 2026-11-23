@@ -208,6 +208,20 @@ TEST(Triangulation, LargeSmoothContour) {
   EXPECT_EQ(triangles.size(), numVert - 2);
 }
 
+// Benchmark: triangulate one large regular polygon. It is convex, so the
+// triangulator takes its convex path, which should run in linear time.
+TEST(Triangulation, LargeConvexContour) {
+  const int numVert = 100000;
+  Polygons polys(1);
+  for (int i = 0; i < numVert; ++i) {
+    const double angle = kTwoPi * i / numVert;
+    polys[0].push_back({10 * std::cos(angle), 10 * std::sin(angle)});
+  }
+  std::vector<ivec3> triangles;
+  EXPECT_NO_THROW(triangles = Triangulate(polys));
+  EXPECT_EQ(triangles.size(), numVert - 2);
+}
+
 // The triangulator must not build fans on smooth contours. Each clipped ear
 // adds a triangle at the fan's center vertex, the fan's edges reach across the
 // polygon, and its long sliver triangles slow both the ear search and later

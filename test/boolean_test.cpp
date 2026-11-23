@@ -658,6 +658,20 @@ TEST(Boolean, SmoothExtrusionCrossing) {
   EXPECT_NEAR(result.Volume(), 4 * width, 0.05 * width);
 }
 
+// Benchmark: the same crossing as SmoothExtrusionCrossing, with cylinders.
+// Their caps are convex, so the triangulator's convex path splits them.
+TEST(Boolean, ConvexExtrusionCrossing) {
+  const Manifold slab =
+      Manifold::Cylinder(2, 10, 10, 20000).Translate({0, 0, -1});
+  const Manifold crossed = slab.Rotate(90, 0, 0);
+  const Manifold result = slab ^ crossed;
+
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(result.Genus(), 0);
+  // The intersection is close to a 2 x 2 bar across the 20-wide cylinder.
+  EXPECT_NEAR(result.Volume(), 80, 1);
+}
+
 TEST(Boolean, Coplanar) {
   Manifold cylinder =
       WithPositionColors(Manifold::Cylinder(1.0, 1.0).AsOriginal());
