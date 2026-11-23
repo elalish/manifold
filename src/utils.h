@@ -39,12 +39,12 @@
 
 namespace manifold {
 
-// A requested relative precision raised to at least kDefaultRelativePrecision.
-// NaN and infinity give the default.
-inline double ClampRelPrecision(double relPrecision) {
+// A requested relative precision raised to at least kMinRelativePrecision.
+// NaN and infinity give defaultPrecision.
+inline double ClampRelPrecision(double relPrecision, double defaultPrecision) {
   return std::isfinite(relPrecision)
-             ? std::max(kDefaultRelativePrecision, relPrecision)
-             : kDefaultRelativePrecision;
+             ? std::max(kMinRelativePrecision, relPrecision)
+             : defaultPrecision;
 }
 
 inline int Next3(int i) {

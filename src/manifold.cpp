@@ -198,9 +198,9 @@ CsgLeafNode& Manifold::GetCsgLeafNode(ExecutionContext::Impl* ctx) const {
  *
  * @param meshGL The input MeshGL.
  * @param relPrecision The relative precision of the result, which defines what
- * counts as coplanar or degenerate in this and later operations. Values below
- * kDefaultRelativePrecision are raised to it, and NaN or infinity give the
- * default.
+ * counts as coplanar or degenerate in this and later operations. The default
+ * is kDefaultRelativePrecision (float epsilon). Values below
+ * kMinRelativePrecision are raised to it, and NaN or infinity give the default.
  */
 Manifold::Manifold(const MeshGL& meshGL, double relPrecision)
     : pNode_(std::make_shared<CsgLeafNode>(
@@ -219,9 +219,9 @@ Manifold::Manifold(const MeshGL& meshGL, double relPrecision)
  *
  * @param meshGL64 The input MeshGL64.
  * @param relPrecision The relative precision of the result, which defines what
- * counts as coplanar or degenerate in this and later operations. Values below
- * kDefaultRelativePrecision are raised to it, and NaN or infinity give the
- * default.
+ * counts as coplanar or degenerate in this and later operations. The default
+ * is kMinRelativePrecision. Values below it are raised to it, and NaN or
+ * infinity give the default.
  */
 Manifold::Manifold(const MeshGL64& meshGL64, double relPrecision)
     : pNode_(std::make_shared<CsgLeafNode>(
@@ -339,17 +339,19 @@ double Manifold::GetEpsilon() const {
  * non-empty inputs.
  *
  * @param relPrecision The relative precision. Values below
- * kDefaultRelativePrecision are raised to it, and NaN or infinity give the
- * default.
+ * kMinRelativePrecision are raised to it, and NaN or infinity give
+ * kDefaultRelativePrecision.
  */
 Manifold Manifold::WithPrecision(double relPrecision) const {
   return Manifold(GetCsgLeafNode(AtomicLoadShared(&ctx_).get())
-                      .WithPrecision(ClampRelPrecision(relPrecision)));
+                      .WithPrecision(ClampRelPrecision(
+                          relPrecision, kDefaultRelativePrecision)));
 }
 
 /**
  * Returns the relative precision of this Manifold, set by its input mesh or
- * WithPrecision(), or taken from its inputs.
+ * WithPrecision(), or taken from its inputs. Shapes, extrusions, revolutions,
+ * level sets and hulls of points have kDefaultRelativePrecision.
  */
 double Manifold::GetPrecision() const {
   return GetCsgLeafNode().RelPrecision();

@@ -698,7 +698,7 @@ class EarClip {
       Link(last, first);
     }
 
-    if (epsilon_ < 0) epsilon_ = bBox_.Scale() * kDefaultRelativePrecision;
+    if (epsilon_ < 0) epsilon_ = bBox_.Scale() * kMinRelativePrecision;
 
     result_.AddContours(polys);
     // Slightly more than enough, since each hole can cause two extra triangles.

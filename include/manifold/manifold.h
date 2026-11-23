@@ -91,7 +91,7 @@ class Manifold {
    */
   ///@{
   Manifold(const MeshGL&, double relPrecision = kDefaultRelativePrecision);
-  Manifold(const MeshGL64&, double relPrecision = kDefaultRelativePrecision);
+  Manifold(const MeshGL64&, double relPrecision = kMinRelativePrecision);
   MeshGL GetMeshGL() const;
   MeshGL64 GetMeshGL64() const;
   ///@}
@@ -311,6 +311,9 @@ class Manifold {
    * }
    * ofile.close();
    * @endcode
+   *
+   * ReadOBJ reads double-precision positions, so the result has
+   * kMinRelativePrecision, like Manifold(MeshGL64).
    */
 #ifndef MANIFOLD_NO_IOSTREAM
   static Manifold ReadOBJ(std::istream& stream);
