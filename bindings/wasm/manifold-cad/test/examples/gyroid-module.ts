@@ -30,13 +30,13 @@ function gyroidOffset(level) {
   } as Box;
   return Manifold.levelSet(gyroid, box, period / n, level)
       .scale(size / period)
-      .calculateNormals(0);
+      .calculateNormals();
 };
 
 function rhombicDodecahedron() {
   const box = Manifold.cube([1, 1, 2], true).scale(size * Math.sqrt(2));
   const result = box.rotate([90, 45, 0]).intersect(box.rotate([90, 45, 90]));
-  return result.intersect(box.rotate([0, 0, 45])).calculateNormals(0);
+  return result.intersect(box.rotate([0, 0, 45])).calculateNormals();
 }
 
 const gyroidModule = rhombicDodecahedron()

@@ -25,12 +25,13 @@
 import type {ManifoldToplevel} from 'manifold-3d';
 import type {CrossSection, Manifold} from 'manifold-3d/manifold-encapsulated-types.d.ts';
 
-const memoryRegistry = Array<Manifold|CrossSection>();
+type ManagedGeometry = (Manifold|CrossSection)&{isDeleted?: () => boolean};
+const memoryRegistry = new Set<ManagedGeometry>();
 
 // manifold static methods (that return a new manifold)
 const manifoldStaticFunctions = [
-  'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'compose',
-  'union', 'difference', 'intersection', 'levelSet', 'smooth', 'ofMesh', 'hull'
+  'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'union',
+  'difference', 'intersection', 'levelSet', 'ofMesh', 'hull'
 ];
 // manifold member functions (that return a new manifold)
 const manifoldMemberFunctions = [
@@ -39,6 +40,10 @@ const manifoldMemberFunctions = [
   'intersect',
   'decompose',
   'warp',
+  'warpBatch',
+  'minkowskiSum',
+  'minkowskiDifference',
+  'withContext',
   'transform',
   'translate',
   'rotate',
@@ -47,7 +52,6 @@ const manifoldMemberFunctions = [
   'calculateCurvature',
   'calculateNormals',
   'smoothByNormals',
-  'smoothOut',
   'refine',
   'refineToLength',
   'refineToTolerance',
@@ -67,10 +71,11 @@ const crossSectionStaticFunctions = [
   'square', 'circle', 'union', 'difference', 'intersection', 'ofPolygons',
   'evenOdd', 'nonZero', 'hull'
 ];
-// CrossSection member functions (that return a new cross-section)
+// CrossSection member functions (that return new geometry)
 const crossSectionMemberFunctions = [
-  'add', 'subtract', 'intersect', 'rectClip', 'decompose', 'transform',
-  'translate', 'rotate', 'scale', 'mirror', 'simplify', 'offset', 'hull'
+  'add', 'subtract', 'intersect', 'decompose', 'transform', 'translate',
+  'rotate', 'scale', 'mirror', 'warp', 'simplify', 'offset', 'hull', 'extrude',
+  'revolve'
 ];
 
 /**
@@ -78,13 +83,10 @@ const crossSectionMemberFunctions = [
  */
 export const cleanup = () => {
   for (const obj of memoryRegistry) {
-    // decompose result is an array of manifolds
-    if (obj instanceof Array)
-      for (const elem of obj) elem.delete();
-    else
-      obj.delete();
+    // Embind handles may also have been deleted explicitly by the caller.
+    if (!obj.isDeleted?.()) obj.delete();
   }
-  memoryRegistry.length = 0;
+  memoryRegistry.clear();
 };
 
 /**
@@ -97,10 +99,13 @@ export const cleanup = () => {
  * @returns
  */
 export const garbageCollectFunction = (originalFn: any): any => {
-  return (...args: any) => {
-    //@ts-ignore
-    const result = originalFn(...args);
-    memoryRegistry.push(result);
+  return function(this: any, ...args: any[]) {
+    const result = originalFn.apply(this, args);
+    // A factory or scene helper may return a result already registered by a
+    // member call. Track each handle only once, including array results.
+    for (const obj of Array.isArray(result) ? result : [result]) {
+      memoryRegistry.add(obj);
+    }
     return result;
   };
 };
@@ -108,7 +113,13 @@ export const garbageCollectFunction = (originalFn: any): any => {
 const interceptMethods = (target: any, methodNames: Array<string>) => {
   for (const name of methodNames) {
     const originalFn = target[name];
-    target[name] = garbageCollectFunction(originalFn);
+    if (typeof originalFn !== 'function') continue;
+    // The public constructors inherit from the native prototypes, but native
+    // factory results use those original prototypes directly. Replace the
+    // method where it is defined so both kinds of instance reach the wrapper.
+    let owner = target;
+    while (!Object.hasOwn(owner, name)) owner = Object.getPrototypeOf(owner);
+    owner[name] = garbageCollectFunction(originalFn);
   }
 };
 

@@ -66,6 +66,19 @@ export function setMinCircularAngle(angle: number): void;
 export function setMinCircularEdgeLength(length: number): void;
 
 /**
+ * Returns the configured minimum angle in degrees between circular segments.
+ * This is the angle constraint, even when {@link setCircularSegments} overrides
+ * it.
+ */
+export function getMinCircularAngle(): number;
+
+/**
+ * Returns the configured minimum length of circular segments. This is the
+ * length constraint, even when {@link setCircularSegments} overrides it.
+ */
+export function getMinCircularEdgeLength(): number;
+
+/**
  * Sets the default number of circular segments for the
  * {@link CrossSection.circle}, {@link Manifold.cylinder}, {@link
  * Manifold.sphere}, and
@@ -726,18 +739,13 @@ export class Manifold {
   /**
    * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
    * geometry will remain unchanged until Refine or RefineToLength is called to
-   * interpolate the surface. This version uses the supplied vertex normal
-   * properties to define the tangent vectors.
-   *
-   * @param normalIdx The first property channel of the normals. Channels past
-   * NumProp count as missing normals. Any vertex where multiple normals exist
-   * and don't agree will result in a sharp edge. Default is 0, the standard
-   * slot.
-   * Non-zero values are retained for compatibility and will not be supported
-   * in a future release.
+   * interpolate the surface. This version uses standard vertex normal
+   * properties to define the tangent vectors. Fewer than three properties
+   * count as missing normals. Any vertex where multiple normals exist and don't
+   * agree will result in a sharp edge.
    * @group Smoothing
    */
-  smoothByNormals(normalIdx?: number): Manifold;
+  smoothByNormals(): Manifold;
 
   /**
    * Increase the density of the mesh by splitting every edge into n pieces. For
@@ -823,13 +831,11 @@ export class Manifold {
    * Fills in vertex properties for normal vectors, calculated from the mesh
    * geometry. Flat faces composed of three or more triangles will remain flat.
    *
-   * @param normalIdx The property channel in which to store the X values of the
-   * normals. The X, Y, and Z channels will be sequential. The property set will
-   * be automatically expanded to include up through normalIdx + 2. Default is
-   * 0, the standard slot; in that case the Manifold records the recording so
-   * a subsequent getMesh() without an explicit normalIdx returns solid-frame
-   * normals. Non-zero values are retained for compatibility and will not be
-   * supported in a future release.
+   * Normals are stored in the first three extra property channels. The
+   * Manifold records them so a subsequent getMesh() returns world-frame
+   * normals. Normals supplied by setProperties() are not recorded; use this
+   * instead of setProperties() on every operand when normals must follow
+   * transforms.
    *
    * @param minSharpAngle Any edges with angles greater than this value will
    * remain sharp, getting different normal vector properties on each side of
@@ -839,7 +845,7 @@ export class Manifold {
    * all.
    * @group Properties
    */
-  calculateNormals(normalIdx?: number, minSharpAngle?: number): Manifold;
+  calculateNormals(minSharpAngle?: number): Manifold;
 
   // Boolean Operations
 
@@ -1000,21 +1006,9 @@ export class Manifold {
   // Topological Operations
 
   /**
-   * Constructs a new manifold from a list of other manifolds. This is a purely
-   * topological operation, so care should be taken to avoid creating
-   * overlapping results. It is the inverse operation of Decompose().
-   *
-   * @param manifolds A list of Manifolds to lazy-union together.
-   * @deprecated Please use {@link add} or {@link union} instead.
-   * @group Constructors
-   */
-  static compose(manifolds: readonly Manifold[]): Manifold;
-
-  /**
    * This operation returns a vector of Manifolds that are topologically
    * disconnected. If everything is connected, the vector is length one,
-   * containing a copy of the original. It is the inverse operation of
-   * Compose().
+   * containing a copy of the original.
    *
    * @group Constructors
    */
@@ -1164,16 +1158,15 @@ export class Manifold {
    * includes relations to all the input meshes that form a part of this result
    * and the transforms applied to each.
    *
-   * @param normalIdx If the original MeshGL inputs that formed this manifold
-   * had properties corresponding to normal vectors, you can specify the first
-   * of the three consecutive property channels forming the (x, y, z) normals,
-   * which will cause this output MeshGL to automatically update these normals
-   * according to the applied transforms and front/back side. normalIdx + 3 must
-   * be <= numProp, and all original MeshGLs must use the same channels for
-   * their normals.
+   * For each run that records normals (runFlags bit 1), the first three extra
+   * property channels contain world-frame normals. Non-original results
+   * normalize them for graphics output. Unflagged values in those channels are
+   * ordinary properties. To have normals follow transforms, call
+   * calculateNormals() on every operand or import a MeshGL with runFlags bit 1
+   * set.
    * @group Input & Output
    */
-  getMesh(normalIdx?: number): Mesh;
+  getMesh(): Mesh;
 
   // ID Management
 
@@ -1183,6 +1176,9 @@ export class Manifold {
    * - these don't get joined at boundaries where originalID changes, so the
    * reset may allow triangles of flat faces to be further collapsed with
    * Simplify().
+   *
+   * If only some of the input recorded normals, the result keeps two runs
+   * with this ID, one for the triangles with normals and one for the rest.
    *
    * @param id The ID to assign to this manifold. If negative (the default), a
    *     new ID is assigned. Use zero to match all default-constructed
@@ -1234,6 +1230,7 @@ export interface MeshOptions {
   runIndex?: Uint32Array;
   runOriginalID?: Uint32Array;
   runTransform?: Float32Array;
+  runFlags?: Uint8Array;
   faceID?: Uint32Array;
   halfedgeTangent?: Float32Array;
 }
@@ -1416,7 +1413,7 @@ export class Mesh {
 
   /**
    * Returns true if the first three extra-property channels of this run
-   * carry world-frame vertex normals (set by `calculateNormals(0)` and
+   * carry world-frame vertex normals (set by `calculateNormals()` and
    * round-tripped via `runFlags` bit 1). Consumers should treat the slot
    * as normals and skip re-applying `runTransform` to it.
    *
@@ -1424,8 +1421,8 @@ export class Mesh {
    * Behavior is undefined when a single propVert is shared by triangles
    * from runs that disagree - the slot has one interpretation, and a
    * transform rotates it for hasNormals=true and clobbers any
-   * hasNormals=false sharer. Standard `calculateNormals` / boolean /
-   * compose outputs never produce that shape.
+   * hasNormals=false sharer. Standard `calculateNormals` and boolean
+   * outputs never produce that shape.
    *
    * @param run triangle run index.
    */
