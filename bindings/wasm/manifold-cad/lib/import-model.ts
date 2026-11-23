@@ -549,14 +549,15 @@ function gltfMeshToMesh(gltfmesh: GLTFTransform.Mesh): Mesh {
     setMaterialByID(runID, {
       // 'POSITION' is always present; we don't need to specify it.
       attributes: attributes.filter(x => x !== 'POSITION'),
-      alpha: material.getAlpha(),
-      baseColorFactor: material.getBaseColorFactor().slice(0, 3) as Vec3,
-      metallic: material.getMetallicFactor(),
-      roughness: material.getRoughnessFactor(),
-      name: material.getName(),
+      alpha: material?.getAlpha() ?? 1,
+      baseColorFactor:
+          (material?.getBaseColorFactor().slice(0, 3) ?? [1, 1, 1]) as Vec3,
+      metallic: material?.getMetallicFactor() ?? 1,
+      roughness: material?.getRoughnessFactor() ?? 1,
+      name: material?.getName(),
 
       // Make sure we can find this source material later.
-      sourceMaterial: material,
+      sourceMaterial: material ?? undefined,
       sourceRunID: runID,
     });
   }

@@ -73,7 +73,7 @@ export const attributeDefs = {
 export type Attribute = keyof(typeof attributeDefs);
 
 export interface Properties {
-  material: GLTFTransform.Material;
+  material: GLTFTransform.Material|null;
   attributes: Attribute[];
 }
 
@@ -216,7 +216,7 @@ export function readMesh(
       runIndexArray.push(triVertArray.length);
       runFlagsArray.push(attributesIn.includes('NORMAL') ? 0x02 : 0x00);
       runProperties.push({
-        material: primitive.getMaterial()!,
+        material: primitive.getMaterial(),
         attributes: runAttributes(attributes, attributesIn)
       });
     }
@@ -248,7 +248,7 @@ export function readMesh(
       const attributesIn = primitive.listSemantics() as Attribute[];
       runFlagsArray.push(attributesIn.includes('NORMAL') ? 0x02 : 0x00);
       runProperties.push({
-        material: primitive.getMaterial()!,
+        material: primitive.getMaterial(),
         attributes: runAttributes(attributes, attributesIn)
       });
     }
