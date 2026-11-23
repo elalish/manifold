@@ -234,12 +234,7 @@ class SweepPass {
     }
   }
 
-  // `mergeVerticalOutput` runs the footnote-9 vertical resolve on the result:
-  // coincident and overlapping vertical edges are summed into signed-coverage
-  // segments (input breakpoints preserved). The arrangement pass needs it to
-  // order coincident verticals the sweep status cannot; the measure pass emits
-  // the already-resolved boundary and skips it.
-  void Run(bool mergeVerticalOutput = true) {
+  void Run() {
     while (!events_.empty()) {
       // Erase the event before processing it. Processing can requeue a
       // remainder at p, which needs a new event; if this entry were still
@@ -252,7 +247,6 @@ class SweepPass {
     }
     DEBUG_ASSERT(status_.empty(), logicErr,
                  "Boolean2 sweep left live edges after draining");
-    if (mergeVerticalOutput) MergeVerticals1D(out_);
   }
 
   void RunStatic(const PolySet2& arr) {
@@ -608,15 +602,16 @@ class SweepPass {
   bool dirtySizeChanged_ = false;
 };
 
-// Arrangement pass: the collect sweep discovers crossings (testPair), resolves
-// near-concurrences with the block rule, merges coincident verticals, and emits
-// every finalized piece. The result is a true arrangement - every crossing is a
-// shared vertex, no two pieces cross.
-// The arrangement pass over the seeded PolySet2.
+// Arrangement pass: the collect sweep discovers crossings (TestPair), resolves
+// near-concurrences with the block rule, and emits every finalized piece.
+// MergeVerticals1D then merges coincident vertical edges, which the sweep
+// status can't order. The result is a true arrangement: every crossing is a
+// shared vertex, and no two pieces cross.
 PolySet2 CollectArrangement(PolySet2 arr, WindRule rule) {
   SweepPass collect(rule, SweepMode::Arrangement);
   collect.SeedFromPolySet(arr);
   collect.Run();
+  MergeVerticals1D(collect.Out());
   return std::move(collect.Out());
 }
 
