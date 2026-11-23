@@ -89,6 +89,31 @@ test(
       expectCollected();
     });
 
+test('collects a Manifold built with its constructor', () => {
+  const cube = remember(module.Manifold.cube());
+  const manifold = remember(new module.Manifold(cube.getMesh()));
+  expect(manifold).toBeInstanceOf(module.Manifold);
+  expect(manifold.translate([1, 0, 0]).volume()).toBeCloseTo(1);
+  expectCollected();
+});
+
+test('collects a CrossSection built with its constructor', () => {
+  const triangle = remember(new module.CrossSection([[0, 0], [1, 0], [0, 1]]));
+  expect(triangle).toBeInstanceOf(module.CrossSection);
+  expect(triangle.translate([1, 0]).area()).toBeCloseTo(0.5);
+  expectCollected();
+});
+
+test('collects constructors called without new', () => {
+  const cube = remember(module.Manifold.cube());
+  const manifold = remember((module.Manifold as any)(cube.getMesh()));
+  const triangle =
+      remember((module.CrossSection as any)([[0, 0], [1, 0], [0, 1]]));
+  expect(manifold.volume()).toBeCloseTo(1);
+  expect(triangle.area()).toBeCloseTo(0.5);
+  expectCollected();
+});
+
 test('collects chained CrossSection member results', () => {
   const square = remember(module.CrossSection.square());
   const translated = remember(square.translate([2, 3]));
