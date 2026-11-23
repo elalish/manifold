@@ -194,6 +194,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("isEmpty", &Manifold::IsEmpty)
       .function("status", &man_js::Status)
       .function("withContext", &Manifold::WithContext)
+      .function("withPrecision", &Manifold::WithPrecision)
+      .function("getPrecision", &Manifold::GetPrecision)
       .function("numVert", &Manifold::NumVert)
       .function("numEdge", &Manifold::NumEdge)
       .function("numTri", &Manifold::NumTri)
@@ -232,8 +234,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
       select_overload<Manifold(const std::vector<vec3>&)>(&Manifold::Hull));
 
   // Quality Globals
-  function("setRelativePrecision", &Quality::SetRelativePrecision);
-  function("getRelativePrecision", &Quality::GetRelativePrecision);
   function("resetToCircularDefaults", &Quality::ResetToDefaults);
 
   function("_DefaultCircularQuality", &js::DefaultCircularQuality);

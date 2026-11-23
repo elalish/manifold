@@ -63,7 +63,8 @@ const manifoldMemberFunctions = [
   'splitByPlane',
   'slice',
   'project',
-  'hull'
+  'hull',
+  'withPrecision'
 ];
 
 // CrossSection static methods (that return a new cross-section)

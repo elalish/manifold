@@ -29,9 +29,13 @@ using namespace manifold;
 
 ExecutionParams manifoldParams;
 
-Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
+// The cutter carries relPrecision, so cutting keeps the source's precision.
+Manifold Halfspace(Box bBox, vec3 normal, double originOffset,
+                   double relPrecision) {
   normal = la::normalize(normal);
-  Manifold cutter = Manifold::Cube(vec3(2.0), true).Translate({1.0, 0.0, 0.0});
+  Manifold cutter = Manifold::Cube(vec3(2.0), true)
+                        .WithPrecision(relPrecision)
+                        .Translate({1.0, 0.0, 0.0});
   double size = la::length(bBox.Center() - normal * originOffset) +
                 0.5 * la::length(bBox.Size());
   cutter = cutter.Scale(vec3(size)).Translate({originOffset, 0.0, 0.0});
@@ -62,21 +66,6 @@ std::array<int, 3> Version() {
           MANIFOLD_VERSION_PATCH};
 }
 
-static std::atomic<double> relativePrecision_ = kPrecision;
-
-/**
- * Sets the relative precision for geometric computations, defining what counts
- * as coplanar or degenerate, and therefore how much simplification can occur.
- *
- * @param p The relative precision value. The default is 1e-12 for double
- * precision, and smaller values will be clamped to this minimum.
- */
-void Quality::SetRelativePrecision(double p) {
-  relativePrecision_ = std::max(p, kPrecision);
-}
-
-double Quality::GetRelativePrecision() { return relativePrecision_; }
-
 /**
  * Returns the number of segments a circle of this radius gets with these
  * settings. A minAngle or minEdgeLength that is not positive (or is NaN) uses
@@ -102,9 +91,9 @@ int CircularQuality::SegmentsFor(double radius) const {
 }
 
 /**
- * Resets the relative precision to its default.
+ * Quality has no settings left, so this does nothing.
  */
-void Quality::ResetToDefaults() { relativePrecision_ = kPrecision; }
+void Quality::ResetToDefaults() {}
 
 /**
  * Construct an empty Manifold.
@@ -213,9 +202,14 @@ CsgLeafNode& Manifold::GetCsgLeafNode(ExecutionContext::Impl* ctx) const {
  * runs.
  *
  * @param meshGL The input MeshGL.
+ * @param relPrecision The relative precision of the result, which defines what
+ * counts as coplanar or degenerate in this and later operations. Values below
+ * kDefaultRelativePrecision are raised to it, and NaN or infinity give the
+ * default.
  */
-Manifold::Manifold(const MeshGL& meshGL)
-    : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(meshGL))) {}
+Manifold::Manifold(const MeshGL& meshGL, double relPrecision)
+    : pNode_(std::make_shared<CsgLeafNode>(
+          std::make_shared<Impl>(meshGL, relPrecision))) {}
 
 /**
  * Convert a MeshGL into a Manifold, retaining its properties and merging only
@@ -229,9 +223,14 @@ Manifold::Manifold(const MeshGL& meshGL)
  * runs.
  *
  * @param meshGL64 The input MeshGL64.
+ * @param relPrecision The relative precision of the result, which defines what
+ * counts as coplanar or degenerate in this and later operations. Values below
+ * kDefaultRelativePrecision are raised to it, and NaN or infinity give the
+ * default.
  */
-Manifold::Manifold(const MeshGL64& meshGL64)
-    : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(meshGL64))) {}
+Manifold::Manifold(const MeshGL64& meshGL64, double relPrecision)
+    : pNode_(std::make_shared<CsgLeafNode>(
+          std::make_shared<Impl>(meshGL64, relPrecision))) {}
 
 /**
  * Returns a MeshGL that is designed
@@ -335,6 +334,35 @@ Box Manifold::BoundingBox() const { return GetCsgLeafNode().GetImpl()->bBox_; }
  */
 double Manifold::GetEpsilon() const {
   return GetCsgLeafNode().GetImpl()->epsilon_;
+}
+
+/**
+ * Evaluates this Manifold and returns it with the given relative precision,
+ * which defines what counts as coplanar or degenerate. The geometry is not
+ * recomputed: the precision applies only to later operations. Booleans and
+ * other operations on several Manifolds use the smallest precision among their
+ * non-empty inputs.
+ *
+ * @param relPrecision The relative precision. Values below
+ * kDefaultRelativePrecision are raised to it, and NaN or infinity give the
+ * default.
+ */
+Manifold Manifold::WithPrecision(double relPrecision) const {
+  auto leafImpl = GetCsgLeafNode(AtomicLoadShared(&ctx_).get()).GetImpl();
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  auto impl = std::make_shared<Impl>(*leafImpl);
+  impl->relPrecision_ = ClampRelPrecision(relPrecision);
+  impl->epsilon_ = impl->relPrecision_ * impl->bBox_.Scale();
+  return Manifold(impl);
+}
+
+/**
+ * Returns the relative precision of this Manifold, set by its input mesh or
+ * WithPrecision(), or taken from its inputs.
+ */
+double Manifold::GetPrecision() const {
+  return GetCsgLeafNode().GetImpl()->relPrecision_;
 }
 
 /**
@@ -856,6 +884,9 @@ Manifold Manifold::RefineToTolerance(double tolerance) const {
  * These operations are optimized to produce nearly-instant results if either
  * input is empty or their bounding boxes do not overlap.
  *
+ * The result uses the smaller relative precision of the two inputs, ignoring
+ * an empty input. See WithPrecision().
+ *
  * @param second The other Manifold.
  * @param op The type of operation to perform.
  */
@@ -868,7 +899,8 @@ Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
  * Subtract, all Manifolds in the tail are differenced from the head. The
  * empty-input case returns a default-constructed Manifold; the
  * single-input case returns the input unchanged, without any attached
- * ExecutionContext.
+ * ExecutionContext. The result uses the smallest relative precision among the
+ * non-empty inputs.
  */
 Manifold Manifold::BatchBoolean(const std::vector<Manifold>& manifolds,
                                 OpType op) {
@@ -963,7 +995,7 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(
     return {err, err};
   }
   if (IsEmpty()) return {Manifold(), Manifold()};
-  return Split(Halfspace(BoundingBox(), normal, originOffset));
+  return Split(Halfspace(BoundingBox(), normal, originOffset, GetPrecision()));
 }
 
 /**
@@ -976,7 +1008,7 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(
  * direction of the normal vector.
  */
 Manifold Manifold::TrimByPlane(vec3 normal, double originOffset) const {
-  return *this ^ Halfspace(BoundingBox(), normal, originOffset);
+  return *this ^ Halfspace(BoundingBox(), normal, originOffset, GetPrecision());
 }
 
 /**
@@ -1059,6 +1091,7 @@ Manifold Manifold::Hull() const {
   if (srcImpl->status_ != Error::NoError)
     return PropagateStatus(srcImpl->status_);
   std::shared_ptr<Impl> impl = std::make_shared<Impl>();
+  impl->relPrecision_ = srcImpl->relPrecision_;
   impl->Hull(srcImpl->vertPos_, ctx.get());
   return Manifold(std::make_shared<CsgLeafNode>(impl));
 }
@@ -1068,6 +1101,8 @@ Manifold Manifold::Hull() const {
  * is empty (or all input manifolds are empty), returns a default-constructed
  * Manifold with no attached ExecutionContext (no source operand to inherit
  * from).
+ *
+ * The result uses the smallest relative precision among the non-empty inputs.
  *
  * @param manifolds A vector of manifolds over which to compute a convex hull.
  */
@@ -1082,11 +1117,15 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
   for (const auto& man : manifolds) size += man.NumVert();
   if (size == 0) return Manifold();
   vertPos.reserve(size);
+  double relPrecision = std::numeric_limits<double>::infinity();
   for (const auto& man : manifolds) {
     const auto& impl = man.GetCsgLeafNode().GetImpl();
+    if (impl->IsEmpty()) continue;
+    relPrecision = std::min(relPrecision, impl->relPrecision_);
     vertPos.insert(vertPos.end(), impl->vertPos_.begin(), impl->vertPos_.end());
   }
   std::shared_ptr<Impl> impl = std::make_shared<Impl>();
+  impl->relPrecision_ = relPrecision;
   impl->Hull(VecView<const vec3>(vertPos));
   return Manifold(std::make_shared<CsgLeafNode>(impl));
 }

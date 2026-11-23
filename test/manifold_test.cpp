@@ -2960,10 +2960,8 @@ TEST(Manifold, RemoveDegeneratesSplitsAtNewVert) {
       53, 51, 15, 50, 49, 13, 37, 49, 54, 54, 55, 26, 48, 54, 27, 55, 53, 25,
       47, 48, 24, 49, 50, 55, 50, 52, 53, 52, 51, 53, 49, 55, 54, 50, 53, 55,
   };
-  Quality::SetRelativePrecision(0.1);
   Manifold result;
-  EXPECT_NO_THROW(result = Manifold(mesh).RemoveDegenerates());
-  Quality::ResetToDefaults();
+  EXPECT_NO_THROW(result = Manifold(mesh, 0.1).RemoveDegenerates());
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   EXPECT_EQ(result.NumDegenerateTris(), 0);
 }

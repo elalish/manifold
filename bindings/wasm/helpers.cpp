@@ -93,8 +93,8 @@ val GetMeshJS(const Manifold& manifold) {
   return MeshGL2JS(mesh);
 }
 
-val Merge(const val& mesh, float tolerance) {
-  return MeshGL2JS(MeshJS2GL(mesh).Merge(tolerance));
+val Merge(const val& mesh, float tolerance, double relPrecision) {
+  return MeshGL2JS(MeshJS2GL(mesh).Merge(tolerance, relPrecision));
 }
 
 CircularQuality DefaultCircularQuality() { return {}; }
@@ -170,7 +170,9 @@ void CollectVertices(std::vector<vec2>& verts, const CrossSection& cs) {
 }  // namespace cross_js
 
 namespace man_js {
-Manifold FromMeshJS(const val& mesh) { return Manifold(js::MeshJS2GL(mesh)); }
+Manifold FromMeshJS(const val& mesh, double relPrecision) {
+  return Manifold(js::MeshJS2GL(mesh), relPrecision);
+}
 
 Manifold Union(const Manifold& a, const Manifold& b) { return a + b; }
 

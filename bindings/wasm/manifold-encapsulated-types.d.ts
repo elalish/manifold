@@ -37,9 +37,6 @@ export {ExecutionContext} from './manifold-global-types';
 export function triangulate(
     polygons: Polygons, epsilon?: number, allowConvex?: boolean): Vec3[];
 
-export function setRelativePrecision(precision: number): void;
-export function getRelativePrecision(): number;
-
 /**
  * Returns the number of segments a circle of this radius gets with this
  * quality.
@@ -478,9 +475,12 @@ export class Manifold {
    * reserveIDs() to set a unique originalID for each material, and sort the
    * materials into triangle runs.
    *
+   * @param relPrecision The relative precision of the result, which defines
+   * what counts as coplanar or degenerate in this and later operations.
+   * Values below the default of 1e-12, including 0, use the default.
    * @group Basics
    */
-  constructor(mesh: Mesh);
+  constructor(mesh: Mesh, relPrecision?: number);
 
   // Shapes
 
@@ -590,9 +590,13 @@ export class Manifold {
    * round-trip of data from getMesh(). For multi-material input, use
    * reserveIDs() to set a unique originalID for each material, and sort the
    * materials into triangle runs.
+   *
+   * @param relPrecision The relative precision of the result, which defines
+   * what counts as coplanar or degenerate in this and later operations.
+   * Values below the default of 1e-12, including 0, use the default.
    * @group Input & Output
    */
-  static ofMesh(mesh: Mesh): Manifold;
+  static ofMesh(mesh: Mesh, relPrecision?: number): Manifold;
 
   // Signed Distance Functions
 
@@ -965,7 +969,8 @@ export class Manifold {
 
   /**
    * Compute the convex hull of all points contained within a set of Manifolds
-   * and point vectors.
+   * and point vectors. The hull uses the smallest precision among the
+   * non-empty input Manifolds.
    *
    * @group Convex Hull
    */
@@ -1117,6 +1122,27 @@ export class Manifold {
    * @group Information
    */
   withContext(ctx: ExecutionContext): Manifold;
+
+  /**
+   * Evaluates this Manifold and returns it with the given relative precision,
+   * which defines what counts as coplanar or degenerate. The geometry is not
+   * recomputed: the precision applies only to later operations. Booleans and
+   * other operations on several Manifolds use the smallest precision among
+   * their non-empty inputs.
+   *
+   * @param relPrecision The relative precision. Values below the default of
+   * 1e-12 use the default.
+   * @group Information
+   */
+  withPrecision(relPrecision: number): Manifold;
+
+  /**
+   * Returns the relative precision of this Manifold, set by its input mesh or
+   * withPrecision(), or taken from its inputs.
+   *
+   * @group Information
+   */
+  getPrecision(): number;
 
   // Export
 
@@ -1319,8 +1345,8 @@ export class Mesh {
    * Returns a copy with mergeFromVert and mergeToVert vectors updated in order
    * to create a manifold solid. If the MeshGL is already manifold, the merge
    * vectors are unchanged. Otherwise, verts along open edges are merged within
-   * tolerance (the maximum of the specified tolerance and the baseline
-   * bounding-box tolerance), keeping any from the existing merge vectors.
+   * tolerance (the maximum of the specified tolerance and relPrecision times
+   * the bounding box scale), keeping any from the existing merge vectors.
    *
    * There is no guarantee the result will be manifold - this is a best-effort
    * helper function designed primarily to aid in the case where a manifold
@@ -1329,8 +1355,10 @@ export class Mesh {
    * will report a Status if it is not manifold.
    *
    * @param tolerance Default 0, with a bounding-box and precision-based floor.
+   * @param relPrecision The relative precision of the mesh, raised to at least
+   * float epsilon.
    */
-  merge(tolerance?: number): Mesh;
+  merge(tolerance?: number, relPrecision?: number): Mesh;
 
   /**
    * Gets the three vertex indices of this triangle in CCW order.

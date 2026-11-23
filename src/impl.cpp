@@ -571,6 +571,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   if (transform_ == mat3x4(la::identity)) return *this;
   auto policy = autoPolicy(NumVert());
   Impl result;
+  result.relPrecision_ = relPrecision_;
   if (status_ != Manifold::Error::NoError) {
     result.status_ = status_;
     return result;
@@ -847,7 +848,7 @@ MeshGL64 ReadOBJ(std::istream& stream) { return ReadOBJMesh(stream); }
 Manifold Manifold::ReadOBJ(std::istream& stream) {
   if (!stream.good()) return Invalid();
   MeshGL64 mesh = ReadOBJMesh(stream);
-  auto impl = std::make_shared<Impl>(mesh);
+  auto impl = std::make_shared<Impl>(mesh, kDefaultRelativePrecision);
   return Manifold(impl);
 }
 

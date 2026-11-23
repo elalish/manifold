@@ -73,6 +73,9 @@ class CsgLeafNode final : public CsgNode {
   // Returns the number of vertices without triggering eager transform.
   size_t NumVert() const;
 
+  // Returns the relative precision without triggering eager transform.
+  double RelPrecision() const;
+
  private:
   mutable std::shared_ptr<const Manifold::Impl> pImpl_;
   mutable mat3x4 transform_ = la::identity;

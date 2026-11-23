@@ -38,6 +38,7 @@ import {ImportError, UnsupportedFormatError} from './error.ts';
 import * as gltfIO from './gltf-io.ts';
 import {VisualizationGLTFNode} from './gltf-node.ts';
 import * as import3MF from './import-3mf.ts';
+import {getRelativePrecision} from './level-of-detail.ts';
 import {setMaterialByID} from './material.ts';
 import {euler2quat, multiplyQuat} from './math.ts';
 import {fetchWithRetry, findExtension, findMimeType, isNode} from './util.ts';
@@ -455,7 +456,7 @@ function gltfNodeToMeshes(
 const tryToMakeManifold = (mesh: Mesh): Manifold|null => {
   const {Manifold} = getManifoldModuleSync()!;
   try {
-    const manifold = new Manifold(mesh);
+    const manifold = new Manifold(mesh, getRelativePrecision());
     if (manifold && !manifold.isEmpty()) {
       return manifold;
     }
@@ -483,13 +484,13 @@ function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
     let merged = mesh;
     if (!manifold) {
       // That didn't work.  Do we need to merge primitives?
-      merged = merged.merge();
+      merged = merged.merge(0, getRelativePrecision());
       manifold = tryToMakeManifold(merged);
     }
     if (!manifold && tolerance) {
       // That didn't work either.
       // Can we adjust the model within tolerance?
-      merged = merged.merge(tolerance);
+      merged = merged.merge(tolerance, getRelativePrecision());
       manifold = tryToMakeManifold(merged);
     }
     if (!manifold) continue;

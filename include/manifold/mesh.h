@@ -165,8 +165,8 @@ struct MeshGLP {
    * invalid (fewer than 3 properties, merge vectors of different lengths, or
    * out-of-range indices), the copy is unchanged. Otherwise, verts along open
    * edges are merged within tolerance (the maximum of the specified tolerance
-   * and the baseline bounding-box tolerance), keeping any from the existing
-   * merge vectors.
+   * and relPrecision times the bounding box scale), keeping any from the
+   * existing merge vectors.
    *
    * There is no guarantee the result will be manifold - this is a
    * best-effort helper function designed primarily to aid in the case where
@@ -176,8 +176,12 @@ struct MeshGLP {
    * manifold.
    *
    * @param tolerance Merge open-edge verts closer than this.
+   * @param relPrecision The relative precision of the mesh, raised to at least
+   * float epsilon for MeshGL and kDefaultRelativePrecision for MeshGL64.
    */
-  [[nodiscard]] MeshGLP Merge(Precision tolerance = 0) const;
+  [[nodiscard]] MeshGLP Merge(
+      Precision tolerance = 0,
+      double relPrecision = kDefaultRelativePrecision) const;
 
   /**
    * Returns the x, y, z position of the ith vertex.
