@@ -92,8 +92,8 @@ class Manifold {
   ///@{
   Manifold(const MeshGL&);
   Manifold(const MeshGL64&);
-  MeshGL GetMeshGL(int normalIdx = -1) const;
-  MeshGL64 GetMeshGL64(int normalIdx = -1) const;
+  MeshGL GetMeshGL() const;
+  MeshGL64 GetMeshGL64() const;
   ///@}
 
   /** @name Constructors
@@ -101,9 +101,6 @@ class Manifold {
    */
   ///@{
   std::vector<Manifold> Decompose() const;
-  [[deprecated(
-      "Compose is deprecated, use BatchBoolean with OpType::Add instead.")]]
-  static Manifold Compose(const std::vector<Manifold>&);
   static Manifold Tetrahedron();
   static Manifold Cube(vec3 size = vec3(1.0), bool center = false);
   static Manifold Cylinder(double height, double radiusLow,
@@ -253,8 +250,7 @@ class Manifold {
       int numProp,
       std::function<void(double*, vec3, const double*)> propFunc) const;
   Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
-  Manifold CalculateNormals(int normalIdx = 0,
-                            double minSharpAngle = 52.5) const;
+  Manifold CalculateNormals(double minSharpAngle = 52.5) const;
   ///@}
 
   /** @name Smoothing
@@ -265,7 +261,7 @@ class Manifold {
   Manifold Refine(int) const;
   Manifold RefineToLength(double) const;
   Manifold RefineToTolerance(double) const;
-  Manifold SmoothByNormals(int normalIdx = 0) const;
+  Manifold SmoothByNormals() const;
   ///@}
 
   /** @name Convex Hull

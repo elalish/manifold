@@ -229,6 +229,12 @@ NB_MODULE(manifold3d, m) {
   m.def("set_min_circular_edge_length", Quality::SetMinCircularEdgeLength,
         nb::arg("length"), quality__set_min_circular_edge_length__length);
 
+  m.def("get_min_circular_angle", Quality::GetMinCircularAngle,
+        quality__get_min_circular_angle);
+
+  m.def("get_min_circular_edge_length", Quality::GetMinCircularEdgeLength,
+        quality__get_min_circular_edge_length);
+
   m.def("set_circular_segments", Quality::SetCircularSegments,
         nb::arg("number"), quality__set_circular_segments__number);
 
@@ -352,10 +358,10 @@ NB_MODULE(manifold3d, m) {
            "Returns the winding number of this manifold around each of the "
            "given points. 0 means outside, non-zero means inside.")
       .def("calculate_normals", &Manifold::CalculateNormals,
-           nb::arg("normal_idx") = 0, nb::arg("min_sharp_angle") = 52.5,
-           manifold__calculate_normals__normal_idx__min_sharp_angle)
+           nb::arg("min_sharp_angle") = 52.5,
+           manifold__calculate_normals__min_sharp_angle)
       .def("smooth_by_normals", &Manifold::SmoothByNormals,
-           nb::arg("normal_idx") = 0, manifold__smooth_by_normals__normal_idx)
+           manifold__smooth_by_normals)
       .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n,
            release_gil())
       .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
@@ -363,10 +369,8 @@ NB_MODULE(manifold3d, m) {
       .def("refine_to_tolerance", &Manifold::RefineToTolerance,
            nb::arg("tolerance"), manifold__refine_to_tolerance__tolerance,
            release_gil())
-      .def("to_mesh", &Manifold::GetMeshGL, nb::arg("normal_idx") = -1,
-           manifold__get_mesh_gl__normal_idx)
-      .def("to_mesh64", &Manifold::GetMeshGL64, nb::arg("normal_idx") = -1,
-           manifold__get_mesh_gl64__normal_idx)
+      .def("to_mesh", &Manifold::GetMeshGL, manifold__get_mesh_gl)
+      .def("to_mesh64", &Manifold::GetMeshGL64, manifold__get_mesh_gl64)
       .def("num_vert", &Manifold::NumVert, manifold__num_vert)
       .def("num_edge", &Manifold::NumEdge, manifold__num_edge)
       .def("num_tri", &Manifold::NumTri, manifold__num_tri)
@@ -429,12 +433,6 @@ NB_MODULE(manifold3d, m) {
       .def_static("batch_boolean", &Manifold::BatchBoolean,
                   nb::arg("manifolds"), nb::arg("op"),
                   manifold__batch_boolean__manifolds__op)
-      .def_static(
-          "compose",
-          [](const std::vector<Manifold>& manifolds) {
-            return Manifold::BatchBoolean(manifolds, OpType::Add);
-          },
-          nb::arg("manifolds"), manifold__compose__manifolds)
       .def_static("tetrahedron", &Manifold::Tetrahedron, manifold__tetrahedron)
       .def_static("cube", &Manifold::Cube,
                   nb::arg("size") = std::make_tuple(1.0, 1.0, 1.0),
@@ -726,6 +724,7 @@ NB_MODULE(manifold3d, m) {
            mesh_gl__merge__tolerance);
 
   nb::class_<RayHit>(m, "RayHit")
+      .def_ro("original_id", &RayHit::originalID)
       .def_ro("face_id", &RayHit::faceID)
       .def_ro("distance", &RayHit::distance)
       .def_ro("position", &RayHit::position)

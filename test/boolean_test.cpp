@@ -94,7 +94,7 @@ TEST(Boolean, MeshGLRoundTrip) {
 TEST(Boolean, Normals) {
   const MeshGL cubeGL = CubeSTL().Merge();
   const Manifold cube(cubeGL);
-  const Manifold sphere = Manifold::Sphere(60).CalculateNormals(0).AsOriginal();
+  const Manifold sphere = Manifold::Sphere(60).CalculateNormals().AsOriginal();
   const MeshGL sphereGL = sphere.GetMeshGL();
 
   Manifold result =
@@ -118,8 +118,8 @@ TEST(Boolean, Normals) {
 TEST(Boolean, MissingNormals) {
   const Manifold noNormals = Manifold::Cube(vec3(1), true);
   const Manifold hasNormals =
-      Manifold::Cube(vec3(2), true).Translate({0, 0, -1}).CalculateNormals(0);
-  const MeshGL combo = (noNormals + hasNormals).GetMeshGL(0);
+      Manifold::Cube(vec3(2), true).Translate({0, 0, -1}).CalculateNormals();
+  const MeshGL combo = (noNormals + hasNormals).GetMeshGL();
   Manifold result(combo);
   EXPECT_FALSE(result.IsEmpty());
 }
@@ -454,7 +454,7 @@ TEST(Boolean, CreatePropertiesSlow) {
 }
 
 TEST(Boolean, SimpleProperties) {
-  Manifold cube = Manifold::Cube(vec3(2), true).CalculateNormals(0, 180);
+  Manifold cube = Manifold::Cube(vec3(2), true).CalculateNormals(180);
   EXPECT_TRUE(cube.HasSimpleProps());
   Manifold flange =
       Manifold::Extrude(cube.Slice(), 2, 0, 0, vec2(2)).AsOriginal();
@@ -638,6 +638,24 @@ TEST(Boolean, Perturb3) {
   if (options.exportModels) {
     WriteTestOBJ("perturb3_nastyGear.obj", nastyGear);
   }
+}
+
+// Benchmark: intersect two solids with large faces triangulated from finely
+// sampled contours. Each extrusion's caps are single smooth polygons, and each
+// solid's caps cut through the other's walls, so the broadphase work depends
+// on how the triangulator splits the caps.
+TEST(Boolean, SmoothExtrusionCrossing) {
+  const int numVert = 5000;
+  const Polygons blob = SmoothBlob(numVert);
+  const Manifold slab = Manifold::Extrude(blob, 2).Translate({0, 0, -1});
+  const Manifold crossed = slab.Rotate(90, 0, 0);
+  const Manifold result = slab ^ crossed;
+
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(result.Genus(), 0);
+  // The intersection is close to a 2 x 2 bar spanning the blob along x.
+  const double width = blob[0][0].x - blob[0][numVert / 2].x;
+  EXPECT_NEAR(result.Volume(), 4 * width, 0.05 * width);
 }
 
 TEST(Boolean, Coplanar) {

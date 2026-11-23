@@ -285,7 +285,7 @@ TEST(Properties, CalculateNormalsWithPropertySeams) {
   ASSERT_EQ(input.Status(), Manifold::Error::NoError);
   for (double sharpAngle : {0.0, 52.5}) {
     SCOPED_TRACE(sharpAngle);
-    const Manifold result = input.CalculateNormals(0, sharpAngle);
+    const Manifold result = input.CalculateNormals(sharpAngle);
     ASSERT_EQ(result.Status(), Manifold::Error::NoError);
     EXPECT_DOUBLE_EQ(result.Volume(), 1.0);
     EXPECT_NEAR(result.SmoothByNormals().Refine(3).Volume(), 1.0, 1e-12);
@@ -316,8 +316,6 @@ TEST(Properties, PropertyIndexTooLarge) {
   EXPECT_EQ(
       cube.CalculateCurvature(std::numeric_limits<int>::max(), -1).Status(),
       Manifold::Error::ResultTooLarge);
-  EXPECT_EQ(cube.CalculateNormals(1 << 30).Status(),
-            Manifold::Error::ResultTooLarge);
   EXPECT_EQ(cube.SetProperties(1 << 30, nullptr).Status(),
             Manifold::Error::ResultTooLarge);
 }
