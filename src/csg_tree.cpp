@@ -17,9 +17,11 @@
 #endif
 
 #include <algorithm>
-#include <array>
 #include <cstdint>
+#ifdef MANIFOLD_DEBUG
+#include <array>
 #include <exception>
+#endif
 
 #include "boolean3.h"
 #include "csg_tree.h"
@@ -448,10 +450,12 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
   std::vector<uint64_t> parallelSerial;
   for (int i = 0; i < 4; i++) parallelTmp.push_back(nullptr);
   for (int i = 0; i < 4; i++) parallelSerial.push_back(0);
+#ifdef MANIFOLD_DEBUG
   // An exception escaping a task cancels the group, and the nested parallel
   // loops of the tasks still running would then skip their work, leaving them
   // to compute on uninitialized data. Each task keeps its own exception.
   std::array<std::exception_ptr, 4> parallelError;
+#endif
 #endif
   while (heapNodes.size() > 1) {
     if (IsCancelled(ctx)) return ErrorLeaf(Manifold::Error::Cancelled);
@@ -484,8 +488,10 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
     }
 #if MANIFOLD_PAR == 1
     group.wait();
+#ifdef MANIFOLD_DEBUG
     for (const std::exception_ptr& error : parallelError)
       if (error) std::rethrow_exception(error);
+#endif
     for (int i = 0; i < 4 && parallelTmp[i]; i++)
       tmp.emplace_back(std::move(parallelTmp[i]), parallelSerial[i]);
 #endif
