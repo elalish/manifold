@@ -52,7 +52,8 @@ typedef struct ManifoldVec3 {
 
 typedef struct ManifoldMeshGLOptions {
   // Set struct_size to sizeof(ManifoldMeshGLOptions), for example with the
-  // initializer. Smaller values make manifold_meshgl_w_options abort.
+  // initializer. A struct_size smaller than the v4.0 struct aborts. Fields
+  // added later default to empty when struct_size does not cover them.
   // NULL options mean no options. Bindings that cannot call static inline
   // functions must set struct_size themselves.
   size_t struct_size;
@@ -73,7 +74,8 @@ typedef struct ManifoldMeshGLOptions {
 
 typedef struct ManifoldMeshGL64Options {
   // Set struct_size to sizeof(ManifoldMeshGL64Options), for example with the
-  // initializer. Smaller values make manifold_meshgl64_w_options abort.
+  // initializer. A struct_size smaller than the v4.0 struct aborts. Fields
+  // added later default to empty when struct_size does not cover them.
   // NULL options mean no options. Bindings that cannot call static inline
   // functions must set struct_size themselves.
   size_t struct_size;

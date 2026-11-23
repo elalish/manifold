@@ -17,6 +17,7 @@
 #ifndef MANIFOLD_NO_IOSTREAM
 #include <sstream>
 #endif
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
@@ -54,10 +55,14 @@ template <typename Mesh, typename Float, typename Index, typename Options>
 Mesh* meshgl_w_options(const Float* vert_props, size_t n_verts, size_t n_props,
                        const Index* tri_verts, size_t n_tris,
                        const Options* options) {
-  if (options != nullptr && options->struct_size < sizeof(Options)) {
+  // The v4.0 struct ends at face_id. Read a field added after it only when
+  // struct_size covers it, otherwise treat it as empty.
+  constexpr size_t minSize =
+      offsetof(Options, face_id) + sizeof(Options::face_id);
+  if (options != nullptr && options->struct_size < minSize) {
     std::fprintf(stderr,
                  "manifold: options struct_size %zu is smaller than %zu\n",
-                 options->struct_size, sizeof(Options));
+                 options->struct_size, minSize);
     std::abort();
   }
 

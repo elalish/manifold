@@ -1,6 +1,7 @@
 #include "manifold/manifoldc.h"
 
 #include <cmath>
+#include <cstddef>
 #ifndef MANIFOLD_NO_IOSTREAM
 #include <fstream>
 #endif
@@ -91,6 +92,14 @@ TEST(CBIND, meshgl_options) {
   ASSERT_NE(plain, nullptr);
   EXPECT_EQ(manifold_meshgl_face_id_length(plain), 0);
 
+  ManifoldMeshGLOptions v40Options = options;
+  v40Options.struct_size =
+      offsetof(ManifoldMeshGLOptions, face_id) + sizeof(v40Options.face_id);
+  ManifoldMeshGL* v40 =
+      manifold_meshgl_w_options(vertProps, 4, 6, triVerts, 4, &v40Options);
+  ASSERT_NE(v40, nullptr);
+  EXPECT_EQ(manifold_meshgl_face_id_length(v40), 4);
+
   ManifoldMeshGLOptions largerOptions = options;
   largerOptions.struct_size = sizeof(largerOptions) + 8;
   ManifoldMeshGL* larger =
@@ -99,6 +108,7 @@ TEST(CBIND, meshgl_options) {
   EXPECT_EQ(manifold_meshgl_face_id_length(larger), 4);
 
   manifold_delete_meshgl(larger);
+  manifold_delete_meshgl(v40);
   manifold_delete_meshgl(plain);
   manifold_delete_meshgl(mesh);
 }
@@ -232,6 +242,14 @@ TEST(CBIND, meshgl64_options) {
   ASSERT_NE(plain, nullptr);
   EXPECT_EQ(manifold_meshgl64_face_id_length(plain), 0);
 
+  ManifoldMeshGL64Options v40Options = options;
+  v40Options.struct_size =
+      offsetof(ManifoldMeshGL64Options, face_id) + sizeof(v40Options.face_id);
+  ManifoldMeshGL64* v40 =
+      manifold_meshgl64_w_options(vertProps, 4, 6, triVerts, 4, &v40Options);
+  ASSERT_NE(v40, nullptr);
+  EXPECT_EQ(manifold_meshgl64_face_id_length(v40), 4);
+
   ManifoldMeshGL64Options largerOptions = options;
   largerOptions.struct_size = sizeof(largerOptions) + 8;
   ManifoldMeshGL64* larger =
@@ -240,6 +258,7 @@ TEST(CBIND, meshgl64_options) {
   EXPECT_EQ(manifold_meshgl64_face_id_length(larger), 4);
 
   manifold_delete_meshgl64(larger);
+  manifold_delete_meshgl64(v40);
   manifold_delete_meshgl64(plain);
   manifold_delete_meshgl64(mesh);
 }
@@ -256,7 +275,8 @@ TEST(CBIND, meshgl_options_short_size_aborts) {
   const double vertProps64[] = {0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1};
   const uint64_t triVerts64[] = {0, 2, 1, 0, 1, 3, 1, 2, 3, 2, 0, 3};
   ManifoldMeshGLOptions shortOptions = manifold_meshgl_options_init();
-  shortOptions.struct_size = sizeof(shortOptions) - 1;
+  shortOptions.struct_size = offsetof(ManifoldMeshGLOptions, face_id) +
+                             sizeof(shortOptions.face_id) - 1;
   EXPECT_DEATH(
       manifold_meshgl_w_options(vertProps, 4, 3, triVerts, 4, &shortOptions),
       "struct_size");
@@ -265,7 +285,8 @@ TEST(CBIND, meshgl_options_short_size_aborts) {
       manifold_meshgl_w_options(vertProps, 4, 3, triVerts, 4, &shortOptions),
       "struct_size");
   ManifoldMeshGL64Options shortOptions64 = manifold_meshgl64_options_init();
-  shortOptions64.struct_size = sizeof(shortOptions64) - 1;
+  shortOptions64.struct_size = offsetof(ManifoldMeshGL64Options, face_id) +
+                               sizeof(shortOptions64.face_id) - 1;
   EXPECT_DEATH(manifold_meshgl64_w_options(vertProps64, 4, 3, triVerts64, 4,
                                            &shortOptions64),
                "struct_size");
