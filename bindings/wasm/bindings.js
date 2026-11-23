@@ -722,10 +722,6 @@ Module.setup = function() {
     return new Module.Manifold(mesh);
   };
 
-  Module.Manifold.ofMesh64 = function(mesh) {
-    return new Module.Manifold(new Mesh64(mesh));
-  };
-
   Module.Manifold.tetrahedron = function() {
     return Module._Tetrahedron();
   };
@@ -808,10 +804,6 @@ Module.setup = function() {
   // run under this ExecutionContext so progress/cancellation are observed.
   Module.ExecutionContext.prototype.fromMesh = function(mesh) {
     return mesh?.[isMesh64] ? this._FromMesh64(mesh) : this._FromMesh(mesh);
-  };
-
-  Module.ExecutionContext.prototype.fromMesh64 = function(mesh) {
-    return this._FromMesh64(mesh);
   };
 
   Module.ExecutionContext.prototype.levelSet = function(

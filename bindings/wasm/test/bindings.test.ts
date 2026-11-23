@@ -329,14 +329,14 @@ suite('Mesh64', () => {
     input.faceID = Uint32Array.from({length: input.numTri}, (_, i) => 100 + i);
     input.runOriginalID = new Uint32Array([id, id + 1]);
     input.runIndex = new Uint32Array([0, 18, input.triVerts.length]);
-    const manifold = Manifold.ofMesh64(input);
+    const manifold = new Manifold(input);
     const output = manifold.getMesh64();
     expect(Array.from(output.runOriginalID)).toEqual([id, id + 1]);
     expect(Array.from(output.faceID).sort((a, b) => a - b))
         .toEqual(Array.from(input.faceID));
 
     // Feed the output back in: a lossless round trip.
-    const again = Manifold.ofMesh64(output);
+    const again = new Manifold(output);
     const againMesh = again.getMesh64();
     expect(Array.from(againMesh.runOriginalID)).toEqual([id, id + 1]);
     expect(Array.from(againMesh.faceID).sort((a, b) => a - b))
@@ -415,16 +415,6 @@ suite('Mesh64', () => {
     for (const m of [cube, withNormals, manifold]) m.delete();
   });
 
-  test('ExecutionContext.fromMesh64 reads a Mesh64', () => {
-    const ctx = new manifoldModule.ExecutionContext();
-    const input = doubleCube();
-    const manifold = ctx.fromMesh64(input);
-    expect(manifold.status()).toEqual('NoError');
-    expect(sortedVerts(manifold.getMesh64())).toEqual(sortedVerts(input));
-    manifold.delete();
-    ctx.delete();
-  });
-
   test('ofMesh and fromMesh also read a Mesh64 as double', () => {
     const {Manifold, ExecutionContext} = manifoldModule;
     const input = doubleCube();
@@ -450,8 +440,8 @@ suite('Mesh64', () => {
     ctx.delete();
   });
 
-  test('ofMesh64 and fromMesh64 read a plain object as double', () => {
-    const {Manifold, ExecutionContext} = manifoldModule;
+  test('a plain object wrapped in Mesh64 reads as double', () => {
+    const {Manifold, Mesh64, ExecutionContext} = manifoldModule;
     const input = doubleCube();
     const plain = {
       numProp: input.numProp,
@@ -459,7 +449,10 @@ suite('Mesh64', () => {
       vertProperties: input.vertProperties
     };
     const ctx = new ExecutionContext();
-    for (const manifold of [Manifold.ofMesh64(plain), ctx.fromMesh64(plain)]) {
+    for (const manifold
+             of [new Manifold(new Mesh64(plain)),
+                 Manifold.ofMesh(new Mesh64(plain)),
+                 ctx.fromMesh(new Mesh64(plain))]) {
       expect(sortedVerts(manifold.getMesh64())).toEqual(sortedVerts(input));
       manifold.delete();
     }
@@ -471,8 +464,7 @@ suite('Mesh64', () => {
     const input = doubleCube();
     input.triVerts = Uint32Array.from(input.triVerts, v => v == 0 ? 8 : v);
     expect(() => new Manifold(input)).toThrow('Vertex index out of bounds');
-    expect(() => Manifold.ofMesh64(input))
-        .toThrow('Vertex index out of bounds');
+    expect(() => Manifold.ofMesh(input)).toThrow('Vertex index out of bounds');
   });
 
   test('a Mesh reads as float, whatever its array type', () => {

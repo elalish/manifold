@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Type-only import for the ctx-aware factories on ExecutionContext below.
-import type {Manifold, Mesh, Mesh64, Mesh64Options} from './manifold-encapsulated-types';
+import type {Manifold, Mesh, Mesh64} from './manifold-encapsulated-types';
 
 /**
  * @inline
@@ -186,8 +186,6 @@ export interface ExecutionContext {
 
   /** Like {@link Manifold.ofMesh}, observed/cancellable via this context. */
   fromMesh(mesh: Mesh|Mesh64): Manifold;
-  /** Like {@link Manifold.ofMesh64}, observed/cancellable via this context. */
-  fromMesh64(mesh: Mesh64Options): Manifold;
   /** Like {@link Manifold.levelSet}, observed/cancellable via this context. */
   levelSet(
       sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,

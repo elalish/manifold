@@ -31,7 +31,7 @@ const memoryRegistry = new Set<ManagedGeometry>();
 // manifold static methods (that return a new manifold)
 const manifoldStaticFunctions = [
   'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'union',
-  'difference', 'intersection', 'levelSet', 'ofMesh', 'ofMesh64', 'hull'
+  'difference', 'intersection', 'levelSet', 'ofMesh', 'hull'
 ];
 // manifold member functions (that return a new manifold)
 const manifoldMemberFunctions = [

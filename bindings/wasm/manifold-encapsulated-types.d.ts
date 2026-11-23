@@ -478,8 +478,9 @@ export class Manifold {
    * reserveIDs() to set a unique originalID for each material, and sort the
    * materials into triangle runs.
    *
-   * A Mesh64 is read in double precision, as by ofMesh64(). A plain object is
-   * read as a Mesh.
+   * A Mesh64 is read in double precision, so the input positions are not
+   * rounded to float. A plain object is read as a Mesh. To read a plain object
+   * in double precision, wrap it with new Mesh64(obj).
    *
    * @group Basics
    */
@@ -594,19 +595,12 @@ export class Manifold {
    * reserveIDs() to set a unique originalID for each material, and sort the
    * materials into triangle runs.
    *
-   * A Mesh64 is read in double precision, as by ofMesh64(). A plain object is
-   * read as a Mesh.
+   * A Mesh64 is read in double precision, so the input positions are not
+   * rounded to float. A plain object is read as a Mesh. To read a plain object
+   * in double precision, wrap it with new Mesh64(obj).
    * @group Input & Output
    */
   static ofMesh(mesh: Mesh|Mesh64): Manifold;
-
-  /**
-   * Like ofMesh(), but reads the mesh in double precision (MeshGL64), so the
-   * input positions are not rounded to float. Takes a Mesh64 or a plain object
-   * with the same fields.
-   * @group Input & Output
-   */
-  static ofMesh64(mesh: Mesh64Options): Manifold;
 
   // Signed Distance Functions
 
