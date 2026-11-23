@@ -64,7 +64,7 @@ TEST(Smooth, RefineQuads) {
                            for (const int i : {0, 1, 2})
                              newProp[i] = oldProp[i + 3];
                          });
-  EXPECT_EQ(cylinder.NumTri(), 16644);
+  EXPECT_EQ(cylinder.NumTri(), 16504);
   EXPECT_NEAR(cylinder.Volume(), 2 * kPi, 0.003);
   EXPECT_NEAR(cylinder.SurfaceArea(), 6 * kPi, 0.004);
   const MeshGL out = cylinder.GetMeshGL();
@@ -90,8 +90,8 @@ TEST(Smooth, TruncatedCone) {
                         .SmoothByNormals()
                         .RefineToLength(0.5)
                         .CalculateNormals();
-  EXPECT_NEAR(smooth.Volume(), 1021.05, 0.01);
-  EXPECT_NEAR(smooth.SurfaceArea(), 737.67, 0.01);
+  EXPECT_NEAR(smooth.Volume(), 1020.90, 0.01);
+  EXPECT_NEAR(smooth.SurfaceArea(), 737.64, 0.01);
   CheckGL(smooth, false);
 
   if (options.exportModels) WriteTestOBJ("smoothTruncatedCone.obj", smooth);
@@ -172,7 +172,7 @@ TEST(Smooth, Precision) {
   }
   EXPECT_NEAR(std::sqrt(minR2), radius - tolerance, 1e-4);
   EXPECT_NEAR(std::sqrt(maxR2), radius, 1e-8);
-  EXPECT_EQ(smoothed.NumTri(), 7984);
+  EXPECT_EQ(smoothed.NumTri(), 8152);
   if (options.exportModels) WriteTestOBJ("refineCylinder.obj", smoothed);
 }
 

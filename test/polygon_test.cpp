@@ -270,6 +270,25 @@ TEST(Triangulation, NoFansOnSmoothContour) {
   }
 }
 
+// The convex path must not split a finely sampled convex contour into long
+// slivers either. A zigzag strip, its earlier layout, has about numVert / 5
+// perimeters of interior edge length. Halving the ring stays far below that.
+TEST(Triangulation, ShortEdgesOnConvexContour) {
+  for (const int numVert : {1000, 20000}) {
+    Polygons polys(1);
+    for (int i = 0; i < numVert; ++i) {
+      const double angle = kTwoPi * i / numVert;
+      polys[0].push_back({10 * std::cos(angle), 10 * std::sin(angle)});
+    }
+    const std::vector<ivec3> triangles = Triangulate(polys);
+    ASSERT_EQ(triangles.size(), numVert - 2);
+    const EdgeStats stats = MeasureEdges(polys[0], triangles);
+    EXPECT_LE(stats.maxDegree, numVert / 25) << numVert << " verts";
+    EXPECT_LE(stats.interiorPerPerimeter, numVert / 40.0)
+        << numVert << " verts";
+  }
+}
+
 #ifndef MANIFOLD_NO_IOSTREAM
 void RegisterPolygonTests() {
   std::string files[] = {"polygon_corpus.txt", "sponge.txt", "zebra.txt",
