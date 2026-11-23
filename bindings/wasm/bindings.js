@@ -715,7 +715,7 @@ Module.setup = function() {
   const ManifoldCtor = Module.Manifold;
   Module.Manifold = function(mesh) {
     return checkedManifold(
-        mesh?.[isMesh64] ? Module._FromMesh64(mesh) : new ManifoldCtor(mesh));
+        mesh?.[isMesh64] ? Module._FromMesh64(mesh) : Module._FromMesh(mesh));
   };
 
   Module.Manifold.ofMesh = function(mesh) {

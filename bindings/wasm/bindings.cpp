@@ -166,7 +166,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
                &CrossSection::Hull));
 
   class_<Manifold>("Manifold")
-      .constructor(&man_js::FromMeshJS<float, uint32_t>)
       .function("add", &man_js::Union)
       .function("subtract", &man_js::Difference)
       .function("intersect", &man_js::Intersection)
@@ -226,6 +225,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_LevelSet", &man_js::LevelSet);
   function("_Merge", &js::Merge<float, uint32_t>);
   function("_Merge64", &js::Merge<double, uint64_t>);
+  function("_FromMesh", &man_js::FromMeshJS<float, uint32_t>);
   function("_FromMesh64", &man_js::FromMeshJS<double, uint64_t>);
   function("_ReserveIDs", &Manifold::ReserveIDs);
   function("_manifoldUnionN", &man_js::UnionN);
