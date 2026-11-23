@@ -114,13 +114,11 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       // Import
       'importModel', 'importManifold',
       // Getters for global properties
-      'getRelativePrecision', 'getAnimationDuration', 'getAnimationFPS',
-      'getAnimationMode',
+      'getAnimationDuration', 'getAnimationFPS', 'getAnimationMode',
       // Setters for global properties.
       // These will only be defined for top level scripts
-      'setRelativePrecision', 'setMorphStart', 'setMorphEnd',
-      'setAnimationDuration', 'setAnimationFPS', 'setAnimationMode',
-      'resetGLTFNodes',
+      'setMorphStart', 'setMorphEnd', 'setAnimationDuration', 'setAnimationFPS',
+      'setAnimationMode', 'resetGLTFNodes',
 
       // ManifoldCAD specific exports.
       'isManifoldCAD'
