@@ -10,7 +10,7 @@ on:
   push:
     branches: [ master, 'v*-release',"java-bindings" ]
     tags:
-      - '*'
+      - 'v*'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -24,7 +24,7 @@ jobs:
     steps:
     - name: Install common dependencies
       run: |
-        pip install trimesh pytest maven
+        pip install trimesh pytest
     - name: Build googletest for x86_64
       run: |
         git clone https://github.com/google/googletest.git
@@ -108,7 +108,7 @@ jobs:
       run: wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-jdk25.0.2-linux_aarch64.tar.gz
 
     - name: Set Java
-      uses: actions/setup-java@v1
+      uses: actions/setup-java@v6
       with:
         java-version: 25
         jdkFile: ./zulu25.32.21-ca-jdk25.0.2-linux_aarch64.tar.gz
@@ -157,7 +157,7 @@ jobs:
     - name: Pull a JDK
       run: wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-jdk25.0.2-linux_x64.tar.gz
     - name: Set Java
-      uses: actions/setup-java@v1
+      uses: actions/setup-java@v6
       with:
         java-version: 25
         jdkFile: ./zulu25.32.21-ca-jdk25.0.2-linux_x64.tar.gz
@@ -205,7 +205,7 @@ jobs:
       run: curl -O https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-jdk25.0.2-win_x64.zip
 
     - name: Set Java
-      uses: actions/setup-java@v1
+      uses: actions/setup-java@v6
       with:
         java-version: 25
         jdkFile: ./zulu25.32.21-ca-jdk25.0.2-win_x64.zip
@@ -261,7 +261,7 @@ jobs:
         run: wget https://cdn.azul.com/zulu/bin/zulu25.32.21-ca-jdk25.0.2-linux_x64.tar.gz
 
       - name: Set Java
-        uses: actions/setup-java@v1
+        uses: actions/setup-java@v6
         with:
           java-version: 25
           jdkFile: ./zulu25.32.21-ca-jdk25.0.2-linux_x64.tar.gz
