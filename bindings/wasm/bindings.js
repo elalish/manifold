@@ -713,13 +713,14 @@ Module.setup = function() {
   // Manifold Constructors
 
   const ManifoldCtor = Module.Manifold;
-  Module.Manifold = function(mesh, relPrecision = 0) {
+  // NaN gives the library's default relative precision for the mesh type.
+  Module.Manifold = function(mesh, relPrecision = NaN) {
     return checkedManifold(
         mesh?.[isMesh64] ? Module._FromMesh64(mesh, relPrecision) :
                            Module._FromMesh(mesh, relPrecision));
   };
 
-  Module.Manifold.ofMesh = function(mesh, relPrecision = 0) {
+  Module.Manifold.ofMesh = function(mesh, relPrecision = NaN) {
     return new Module.Manifold(mesh, relPrecision);
   };
 

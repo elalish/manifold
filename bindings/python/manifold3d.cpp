@@ -256,7 +256,7 @@ NB_MODULE(manifold3d, m) {
            nb::arg("rel_precision") = kDefaultRelativePrecision,
            manifold__manifold__mesh_gl__rel_precision)
       .def(nb::init<const MeshGL64&, double>(), nb::arg("mesh"),
-           nb::arg("rel_precision") = kDefaultRelativePrecision,
+           nb::arg("rel_precision") = kMinRelativePrecision,
            manifold__manifold__mesh_gl64__rel_precision)
       .def(nb::self + nb::self, manifold__operator_plus__q)
       .def(nb::self - nb::self, manifold__operator_minus__q)
@@ -744,7 +744,7 @@ NB_MODULE(manifold3d, m) {
       .def("backside", &MeshGL64::Backside, nb::arg("run"))
       .def("has_normals", &MeshGL64::HasNormals, nb::arg("run"))
       .def("merge", &MeshGL64::Merge, nb::arg("tolerance") = 0.0,
-           nb::arg("rel_precision") = kDefaultRelativePrecision,
+           nb::arg("rel_precision") = kMinRelativePrecision,
            mesh_gl__merge__tolerance__rel_precision);
 
   nb::class_<RayHit>(m, "RayHit")
@@ -777,7 +777,8 @@ NB_MODULE(manifold3d, m) {
           },
           nb::arg("mesh"),
           "Ingest a MeshGL into a Manifold under this context, so the ingest "
-          "reports progress and observes cancellation.")
+          "reports progress and observes cancellation. The result has float "
+          "relative precision.")
       .def(
           "from_mesh",
           [](ExecutionContext& ctx, const MeshGL64& mesh) {
@@ -786,7 +787,8 @@ NB_MODULE(manifold3d, m) {
           },
           nb::arg("mesh"),
           "Ingest a MeshGL64 into a Manifold under this context, so the ingest "
-          "reports progress and observes cancellation.")
+          "reports progress and observes cancellation. The result has "
+          "relative precision 1e-12.")
       .def(
           "level_set",
           [](ExecutionContext& ctx,

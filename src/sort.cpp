@@ -176,10 +176,11 @@ void MergeMeshGLP(MeshGLP<Precision, I>& mesh, Precision requestedTolerance,
 
   const double minPrecision = std::is_same<Precision, float>::value
                                   ? std::numeric_limits<float>::epsilon()
-                                  : kDefaultRelativePrecision;
+                                  : kMinRelativePrecision;
   const double tolerance = std::max(
       static_cast<double>(requestedTolerance),
-      std::max(minPrecision, ClampRelPrecision(relPrecision)) * bBox.Scale());
+      std::max(minPrecision, ClampRelPrecision(relPrecision, minPrecision)) *
+          bBox.Scale());
 
   auto policy = autoPolicy(numOpenVert, 1e5);
   Vec<Box> vertBox(numOpenVert);
@@ -623,7 +624,7 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
  * within tolerance (the maximum of the specified tolerance and relPrecision
  * times the bounding box scale), keeping any from the existing merge vectors.
  * relPrecision is raised to at least float epsilon for MeshGL and
- * kDefaultRelativePrecision for MeshGL64.
+ * kMinRelativePrecision for MeshGL64, which are also the defaults.
  *
  * There is no guarantee the result will be manifold - this is a best-effort
  * helper function designed primarily to aid in the case where a manifold

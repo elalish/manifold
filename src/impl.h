@@ -298,7 +298,10 @@ void Manifold::Impl::ForVert(
 template <typename Precision, typename I>
 Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL, double relPrecision,
                      ExecutionContext::Impl* ctx)
-    : relPrecision_(ClampRelPrecision(relPrecision)) {
+    : relPrecision_(
+          ClampRelPrecision(relPrecision, std::is_same<Precision, float>::value
+                                              ? kDefaultRelativePrecision
+                                              : kMinRelativePrecision)) {
   MANIFOLD_BEGIN_PHASE_TIMING();
   // Entry-time cancel wins over empty/malformed input; past this gate,
   // validation errors win over races.

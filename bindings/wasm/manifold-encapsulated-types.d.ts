@@ -475,8 +475,10 @@ export class Manifold {
    * in double precision, wrap it with new Mesh64(obj).
    *
    * @param relPrecision The relative precision of the result, which defines
-   * what counts as coplanar or degenerate in this and later operations.
-   * Values below the default of 1e-12, including 0, use the default.
+   * what counts as coplanar or degenerate in this and later operations. The
+   * default is float epsilon, about 1.2e-7, for a Mesh and 1e-12 for a Mesh64.
+   * Values below 1e-12, including 0, use 1e-12, and NaN or infinity use the
+   * default.
    * @group Basics
    */
   constructor(mesh: Mesh|Mesh64, relPrecision?: number);
@@ -595,8 +597,10 @@ export class Manifold {
    * in double precision, wrap it with new Mesh64(obj).
    *
    * @param relPrecision The relative precision of the result, which defines
-   * what counts as coplanar or degenerate in this and later operations.
-   * Values below the default of 1e-12, including 0, use the default.
+   * what counts as coplanar or degenerate in this and later operations. The
+   * default is float epsilon, about 1.2e-7, for a Mesh and 1e-12 for a Mesh64.
+   * Values below 1e-12, including 0, use 1e-12, and NaN or infinity use the
+   * default.
    * @group Input & Output
    */
   static ofMesh(mesh: Mesh|Mesh64, relPrecision?: number): Manifold;
@@ -1133,15 +1137,17 @@ export class Manifold {
    * other operations on several Manifolds use the smallest precision among
    * their non-empty inputs.
    *
-   * @param relPrecision The relative precision. Values below the default of
-   * 1e-12 use the default.
+   * @param relPrecision The relative precision. Values below 1e-12 use
+   * 1e-12, and NaN or infinity use float epsilon.
    * @group Information
    */
   withPrecision(relPrecision: number): Manifold;
 
   /**
    * Returns the relative precision of this Manifold, set by its input mesh or
-   * withPrecision(), or taken from its inputs.
+   * withPrecision(), or taken from its inputs. Shapes, extrusions,
+   * revolutions, level sets and hulls of points have the default, float
+   * epsilon.
    *
    * @group Information
    */

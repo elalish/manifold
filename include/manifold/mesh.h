@@ -177,11 +177,14 @@ struct MeshGLP {
    *
    * @param tolerance Merge open-edge verts closer than this.
    * @param relPrecision The relative precision of the mesh, raised to at least
-   * float epsilon for MeshGL and kDefaultRelativePrecision for MeshGL64.
+   * float epsilon for MeshGL and kMinRelativePrecision for MeshGL64. These
+   * are also the defaults.
    */
   [[nodiscard]] MeshGLP Merge(
       Precision tolerance = 0,
-      double relPrecision = kDefaultRelativePrecision) const;
+      double relPrecision = std::is_same<Precision, float>::value
+                                ? kDefaultRelativePrecision
+                                : kMinRelativePrecision) const;
 
   /**
    * Returns the x, y, z position of the ith vertex.

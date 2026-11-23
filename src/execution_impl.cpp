@@ -97,7 +97,7 @@ Manifold ExecutionContext::FromMeshGL(const MeshGL& mesh) {
 Manifold ExecutionContext::FromMeshGL(const MeshGL64& mesh) {
   ResetForStaticFactory(impl_.get(), kPhasesPerFromMesh);
   return Manifold::FromImpl(std::make_shared<Manifold::Impl>(
-      mesh, kDefaultRelativePrecision, impl_.get()));
+      mesh, kMinRelativePrecision, impl_.get()));
 }
 
 Manifold ExecutionContext::LevelSet(std::function<double(vec3)> sdf, Box bounds,

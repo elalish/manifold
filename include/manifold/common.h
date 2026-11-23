@@ -76,11 +76,18 @@ constexpr double kTwoPi = 6.28318530717958647692528676655900576;
 constexpr double kHalfPi = 1.57079632679489661923132169163975144;
 
 /**
- * The default relative precision of a Manifold, and the smallest one allowed.
- * NaN and infinity also give the default. A Manifold's epsilon is its relative
- * precision times its bounding box scale.
+ * The default relative precision of a Manifold made from MeshGL or built by a
+ * factory such as Cube() or LevelSet(): float epsilon. A Manifold's epsilon is
+ * its relative precision times its bounding box scale.
  */
-constexpr double kDefaultRelativePrecision = 1e-12;
+constexpr double kDefaultRelativePrecision =
+    std::numeric_limits<float>::epsilon();
+
+/**
+ * The smallest relative precision allowed, and the default for a Manifold made
+ * from MeshGL64.
+ */
+constexpr double kMinRelativePrecision = 1e-12;
 
 /**
  * Convert degrees to radians.
@@ -282,7 +289,8 @@ class ExecutionContext {
   /// validation errors win over a Cancel() that races in after that.
   /// Concurrent calls on the same ctx produce undefined progress
   /// values; the returned Manifolds remain valid. The result has the
-  /// default relative precision. Use `Manifold::WithPrecision` to change it.
+  /// default relative precision of `Manifold(MeshGL)` or
+  /// `Manifold(MeshGL64)`. Use `Manifold::WithPrecision` to change it.
   Manifold FromMeshGL(const MeshGL& mesh);
   Manifold FromMeshGL(const MeshGL64& mesh);
 
