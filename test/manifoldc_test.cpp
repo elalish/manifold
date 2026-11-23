@@ -1,6 +1,7 @@
 #include "manifold/manifoldc.h"
 
 #include <cmath>
+#include <cstddef>
 #ifndef MANIFOLD_NO_IOSTREAM
 #include <fstream>
 #endif
@@ -38,6 +39,263 @@ TEST(CBIND, meshgl_no_props) {
   EXPECT_EQ(manifold_meshgl_num_vert(mesh), 0);
   manifold_delete_meshgl(mesh);
 }
+
+TEST(CBIND, meshgl_options) {
+  const float vertProps[] = {
+      0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1,
+  };
+  const uint32_t triVerts[] = {0, 2, 1, 0, 1, 3, 1, 2, 3, 2, 0, 3};
+  const uint32_t runIndices[] = {0, 3, 6, 9, 12};
+  uint32_t runOriginalIDs[] = {manifold_reserve_ids(1),
+                               manifold_reserve_ids(1)};
+  const uint32_t mergeFrom[] = {0, 1, 2};
+  const uint32_t mergeTo[] = {1, 2, 3};
+  const float runTransform[] = {
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 2, 0, 0, 1, 3,
+  };
+  const uint8_t runFlags[] = {2, 3, 4, 5};
+  const uint32_t faceIDs[] = {10, 11, 12, 13};
+  const float tangents[48] = {};
+
+  ManifoldMeshGLOptions options = manifold_meshgl_options_init();
+  options.run_indices = runIndices;
+  options.run_indices_length = 5;
+  options.run_original_ids = runOriginalIDs;
+  options.run_original_ids_length = 2;
+  options.merge_from_vert = mergeFrom;
+  options.merge_to_vert = mergeTo;
+  options.merge_verts_length = 3;
+  options.halfedge_tangents = tangents;
+  options.run_transform = runTransform;
+  options.run_transform_length = 24;
+  options.run_flags = runFlags;
+  options.run_flags_length = 4;
+  options.face_id = faceIDs;
+
+  ManifoldMeshGL* mesh =
+      manifold_meshgl_w_options(vertProps, 4, 6, triVerts, 4, &options);
+  ASSERT_EQ(manifold_meshgl_merge_length(mesh), 3);
+  EXPECT_EQ(manifold_meshgl_merge_from_vert(mesh)[0], 0);
+  EXPECT_EQ(manifold_meshgl_merge_to_vert(mesh)[0], 1);
+  EXPECT_EQ(manifold_meshgl_tangent_length(mesh), 48);
+  EXPECT_EQ(manifold_meshgl_run_index_length(mesh), 5);
+  EXPECT_EQ(manifold_meshgl_run_original_id_length(mesh), 2);
+  ASSERT_EQ(manifold_meshgl_run_transform_length(mesh), 24);
+  EXPECT_FLOAT_EQ(manifold_meshgl_run_transform(mesh)[23], 3);
+  ASSERT_EQ(manifold_meshgl_run_flags_length(mesh), 4);
+  EXPECT_EQ(manifold_meshgl_run_flags(mesh)[3], 5);
+  ASSERT_EQ(manifold_meshgl_face_id_length(mesh), 4);
+  EXPECT_EQ(manifold_meshgl_face_id(mesh)[3], 13);
+
+  ManifoldMeshGL* plain =
+      manifold_meshgl_w_options(vertProps, 4, 6, triVerts, 4, nullptr);
+  ASSERT_NE(plain, nullptr);
+  EXPECT_EQ(manifold_meshgl_face_id_length(plain), 0);
+
+  ManifoldMeshGLOptions v40Options = options;
+  v40Options.struct_size =
+      offsetof(ManifoldMeshGLOptions, face_id) + sizeof(v40Options.face_id);
+  ManifoldMeshGL* v40 =
+      manifold_meshgl_w_options(vertProps, 4, 6, triVerts, 4, &v40Options);
+  ASSERT_NE(v40, nullptr);
+  EXPECT_EQ(manifold_meshgl_face_id_length(v40), 4);
+
+  ManifoldMeshGLOptions largerOptions = options;
+  largerOptions.struct_size = sizeof(largerOptions) + 8;
+  ManifoldMeshGL* larger =
+      manifold_meshgl_w_options(vertProps, 4, 6, triVerts, 4, &largerOptions);
+  ASSERT_NE(larger, nullptr);
+  EXPECT_EQ(manifold_meshgl_face_id_length(larger), 4);
+
+  manifold_delete_meshgl(larger);
+  manifold_delete_meshgl(v40);
+  manifold_delete_meshgl(plain);
+  manifold_delete_meshgl(mesh);
+}
+
+TEST(CBIND, meshgl_options_run_flags_rotate_normals) {
+  ManifoldManifold* cube = manifold_cube(1, 1, 1, 1);
+  ManifoldManifold* normals = manifold_calculate_normals(cube, 60);
+  ManifoldMeshGL* source = manifold_get_meshgl(normals);
+  const size_t numVert = manifold_meshgl_num_vert(source);
+  const size_t numProp = manifold_meshgl_num_prop(source);
+  const size_t numTri = manifold_meshgl_num_tri(source);
+
+  ManifoldMeshGLOptions options = manifold_meshgl_options_init();
+  options.run_indices = manifold_meshgl_run_index(source);
+  options.run_indices_length = manifold_meshgl_run_index_length(source);
+  options.run_original_ids = manifold_meshgl_run_original_id(source);
+  options.run_original_ids_length =
+      manifold_meshgl_run_original_id_length(source);
+  options.merge_from_vert = manifold_meshgl_merge_from_vert(source);
+  options.merge_to_vert = manifold_meshgl_merge_to_vert(source);
+  options.merge_verts_length = manifold_meshgl_merge_length(source);
+  options.halfedge_tangents = manifold_meshgl_halfedge_tangent(source);
+  options.run_transform = manifold_meshgl_run_transform(source);
+  options.run_transform_length = manifold_meshgl_run_transform_length(source);
+  options.run_flags = manifold_meshgl_run_flags(source);
+  options.run_flags_length = manifold_meshgl_run_flags_length(source);
+  ManifoldMeshGL* flagged = manifold_meshgl_w_options(
+      manifold_meshgl_vert_properties(source), numVert, numProp,
+      manifold_meshgl_tri_verts(source), numTri, &options);
+
+  ManifoldManifold* flaggedManifold = manifold_of_meshgl(flagged);
+  ASSERT_EQ(manifold_status(flaggedManifold), MANIFOLD_NO_ERROR);
+  ManifoldManifold* flaggedRotated = manifold_rotate(flaggedManifold, 90, 0, 0);
+  ManifoldMeshGL* flaggedOut = manifold_get_meshgl(flaggedRotated);
+  ManifoldManifold* expectedRotated = manifold_rotate(normals, 90, 0, 0);
+  ManifoldMeshGL* expected = manifold_get_meshgl(expectedRotated);
+  ASSERT_EQ(manifold_meshgl_vert_properties_length(flaggedOut),
+            manifold_meshgl_vert_properties_length(expected));
+  const float* flaggedProps = manifold_meshgl_vert_properties(flaggedOut);
+  const float* expectedProps = manifold_meshgl_vert_properties(expected);
+  for (size_t vert = 0; vert < manifold_meshgl_num_vert(flaggedOut); ++vert) {
+    for (size_t prop = 3; prop < 6; ++prop) {
+      EXPECT_NEAR(flaggedProps[vert * numProp + prop],
+                  expectedProps[vert * numProp + prop], 1e-5);
+    }
+  }
+
+  uint8_t plainFlags[1] = {0};
+  options.run_flags = plainFlags;
+  options.run_flags_length = 1;
+  ManifoldMeshGL* plain = manifold_meshgl_w_options(
+      manifold_meshgl_vert_properties(source), numVert, numProp,
+      manifold_meshgl_tri_verts(source), numTri, &options);
+  ManifoldManifold* plainManifold = manifold_of_meshgl(plain);
+  ManifoldManifold* plainRotated = manifold_rotate(plainManifold, 90, 0, 0);
+  ManifoldMeshGL* plainOut = manifold_get_meshgl(plainRotated);
+  const float* plainProps = manifold_meshgl_vert_properties(plainOut);
+  bool differsFromRotatedNormals = false;
+  for (size_t vert = 0; vert < manifold_meshgl_num_vert(plainOut); ++vert) {
+    for (size_t prop = 3; prop < 6; ++prop) {
+      differsFromRotatedNormals |=
+          std::abs(plainProps[vert * numProp + prop] -
+                   expectedProps[vert * numProp + prop]) > 1e-5;
+    }
+  }
+  EXPECT_TRUE(differsFromRotatedNormals);
+
+  manifold_delete_meshgl(plainOut);
+  manifold_delete_manifold(plainRotated);
+  manifold_delete_manifold(plainManifold);
+  manifold_delete_meshgl(plain);
+  manifold_delete_meshgl(expected);
+  manifold_delete_manifold(expectedRotated);
+  manifold_delete_meshgl(flaggedOut);
+  manifold_delete_manifold(flaggedRotated);
+  manifold_delete_manifold(flaggedManifold);
+  manifold_delete_meshgl(flagged);
+  manifold_delete_meshgl(source);
+  manifold_delete_manifold(normals);
+  manifold_delete_manifold(cube);
+}
+
+TEST(CBIND, meshgl64_options) {
+  const double vertProps[] = {
+      0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1,
+  };
+  const uint64_t triVerts[] = {0, 2, 1, 0, 1, 3, 1, 2, 3, 2, 0, 3};
+  const uint64_t runIndices[] = {0, 3, 6, 9, 12};
+  const uint32_t runOriginalIDs[] = {7, 8};
+  const uint64_t mergeFrom[] = {0, 1, 2};
+  const uint64_t mergeTo[] = {1, 2, 3};
+  const double runTransform[] = {
+      1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 2, 0, 0, 1, 3,
+  };
+  const uint8_t runFlags[] = {2, 3, 4, 5};
+  const uint64_t faceIDs[] = {10, 11, 12, 13};
+  const double tangents[48] = {};
+
+  ManifoldMeshGL64Options options = manifold_meshgl64_options_init();
+  options.run_indices = runIndices;
+  options.run_indices_length = 5;
+  options.run_original_ids = runOriginalIDs;
+  options.run_original_ids_length = 2;
+  options.merge_from_vert = mergeFrom;
+  options.merge_to_vert = mergeTo;
+  options.merge_verts_length = 3;
+  options.halfedge_tangents = tangents;
+  options.run_transform = runTransform;
+  options.run_transform_length = 24;
+  options.run_flags = runFlags;
+  options.run_flags_length = 4;
+  options.face_id = faceIDs;
+
+  ManifoldMeshGL64* mesh =
+      manifold_meshgl64_w_options(vertProps, 4, 6, triVerts, 4, &options);
+  ASSERT_EQ(manifold_meshgl64_merge_length(mesh), 3);
+  EXPECT_EQ(manifold_meshgl64_merge_from_vert(mesh)[0], 0);
+  EXPECT_EQ(manifold_meshgl64_merge_to_vert(mesh)[0], 1);
+  EXPECT_EQ(manifold_meshgl64_tangent_length(mesh), 48);
+  EXPECT_EQ(manifold_meshgl64_run_index_length(mesh), 5);
+  EXPECT_EQ(manifold_meshgl64_run_original_id_length(mesh), 2);
+  ASSERT_EQ(manifold_meshgl64_run_transform_length(mesh), 24);
+  EXPECT_DOUBLE_EQ(manifold_meshgl64_run_transform(mesh)[23], 3);
+  ASSERT_EQ(manifold_meshgl64_run_flags_length(mesh), 4);
+  EXPECT_EQ(manifold_meshgl64_run_flags(mesh)[3], 5);
+  ASSERT_EQ(manifold_meshgl64_face_id_length(mesh), 4);
+  EXPECT_EQ(manifold_meshgl64_face_id(mesh)[3], 13);
+
+  ManifoldMeshGL64* plain =
+      manifold_meshgl64_w_options(vertProps, 4, 6, triVerts, 4, nullptr);
+  ASSERT_NE(plain, nullptr);
+  EXPECT_EQ(manifold_meshgl64_face_id_length(plain), 0);
+
+  ManifoldMeshGL64Options v40Options = options;
+  v40Options.struct_size =
+      offsetof(ManifoldMeshGL64Options, face_id) + sizeof(v40Options.face_id);
+  ManifoldMeshGL64* v40 =
+      manifold_meshgl64_w_options(vertProps, 4, 6, triVerts, 4, &v40Options);
+  ASSERT_NE(v40, nullptr);
+  EXPECT_EQ(manifold_meshgl64_face_id_length(v40), 4);
+
+  ManifoldMeshGL64Options largerOptions = options;
+  largerOptions.struct_size = sizeof(largerOptions) + 8;
+  ManifoldMeshGL64* larger =
+      manifold_meshgl64_w_options(vertProps, 4, 6, triVerts, 4, &largerOptions);
+  ASSERT_NE(larger, nullptr);
+  EXPECT_EQ(manifold_meshgl64_face_id_length(larger), 4);
+
+  manifold_delete_meshgl64(larger);
+  manifold_delete_meshgl64(v40);
+  manifold_delete_meshgl64(plain);
+  manifold_delete_meshgl64(mesh);
+}
+
+#ifndef __EMSCRIPTEN__
+TEST(CBIND, meshgl_options_short_size_aborts) {
+#ifdef GTEST_FLAG_SET
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
+#else
+  testing::GTEST_FLAG(death_test_style) = "threadsafe";
+#endif
+  const float vertProps[] = {0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1};
+  const uint32_t triVerts[] = {0, 2, 1, 0, 1, 3, 1, 2, 3, 2, 0, 3};
+  const double vertProps64[] = {0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1};
+  const uint64_t triVerts64[] = {0, 2, 1, 0, 1, 3, 1, 2, 3, 2, 0, 3};
+  ManifoldMeshGLOptions shortOptions = manifold_meshgl_options_init();
+  shortOptions.struct_size = offsetof(ManifoldMeshGLOptions, face_id) +
+                             sizeof(shortOptions.face_id) - 1;
+  EXPECT_DEATH(
+      manifold_meshgl_w_options(vertProps, 4, 3, triVerts, 4, &shortOptions),
+      "struct_size");
+  shortOptions.struct_size = 0;
+  EXPECT_DEATH(
+      manifold_meshgl_w_options(vertProps, 4, 3, triVerts, 4, &shortOptions),
+      "struct_size");
+  ManifoldMeshGL64Options shortOptions64 = manifold_meshgl64_options_init();
+  shortOptions64.struct_size = offsetof(ManifoldMeshGL64Options, face_id) +
+                               sizeof(shortOptions64.face_id) - 1;
+  EXPECT_DEATH(manifold_meshgl64_w_options(vertProps64, 4, 3, triVerts64, 4,
+                                           &shortOptions64),
+               "struct_size");
+  shortOptions64.struct_size = 0;
+  EXPECT_DEATH(manifold_meshgl64_w_options(vertProps64, 4, 3, triVerts64, 4,
+                                           &shortOptions64),
+               "struct_size");
+}
+#endif
 
 TEST(CBIND, sphere) {
   int n = 25;
@@ -384,6 +642,28 @@ TEST(CBIND, properties) {
   free(context);
 }
 
+TEST(CBIND, set_properties_null_zero_fills) {
+  ManifoldManifold* cube = manifold_cube(1.0, 1.0, 1.0, 1);
+  ManifoldManifold* zeroed = manifold_set_properties(cube, 2, NULL, NULL);
+  EXPECT_EQ(manifold_status(zeroed), MANIFOLD_NO_ERROR);
+  EXPECT_EQ(manifold_num_prop(zeroed), 2);
+
+  ManifoldMeshGL* mesh = manifold_get_meshgl(zeroed);
+  const size_t num_prop = manifold_meshgl_num_prop(mesh);
+  ASSERT_EQ(num_prop, 5);
+  const float* props = manifold_meshgl_vert_properties(mesh);
+  const size_t len = manifold_meshgl_vert_properties_length(mesh);
+  ASSERT_GT(len, 0);
+  for (size_t i = 0; i < len; i += num_prop) {
+    EXPECT_EQ(props[i + 3], 0);
+    EXPECT_EQ(props[i + 4], 0);
+  }
+
+  manifold_delete_meshgl(mesh);
+  manifold_delete_manifold(zeroed);
+  manifold_delete_manifold(cube);
+}
+
 TEST(CBIND, extrude) {
   ManifoldVec2 pts[] = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
   ManifoldSimplePolygon* sq[] = {manifold_simple_polygon(&pts[0], 4)};
@@ -693,6 +973,29 @@ TEST(CBIND, cross_section_non_zero) {
   manifold_delete_cross_section(multiple);
   manifold_delete_polygons(polygons);
   manifold_delete_simple_polygon(ring);
+}
+
+TEST(CBIND, cross_section_warp) {
+  ManifoldVec2 pts[] = {{0, 0}, {0, 2}, {2, 2}, {2, 0}};
+  ManifoldSimplePolygon* polygon = manifold_simple_polygon(pts, 4);
+  ManifoldCrossSection* cross_section =
+      manifold_cross_section_non_zero_simple_polygon(polygon);
+  double dx = 1.0;
+  ManifoldCrossSection* warped = manifold_cross_section_warp(
+      cross_section,
+      [](double x, double y, void* ctx) {
+        return ManifoldVec2{x + *static_cast<double*>(ctx), y};
+      },
+      &dx);
+  ManifoldRect* bounds = manifold_cross_section_bounds(warped);
+  EXPECT_DOUBLE_EQ(manifold_rect_min(bounds).x, 1.0);
+  EXPECT_DOUBLE_EQ(manifold_rect_max(bounds).x, 3.0);
+  EXPECT_DOUBLE_EQ(manifold_rect_min(bounds).y, 0.0);
+  EXPECT_DOUBLE_EQ(manifold_rect_max(bounds).y, 2.0);
+  manifold_delete_rect(bounds);
+  manifold_delete_cross_section(warped);
+  manifold_delete_cross_section(cross_section);
+  manifold_delete_simple_polygon(polygon);
 }
 
 TEST(CBIND, cross_section_even_odd) {

@@ -50,45 +50,69 @@ typedef struct ManifoldVec3 {
   double z;
 } ManifoldVec3;
 
-typedef struct ManifoldIVec3 {
-  int x;
-  int y;
-  int z;
-} ManifoldIVec3;
-
-typedef struct ManifoldVec4 {
-  double x;
-  double y;
-  double z;
-  double w;
-} ManifoldVec4;
-
-typedef struct ManifoldProperties {
-  double surface_area;
-  double volume;
-} ManifoldProperties;
-
 typedef struct ManifoldMeshGLOptions {
-  uint32_t* run_indices;
+  // Set struct_size to sizeof(ManifoldMeshGLOptions), for example with the
+  // initializer. A struct_size smaller than the v4.0 struct aborts. Fields
+  // added later default to empty when struct_size does not cover them.
+  // NULL options mean no options. Bindings that cannot call static inline
+  // functions must set struct_size themselves.
+  size_t struct_size;
+  const uint32_t* run_indices;
   size_t run_indices_length;
-  uint32_t* run_original_ids;
+  const uint32_t* run_original_ids;
   size_t run_original_ids_length;
-  uint32_t* merge_from_vert;
-  uint32_t* merge_to_vert;
+  const uint32_t* merge_from_vert;
+  const uint32_t* merge_to_vert;
   size_t merge_verts_length;
-  float* halfedge_tangents;
+  const float* halfedge_tangents;
+  const float* run_transform;
+  size_t run_transform_length;
+  const uint8_t* run_flags;
+  size_t run_flags_length;
+  const uint32_t* face_id;
 } ManifoldMeshGLOptions;
 
 typedef struct ManifoldMeshGL64Options {
-  uint64_t* run_indices;
+  // Set struct_size to sizeof(ManifoldMeshGL64Options), for example with the
+  // initializer. A struct_size smaller than the v4.0 struct aborts. Fields
+  // added later default to empty when struct_size does not cover them.
+  // NULL options mean no options. Bindings that cannot call static inline
+  // functions must set struct_size themselves.
+  size_t struct_size;
+  const uint64_t* run_indices;
   size_t run_indices_length;
-  uint32_t* run_original_ids;
+  const uint32_t* run_original_ids;
   size_t run_original_ids_length;
-  uint64_t* merge_from_vert;
-  uint64_t* merge_to_vert;
+  const uint64_t* merge_from_vert;
+  const uint64_t* merge_to_vert;
   size_t merge_verts_length;
-  double* halfedge_tangents;
+  const double* halfedge_tangents;
+  const double* run_transform;
+  size_t run_transform_length;
+  const uint8_t* run_flags;
+  size_t run_flags_length;
+  const uint64_t* face_id;
 } ManifoldMeshGL64Options;
+
+static inline ManifoldMeshGLOptions manifold_meshgl_options_init(void) {
+#ifdef __cplusplus
+  ManifoldMeshGLOptions options = {};
+#else
+  ManifoldMeshGLOptions options = {0};
+#endif
+  options.struct_size = sizeof(options);
+  return options;
+}
+
+static inline ManifoldMeshGL64Options manifold_meshgl64_options_init(void) {
+#ifdef __cplusplus
+  ManifoldMeshGL64Options options = {};
+#else
+  ManifoldMeshGL64Options options = {0};
+#endif
+  options.struct_size = sizeof(options);
+  return options;
+}
 
 typedef struct ManifoldRayHit {
   uint32_t original_id;
@@ -111,7 +135,7 @@ typedef enum ManifoldError {
   MANIFOLD_NO_ERROR,
   MANIFOLD_NON_FINITE_VERTEX,
   MANIFOLD_NOT_MANIFOLD,
-  MANIFOLD_VERTEX_INDEX_OUT_OF_BOUNDS,
+  MANIFOLD_VERTEX_OUT_OF_BOUNDS,
   MANIFOLD_PROPERTIES_WRONG_LENGTH,
   MANIFOLD_MISSING_POSITION_PROPERTIES,
   MANIFOLD_MERGE_VECTORS_DIFFERENT_LENGTHS,
