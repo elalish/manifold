@@ -1336,9 +1336,17 @@ TEST(Manifold, RevolveDivisionsForAngle) {
   EXPECT_EQ(numDivisions({3}, 120.001), 2);
   EXPECT_EQ(numDivisions({3}, 240), 2);
   EXPECT_EQ(numDivisions({3}, 240.001), 3);
-  // An excess within 1e-12 relative is treated as floating-point error.
-  EXPECT_EQ(numDivisions({30}, 120 * (1 + 1e-13)), 10);
-  EXPECT_EQ(numDivisions({30}, 120 * (1 + 1e-11)), 11);
+  // An excess of one ulp is treated as floating-point error, two is not. Two
+  // and three ulps above 120 degrees give 30 segments one and two ulps above
+  // 10.
+  const double up1 = std::nextafter(120.0, 360.0);
+  const double up2 = std::nextafter(up1, 360.0);
+  const double up3 = std::nextafter(up2, 360.0);
+  EXPECT_EQ(30 * up2 / 360, std::nextafter(10.0, 11.0));
+  EXPECT_EQ(numDivisions({30}, up2), 10);
+  EXPECT_EQ(30 * up3 / 360, std::nextafter(std::nextafter(10.0, 11.0), 11.0));
+  EXPECT_EQ(numDivisions({30}, up3), 11);
+  EXPECT_EQ(numDivisions({30}, 120.00000000001), 11);
   EXPECT_EQ(Manifold::Revolve(ring, 30, 90).NumVert(),
             Manifold::Revolve(ring, CircularQuality{30}, 90).NumVert());
 
