@@ -129,6 +129,53 @@ double ValidMiterLimit(double miterLimit) {
   return std::isfinite(miterLimit) && miterLimit >= 2.0 ? miterLimit : 2.0;
 }
 
+// Appends the points of the join at convex corner V. The caller appends the
+// offset endpoints V + delta * nPrev before them and V + delta * nNext after
+// them, and passes a miterLimit already checked by ValidMiterLimit.
+void AppendJoin(SimplePolygon& out, vec2 V, vec2 nPrev, vec2 nNext,
+                double delta, JoinType jt, double miterLimit, int segments) {
+  switch (jt) {
+    case JoinType::Round:
+      AppendRoundJoin(out, V, nPrev, nNext, delta, segments);
+      break;
+    case JoinType::Miter: {
+      // miterLen / |delta| = 1 / cos(half_angle) =
+      // sqrt(2 / (1 + dot(nPrev, nNext))). The limit
+      // miterLen <= miterLimit * |delta| rearranges to
+      // dot >= 2 / miterLimit^2 - 1. Comparing on the dot product
+      // directly avoids computing the miter point in the
+      // clamped case (and avoids FP-fragility of MiterPoint when
+      // the denominator (1 + dot) approaches zero - exactly the
+      // case where we'd clamp anyway).
+      const double dotN = dot(nPrev, nNext);
+      const double miterCosThresh = 2.0 / (miterLimit * miterLimit) - 1.0;
+      // Equality is allowed by the miter limit. `dotN` comes from rounded
+      // unit normals, so use only the baseline unit-scale predicate epsilon
+      // to avoid squaring a corner that is exactly on the limit.
+      const double miterTieTol = EpsilonFromScale(1.0, /*k_budget=*/0);
+      // Near-opposite normals make MiterPoint unbounded (it scales as
+      // 1/(1 + dotN)), and the miterLimit gate stops bounding it once
+      // 2/miterLimit^2 underflows miterTieTol (i.e. for very large
+      // miterLimit). Independently square such degenerate-sharp corners so
+      // the emitted coordinate stays bounded by sqrt(2 / kMinMiterDenom) *
+      // |delta|; 2e-12 caps it at ~1e6 * |delta|, far beyond any meaningful
+      // miter, so honest finite limits are unaffected.
+      constexpr double kMinMiterDenom = 2e-12;
+      if (dotN + miterTieTol < miterCosThresh || 1.0 + dotN < kMinMiterDenom) {
+        AppendSquareJoin(out, V, nPrev, nNext, delta);
+      } else {
+        out.push_back(MiterPoint(V, nPrev, nNext, delta));
+      }
+      break;
+    }
+    case JoinType::Square:
+      AppendSquareJoin(out, V, nPrev, nNext, delta);
+      break;
+    case JoinType::Bevel:
+      break;
+  }
+}
+
 // Offset a single input contour. Positive `delta` inflates the solid
 // region (outer CCW rings expand outward; inner CW holes shrink as
 // their boundary moves into the hole). Negative `delta` does the
@@ -195,47 +242,7 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
     }
     // Convex corner: apply join.
     out.push_back(endPrev);
-    switch (jt) {
-      case JoinType::Round:
-        AppendRoundJoin(out, V, nPrev, nNext, delta, segments);
-        break;
-      case JoinType::Miter: {
-        // miterLen / |delta| = 1 / cos(half_angle) =
-        // sqrt(2 / (1 + dot(nPrev, nNext))). The limit
-        // miterLen <= miterLimit * |delta| rearranges to
-        // dot >= 2 / miterLimit^2 - 1. Comparing on the dot product
-        // directly avoids materialising the miter point in the
-        // clamped case (and avoids FP-fragility of MiterPoint when
-        // the denominator (1 + dot) approaches zero - exactly the
-        // case where we'd clamp anyway).
-        const double dotN = dot(nPrev, nNext);
-        const double miterCosThresh = 2.0 / (miterLimit * miterLimit) - 1.0;
-        // Equality is allowed by the miter limit. `dotN` comes from rounded
-        // unit normals, so use only the baseline unit-scale predicate epsilon
-        // to avoid squaring a corner that is exactly on the limit.
-        const double miterTieTol = EpsilonFromScale(1.0, /*k_budget=*/0);
-        // Near-opposite normals make MiterPoint unbounded (it scales as
-        // 1/(1 + dotN)), and the miterLimit gate stops bounding it once
-        // 2/miterLimit^2 underflows miterTieTol (i.e. for very large
-        // miterLimit). Independently square such degenerate-sharp corners so
-        // the emitted coordinate stays bounded by sqrt(2 / kMinMiterDenom) *
-        // |delta|; 2e-12 caps it at ~1e6 * |delta|, far beyond any meaningful
-        // miter, so honest finite limits are unaffected.
-        constexpr double kMinMiterDenom = 2e-12;
-        if (dotN + miterTieTol < miterCosThresh ||
-            1.0 + dotN < kMinMiterDenom) {
-          AppendSquareJoin(out, V, nPrev, nNext, delta);
-        } else {
-          out.push_back(MiterPoint(V, nPrev, nNext, delta));
-        }
-        break;
-      }
-      case JoinType::Square:
-        AppendSquareJoin(out, V, nPrev, nNext, delta);
-        break;
-      case JoinType::Bevel:
-        break;
-    }
+    AppendJoin(out, V, nPrev, nNext, delta, jt, miterLimit, segments);
     out.push_back(startNext);
   }
   return out;
