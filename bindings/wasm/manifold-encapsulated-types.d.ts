@@ -16,7 +16,7 @@
  * @primaryExport
  */
 
-import {Box, CircularQuality, ErrorStatus, ExecutionContext, JoinType, Mat3, Mat4, Polygons, RayHit, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Vec2, Vec3} from './manifold-global-types';
+import {Box, CircularQuality, ErrorStatus, ExecutionContext, JoinType, Mat3, Mat4, Polygons, RayHit, Rect, SealedFloat32Array, SealedFloat64Array, SealedUint32Array, SimplePolygon, Vec2, Vec3} from './manifold-global-types';
 
 export {ExecutionContext} from './manifold-global-types';
 
@@ -478,9 +478,12 @@ export class Manifold {
    * reserveIDs() to set a unique originalID for each material, and sort the
    * materials into triangle runs.
    *
+   * A Mesh64 is read in double precision, as by ofMesh64(). A plain object is
+   * read as a Mesh.
+   *
    * @group Basics
    */
-  constructor(mesh: Mesh);
+  constructor(mesh: Mesh|Mesh64);
 
   // Shapes
 
@@ -590,9 +593,20 @@ export class Manifold {
    * round-trip of data from getMesh(). For multi-material input, use
    * reserveIDs() to set a unique originalID for each material, and sort the
    * materials into triangle runs.
+   *
+   * A Mesh64 is read in double precision, as by ofMesh64(). A plain object is
+   * read as a Mesh.
    * @group Input & Output
    */
-  static ofMesh(mesh: Mesh): Manifold;
+  static ofMesh(mesh: Mesh|Mesh64): Manifold;
+
+  /**
+   * Like ofMesh(), but reads the mesh in double precision (MeshGL64), so the
+   * input positions are not rounded to float. Takes a Mesh64 or a plain object
+   * with the same fields.
+   * @group Input & Output
+   */
+  static ofMesh64(mesh: Mesh64Options): Manifold;
 
   // Signed Distance Functions
 
@@ -1136,6 +1150,14 @@ export class Manifold {
    */
   getMesh(): Mesh;
 
+  /**
+   * Like getMesh(), but returns the full double precision used internally
+   * (MeshGL64): vertProperties, runTransform and halfedgeTangent are
+   * Float64Array.
+   * @group Input & Output
+   */
+  getMesh64(): Mesh64;
+
   // ID Management
 
   /**
@@ -1394,5 +1416,74 @@ export class Mesh {
    *
    * @param run triangle run index.
    */
+  hasNormals(run: number): boolean;
+}
+
+/**
+ * @group Input & Output
+ * @internal
+ */
+export interface Mesh64Options {
+  numProp: number;
+  vertProperties: Float64Array;
+  triVerts: Uint32Array;
+  mergeFromVert?: Uint32Array;
+  mergeToVert?: Uint32Array;
+  runIndex?: Uint32Array;
+  runOriginalID?: Uint32Array;
+  runTransform?: Float64Array;
+  runFlags?: Uint8Array;
+  faceID?: Uint32Array;
+  halfedgeTangent?: Float64Array;
+}
+
+/**
+ * The double-precision version of Mesh, matching MeshGL64 in C++: the vertex
+ * properties, run transforms and tangents are Float64Array. Indices are
+ * Uint32Array, as in Mesh. See Mesh for the meaning of each field and method.
+ *
+ * @see {@link https://manifoldcad.org/docs/html/structmanifold_1_1_mesh_g_l_p.html | C++ API: MeshGLP< Precision, I > Struct Template Reference}
+ * @group Input & Output
+ * @internal
+ */
+export class Mesh64 {
+  constructor(options: Mesh64Options);
+
+  numProp: number;
+  vertProperties: Float64Array;
+  triVerts: Uint32Array;
+  mergeFromVert: Uint32Array;
+  mergeToVert: Uint32Array;
+  runIndex: Uint32Array;
+  runOriginalID: Uint32Array;
+  runTransform: Float64Array;
+  runFlags: Uint8Array;
+  faceID: Uint32Array;
+  halfedgeTangent: Float64Array;
+
+  get numTri(): number;
+  get numVert(): number;
+  get numRun(): number;
+
+  /**
+   * Like Mesh.merge(), in double precision.
+   *
+   * @param tolerance Default 0, with a bounding-box and precision-based floor.
+   */
+  merge(tolerance?: number): Mesh64;
+
+  verts(tri: number): SealedUint32Array<3>;
+
+  /** Gets the x, y, z position of this vertex in double precision. */
+  position(vert: number): SealedFloat64Array<3>;
+
+  /** Gets any other properties of this vertex in double precision. */
+  extras(vert: number): Float64Array;
+
+  /** Like Mesh.tangent(), in double precision. */
+  tangent(halfedge: number): SealedFloat64Array<4>;
+
+  transform(run: number): Mat4;
+  backside(run: number): boolean;
   hasNormals(run: number): boolean;
 }

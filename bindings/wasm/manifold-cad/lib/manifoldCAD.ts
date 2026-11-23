@@ -50,8 +50,15 @@ export {importManifold, importModel} from './import-model.ts';
 const manifoldWasm: ManifoldToplevel =
     garbageCollectManifold(await getManifoldModule());
 
-const {Mesh, Manifold, CrossSection, triangulate, segmentsFor, forDivisions} =
-    manifoldWasm;
+const {
+  Mesh,
+  Mesh64,
+  Manifold,
+  CrossSection,
+  triangulate,
+  segmentsFor,
+  forDivisions
+} = manifoldWasm;
 
 // These methods are not intrinsic to manifold itself, but provided by the scene
 // builder.
@@ -67,6 +74,7 @@ const isManifoldCAD = () => false;
 
 export {
   Mesh,
+  Mesh64,
   Manifold,
   CrossSection,
   triangulate,

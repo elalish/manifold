@@ -438,11 +438,12 @@ Module.setup = function() {
     return this._Simplify(tolerance);
   };
 
-  class Mesh {
-    constructor({
+  // Shared by Mesh and Mesh64, which differ only in float precision.
+  class MeshBase {
+    constructor(Float, {
       numProp = 3,
       triVerts = new Uint32Array(),
-      vertProperties = new Float32Array(),
+      vertProperties = new Float(),
       mergeFromVert,
       mergeToVert,
       runIndex,
@@ -475,10 +476,6 @@ Module.setup = function() {
 
     get numRun() {
       return this.runOriginalID.length;
-    }
-
-    merge(tolerance = 0) {
-      return new Mesh(Module._Merge(this, tolerance));
     }
 
     verts(tri) {
@@ -521,10 +518,40 @@ Module.setup = function() {
     }
   }
 
+  class Mesh extends MeshBase {
+    constructor(options) {
+      super(Float32Array, options);
+    }
+
+    merge(tolerance = 0) {
+      return new Mesh(Module._Merge(this, tolerance));
+    }
+  }
+
+  class Mesh64 extends MeshBase {
+    constructor(options) {
+      super(Float64Array, options);
+    }
+
+    merge(tolerance = 0) {
+      return new Mesh64(Module._Merge64(this, tolerance));
+    }
+  }
+
+  // A registered symbol, so a Mesh64 from another instance of this module is
+  // also read as double.
+  const isMesh64 = Symbol.for('manifold-3d.Mesh64');
+  Mesh64.prototype[isMesh64] = true;
+
   Module.Mesh = Mesh;
+  Module.Mesh64 = Mesh64;
 
   Module.Manifold.prototype.getMesh = function() {
     return new Mesh(this._GetMeshJS());
+  };
+
+  Module.Manifold.prototype.getMesh64 = function() {
+    return new Mesh64(this._GetMesh64JS());
   };
 
   Module.ManifoldError = function ManifoldError(code, ...args) {
@@ -687,11 +714,16 @@ Module.setup = function() {
 
   const ManifoldCtor = Module.Manifold;
   Module.Manifold = function(mesh) {
-    return checkedManifold(new ManifoldCtor(mesh));
+    return checkedManifold(
+        mesh?.[isMesh64] ? Module._FromMesh64(mesh) : new ManifoldCtor(mesh));
   };
 
   Module.Manifold.ofMesh = function(mesh) {
     return new Module.Manifold(mesh);
+  };
+
+  Module.Manifold.ofMesh64 = function(mesh) {
+    return new Module.Manifold(new Mesh64(mesh));
   };
 
   Module.Manifold.tetrahedron = function() {
@@ -775,7 +807,11 @@ Module.setup = function() {
   // ctx-aware static factories: mirror Manifold.ofMesh / levelSet but
   // run under this ExecutionContext so progress/cancellation are observed.
   Module.ExecutionContext.prototype.fromMesh = function(mesh) {
-    return this._FromMesh(mesh);
+    return mesh?.[isMesh64] ? this._FromMesh64(mesh) : this._FromMesh(mesh);
+  };
+
+  Module.ExecutionContext.prototype.fromMesh64 = function(mesh) {
+    return this._FromMesh64(mesh);
   };
 
   Module.ExecutionContext.prototype.levelSet = function(

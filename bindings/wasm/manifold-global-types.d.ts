@@ -13,7 +13,7 @@
 // limitations under the License.
 
 // Type-only import for the ctx-aware factories on ExecutionContext below.
-import type {Manifold, Mesh} from './manifold-encapsulated-types';
+import type {Manifold, Mesh, Mesh64, Mesh64Options} from './manifold-encapsulated-types';
 
 /**
  * @inline
@@ -28,6 +28,14 @@ export interface SealedUint32Array<N extends number> extends Uint32Array {
  * @hidden
  */
 export interface SealedFloat32Array<N extends number> extends Float32Array {
+  length: N;
+}
+
+/**
+ * @inline
+ * @hidden
+ */
+export interface SealedFloat64Array<N extends number> extends Float64Array {
   length: N;
 }
 
@@ -177,7 +185,9 @@ export interface ExecutionContext {
   // have no source Manifold to attach via Manifold.withContext).
 
   /** Like {@link Manifold.ofMesh}, observed/cancellable via this context. */
-  fromMesh(mesh: Mesh): Manifold;
+  fromMesh(mesh: Mesh|Mesh64): Manifold;
+  /** Like {@link Manifold.ofMesh64}, observed/cancellable via this context. */
+  fromMesh64(mesh: Mesh64Options): Manifold;
   /** Like {@link Manifold.levelSet}, observed/cancellable via this context. */
   levelSet(
       sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,

@@ -94,10 +94,10 @@ export type {
 
 /* See the Developer Guide for more detail on these: */
 /** @internal */
-export type {SealedFloat32Array, SealedUint32Array} from 'manifold-3d';
+export type {SealedFloat32Array, SealedFloat64Array, SealedUint32Array} from 'manifold-3d';
 /** @internal */
 export type {ImportOptions} from '../lib/import-model';
 /** @internal */
-export type {MeshOptions} from 'manifold-3d';
+export type {MeshOptions, Mesh64Options} from 'manifold-3d';
 /** @internal */
-export {Mesh} from 'manifold-3d';
+export {Mesh, Mesh64} from 'manifold-3d';
