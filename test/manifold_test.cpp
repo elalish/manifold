@@ -56,7 +56,7 @@ int NumUnique(const std::vector<T>& in) {
 // Impl::Transform / Compose / CreateProperties was added to support.
 Manifold MixedNormalsCubePlusSphere(double sphereRadius = 5.0) {
   return Manifold(CubeSTL().Merge()).Translate({20, 0, 0}) +
-         Manifold::Sphere(sphereRadius, 32).CalculateNormals(0);
+         Manifold::Sphere(sphereRadius, 32).CalculateNormals();
 }
 
 // Count verts on the sphere surface (|pos| ~ sphereRadius) whose stored
@@ -100,12 +100,12 @@ TEST(Manifold, GetMeshGL) {
 
 TEST(Manifold, SharedTopologyCopyIsolation) {
   const Manifold sphere =
-      Manifold::Sphere(1, 16).CalculateNormals(0, 180).SmoothByNormals();
-  const Manifold cube = Manifold::Cube().Refine(2).CalculateNormals(0, 30);
+      Manifold::Sphere(1, 16).CalculateNormals(180).SmoothByNormals();
+  const Manifold cube = Manifold::Cube().Refine(2).CalculateNormals(30);
   for (const Manifold& source : {sphere, cube}) {
     const MeshGL64 original = source.GetMeshGL64();
     const std::vector<std::function<Manifold(const Manifold&)>> operations = {
-        [](const Manifold& m) { return m.CalculateNormals(0, 30); },
+        [](const Manifold& m) { return m.CalculateNormals(30); },
         [](const Manifold& m) { return m.Refine(2); },
         [](const Manifold& m) { return m.Simplify(0.02); },
         [](const Manifold& m) { return m.RemoveDegenerates(); },
@@ -142,7 +142,7 @@ TEST(Manifold, SharedTopologyCopyIsolation) {
 #if (defined(__cpp_exceptions) || defined(_CPPUNWIND)) && \
     !defined(__EMSCRIPTEN__)
 TEST(Manifold, SharedTopologyThrowingCallbacks) {
-  const Manifold source = Manifold::Cube().CalculateNormals(0, 30);
+  const Manifold source = Manifold::Cube().CalculateNormals(30);
   const MeshGL64 original = source.GetMeshGL64();
   EXPECT_THROW(source.WarpBatch([](VecView<vec3> points) {
     points[0].x += 1;
@@ -163,14 +163,14 @@ TEST(Manifold, SharedTopologyThrowingCallbacks) {
 
 #ifndef __EMSCRIPTEN__
 TEST(Manifold, SharedTopologyConcurrentCopies) {
-  const Manifold source = Manifold::Sphere(1, 16).CalculateNormals(0, 180);
+  const Manifold source = Manifold::Sphere(1, 16).CalculateNormals(180);
   const MeshGL64 original = source.GetMeshGL64();
   std::atomic<bool> intact = true;
   std::vector<std::thread> threads;
   for (int i = 0; i < 4; ++i) {
     threads.emplace_back([&] {
       for (int iteration = 0; iteration < 10; ++iteration) {
-        const Manifold result = source.CalculateNormals(0, 30)
+        const Manifold result = source.CalculateNormals(30)
                                     .Refine(2)
                                     .Mirror({1, 2, 3})
                                     .SetProperties(1, nullptr);
@@ -371,6 +371,44 @@ TEST(Manifold, InvalidInput64BitIndex) {
             Manifold::Error::MergeIndexOutOfBounds);
 }
 
+TEST(Manifold, InvalidInputPropertiesWrongLength) {
+  // vertProperties written with 4 floats per vertex, but numProp says 3.
+  const MeshGL tet = Manifold::Tetrahedron().GetMeshGL();
+  ASSERT_EQ(tet.numProp, 3);
+  MeshGL stride = tet;
+  stride.vertProperties.clear();
+  for (size_t v = 0; v < tet.NumVert(); ++v) {
+    for (int j = 0; j < 3; ++j)
+      stride.vertProperties.push_back(tet.vertProperties[3 * v + j]);
+    stride.vertProperties.push_back(0.5f);
+  }
+  EXPECT_EQ(Manifold(stride).Status(), Manifold::Error::PropertiesWrongLength);
+
+  // A trailing partial vertex, with numProp = 5.
+  MeshGL partial = TetGL();
+  partial.vertProperties.insert(partial.vertProperties.end(), {1, 1});
+  EXPECT_EQ(Manifold(partial).Status(), Manifold::Error::PropertiesWrongLength);
+
+  MeshGL64 partial64;
+  partial64.numProp = partial.numProp;
+  partial64.vertProperties.assign(partial.vertProperties.begin(),
+                                  partial.vertProperties.end());
+  partial64.triVerts.assign(partial.triVerts.begin(), partial.triVerts.end());
+  partial64.mergeFromVert.assign(partial.mergeFromVert.begin(),
+                                 partial.mergeFromVert.end());
+  partial64.mergeToVert.assign(partial.mergeToVert.begin(),
+                               partial.mergeToVert.end());
+  EXPECT_EQ(Manifold(partial64).Status(),
+            Manifold::Error::PropertiesWrongLength);
+
+  // Merge leaves a malformed MeshGL unchanged instead of reading the
+  // trailing float as a coordinate.
+  MeshGL unmerged = CubeSTL();
+  ASSERT_FALSE(unmerged.Merge().mergeFromVert.empty());
+  unmerged.vertProperties.push_back(1e7f);
+  EXPECT_TRUE(unmerged.Merge().mergeFromVert.empty());
+}
+
 TEST(Manifold, InvalidInput7) {
   MeshGL cube = CubeUV();
   cube.runIndex = {0, 1, static_cast<uint32_t>(cube.triVerts.size())};
@@ -489,17 +527,15 @@ TEST(Manifold, ErrorPropagationCalculateNormals) {
   in.vertProperties[2 * 3 + 1] = NAN;
   Manifold errored(in);
   ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
-  EXPECT_EQ(errored.CalculateNormals(0).Status(),
+  EXPECT_EQ(errored.CalculateNormals().Status(),
             Manifold::Error::NonFiniteVertex);
 }
 
-// CalculateNormals(idx) followed by GetMeshGL() (no idx) used to drop
-// the transform-on-export step, returning input-frame data.
 TEST(Manifold, NormalsCavity) {
   // The #1712 repro: inner-sphere normals from a Boolean diff should point
   // toward the origin (outward from the surrounding solid).
   MeshGL mesh = (Manifold::Sphere(10.0, 32) - Manifold::Sphere(3.0, 32))
-                    .CalculateNormals(0)
+                    .CalculateNormals()
                     .GetMeshGL();
   ASSERT_GE(mesh.numProp, 6);
   auto [good, bad] = CountSphereNormalAlignment(
@@ -513,7 +549,7 @@ TEST(Manifold, NormalsRotateBeforeCalc) {
   // rotated faceNormal_ and stores world-frame at slot 0.
   MeshGL mesh = Manifold::Sphere(10.0, 32)
                     .Rotate(45, 0, 0)
-                    .CalculateNormals(0)
+                    .CalculateNormals()
                     .GetMeshGL();
   auto [_, bad] = CountSphereNormalAlignment(
       mesh, 10.0, 3, [](vec3 pos) { return la::normalize(pos); });
@@ -537,7 +573,7 @@ TEST(Manifold, NormalsRotateAfterCalc) {
   // Rotation *after* CalculateNormals: Impl::Transform eager-transforms the
   // stored slot 0..2 so it tracks the new orientation.
   MeshGL mesh = Manifold::Sphere(10.0, 32)
-                    .CalculateNormals(0)
+                    .CalculateNormals()
                     .Rotate(45, 0, 0)
                     .GetMeshGL();
   auto [_, bad] = CountSphereNormalAlignment(
@@ -586,19 +622,11 @@ TEST(Manifold, NormalsSmoothByNormalsNoArg) {
   EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
 }
 
-TEST(Manifold, NormalsNonStandardSlotNotRecorded) {
-  // CalculateNormals(non-zero) does NOT set the per-run recording, since a
-  // non-standard slot can't be safely auto-substituted on GetMeshGL(-1).
-  MeshGL mesh = Manifold::Sphere(10.0, 32).CalculateNormals(3).GetMeshGL();
-  ASSERT_GT(mesh.NumRun(), 0u);
-  EXPECT_FALSE(mesh.HasNormals(0));
-}
-
 TEST(Manifold, NormalsDroppedWithChannels) {
   // With fewer than three properties left, the recorded normals no longer
   // exist, so export must not write them into the next vertex.
   const Manifold m = (Manifold::Cube(vec3(2), true) + Manifold::Sphere(5, 8))
-                         .CalculateNormals(0)
+                         .CalculateNormals()
                          .SetProperties(1, nullptr);
   const MeshGL64 mesh = m.GetMeshGL64();
   ASSERT_EQ(mesh.numProp, 4);
@@ -609,13 +637,51 @@ TEST(Manifold, NormalsDroppedWithChannels) {
   EXPECT_NEAR(Manifold(mesh).Volume(), m.Volume(), 1e-9);
 }
 
+TEST(Manifold, NormalsNormalizedPerRun) {
+  // GetMeshGL normalizes each run that records normals, even when other runs
+  // don't. The overlap makes the Boolean interpolate the sphere's normals to
+  // less than unit length. The cube's unflagged slot 0..2 is left alone.
+  const Manifold cube =
+      Manifold::Cube(vec3(6), true)
+          .Translate({4, 0, 0})
+          .SetProperties(3, [](double* newProp, vec3, const double*) {
+            newProp[0] = 0;
+            newProp[1] = 0;
+            newProp[2] = 2;
+          });
+  const Manifold mixed = Manifold::Sphere(5, 32).CalculateNormals() + cube;
+  auto check = [](const auto& gl) {
+    int flagged = 0;
+    int unflagged = 0;
+    for (size_t run = 0; run < gl.NumRun(); ++run) {
+      for (size_t i = gl.runIndex[run]; i < gl.runIndex[run + 1]; ++i) {
+        const size_t v = gl.triVerts[i];
+        const vec3 n(gl.vertProperties[v * gl.numProp + 3],
+                     gl.vertProperties[v * gl.numProp + 4],
+                     gl.vertProperties[v * gl.numProp + 5]);
+        if (gl.HasNormals(run)) {
+          ++flagged;
+          EXPECT_NEAR(la::length(n), 1, 1e-6) << v;
+        } else {
+          ++unflagged;
+          EXPECT_NEAR(la::length(n - vec3(0, 0, 2)), 0, 1e-6) << v;
+        }
+      }
+    }
+    EXPECT_GT(flagged, 0);
+    EXPECT_GT(unflagged, 0);
+  };
+  check(mixed.GetMeshGL());
+  check(mixed.GetMeshGL64());
+}
+
 TEST(Manifold, NormalsSharedPropVertMixedFlagsUndefined) {
   // hasNormals is per-run, but a single propVert holds one slot 0..2
   // value. If a hand-built MeshGL shares a propVert between a
   // hasNormals=true run and a hasNormals=false run, a Transform rotates
   // the slot on behalf of the hasNormals=true camp; the other camp's
   // interpretation (e.g. color) is collateral damage. Standard
-  // CalculateNormals / Boolean / Compose outputs never share propVerts
+  // CalculateNormals and Boolean outputs never share propVerts
   // this way - this test pins the documented behaviour for the only
   // input shape that can produce it.
   MeshGL gl;
@@ -660,65 +726,98 @@ TEST(Manifold, NormalsSharedPropVertMixedFlagsUndefined) {
   EXPECT_GT(run1Bad, 0);
 }
 
-TEST(Manifold, GetNormalLegacyContract) {
-  // Pre-#1718, slot N normals were stored in per-mesh frame and runTransform
-  // had to be applied on read - there was no runFlags bit 1 to mark
-  // world-frame storage. GetNormal must still honour that contract when
-  // reading a MeshGL without the bit set, or SmoothByNormals on legacy data
-  // produces wrong tangents.
-  //
-  // Build twins: take a CalculateNormals'd rotated cube, emit both as a
-  // modern MeshGL (world-frame + bit 1 set) and as a legacy MeshGL (the same
-  // normals inverse-rotated into per-mesh frame, bit 1 cleared). Both should
-  // produce the same SmoothByNormals.Refine output if GetNormal recomposes
-  // correctly.
+TEST(Manifold, GetNormalUnflaggedMeshFrame) {
+  // A hand-built MeshGL without hasNormals stores slot 0..2 in the mesh frame.
+  // Recompose those values with the run transform before smoothing.
   const Manifold rotated =
-      Manifold::Cube({1, 1, 1}, true).Rotate(30, 45, 0).CalculateNormals(0);
+      Manifold::Cube({1, 1, 1}, true).Rotate(30, 45, 0).CalculateNormals();
   MeshGL gl_modern = rotated.GetMeshGL();
   ASSERT_GT(gl_modern.NumRun(), 0u);
   ASSERT_TRUE(gl_modern.HasNormals(0));
 
-  MeshGL gl_legacy = gl_modern;
-  std::vector<bool> visited(gl_legacy.NumVert(), false);
-  for (size_t run = 0; run < gl_legacy.NumRun(); ++run) {
-    // Invert the per-run normal transform that the legacy GetNormal will
-    // apply on read, so the stored values look "per-mesh frame" again.
+  MeshGL gl_mesh_frame = gl_modern;
+  std::vector<bool> visited(gl_mesh_frame.NumVert(), false);
+  for (size_t run = 0; run < gl_mesh_frame.NumRun(); ++run) {
+    // Convert world-frame values to the input mesh frame for this run.
     const mat3 fwd =
-        la::inverse(la::transpose(mat3(gl_legacy.GetRunTransform(run)))) *
-        (gl_legacy.Backside(run) ? -1.0 : 1.0);
+        la::inverse(la::transpose(mat3(gl_mesh_frame.GetRunTransform(run)))) *
+        (gl_mesh_frame.Backside(run) ? -1.0 : 1.0);
     const mat3 inv = la::inverse(fwd);
-    // `data() + i` rather than `&v[i]`: the latter is UB when `i == size()`
-    // (one-past-the-end of the final run) and traps under libc++ fast
-    // hardening - see #1735.
-    for (uint32_t* itr = gl_legacy.triVerts.data() + gl_legacy.runIndex[run];
-         itr < gl_legacy.triVerts.data() + gl_legacy.runIndex[run + 1]; ++itr) {
+    for (uint32_t* itr =
+             gl_mesh_frame.triVerts.data() + gl_mesh_frame.runIndex[run];
+         itr < gl_mesh_frame.triVerts.data() + gl_mesh_frame.runIndex[run + 1];
+         ++itr) {
       const uint32_t v = *itr;
       if (visited[v]) continue;
       visited[v] = true;
-      vec3 n(gl_legacy.vertProperties[v * gl_legacy.numProp + 3],
-             gl_legacy.vertProperties[v * gl_legacy.numProp + 4],
-             gl_legacy.vertProperties[v * gl_legacy.numProp + 5]);
+      vec3 n(gl_mesh_frame.vertProperties[v * gl_mesh_frame.numProp + 3],
+             gl_mesh_frame.vertProperties[v * gl_mesh_frame.numProp + 4],
+             gl_mesh_frame.vertProperties[v * gl_mesh_frame.numProp + 5]);
       n = inv * n;
-      gl_legacy.vertProperties[v * gl_legacy.numProp + 3] = n.x;
-      gl_legacy.vertProperties[v * gl_legacy.numProp + 4] = n.y;
-      gl_legacy.vertProperties[v * gl_legacy.numProp + 5] = n.z;
+      gl_mesh_frame.vertProperties[v * gl_mesh_frame.numProp + 3] = n.x;
+      gl_mesh_frame.vertProperties[v * gl_mesh_frame.numProp + 4] = n.y;
+      gl_mesh_frame.vertProperties[v * gl_mesh_frame.numProp + 5] = n.z;
     }
-    gl_legacy.runFlags[run] &= ~uint8_t(2);
+    gl_mesh_frame.runFlags[run] &= ~uint8_t(2);
   }
-  ASSERT_FALSE(gl_legacy.HasNormals(0));
+  ASSERT_FALSE(gl_mesh_frame.HasNormals(0));
 
   Manifold m_modern(gl_modern);
-  Manifold m_legacy(gl_legacy);
+  Manifold m_mesh_frame(gl_mesh_frame);
 
-  Manifold sm_modern = m_modern.SmoothByNormals(0).Refine(4);
-  Manifold sm_legacy = m_legacy.SmoothByNormals(0).Refine(4);
-  EXPECT_NEAR(sm_modern.Volume(), sm_legacy.Volume(), 1e-4);
-  EXPECT_NEAR(sm_modern.SurfaceArea(), sm_legacy.SurfaceArea(), 1e-4);
+  Manifold sm_modern = m_modern.SmoothByNormals().Refine(4);
+  Manifold sm_mesh_frame = m_mesh_frame.SmoothByNormals().Refine(4);
+  EXPECT_NEAR(sm_modern.Volume(), sm_mesh_frame.Volume(), 1e-4);
+  EXPECT_NEAR(sm_modern.SurfaceArea(), sm_mesh_frame.SurfaceArea(), 1e-4);
+}
+
+TEST(Manifold, MixedNormalsDefaultIDRoundTrip) {
+  // Both operands use the default originalID 0, but only the sphere records
+  // normals. A MeshGL round trip must keep that per run, in either operand
+  // order, so the sphere's normals still rotate afterward.
+  const Manifold sphere = Manifold::Sphere(5, 32).CalculateNormals();
+  const Manifold overlap = Manifold::Cube(vec3(6), true).Translate({4, 0, 0});
+  const Manifold apart = Manifold::Cube(vec3(6), true).Translate({20, 0, 0});
+  for (const Manifold& mixed :
+       {sphere + overlap, overlap + sphere, sphere + apart, apart + sphere}) {
+    const MeshGL gl = mixed.GetMeshGL();
+    const MeshGL round = Manifold(gl).GetMeshGL();
+    ASSERT_EQ(round.NumRun(), gl.NumRun());
+    for (size_t run = 0; run < gl.NumRun(); ++run) {
+      EXPECT_EQ(round.runIndex[run + 1], gl.runIndex[run + 1]);
+      EXPECT_EQ(round.HasNormals(run), gl.HasNormals(run));
+    }
+    // The overlapping cube has verts at the sphere's radius, so compare with
+    // the result that skipped the round trip instead of expecting no misses.
+    auto outward = [](vec3 pos) { return la::normalize(pos); };
+    const auto expected = CountSphereNormalAlignment(
+        mixed.Rotate(90, 0, 0).GetMeshGL(), 5.0, 3, outward);
+    const auto actual = CountSphereNormalAlignment(
+        Manifold(gl).Rotate(90, 0, 0).GetMeshGL(), 5.0, 3, outward);
+    EXPECT_GT(expected.first, 0);
+    EXPECT_EQ(actual, expected);
+  }
+}
+
+TEST(Manifold, UntrackedRunsGroupedByNormals) {
+  // Untracked runs that agree on normals share one relation, so only a
+  // disagreeing run is split off.
+  MeshGL gl = Manifold::Cube().CalculateNormals().GetMeshGL();
+  ASSERT_EQ(gl.NumTri(), 12u);
+  gl.runOriginalID = {0, 0, 0};
+  gl.runIndex = {0, 12, 24, 36};
+  gl.runFlags = {2, 0, 2};
+  gl.runTransform.clear();
+  const MeshGL out = Manifold(gl).GetMeshGL();
+  ASSERT_EQ(out.NumRun(), 2u);
+  for (size_t run = 0; run < out.NumRun(); ++run) {
+    const uint32_t numTri = (out.runIndex[run + 1] - out.runIndex[run]) / 3;
+    EXPECT_EQ(numTri, out.HasNormals(run) ? 8u : 4u);
+  }
 }
 
 TEST(Manifold, TransformMixedNormalsPerMeshID) {
-  // Mixed Boolean output (no-normals + with-normals): the result's
-  // AllHaveNormals() is false (AND across meshIDs), but the with-normals
+  // Mixed Boolean output (no-normals + with-normals): the with-normals
   // meshIDs still hold world-frame normals at slot 0..2 that must rotate
   // with a subsequent Transform. Impl::Transform must per-meshID iterate,
   // not skip on the whole-impl flag.
@@ -729,11 +828,66 @@ TEST(Manifold, TransformMixedNormalsPerMeshID) {
   EXPECT_EQ(bad, 0);
 }
 
+TEST(Manifold, AsOriginalMixedNormalsKept) {
+  // AsOriginal of a mixed result keeps two runs under one ID, one with the
+  // sphere's normals and one for the cube without. The sphere's normals still
+  // rotate, triID still matches the output order, and a MeshGL round trip
+  // keeps both runs. The overlap interleaves the two kinds of triangles, and
+  // the IDs cover untracked, reserved, above the reserved range, and equal to
+  // the next reserved ID.
+  const Manifold sphere = Manifold::Sphere(5, 32).CalculateNormals();
+  const Manifold cube = Manifold::Cube(vec3(6), true).Translate({4, 0, 0});
+  for (const Manifold& mixed : {sphere + cube, cube + sphere}) {
+    for (const int id : {-1, 0, 1 << 29, -2}) {
+      const int useID =
+          id == -2 ? static_cast<int>(Manifold::ReserveIDs(1)) + 1 : id;
+      const Manifold original = mixed.AsOriginal(useID);
+      const MeshGL gl = original.GetMeshGL();
+      ASSERT_EQ(gl.NumRun(), 2u) << id;
+      EXPECT_EQ(gl.runOriginalID[0], gl.runOriginalID[1]) << id;
+      EXPECT_NE(gl.HasNormals(0), gl.HasNormals(1)) << id;
+      const MeshGL round = Manifold(gl).GetMeshGL();
+      ASSERT_EQ(round.NumRun(), 2u) << id;
+      EXPECT_NE(round.HasNormals(0), round.HasNormals(1)) << id;
+      auto outward = [](vec3 pos) { return la::normalize(pos); };
+      const auto expected = CountSphereNormalAlignment(
+          mixed.Rotate(90, 0, 0).GetMeshGL(), 5.0, 3, outward);
+      const auto actual = CountSphereNormalAlignment(
+          original.Rotate(90, 0, 0).GetMeshGL(), 5.0, 3, outward);
+      EXPECT_GT(actual.first, 0) << id;
+      EXPECT_EQ(actual, expected) << id;
+      const MeshGL tri = original.TriID2FaceID().GetMeshGL();
+      int mismatch = 0;
+      for (size_t t = 0; t < tri.NumTri(); ++t) mismatch += tri.faceID[t] != t;
+      EXPECT_EQ(mismatch, 0) << id;
+    }
+  }
+}
+
+TEST(Manifold, MinkowskiKeepsNormals) {
+  // Minkowski unions the input with hulls that have no normals and calls
+  // AsOriginal(0), so only the input's surviving triangles keep their normals.
+  const Manifold nonConvex =
+      (Manifold::Cube(vec3(2), true) - Manifold::Sphere(0.75, 8))
+          .CalculateNormals();
+  const Manifold ball = Manifold::Sphere(0.1, 8);
+  const MeshGL sum = nonConvex.MinkowskiSum(ball).GetMeshGL();
+  ASSERT_EQ(sum.NumRun(), 2u);
+  EXPECT_TRUE(sum.HasNormals(0));
+  EXPECT_FALSE(sum.HasNormals(1));
+  // Erosion keeps none of the input's triangles, so nothing records normals.
+  const MeshGL difference = nonConvex.MinkowskiDifference(ball).GetMeshGL();
+  ASSERT_EQ(difference.NumRun(), 1u);
+  EXPECT_FALSE(difference.HasNormals(0));
+  for (const MeshGL* gl : {&sum, &difference})
+    for (float x : gl->vertProperties) EXPECT_TRUE(std::isfinite(x));
+}
+
 TEST(Manifold, ComposeMixedNormalsPerMeshID) {
   // Compose's per-node eager-transform check is per-Relation, not whole-node.
   // Pass a mixed Manifold with a pending Rotate into a 3-input BatchBoolean,
   // forcing the disjoint Compose path where node->transform_ is non-identity
-  // and node->pImpl_->AllHaveNormals() is false (mixed). Sphere's normals
+  // and the node mixes meshIDs with and without normals. Sphere's normals
   // within the mixed input must still rotate.
   const Manifold mixed_rot = MixedNormalsCubePlusSphere().Rotate(90, 0, 0);
   const Manifold t1 = Manifold::Tetrahedron().Translate({-50, 0, 0});
@@ -759,30 +913,12 @@ TEST(Manifold, BooleanSubtractMixedQPerMeshIDNegation) {
   EXPECT_EQ(bad, 0);
 }
 
-TEST(Manifold, CalculateNormalsNonZeroIdxSurvivesTransform) {
-  // Non-zero normalIdx is the legacy deferred-transform path: SetNormals
-  // stores slot N in per-mesh frame, and GetMeshGL(N)'s legacy export
-  // applies the per-run runTransform to recover world-frame. This must
-  // survive transforms applied between CalculateNormals and GetMeshGL.
-  const int idx = 3;
-  MeshGL gl = Manifold::Sphere(5.0, 32)
-                  .Rotate(30)
-                  .CalculateNormals(idx)
-                  .Rotate(60)
-                  .GetMeshGL(idx);
-  ASSERT_GE(gl.numProp, 3 + idx + 3);
-  auto [good, bad] = CountSphereNormalAlignment(
-      gl, 5.0, 3 + idx, [](vec3 pos) { return la::normalize(pos); });
-  EXPECT_GT(good, 0);
-  EXPECT_EQ(bad, 0);
-}
-
 TEST(Manifold, ErrorPropagationSmoothByNormals) {
   MeshGL in = TetGL();
   in.vertProperties[2 * 3 + 1] = NAN;
   Manifold errored(in);
   ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
-  EXPECT_EQ(errored.SmoothByNormals(0).Status(),
+  EXPECT_EQ(errored.SmoothByNormals().Status(),
             Manifold::Error::NonFiniteVertex);
 }
 
@@ -948,8 +1084,8 @@ TEST(Manifold, OppositeFace) {
 }
 
 /**
- * ExpectMeshes performs a decomposition, so this test ensures that compose and
- * decompose are inverse operations.
+ * ExpectMeshes performs a decomposition, so this test ensures that a disjoint
+ * BatchBoolean Add and Decompose are inverse operations.
  */
 TEST(Manifold, Decompose) {
   std::vector<Manifold> manifoldList;
@@ -1753,9 +1889,22 @@ TEST(Manifold, MeshRelationRefine) {
 }
 
 TEST(Manifold, MeshRelationRefinePrecision) {
-  MeshGL inGL = WithPositionColors(Csaszar()).GetMeshGL();
+  Manifold source = Manifold(Csaszar()).CalculateNormals(180);
+  const Box bbox = source.BoundingBox();
+  const vec3 size = bbox.Size();
+  const Manifold input = source.SetProperties(
+      6, [bbox, size](double* newProp, vec3 pos, const double* oldProp) {
+        for (const int i : {0, 1, 2}) {
+          newProp[i] = oldProp[i];
+          newProp[i + 3] = (pos[i] - bbox.min[i]) / size[i];
+        }
+      });
+  ASSERT_EQ(input.NumProp(), 6);
+  MeshGL inGL = input.GetMeshGL();
+  ASSERT_EQ(inGL.numProp, 9);
   const int id = inGL.runOriginalID[0];
-  Manifold csaszar = Manifold(inGL).CalculateNormals(3, 180).SmoothByNormals(3);
+  Manifold csaszar = Manifold(inGL).CalculateNormals(180).SmoothByNormals();
+  ASSERT_EQ(csaszar.NumProp(), 6);
 
   csaszar = csaszar.RefineToTolerance(0.05);
   ExpectMeshes(csaszar, {{2135, 4270, 6}});
@@ -1984,7 +2133,7 @@ TEST(Manifold, MirroredNormals) {
   // mirrored along with it, so the resulting mesh vertices do not get
   // duplicated. We check that the MeshGL vertex count remains the same, and
   // that the mirrored normals remain outward-pointing.
-  const Manifold s = Manifold::Sphere(1.0, 32).CalculateNormals(0, 180);
+  const Manifold s = Manifold::Sphere(1.0, 32).CalculateNormals(180);
   const MeshGL mesh = s.GetMeshGL();
   const MeshGL mirrored = s.Mirror({1, 0, 0}).GetMeshGL();
   EXPECT_EQ(mesh.NumVert(), mirrored.NumVert());
@@ -2455,3 +2604,94 @@ TEST(Manifold, DedupeEdgesNeverMovesACorner) {
   EXPECT_NEAR(m.Volume(), 0.00099963253073879, 1e-12);
 }
 #endif
+
+// A coarse cylinder with three verts pulled to just over epsilon from a
+// neighbor, at relative precision 0.1. RemoveDegenerates adds two verts in
+// FormLoop and later splits a quad on an edge that ends at a newer vert.
+TEST(Manifold, RemoveDegeneratesSplitsAtNewVert) {
+  MeshGL64 mesh;
+  mesh.vertProperties = {
+      -0.47488555173337099,   -0.39698845421345746, -0.34188284539605285,
+      -0.38692187123277771,   -0.45770248247545098, -0.37523313166288419,
+      -0.55159161949407864,   -0.33743035459550019, -0.2861598174123241,
+      -0.61319371198073336,   -0.28201467542938935, -0.21085823301390325,
+      -0.65660284304811789,   -0.23352019026423823, -0.11975402807456051,
+      -0.67964229760376771,   -0.19437861508156265, -0.017415547847984506,
+      -0.29211144423694035,   -0.51652798448472081, -0.3845383536007313,
+      -0.19520846144929604,   -0.57051520393661737, -0.36933190852640763,
+      -0.10107204305843429,   -0.61695699621682676, -0.33037631109252441,
+      -0.67592823673392022,   -0.14577450954880902, 0.10457770625687557,
+      -0.66107035128140956,   -0.15143766970761169, 0.20013151388574996,
+      -0.62039022534169885,   -0.14979153782315879, 0.30443137732015946,
+      -0.5611562747527763,    -0.16169682017498199, 0.39869508857131186,
+      -0.39968927624009776,   -0.22312411591338729, 0.53894722501979364,
+      -0.48633873713660769,   -0.18655653619383122, 0.478195871546095,
+      -0.11383944806575433,   -0.38237862965476316, 0.58380404559015331,
+      -0.30555285784923625,   -0.2695659081935966,  0.57790282245367675,
+      -0.20864987506159172,   -0.32355312764549332, 0.59310926752800042,
+      -0.01442258216192438,   -0.6535245759363828,  -0.26962495761882588,
+      0.060394955454244337,   -0.67838429195523209, -0.1901241746440426,
+      0.11962890604316684,    -0.69028957430705529, -0.095860463392890283,
+      0.16030903198287744,    -0.68864344242260245, 0.0084394000415189824,
+      0.18039546189334638,    -0.6735284402282079,  0.11754538498828312,
+      0.17888097830523564,    -0.64570249704865157, 0.22598646177525344,
+      0.17491014944264449,    -0.61422964253813117, 0.28806942712562233,
+      -0.025875767565160995,  -0.44309265791675667, 0.55045375932332208,
+      0.050830300195546574,   -0.50265075753471389, 0.49473073133959322,
+      0.10738341598184817,    -0.58054108972714324, 0.45367172743023804,
+      0.032692828250385608,   0.50285608444653762,  -0.29337167095015726,
+      0.006647349609954889,   0.53195277554562836,  -0.23870914798655166,
+      -0.0071763231234349689, 0.55543772065523367,  -0.17730605985060605,
+      0.16845593269915904,    0.39744340021890068,  -0.39199661013954579,
+      0.069654083742378525,   0.46960667694687114,  -0.33855262158920979,
+      0.11567772439880306,    0.4338718171760968,   -0.371986438379447,
+      -0.0080850132763014004, 0.57213328656296758,  -0.11224141377842371,
+      0.003966844669979902,   0.58120228787960426,  -0.046777822810365369,
+      0.028374920233806333,   0.58218996701027592,  0.015802095250280326,
+      0.06391529058715989,    0.57504679759918209,  0.072360322000971811,
+      0.47238639906472574,    0.2578911451199381,   -0.22437300917754949,
+      0.49679447462855209,    0.25887882425060982,  -0.16179309111690396,
+      0.28348397856924801,    0.32975576734220086,  -0.38845587625765987,
+      0.22534218889666144,    0.36214809901333883,  -0.3975797433022541,
+      0.33996582960376509,    0.3018906919740752,   -0.36508251779732992,
+      0.39195550614167096,    0.27995014414234154,  -0.32863170571311084,
+      0.43684602871137224,    0.26503431453103199,  -0.28093123592824087,
+      0.50884633257483347,    0.2679478255672465,   -0.096329500148845462,
+      0.50793764242196704,    0.28464339147498041,  -0.031264854076663282,
+      0.49411396968857718,    0.30812833658458572,  0.030138234059282398,
+      0.46806849104814646,    0.33722502768367646,  0.084800757022888085,
+      0.10880581315686108,    0.56013096798787254,  0.12006079178584164,
+      0.16079548969476698,    0.53819042015613894,  0.15651160387006077,
+      0.2754191304018706,     0.47793301311687525,  0.18900882937498489,
+      0.21727734072928392,    0.51032534478801328,  0.17988496233039072,
+      0.33230538659937303,    0.4426377119113134,   0.18342569621227664,
+      0.4311072355561536,     0.37047443518334289,  0.12998170766194059,
+      0.38508359489972904,    0.40620929495411728,  0.16341552445217786,
+  };
+  mesh.triVerts = {
+      3,  20, 4,  4,  21, 5,  5,  22, 9,  1,  8,  0,  0,  18, 2,  6,  7,  1,
+      2,  19, 3,  1,  7,  8,  0,  8,  18, 2,  18, 19, 3,  19, 20, 4,  20, 21,
+      5,  21, 22, 33, 0,  2,  31, 1,  0,  41, 6,  1,  9,  23, 10, 9,  22, 23,
+      10, 23, 24, 11, 24, 27, 12, 27, 26, 14, 26, 25, 10, 24, 11, 11, 27, 12,
+      12, 26, 14, 14, 25, 13, 13, 15, 16, 16, 15, 17, 13, 25, 15, 28, 3,  4,
+      29, 4,  5,  30, 5,  9,  34, 9,  10, 32, 2,  3,  28, 32, 3,  32, 33, 2,
+      29, 28, 4,  30, 29, 5,  34, 30, 9,  35, 34, 10, 36, 35, 11, 35, 10, 11,
+      36, 11, 12, 37, 12, 14, 49, 14, 13, 50, 13, 16, 52, 16, 17, 37, 36, 12,
+      49, 37, 14, 40, 7,  6,  42, 8,  7,  43, 18, 8,  44, 19, 18, 39, 21, 20,
+      38, 20, 19, 38, 39, 20, 45, 22, 21, 51, 17, 15, 54, 26, 27, 55, 25, 26,
+      53, 15, 25, 47, 24, 23, 46, 23, 22, 48, 27, 24, 31, 41, 1,  33, 31, 0,
+      41, 40, 6,  40, 42, 7,  42, 43, 8,  31, 33, 42, 33, 32, 43, 32, 28, 44,
+      28, 29, 38, 29, 30, 39, 30, 34, 45, 34, 35, 46, 35, 36, 47, 36, 37, 48,
+      43, 44, 18, 44, 38, 19, 39, 45, 21, 45, 46, 22, 46, 47, 23, 31, 42, 40,
+      33, 43, 42, 41, 31, 40, 32, 44, 43, 28, 38, 44, 29, 39, 38, 30, 45, 39,
+      34, 46, 45, 35, 47, 46, 36, 48, 47, 37, 54, 48, 52, 50, 16, 51, 52, 17,
+      53, 51, 15, 50, 49, 13, 37, 49, 54, 54, 55, 26, 48, 54, 27, 55, 53, 25,
+      47, 48, 24, 49, 50, 55, 50, 52, 53, 52, 51, 53, 49, 55, 54, 50, 53, 55,
+  };
+  Quality::SetRelativePrecision(0.1);
+  Manifold result;
+  EXPECT_NO_THROW(result = Manifold(mesh).RemoveDegenerates());
+  Quality::ResetToDefaults();
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(result.NumDegenerateTris(), 0);
+}

@@ -91,7 +91,8 @@ typedef struct ManifoldMeshGL64Options {
 } ManifoldMeshGL64Options;
 
 typedef struct ManifoldRayHit {
-  uint64_t face_id;
+  uint32_t original_id;
+  uint32_t face_id;
   double distance;
   ManifoldVec3 position;
   ManifoldVec3 normal;

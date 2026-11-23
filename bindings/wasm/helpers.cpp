@@ -88,8 +88,8 @@ MeshGL MeshJS2GL(const val& mesh) {
   return out;
 }
 
-val GetMeshJS(const Manifold& manifold, int normalIdx) {
-  MeshGL mesh = manifold.GetMeshGL(normalIdx);
+val GetMeshJS(const Manifold& manifold) {
+  MeshGL mesh = manifold.GetMeshGL();
   return MeshGL2JS(mesh);
 }
 

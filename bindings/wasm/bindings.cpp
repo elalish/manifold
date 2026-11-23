@@ -96,6 +96,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   value_object<Box>("box").field("min", &Box::min).field("max", &Box::max);
 
   value_object<RayHit>("rayHit")
+      .field("originalID", &RayHit::originalID)
       .field("faceID", &RayHit::faceID)
       .field("distance", &RayHit::distance)
       .field("position", &RayHit::position)
@@ -217,7 +218,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_LevelSet", &man_js::LevelSet);
   function("_Merge", &js::Merge);
   function("_ReserveIDs", &Manifold::ReserveIDs);
-  function("_manifoldCompose", &man_js::UnionN);
   function("_manifoldUnionN", &man_js::UnionN);
   function("_manifoldDifferenceN", &man_js::DifferenceN);
   function("_manifoldIntersectionN", &man_js::IntersectionN);
