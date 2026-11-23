@@ -39,6 +39,7 @@ import type {ManifoldToplevel} from 'manifold-3d';
 
 import * as debug from './debug.ts';
 import {garbageCollectFunction, garbageCollectManifold} from './garbage-collector.ts';
+import {applyRelativePrecision} from './level-of-detail.ts';
 import * as material from './material.ts';
 import {getManifoldModule} from './wasm.ts';
 
@@ -48,7 +49,7 @@ export {CrossSectionGLTFNode, GLTFNode, VisualizationGLTFNode} from './gltf-node
 export {importManifold, importModel} from './import-model.ts';
 
 const manifoldWasm: ManifoldToplevel =
-    garbageCollectManifold(await getManifoldModule());
+    garbageCollectManifold(applyRelativePrecision(await getManifoldModule()));
 
 const {
   Mesh,

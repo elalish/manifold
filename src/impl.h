@@ -51,6 +51,9 @@ struct Manifold::Impl {
   };
 
   Box bBox_;
+  // The requested relative precision. CalculateBBox sets epsilon_ to this
+  // times the bounding box scale.
+  double relPrecision_ = kDefaultRelativePrecision;
   double epsilon_ = -1;
   int numProp_ = 0;
   Error status_ = Error::NoError;
@@ -72,7 +75,7 @@ struct Manifold::Impl {
   Impl(Shape, const mat3x4 = la::identity);
 
   template <typename Precision, typename I>
-  Impl(const MeshGLP<Precision, I>& meshGL,
+  Impl(const MeshGLP<Precision, I>& meshGL, double relPrecision,
        ExecutionContext::Impl* ctx = nullptr);
 
   // sdf.cpp. Populates an empty Impl with the level set of `sdf`. `ctx`
@@ -293,8 +296,9 @@ void Manifold::Impl::ForVert(
 }
 
 template <typename Precision, typename I>
-Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
-                     ExecutionContext::Impl* ctx) {
+Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL, double relPrecision,
+                     ExecutionContext::Impl* ctx)
+    : relPrecision_(ClampRelPrecision(relPrecision)) {
   MANIFOLD_BEGIN_PHASE_TIMING();
   // Entry-time cancel wins over empty/malformed input; past this gate,
   // validation errors win over races.

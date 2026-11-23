@@ -61,7 +61,9 @@ ManifoldMeshGL* manifold_meshgl_w_options(const float* vert_props,
                                           const ManifoldMeshGLOptions* options);
 ManifoldMeshGL* manifold_get_meshgl(const ManifoldManifold* m);
 ManifoldMeshGL* manifold_meshgl_copy(const ManifoldMeshGL* m);
-ManifoldMeshGL* manifold_meshgl_merge(const ManifoldMeshGL* m, float tolerance);
+// rel_precision: relative precision of the mesh; 0 for the default.
+ManifoldMeshGL* manifold_meshgl_merge(const ManifoldMeshGL* m, float tolerance,
+                                      double rel_precision);
 
 ManifoldMeshGL64* manifold_meshgl64(const double* vert_props, size_t n_verts,
                                     size_t n_props, const uint64_t* tri_verts,
@@ -79,7 +81,8 @@ ManifoldMeshGL64* manifold_meshgl64_w_options(
 ManifoldMeshGL64* manifold_get_meshgl64(const ManifoldManifold* m);
 ManifoldMeshGL64* manifold_meshgl64_copy(const ManifoldMeshGL64* m);
 ManifoldMeshGL64* manifold_meshgl64_merge(const ManifoldMeshGL64* m,
-                                          double tolerance);
+                                          double tolerance,
+                                          double rel_precision);
 
 // SDF
 // By default, the execution policy (sequential or parallel) of
@@ -186,8 +189,11 @@ ManifoldManifold* manifold_cylinder(double height, double radius_low,
                                     int center);
 ManifoldManifold* manifold_sphere(double radius,
                                   const ManifoldCircularQuality* quality);
-ManifoldManifold* manifold_of_meshgl(const ManifoldMeshGL* mesh);
-ManifoldManifold* manifold_of_meshgl64(const ManifoldMeshGL64* mesh);
+// rel_precision: relative precision of the result; 0 for the default.
+ManifoldManifold* manifold_of_meshgl(const ManifoldMeshGL* mesh,
+                                     double rel_precision);
+ManifoldManifold* manifold_of_meshgl64(const ManifoldMeshGL64* mesh,
+                                       double rel_precision);
 ManifoldManifold* manifold_extrude(const ManifoldPolygons* cs, double height,
                                    int slices, double twist_degrees,
                                    double scale_x, double scale_y);
@@ -215,6 +221,11 @@ ManifoldError manifold_status(const ManifoldManifold* m);
 // the full model.
 ManifoldManifold* manifold_with_context(const ManifoldManifold* m,
                                         const ManifoldExecutionContext* ctx);
+// Evaluates m and returns it with the given relative precision for later
+// operations, without recomputing it.
+ManifoldManifold* manifold_with_precision(const ManifoldManifold* m,
+                                          double rel_precision);
+double manifold_get_precision(const ManifoldManifold* m);
 size_t manifold_num_vert(const ManifoldManifold* m);
 size_t manifold_num_edge(const ManifoldManifold* m);
 size_t manifold_num_tri(const ManifoldManifold* m);
@@ -425,11 +436,6 @@ int manifold_box_is_finite(const ManifoldBox* b);
 // Version
 
 void manifold_version(int version[3]);
-
-// Static Quality Globals
-
-void manifold_set_relative_precision(double precision);
-double manifold_get_relative_precision(void);
 
 // Circular Quality
 // quality may be NULL for the default CircularQuality.

@@ -473,13 +473,15 @@ ManifoldMeshGL64* manifold_meshgl64_w_options(
                                          tri_verts, n_tris, options));
 }
 
-ManifoldManifold* manifold_of_meshgl(const ManifoldMeshGL* mesh) {
-  auto m = Manifold(*from_c(mesh));
+ManifoldManifold* manifold_of_meshgl(const ManifoldMeshGL* mesh,
+                                     double rel_precision) {
+  auto m = Manifold(*from_c(mesh), rel_precision);
   return to_c(new Manifold(m));
 }
 
-ManifoldManifold* manifold_of_meshgl64(const ManifoldMeshGL64* mesh) {
-  auto m = Manifold(*from_c(mesh));
+ManifoldManifold* manifold_of_meshgl64(const ManifoldMeshGL64* mesh,
+                                       double rel_precision) {
+  auto m = Manifold(*from_c(mesh), rel_precision);
   return to_c(new Manifold(m));
 }
 
@@ -510,9 +512,9 @@ ManifoldMeshGL* manifold_meshgl_copy(const ManifoldMeshGL* m) {
   return to_c(new MeshGL(*from_c(m)));
 }
 
-ManifoldMeshGL* manifold_meshgl_merge(const ManifoldMeshGL* m,
-                                      float tolerance) {
-  return to_c(new MeshGL(from_c(m)->Merge(tolerance)));
+ManifoldMeshGL* manifold_meshgl_merge(const ManifoldMeshGL* m, float tolerance,
+                                      double rel_precision) {
+  return to_c(new MeshGL(from_c(m)->Merge(tolerance, rel_precision)));
 }
 
 ManifoldMeshGL64* manifold_get_meshgl64(const ManifoldManifold* m) {
@@ -524,8 +526,9 @@ ManifoldMeshGL64* manifold_meshgl64_copy(const ManifoldMeshGL64* m) {
 }
 
 ManifoldMeshGL64* manifold_meshgl64_merge(const ManifoldMeshGL64* m,
-                                          double tolerance) {
-  return to_c(new MeshGL64(from_c(m)->Merge(tolerance)));
+                                          double tolerance,
+                                          double rel_precision) {
+  return to_c(new MeshGL64(from_c(m)->Merge(tolerance, rel_precision)));
 }
 
 size_t manifold_meshgl_num_prop(const ManifoldMeshGL* m) {
@@ -761,6 +764,15 @@ double manifold_epsilon(const ManifoldManifold* m) {
   return from_c(m)->GetEpsilon();
 }
 
+ManifoldManifold* manifold_with_precision(const ManifoldManifold* m,
+                                          double rel_precision) {
+  return to_c(new Manifold(from_c(m)->WithPrecision(rel_precision)));
+}
+
+double manifold_get_precision(const ManifoldManifold* m) {
+  return from_c(m)->GetPrecision();
+}
+
 size_t manifold_num_prop_vert(const ManifoldManifold* m) {
   return from_c(m)->NumPropVert();
 }
@@ -884,16 +896,6 @@ void manifold_version(int version[3]) {
   version[0] = v[0];
   version[1] = v[1];
   version[2] = v[2];
-}
-
-// Static Quality Globals
-
-void manifold_set_relative_precision(double precision) {
-  Quality::SetRelativePrecision(precision);
-}
-
-double manifold_get_relative_precision() {
-  return Quality::GetRelativePrecision();
 }
 
 int manifold_circular_quality_segments_for(

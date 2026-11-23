@@ -90,8 +90,8 @@ class Manifold {
    *  Create and retrieve arbitrary manifolds
    */
   ///@{
-  Manifold(const MeshGL&);
-  Manifold(const MeshGL64&);
+  Manifold(const MeshGL&, double relPrecision = kDefaultRelativePrecision);
+  Manifold(const MeshGL64&, double relPrecision = kDefaultRelativePrecision);
   MeshGL GetMeshGL() const;
   MeshGL64 GetMeshGL64() const;
   ///@}
@@ -176,6 +176,9 @@ class Manifold {
   /// Raw copy / assignment preserves the attachment (it's the same logical
   /// Manifold). Only ops that derive a *new* Manifold drop the attachment.
   Manifold WithContext(const ExecutionContext& ctx) const;
+
+  Manifold WithPrecision(double relPrecision) const;
+  double GetPrecision() const;
 
   bool IsEmpty() const;
   size_t NumVert() const;

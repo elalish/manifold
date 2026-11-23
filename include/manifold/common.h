@@ -76,6 +76,13 @@ constexpr double kTwoPi = 6.28318530717958647692528676655900576;
 constexpr double kHalfPi = 1.57079632679489661923132169163975144;
 
 /**
+ * The default relative precision of a Manifold, and the smallest one allowed.
+ * NaN and infinity also give the default. A Manifold's epsilon is its relative
+ * precision times its bounding box scale.
+ */
+constexpr double kDefaultRelativePrecision = 1e-12;
+
+/**
  * Convert degrees to radians.
  *
  * @param a Angle in degrees.
@@ -274,7 +281,8 @@ class ExecutionContext {
   /// Cancel() before this call wins over empty/malformed input;
   /// validation errors win over a Cancel() that races in after that.
   /// Concurrent calls on the same ctx produce undefined progress
-  /// values; the returned Manifolds remain valid.
+  /// values; the returned Manifolds remain valid. The result has the
+  /// default relative precision. Use `Manifold::WithPrecision` to change it.
   Manifold FromMeshGL(const MeshGL& mesh);
   Manifold FromMeshGL(const MeshGL64& mesh);
 
@@ -693,8 +701,6 @@ struct CircularQuality {
  */
 class Quality {
  public:
-  static void SetRelativePrecision(double p);
-  static double GetRelativePrecision();
   static void ResetToDefaults();
 };
 /** @} */

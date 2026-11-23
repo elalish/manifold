@@ -14,7 +14,9 @@
 // limitations under the License.
 
 #pragma once
+#include <algorithm>
 #include <atomic>
+#include <cmath>
 #include <memory>
 #include <mutex>
 
@@ -37,7 +39,13 @@
 
 namespace manifold {
 
-constexpr double kPrecision = 1e-12;
+// A requested relative precision raised to at least kDefaultRelativePrecision.
+// NaN and infinity give the default.
+inline double ClampRelPrecision(double relPrecision) {
+  return std::isfinite(relPrecision)
+             ? std::max(kDefaultRelativePrecision, relPrecision)
+             : kDefaultRelativePrecision;
+}
 
 inline int Next3(int i) {
   constexpr ivec3 next3(1, 2, 0);

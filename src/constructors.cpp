@@ -526,6 +526,7 @@ std::vector<Manifold> Manifold::Decompose() const {
     if (faceNew2Old.empty()) continue;
 
     auto impl = std::make_shared<Impl>();
+    impl->relPrecision_ = pImpl_->relPrecision_;
     const int nVert = vertNew2Old.size();
     impl->vertPos_.resize(nVert);
     impl->vertNormal_.resize(nVert);
@@ -618,6 +619,7 @@ std::vector<Manifold> Manifold::Decompose() const {
     }
 
     auto impl = std::make_shared<Impl>();
+    impl->relPrecision_ = pImpl_->relPrecision_;
 
     Vec<int> vertNew2Old(numVert);
     const int nVert = copy_if(countAt(0), countAt(numVert), vertNew2Old.begin(),

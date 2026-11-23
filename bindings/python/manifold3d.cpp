@@ -227,11 +227,6 @@ const std::string manifold__rotate__degrees =
 NB_MODULE(manifold3d, m) {
   m.doc() = "Python binding for the Manifold library.";
 
-  m.def("set_relative_precision", Quality::SetRelativePrecision,
-        nb::arg("precision"));
-
-  m.def("get_relative_precision", Quality::GetRelativePrecision);
-
   nb::class_<CircularQuality>(m, "CircularQuality")
       .def(
           "__init__",
@@ -257,10 +252,12 @@ NB_MODULE(manifold3d, m) {
 
   nb::class_<Manifold>(m, "Manifold")
       .def(nb::init<>(), manifold__manifold)
-      .def(nb::init<const MeshGL&>(), nb::arg("mesh"),
-           manifold__manifold__mesh_gl)
-      .def(nb::init<const MeshGL64&>(), nb::arg("mesh"),
-           manifold__manifold__mesh_gl64)
+      .def(nb::init<const MeshGL&, double>(), nb::arg("mesh"),
+           nb::arg("rel_precision") = kDefaultRelativePrecision,
+           manifold__manifold__mesh_gl__rel_precision)
+      .def(nb::init<const MeshGL64&, double>(), nb::arg("mesh"),
+           nb::arg("rel_precision") = kDefaultRelativePrecision,
+           manifold__manifold__mesh_gl64__rel_precision)
       .def(nb::self + nb::self, manifold__operator_plus__q)
       .def(nb::self - nb::self, manifold__operator_minus__q)
       .def(nb::self ^ nb::self, manifold__operator_xor__q)
@@ -432,6 +429,10 @@ NB_MODULE(manifold3d, m) {
       .def("status", &Manifold::Status, manifold__status, release_gil())
       .def("with_context", &Manifold::WithContext, nb::arg("ctx"),
            manifold__with_context__ctx)
+      .def("with_precision", &Manifold::WithPrecision, nb::arg("rel_precision"),
+           manifold__with_precision__rel_precision, release_gil())
+      .def("get_precision", &Manifold::GetPrecision, manifold__get_precision,
+           release_gil())
       .def(
           "bounding_box",
           [](const Manifold& self) {
@@ -625,7 +626,8 @@ NB_MODULE(manifold3d, m) {
       .def("backside", &MeshGL::Backside, nb::arg("run"))
       .def("has_normals", &MeshGL::HasNormals, nb::arg("run"))
       .def("merge", &MeshGL::Merge, nb::arg("tolerance") = 0.0f,
-           mesh_gl__merge__tolerance);
+           nb::arg("rel_precision") = kDefaultRelativePrecision,
+           mesh_gl__merge__tolerance__rel_precision);
 
   nb::class_<MeshGL64>(m, "Mesh64")
       .def(
@@ -742,7 +744,8 @@ NB_MODULE(manifold3d, m) {
       .def("backside", &MeshGL64::Backside, nb::arg("run"))
       .def("has_normals", &MeshGL64::HasNormals, nb::arg("run"))
       .def("merge", &MeshGL64::Merge, nb::arg("tolerance") = 0.0,
-           mesh_gl__merge__tolerance);
+           nb::arg("rel_precision") = kDefaultRelativePrecision,
+           mesh_gl__merge__tolerance__rel_precision);
 
   nb::class_<RayHit>(m, "RayHit")
       .def_ro("original_id", &RayHit::originalID)

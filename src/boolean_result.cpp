@@ -827,6 +827,7 @@ Manifold::Impl Boolean3::Result(OpType op) const {
 
   // Create the output Manifold
   Manifold::Impl outR;
+  outR.relPrecision_ = std::min(inP_.relPrecision_, inQ_.relPrecision_);
 
   if (numVertR == 0) {
     return outR;

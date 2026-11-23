@@ -17,7 +17,9 @@
 #endif
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
+#include <limits>
 #ifdef MANIFOLD_DEBUG
 #include <array>
 #include <exception>
@@ -157,6 +159,11 @@ size_t CsgLeafNode::NumVert() const {
   return pImpl_->NumVert();
 }
 
+double CsgLeafNode::RelPrecision() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return pImpl_->relPrecision_;
+}
+
 std::shared_ptr<CsgLeafNode> ImplToLeaf(Manifold::Impl&& impl) {
   return std::make_shared<CsgLeafNode>(
       std::make_shared<Manifold::Impl>(std::move(impl)));
@@ -225,7 +232,8 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl& a,
 std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
     const std::vector<std::shared_ptr<CsgLeafNode>>& nodes) {
   ZoneScoped;
-  double epsilon = -1;
+  // The result keeps the finest precision among the non-empty nodes.
+  double relPrecision = std::numeric_limits<double>::infinity();
   Box bbox;
   int numVert = 0;
   int numEdge = 0;
@@ -247,6 +255,8 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
       return ErrorLeaf(Manifold::Error::NonFiniteVertex);
     }
     bbox = bbox.Union(node->GetBoundingBox());
+    if (!node->pImpl_->IsEmpty())
+      relPrecision = std::min(relPrecision, node->pImpl_->relPrecision_);
 
     vertIndices.push_back(numVert);
     edgeIndices.push_back(numEdge * 2);
@@ -263,7 +273,8 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
 
   Manifold::Impl combined;
   combined.bBox_ = bbox;
-  combined.epsilon_ = Quality::GetRelativePrecision() * combined.bBox_.Scale();
+  if (std::isfinite(relPrecision)) combined.relPrecision_ = relPrecision;
+  combined.epsilon_ = combined.relPrecision_ * combined.bBox_.Scale();
   combined.vertPos_.resize_nofill(numVert);
   combined.vertNormal_.resize_nofill(numVert);
   combined.halfedge_.resize_nofill(2 * numEdge);
@@ -526,24 +537,26 @@ std::shared_ptr<CsgLeafNode> BatchUnion(
                              ? (children.size() - kMaxUnionSize)
                              : 0;
     Vec<Box> boxes;
+    Vec<double> epsilons;
     boxes.reserve(children.size() - start);
+    epsilons.reserve(children.size() - start);
     for (size_t i = start; i < children.size(); i++) {
       boxes.push_back(children[i]->GetBoundingBox());
+      epsilons.push_back(children[i]->RelPrecision() * boxes.back().Scale());
     }
     // partition the children into a set of disjoint sets
     // each set contains a set of children that are pairwise disjoint
     std::vector<Vec<size_t>> disjointSets;
     for (size_t i = 0; i < boxes.size(); i++) {
-      auto lambda = [&boxes, i](const Vec<size_t>& set) {
-        return std::find_if(set.begin(), set.end(), [&boxes, i](size_t j) {
-                 // Children touching within the pair's tie tolerance
-                 // are booleaned, not composed.
-                 const double tol =
-                     Quality::GetRelativePrecision() *
-                     std::min(boxes[i].Scale(), boxes[j].Scale());
-                 return Box(boxes[i].min - tol, boxes[i].max + tol)
-                     .DoesOverlap(boxes[j]);
-               }) == set.end();
+      auto lambda = [&boxes, &epsilons, i](const Vec<size_t>& set) {
+        return std::find_if(
+                   set.begin(), set.end(), [&boxes, &epsilons, i](size_t j) {
+                     // Children touching within the pair's tie tolerance
+                     // are booleaned, not composed.
+                     const double tol = std::min(epsilons[i], epsilons[j]);
+                     return Box(boxes[i].min - tol, boxes[i].max + tol)
+                         .DoesOverlap(boxes[j]);
+                   }) == set.end();
       };
       auto it = std::find_if(disjointSets.begin(), disjointSets.end(), lambda);
       if (it == disjointSets.end()) {
