@@ -1839,11 +1839,54 @@ TEST(CrossSectionComplex, OffsetMiterWavyRing) {
       SCOPED_TRACE(delta);
       const auto result = input.Offset(delta, CrossSection::JoinType::Miter);
       ASSERT_EQ(result.NumContour(), 1);
+      // The fill rule trims the crossing offset edges to 512 corners, each
+      // with a miter point and two collinear offset endpoints.
+      EXPECT_EQ(result.NumVert(), 1536);
       const double reach = delta > 0 ? 2 * delta : delta;
       EXPECT_GT(result.Area(), kPi * (inner + delta) * (inner + delta));
       EXPECT_LT(result.Area(), kPi * (outer + reach) * (outer + reach));
     }
   }
+}
+
+TEST(CrossSectionComplex, OffsetMiterCleanupChain) {
+  // Timed: shrink, grow by twice as much, then shrink again. This common
+  // cleanup removes details narrower than the offset and leaves the rest in
+  // place. The offset is small compared to every feature, so the cost depends
+  // on the number of corners rather than crossings, and each offset takes the
+  // previous one's output.
+  constexpr int side = 16;
+  constexpr int tips = 16;
+  constexpr double delta = 1.0 / 256;
+  Polygons stars;
+  for (int y = 0; y < side; ++y) {
+    for (int x = 0; x < side; ++x) {
+      SimplePolygon star;
+      for (int i = 0; i < 2 * tips; ++i) {
+        const double a = kPi * i / tips;
+        const double r = i % 2 == 0 ? 1.0 : 0.85;
+        star.push_back({3 * x + r * std::cos(a), 3 * y + r * std::sin(a)});
+      }
+      stars.push_back(star);
+    }
+  }
+  const CrossSection input(stars);
+  ASSERT_EQ(input.NumVert(), side * side * 2 * tips);
+  CrossSection result = input;
+  for (int i = 0; i < 3; ++i) {
+    result = result.Offset(-delta, CrossSection::JoinType::Miter)
+                 .Offset(2 * delta, CrossSection::JoinType::Miter)
+                 .Offset(-delta, CrossSection::JoinType::Miter);
+    ASSERT_EQ(result.NumContour(), side * side);
+    // Every corner angle exceeds 60 degrees, the sharpest corner the default
+    // miter limit allows, so no join is squared and the chain returns the
+    // input shape.
+    EXPECT_NEAR(result.Area(), input.Area(), 1e-9 * input.Area());
+  }
+  // Each convex Miter join also emits two offset endpoints collinear with
+  // the miter point, and the next offset keeps them as collinear input
+  // vertices, so every corner ends with three vertices.
+  EXPECT_EQ(result.NumVert(), side * side * 2 * tips * 3);
 }
 
 TEST(CrossSectionComplex, DifferenceManyContoursFewCrossings) {
