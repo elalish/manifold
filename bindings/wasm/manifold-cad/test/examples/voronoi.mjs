@@ -38,7 +38,7 @@ const mesh = new DVMesh(sampler.fill());
 // our predetermined boundary.
 const cells = mesh
   .voronoi()
-  .map(points => CrossSection.ofPolygons([points]))
+  .map(points => new CrossSection([points]))
   .map(cell => cell.offset(-gap / 2 - round).offset(+round))
   .map(cs => cs.intersect(boundary));
 

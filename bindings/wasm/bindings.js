@@ -619,10 +619,6 @@ Module.setup = function() {
     return cs;
   };
 
-  Module.CrossSection.ofPolygons = function(polygons) {
-    return new Module.CrossSection(polygons);
-  };
-
   Module.CrossSection.evenOdd = function(polygons) {
     const polygonsVec = polygons2vec(polygons);
     const cs = Module._EvenOdd(polygonsVec);
@@ -718,10 +714,6 @@ Module.setup = function() {
         mesh?.[isMesh64] ? Module._FromMesh64(mesh) : Module._FromMesh(mesh));
   };
 
-  Module.Manifold.ofMesh = function(mesh) {
-    return new Module.Manifold(mesh);
-  };
-
   Module.Manifold.tetrahedron = function() {
     return Module._Tetrahedron();
   };
@@ -800,7 +792,7 @@ Module.setup = function() {
     return out;
   };
 
-  // ctx-aware static factories: mirror Manifold.ofMesh / levelSet but
+  // ctx-aware static factories: mirror new Manifold / levelSet but
   // run under this ExecutionContext so progress/cancellation are observed.
   Module.ExecutionContext.prototype.fromMesh = function(mesh) {
     return mesh?.[isMesh64] ? this._FromMesh64(mesh) : this._FromMesh(mesh);

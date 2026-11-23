@@ -33,8 +33,7 @@ suite('CrossSection Bindings', () => {
     ];
     // Positive fill leaves the nested pair solid; even-odd cuts the inner
     // square out.
-    expect(manifoldModule.CrossSection.ofPolygons(nested).area())
-        .toBeCloseTo(16);
+    expect(new manifoldModule.CrossSection(nested).area()).toBeCloseTo(16);
     const evenOdd = manifoldModule.CrossSection.evenOdd(nested);
     expect(evenOdd.numContour()).toEqual(2);
     expect(evenOdd.area()).toBeCloseTo(12);
@@ -53,8 +52,7 @@ suite('CrossSection Bindings', () => {
         expect(single.area()).toBeCloseTo(4);
         expect(doubled.area()).toBeCloseTo(4);
         expect(cancelled.isEmpty()).toBe(true);
-        expect(
-            manifoldModule.CrossSection.ofPolygons(single.toPolygons()).area())
+        expect(new manifoldModule.CrossSection(single.toPolygons()).area())
             .toBeCloseTo(4);
       });
 
@@ -294,7 +292,7 @@ suite('Manifold Bindings', () => {
     const cube =
         manifoldModule.Manifold.cube([10, 10, 10]).calculateNormals(30);
     const smooth =
-        manifoldModule.Manifold.ofMesh(cube.getMesh()).smoothByNormals();
+        new manifoldModule.Manifold(cube.getMesh()).smoothByNormals();
     // Before the fix, any tolerance value crashed: RuntimeError: divide by zero
     const refined = smooth.refineToTolerance(0.1);
     expect(refined.volume()).toBeGreaterThan(0);

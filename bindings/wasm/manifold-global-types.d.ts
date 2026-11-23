@@ -189,11 +189,11 @@ export interface ExecutionContext {
    */
   progress(): number;
 
-  // ctx-aware static factories: like Manifold.ofMesh / levelSet, but
+  // ctx-aware static factories: like new Manifold / levelSet, but
   // run under this context so progress / cancellation are observed (these ops
   // have no source Manifold to attach via Manifold.withContext).
 
-  /** Like {@link Manifold.ofMesh}, observed/cancellable via this context. */
+  /** Like `new Manifold`, observed/cancellable via this context. */
   fromMesh(mesh: Mesh|Mesh64): Manifold;
   /** Like {@link Manifold.levelSet}, observed/cancellable via this context. */
   levelSet(

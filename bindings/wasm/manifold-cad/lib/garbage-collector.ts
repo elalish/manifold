@@ -31,7 +31,7 @@ const memoryRegistry = new Set<ManagedGeometry>();
 // manifold static methods (that return a new manifold)
 const manifoldStaticFunctions = [
   'cube', 'cylinder', 'sphere', 'tetrahedron', 'extrude', 'revolve', 'union',
-  'difference', 'intersection', 'levelSet', 'ofMesh', 'hull'
+  'difference', 'intersection', 'levelSet', 'hull'
 ];
 // manifold member functions (that return a new manifold)
 const manifoldMemberFunctions = [
@@ -69,8 +69,8 @@ const manifoldMemberFunctions = [
 
 // CrossSection static methods (that return a new cross-section)
 const crossSectionStaticFunctions = [
-  'square', 'circle', 'union', 'difference', 'intersection', 'ofPolygons',
-  'evenOdd', 'nonZero', 'hull'
+  'square', 'circle', 'union', 'difference', 'intersection', 'evenOdd',
+  'nonZero', 'hull'
 ];
 // CrossSection member functions (that return new geometry)
 const crossSectionMemberFunctions = [
