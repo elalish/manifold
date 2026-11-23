@@ -146,8 +146,8 @@ export class CrossSection {
    *
    * @param quality Number of segments in a full circle, see
    * {@link CircularQuality}. A partial revolve uses the matching fraction of
-   * it, rounded up. For an exact number of divisions, use
-   * {@link forDivisions}.
+   * it, rounded up, ignoring an excess of up to 1e-12 relative. For an exact
+   * number of divisions, use {@link forDivisions}.
    * @param revolveDegrees Number of degrees to revolve. Must be finite and
    * nonzero. A negative value revolves the other way. Default is 360 degrees.
    * @group Transformations
@@ -567,8 +567,8 @@ export class Manifold {
    * @param polygons A set of non-overlapping polygons to revolve.
    * @param quality Number of segments in a full circle, see
    * {@link CircularQuality}. A partial revolve uses the matching fraction of
-   * it, rounded up. For an exact number of divisions, use
-   * {@link forDivisions}.
+   * it, rounded up, ignoring an excess of up to 1e-12 relative. For an exact
+   * number of divisions, use {@link forDivisions}.
    * @param revolveDegrees Number of degrees to revolve. Must be finite and
    * nonzero. A negative value revolves the other way. Default is 360 degrees.
    * @group Polygons

@@ -1329,6 +1329,16 @@ TEST(Manifold, RevolveDivisionsForAngle) {
   EXPECT_EQ(numDivisions({30}, 100), 9);
   EXPECT_EQ(numDivisions({30}, 360), 30);
   EXPECT_EQ(numDivisions({30}, 1), 1);
+  // The product underflows to zero for a subnormal angle.
+  EXPECT_EQ(numDivisions({3}, 5e-324), 1);
+  // Both sides of the boundaries where three segments need another division.
+  EXPECT_EQ(numDivisions({3}, 120), 1);
+  EXPECT_EQ(numDivisions({3}, 120.001), 2);
+  EXPECT_EQ(numDivisions({3}, 240), 2);
+  EXPECT_EQ(numDivisions({3}, 240.001), 3);
+  // An excess within 1e-12 relative is treated as floating-point error.
+  EXPECT_EQ(numDivisions({30}, 120 * (1 + 1e-13)), 10);
+  EXPECT_EQ(numDivisions({30}, 120 * (1 + 1e-11)), 11);
   EXPECT_EQ(Manifold::Revolve(ring, 30, 90).NumVert(),
             Manifold::Revolve(ring, CircularQuality{30}, 90).NumVert());
 

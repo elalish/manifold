@@ -25,10 +25,12 @@
 namespace manifold {
 namespace {
 // Divisions a revolve of degrees, already in (0, 360], makes from a positive
-// full-circle segment count, rounded up. The relative 1e-12 keeps
-// floating-point error from rounding a whole count up to the next one.
+// full-circle segment count, rounded up, and at least one for an angle so small
+// the product underflows. The relative 1e-12 keeps floating-point error from
+// rounding a whole count up to the next one.
 int RevolveDivisions(int segments, double degrees) {
-  return static_cast<int>(std::ceil(segments * degrees / 360 * (1 - 1e-12)));
+  return std::max(
+      1, static_cast<int>(std::ceil(segments * degrees / 360 * (1 - 1e-12))));
 }
 
 std::shared_ptr<Manifold::Impl> ExtrudeImpl(const Polygons& crossSection,
@@ -290,8 +292,8 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
  * @param crossSection A set of non-overlapping polygons to revolve.
  * @param quality Number of segments in a full circle, see CircularQuality. An
  * int sets CircularQuality::segments. A partial revolve uses the matching
- * fraction of it, rounded up. For an exact number of divisions, use
- * CircularQuality::ForDivisions().
+ * fraction of it, rounded up, ignoring an excess of up to 1e-12 relative. For
+ * an exact number of divisions, use CircularQuality::ForDivisions().
  * @param revolveDegrees Number of degrees to revolve. Must be finite and
  * nonzero. A negative value revolves the other way. Default is 360 degrees.
  */
