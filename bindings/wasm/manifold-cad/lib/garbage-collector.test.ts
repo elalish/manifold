@@ -51,6 +51,34 @@ afterEach(() => {
   handles.length = 0;
 });
 
+test('only lists callable WASM methods for automatic cleanup', async () => {
+  const native = await Module();
+  native.setup();
+  const verify = (target: object, label: string) => new Proxy(target, {
+    get(target, key, receiver) {
+      const value = Reflect.get(target, key, receiver);
+      expect.soft(value, `${label}.${String(key)}`).toBeTypeOf('function');
+      return value;
+    }
+  });
+  const checked =
+      Object.fromEntries((['Manifold', 'CrossSection'] as const).map(name => {
+        const constructor = native[name];
+        const statics = verify(constructor, name);
+        const members = verify(constructor.prototype, `${name}.prototype`);
+        // Keep the real owner in the prototype chain so interception still
+        // installs each wrapper on the method's defining object.
+        return [
+          name, new Proxy(Object.create(constructor), {
+            get(_target, key) {
+              return key === 'prototype' ? members : Reflect.get(statics, key);
+            }
+          })
+        ];
+      }));
+  garbageCollectManifold({...native, ...checked});
+});
+
 test(
     'collects chained Manifold member results and preserves their receiver',
     () => {
