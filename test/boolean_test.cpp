@@ -1247,6 +1247,36 @@ TEST(Boolean, SimpleCubeRegression) {
   if (options.exportModels) WriteTestOBJ("simple_cube_regression.obj", result);
 }
 
+#if defined(MANIFOLD_DEBUG) && defined(MANIFOLD_ASSERT)
+// In a parallel BatchBoolean, the small pair below throws from the
+// triangulation check while the pair of spheres is still being computed. The
+// spheres' Boolean must finish normally and the exception must reach the
+// caller. The two pairs race, so this repeats.
+TEST(Boolean, BatchBooleanThrowingPair) {
+  const Manifold cube = Manifold::Cube(vec3(1), true);
+  const MeshGL cubeMesh = cube.GetMeshGL();
+  MeshGL overlapping;
+  overlapping.numProp = 3;
+  for (const vec3 offset : {vec3(0.0), vec3(0.5)}) {
+    const uint32_t firstVert = overlapping.NumVert();
+    for (size_t i = 0; i < cubeMesh.vertProperties.size(); ++i)
+      overlapping.vertProperties.push_back(cubeMesh.vertProperties[i] +
+                                           offset[i % 3]);
+    for (const uint32_t v : cubeMesh.triVerts)
+      overlapping.triVerts.push_back(v + firstVert);
+  }
+  const Manifold small = cube.Scale(vec3(0.5)).Translate({0.6, 0, 0});
+  const Manifold sphere = Manifold::Sphere(1, 256);
+  for (int i = 0; i < 5; ++i) {
+    EXPECT_THROW(Manifold::BatchBoolean({Manifold(overlapping), small, sphere,
+                                         sphere.Translate({0.3, 0.1, 0.05})},
+                                        OpType::Add)
+                     .Status(),
+                 geometryErr);
+  }
+}
+#endif
+
 // Regression: Compose() in csg_tree.cpp used to read the global atomic
 // Manifold::Impl::meshIDCounter_ twice — once when shifting `triRef.meshID`
 // values and once when shifting `meshIDtransform` keys. If another thread
