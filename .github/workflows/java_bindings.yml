@@ -111,7 +111,8 @@ jobs:
       uses: actions/setup-java@v6
       with:
         java-version: 25
-        jdkFile: ./zulu25.32.21-ca-jdk25.0.2-linux_aarch64.tar.gz
+        distribution: jdkfile
+        jdk-file: ./zulu25.32.21-ca-jdk25.0.2-linux_aarch64.tar.gz
     - name: Build With parallelization
       run: |
          bash bindings/java/scripts/linux/buildC-arm.sh
@@ -160,7 +161,8 @@ jobs:
       uses: actions/setup-java@v6
       with:
         java-version: 25
-        jdkFile: ./zulu25.32.21-ca-jdk25.0.2-linux_x64.tar.gz
+        distribution: jdkfile
+        jdk-file: ./zulu25.32.21-ca-jdk25.0.2-linux_x64.tar.gz
     - name: Build With parallelization
       run: |
         bash bindings/java/scripts/linux/buildC.sh
@@ -208,7 +210,8 @@ jobs:
       uses: actions/setup-java@v6
       with:
         java-version: 25
-        jdkFile: ./zulu25.32.21-ca-jdk25.0.2-win_x64.zip
+        distribution: jdkfile
+        jdk-file: ./zulu25.32.21-ca-jdk25.0.2-win_x64.zip
     - name: Build for Java
       shell: bash
       run: |
@@ -264,8 +267,8 @@ jobs:
         uses: actions/setup-java@v6
         with:
           java-version: 25
-          jdkFile: ./zulu25.32.21-ca-jdk25.0.2-linux_x64.tar.gz
-          maven-version: '3.8.7'
+          distribution: jdkfile
+          jdk-file: ./zulu25.32.21-ca-jdk25.0.2-linux_x64.tar.gz
 
       - name: Install Maven 3.8.7
         run: |
