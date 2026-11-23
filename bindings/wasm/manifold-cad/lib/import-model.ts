@@ -97,15 +97,13 @@ register(gltfIO);
 register(import3MF);
 
 const id2mesh = new Map<number, GLTFTransform.Mesh>();
-const mesh2node = new Map<GLTFTransform.Mesh, Array<GLTFTransform.Node>>();
-const mesh2mesh = new Map<Mesh, GLTFTransform.Mesh>();
-const node2doc = new Map<GLTFTransform.Node, GLTFTransform.Document>();
+const mesh2doc = new Map<GLTFTransform.Mesh, GLTFTransform.Document>();
+const mesh2sourceNode = new Map<Mesh, GLTFTransform.Node>();
 
 export const cleanup = () => {
   id2mesh.clear();
-  mesh2node.clear();
-  mesh2mesh.clear();
-  node2doc.clear();
+  mesh2doc.clear();
+  mesh2sourceNode.clear();
 };
 
 /**
@@ -114,9 +112,7 @@ export const cleanup = () => {
 export const getDocumentByID = (runID: number): GLTFTransform.Document|null => {
   const mesh = id2mesh.get(runID);
   if (!mesh) return null;
-  const [node] = mesh2node.get(mesh) ?? [];
-  if (!node) return null;
-  return node2doc.get(node) ?? null;
+  return mesh2doc.get(mesh) ?? null;
 };
 
 function getFormat(identifier: string): ImportFormat {
@@ -444,12 +440,9 @@ function gltfNodeToMeshes(
         const gltfmesh = descendant.getMesh();
         if (!gltfmesh) return null;
 
-        node2doc.set(descendant, document);
-        const nodes = mesh2node.get(gltfmesh) ?? [];
-        nodes.push(descendant);
-        mesh2node.set(gltfmesh, nodes);
-
+        mesh2doc.set(gltfmesh, document);
         const mesh = gltfMeshToMesh(gltfmesh);
+        mesh2sourceNode.set(mesh, descendant);
         return mesh;
       })
       .filter(mesh => !!mesh);
@@ -484,8 +477,6 @@ const tryToMakeManifold = (mesh: Mesh): Manifold|null => {
  */
 function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
   const {Manifold} = getManifoldModuleSync()!;
-  const mesh2nextNode = new Map<GLTFTransform.Mesh, number>();
-
   const manifolds = [];
   for (const mesh of meshes) {
     let manifold = tryToMakeManifold(mesh);
@@ -506,11 +497,7 @@ function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
     // We have a manifold object, but it is in the local coordinate system of
     // the original glTF-transform node.  Find that node, and transform it back
     // if possible.
-    const sourceMesh = mesh2mesh.get(mesh);
-    const sourceNodes = sourceMesh ? mesh2node.get(sourceMesh) : null;
-    const nextNode = sourceMesh ? (mesh2nextNode.get(sourceMesh) ?? 0) : 0;
-    const sourceNode = sourceNodes?.[nextNode] ?? null;
-    if (sourceMesh && sourceNode) mesh2nextNode.set(sourceMesh, nextNode + 1);
+    const sourceNode = mesh2sourceNode.get(mesh);
     if (sourceNode) {
       manifolds.push(manifold.transform(sourceNode.getWorldMatrix()));
     } else {
@@ -575,6 +562,5 @@ function gltfMeshToMesh(gltfmesh: GLTFTransform.Mesh): Mesh {
   }
 
   const manifoldMesh = new Mesh(mesh);
-  mesh2mesh.set(manifoldMesh, gltfmesh);
   return manifoldMesh;
 }
