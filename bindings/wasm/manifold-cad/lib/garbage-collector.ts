@@ -125,8 +125,8 @@ const interceptMethods = (target: any, methodNames: Array<string>) => {
 };
 
 /**
- * Set up garbage collection for a white listed set of methods belonging
- * to the Manifold WASM module.
+ * Set up garbage collection for the constructors and a white listed set of
+ * methods belonging to the Manifold WASM module.
  */
 export const garbageCollectManifold =
     (target: ManifoldToplevel): ManifoldToplevel => {
@@ -135,6 +135,21 @@ export const garbageCollectManifold =
       interceptMethods(target.CrossSection, crossSectionStaticFunctions);
       interceptMethods(
           target.CrossSection.prototype, crossSectionMemberFunctions);
+
+      // A Proxy keeps statics, prototype and instanceof of the original class,
+      // and registers each object it builds, with or without `new`.
+      const track = (result: ManagedGeometry) => {
+        memoryRegistry.add(result);
+        return result;
+      };
+      const handler = {
+        construct: (cls: any, args: any[], newTarget: Function) =>
+            track(Reflect.construct(cls, args, newTarget)),
+        apply: (cls: any, self: any, args: any[]) =>
+            track(Reflect.apply(cls, self, args)),
+      };
+      target.Manifold = new Proxy(target.Manifold, handler);
+      target.CrossSection = new Proxy(target.CrossSection, handler);
 
       return target;
     };
