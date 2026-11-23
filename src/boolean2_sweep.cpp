@@ -126,32 +126,76 @@ bool IsInside(WindRule rule, int64_t w) {
   return false;
 }
 
-// Lex-normalized directed-edge key with signed multiplicity: the PolySet2 of
-// Smith 7.1.2 / 6.5 (reversal negates m, exact-coincident edges sum, zero-mult
-// and zero-length annihilate). Keyed by (lo, hi) in lexicographic point order.
+using EdgeKey = std::pair<vec2, vec2>;
+
 struct PairLexLess {
-  bool operator()(const std::pair<vec2, vec2>& a,
-                  const std::pair<vec2, vec2>& b) const {
+  bool operator()(const EdgeKey& a, const EdgeKey& b) const {
     if (kLexLess(a.first, b.first)) return true;
     if (kLexLess(b.first, a.first)) return false;
     return kLexLess(a.second, b.second);
   }
 };
-using PolySet2 = std::map<std::pair<vec2, vec2>, int64_t, PairLexLess>;
 
-// Add the directed edge a->b with multiplicity m: normalize the key to lex
-// order (negating m on reversal) and erase zero-length or zero-sum entries.
-void PolySetAdd(PolySet2& ps, vec2 a, vec2 b, int64_t m) {
-  if (a == b || m == 0) return;  // zero-length / zero-mult discarded (6.5)
-  if (kLexLess(b, a)) {
-    std::swap(a, b);
-    m = -m;
+// The PolySet2 of Smith 7.1.2 / 6.5: directed edges with signed multiplicity,
+// each keyed by its endpoints in lexicographic order (lo, hi). Reversing an
+// edge negates m, exactly coincident edges sum, and edges with zero length or
+// zero multiplicity drop out. The vector holds one entry per key, in key order.
+using PolySet2 = std::vector<std::pair<EdgeKey, int64_t>>;
+
+// A function object rather than a function: in Wasm builds, the compiler
+// doesn't inline a function pointer through manifold::stable_sort, which makes
+// CrossSection booleans about 10% slower. Native builds don't show this.
+struct EntryLess {
+  bool operator()(const PolySet2::value_type& a,
+                  const PolySet2::value_type& b) const {
+    return PairLexLess()(a.first, b.first);
   }
-  auto [it, inserted] = ps.try_emplace({a, b}, m);
-  if (!inserted && (it->second += m) == 0) {
-    ps.erase(it);
+};
+constexpr EntryLess kEntryLess{};
+
+// Collects edges for a PolySet2. No stage reads a set until it is complete, so
+// Add appends each edge, and Sorted combines duplicate keys once at the end.
+class EdgeSum {
+ public:
+  void reserve(size_t n) { adds_.reserve(n); }
+
+  // Add the directed edge a->b with multiplicity m: normalize the key to lex
+  // order (negating m on reversal) and drop zero-length or zero-mult edges.
+  void Add(vec2 a, vec2 b, int64_t m) {
+    if (a == b || m == 0) return;  // drop zero-length / zero-mult edges (6.5)
+    if (kLexLess(b, a)) {
+      std::swap(a, b);
+      m = -m;
+    }
+    adds_.push_back({{a, b}, m});
   }
-}
+
+  // Sort the edges, sum each key's multiplicities in insertion order, and drop
+  // keys whose sum is zero. Each entry takes its coordinates from the first
+  // edge added after the key's sum was last zero, as a map that erases an
+  // entry when its sum reaches zero would. Equal keys can differ only in the
+  // sign of a zero.
+  PolySet2 Sorted() {
+    manifold::stable_sort(adds_.begin(), adds_.end(), kEntryLess);
+    PolySet2 ps;
+    ps.reserve(adds_.size());
+    for (size_t s = 0; s < adds_.size();) {
+      const EdgeKey* key = nullptr;
+      int64_t m = 0;
+      size_t e = s;
+      for (; e < adds_.size() && !kEntryLess(adds_[s], adds_[e]); ++e) {
+        if (m == 0) key = &adds_[e].first;
+        m += adds_[e].second;
+      }
+      if (m != 0) ps.push_back({*key, m});
+      s = e;
+    }
+    return ps;
+  }
+
+ private:
+  PolySet2 adds_;
+};
 
 // 7.6.1 footnote 9: resolve each x-group of coincident/overlapping vertical
 // edges into signed-coverage segments between consecutive breakpoints, summing
@@ -161,15 +205,18 @@ void PolySetAdd(PolySet2& ps, vec2 a, vec2 b, int64_t m) {
 void MergeVerticals1D(PolySet2& ps) {
   std::map<double, std::vector<std::pair<std::pair<double, double>, int64_t>>>
       groups;
-  std::vector<std::pair<vec2, vec2>> toErase;
+  auto kept = ps.begin();
   for (const auto& kv : ps) {
     if (kv.first.first.x == kv.first.second.x) {
       groups[kv.first.first.x].push_back(
           {{kv.first.first.y, kv.first.second.y}, kv.second});
-      toErase.push_back(kv.first);
+    } else {
+      *kept++ = kv;
     }
   }
-  for (const auto& k : toErase) ps.erase(k);
+  if (groups.empty()) return;
+  ps.erase(kept, ps.end());
+  const size_t numKept = ps.size();
   for (const auto& g : groups) {
     std::map<double, int64_t> delta;  // coverage change at y
     for (const auto& seg : g.second) {
@@ -183,12 +230,15 @@ void MergeVerticals1D(PolySet2& ps) {
     bool have = false;
     for (const auto& d : delta) {
       if (have && cover != 0)
-        PolySetAdd(ps, {g.first, prevY}, {g.first, d.first}, cover);
+        ps.push_back({{{g.first, prevY}, {g.first, d.first}}, cover});
       cover += d.second;
       prevY = d.first;
       have = true;
     }
   }
+  // The loop above emits the new segments in (x, y) order, and none of them
+  // equals another key, so merging the two sorted ranges sorts the vector.
+  std::inplace_merge(ps.begin(), ps.begin() + numKept, ps.end(), kEntryLess);
 }
 
 // A live sweep edge. Roles (7.6.1): l = processed end, r = pending end. `m` is
@@ -234,12 +284,7 @@ class SweepPass {
     }
   }
 
-  // `mergeVerticalOutput` runs the footnote-9 vertical resolve on the result:
-  // coincident and overlapping vertical edges are summed into signed-coverage
-  // segments (input breakpoints preserved). The arrangement pass needs it to
-  // order coincident verticals the sweep status cannot; the measure pass emits
-  // the already-resolved boundary and skips it.
-  void Run(bool mergeVerticalOutput = true) {
+  void Run() {
     while (!events_.empty()) {
       // Erase the event before processing it. Processing can requeue a
       // remainder at p, which needs a new event; if this entry were still
@@ -252,7 +297,6 @@ class SweepPass {
     }
     DEBUG_ASSERT(status_.empty(), logicErr,
                  "Boolean2 sweep left live edges after draining");
-    if (mergeVerticalOutput) MergeVerticals1D(out_);
   }
 
   void RunStatic(const PolySet2& arr) {
@@ -273,7 +317,9 @@ class SweepPass {
     for (const vec2& p : events) ProcessEvent(p);
   }
 
-  PolySet2& Out() { return out_; }
+  void ReserveOut(size_t n) { out_.reserve(n); }
+
+  PolySet2 SortedOut() { return out_.Sorted(); }
 
  private:
   struct PendingEdge {
@@ -347,15 +393,15 @@ class SweepPass {
                     int64_t above) {
     if (from == to) return;
     if (mode_ == SweepMode::Arrangement) {
-      PolySetAdd(out_, from, to, m);
+      out_.Add(from, to, m);
       return;
     }
     const bool insB = IsInside(rule_, below);
     const bool insA = IsInside(rule_, above);
     if (insB == insA) return;
     // above inside -> lex-forward; below inside -> lex-backward.
-    PolySetAdd(
-        out_, from, to,
+    out_.Add(
+        from, to,
         insA ? (kLexLess(from, to) ? 1 : -1) : (kLexLess(from, to) ? -1 : 1));
   }
 
@@ -599,7 +645,7 @@ class SweepPass {
   std::vector<SweepEdge> status_;
   std::vector<StatusBlock> blocks_;
   std::vector<SweepEdge> reinsert_;
-  PolySet2 out_;
+  EdgeSum out_;
   const PolySet2* static_ = nullptr;
   PolySet2::const_iterator staticNext_;
   uint64_t seqCounter_ = 0;
@@ -608,24 +654,27 @@ class SweepPass {
   bool dirtySizeChanged_ = false;
 };
 
-// Arrangement pass: the collect sweep discovers crossings (testPair), resolves
-// near-concurrences with the block rule, merges coincident verticals, and emits
-// every finalized piece. The result is a true arrangement - every crossing is a
-// shared vertex, no two pieces cross.
-// The arrangement pass over the seeded PolySet2.
-PolySet2 CollectArrangement(PolySet2 arr, WindRule rule) {
+// Arrangement pass: the collect sweep discovers crossings (TestPair), resolves
+// near-concurrences with the block rule, and emits every finalized piece.
+// MergeVerticals1D then merges coincident vertical edges, which the sweep
+// status can't order. The result is a true arrangement: every crossing is a
+// shared vertex, and no two pieces cross.
+PolySet2 CollectArrangement(const PolySet2& arr, WindRule rule) {
   SweepPass collect(rule, SweepMode::Arrangement);
+  collect.ReserveOut(arr.size());
   collect.SeedFromPolySet(arr);
   collect.Run();
-  return std::move(collect.Out());
+  PolySet2 out = collect.SortedOut();
+  MergeVerticals1D(out);
+  return out;
 }
 
 // Arrangement then winding over the resulting true arrangement.
-PolySet2 CollectThenMeasure(PolySet2 arr, WindRule rule) {
-  PolySet2 clean = CollectArrangement(std::move(arr), rule);
+PolySet2 CollectThenMeasure(const PolySet2& arr, WindRule rule) {
+  const PolySet2 clean = CollectArrangement(arr, rule);
   SweepPass measure(rule, SweepMode::Winding);
   measure.RunStatic(clean);
-  return std::move(measure.Out());
+  return measure.SortedOut();
 }
 
 struct PointHash {
@@ -658,13 +707,18 @@ std::vector<OutEdge> SweepWinding(const std::vector<EdgeM>& edges,
   // near-concurrences to a single shared vertex; eps-scale vertex-on-edge
   // incidences are pre-split by the caller.
   PolySet2 arr;
-  for (const auto& e : edges) {
-    if (e.v0 == e.v1) continue;
-    PolySetAdd(arr, verts[e.v0], verts[e.v1], e.mult);
+  {
+    EdgeSum sum;
+    sum.reserve(edges.size());
+    for (const auto& e : edges) {
+      if (e.v0 == e.v1) continue;
+      sum.Add(verts[e.v0], verts[e.v1], e.mult);
+    }
+    arr = sum.Sorted();
   }
   MergeVerticals1D(arr);
 
-  const PolySet2 out = CollectThenMeasure(std::move(arr), rule);
+  const PolySet2 out = CollectThenMeasure(arr, rule);
 
   // Materialize the retained boundary as directed OutEdges. A key stores the
   // lex-min/lex-max endpoints with signed multiplicity: positive runs lo->hi.
