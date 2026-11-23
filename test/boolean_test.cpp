@@ -1265,14 +1265,15 @@ TEST(Boolean, BatchBooleanThrowingPair) {
     for (const uint32_t v : cubeMesh.triVerts)
       overlapping.triVerts.push_back(v + firstVert);
   }
-  const Manifold small = cube.Scale(vec3(0.5)).Translate({0.6, 0, 0});
+  const Manifold halfCube = cube.Scale(vec3(0.5)).Translate({0.6, 0, 0});
   const Manifold sphere = Manifold::Sphere(1, 256);
   for (int i = 0; i < 5; ++i) {
-    EXPECT_THROW(Manifold::BatchBoolean({Manifold(overlapping), small, sphere,
-                                         sphere.Translate({0.3, 0.1, 0.05})},
-                                        OpType::Add)
-                     .Status(),
-                 geometryErr);
+    EXPECT_THROW(
+        Manifold::BatchBoolean({Manifold(overlapping), halfCube, sphere,
+                                sphere.Translate({0.3, 0.1, 0.05})},
+                               OpType::Add)
+            .Status(),
+        geometryErr);
   }
 }
 #endif
