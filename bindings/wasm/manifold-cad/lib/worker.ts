@@ -227,7 +227,6 @@ export async function evaluate(
   const globals = {
     // These accessors are only available to top level scripts.
     // See ../lib/manifoldCADGlobals.d.ts
-    setRelativePrecision: levelOfDetail.setRelativePrecision,
     setAnimationDuration: animation.setAnimationDuration,
     setAnimationFPS: animation.setAnimationFPS,
     setAnimationMode: animation.setAnimationMode,

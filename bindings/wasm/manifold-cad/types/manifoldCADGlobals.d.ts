@@ -21,7 +21,3 @@
  * @group Global State
  */
 export {AnimationMode, setAnimationDuration, setAnimationFPS, setAnimationMode} from '../lib/animation.ts';
-/**
- * @group Global State
- */
-export {getRelativePrecision, setRelativePrecision} from '../lib/level-of-detail.ts';
