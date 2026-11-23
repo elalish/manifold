@@ -37,7 +37,7 @@ Module.setup = function() {
     return {...Module._DefaultCircularQuality(), ...quality};
   }
 
-  Module.segmentsFor = function(quality, radius) {
+  Module.segmentsFor = function(radius, quality) {
     return Module._SegmentsFor(toQuality(quality), radius);
   };
 

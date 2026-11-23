@@ -434,7 +434,7 @@ double manifold_get_relative_precision(void);
 // Circular Quality
 // quality may be NULL for the default CircularQuality.
 int manifold_circular_quality_segments_for(
-    const ManifoldCircularQuality* quality, double radius);
+    double radius, const ManifoldCircularQuality* quality);
 ManifoldCircularQuality manifold_circular_quality_for_divisions(int divisions,
                                                                 double degrees);
 

@@ -30,7 +30,7 @@ export function spurGear(teeth: number, height: number, {
   depthRatio = 0.75,
   clearance = 0,
   quality = {} as CircularQuality,
-  n = segmentsFor(quality, circularPitch / 6),
+  n = segmentsFor(circularPitch / 6, quality),
   twist = 0
 } = {}) {
   const nDiv = n * twist * height / circularPitch;
@@ -56,7 +56,7 @@ export function gear2D(teeth: number, {
   depthRatio = 0.75,
   clearance = 0,
   quality = {} as CircularQuality,
-  n = segmentsFor(quality, circularPitch / 6),
+  n = segmentsFor(circularPitch / 6, quality),
 } = {}) {
   const pressureRad = pressureDeg * PI / 180;
   const pitchRadius = teeth * circularPitch / (2 * PI);

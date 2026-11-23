@@ -897,7 +897,7 @@ double manifold_get_relative_precision() {
 }
 
 int manifold_circular_quality_segments_for(
-    const ManifoldCircularQuality* quality, double radius) {
+    double radius, const ManifoldCircularQuality* quality) {
   return from_c(quality).SegmentsFor(radius);
 }
 

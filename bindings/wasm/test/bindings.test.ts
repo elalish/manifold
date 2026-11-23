@@ -82,8 +82,9 @@ suite('Circular quality', () => {
     expect(CrossSection.circle(5, {minAngle: 30}).numVert()).toEqual(12);
     expect(CrossSection.circle(5, {minAngle: undefined}).numVert()).toEqual(32);
     expect(Manifold.cylinder(1, 5, -1, {minAngle: 30}).numVert()).toEqual(24);
-    expect(segmentsFor({minAngle: 30}, 5)).toEqual(12);
-    expect(segmentsFor(7, 5)).toEqual(7);
+    expect(segmentsFor(5, {minAngle: 30})).toEqual(12);
+    expect(segmentsFor(5, 7)).toEqual(7);
+    expect(segmentsFor(5)).toEqual(32);
   });
 
   test('forDivisions gives exact revolve divisions', () => {

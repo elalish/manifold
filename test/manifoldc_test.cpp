@@ -25,8 +25,8 @@ const ManifoldCircularQuality kQuality100 = {100, 10.0, 1.0};
 
 TEST(CBIND, circular_quality) {
   const ManifoldCircularQuality q = {0, 22.5, 0.125};
-  EXPECT_EQ(manifold_circular_quality_segments_for(&q, 2.0), 16);
-  EXPECT_EQ(manifold_circular_quality_segments_for(NULL, 1.0), 8);
+  EXPECT_EQ(manifold_circular_quality_segments_for(2.0, &q), 16);
+  EXPECT_EQ(manifold_circular_quality_segments_for(1.0, NULL), 8);
   const ManifoldCircularQuality exact =
       manifold_circular_quality_for_divisions(21, 0.7);
   EXPECT_EQ(exact.segments, 10543);

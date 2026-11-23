@@ -21,8 +21,8 @@ import {cleanup, evaluate} from './worker.ts';
 test('Each circular constructor takes a quality', () => {
   // 360 / 30 = 12 segments for a radius of 5, instead of the default 32.
   const q = {minAngle: 30};
-  expect(segmentsFor(q, 5)).toBe(12);
-  expect(segmentsFor({}, 5)).toBe(32);
+  expect(segmentsFor(5, q)).toBe(12);
+  expect(segmentsFor(5)).toBe(32);
   expect(CrossSection.circle(5, q).numVert()).toBe(12);
   expect(Manifold.cylinder(1, 5, -1, q).numVert()).toBe(24);
   expect(Manifold.sphere(5, q).numTri()).toBe(Manifold.sphere(5, 12).numTri());

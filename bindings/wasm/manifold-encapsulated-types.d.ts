@@ -44,11 +44,12 @@ export function getRelativePrecision(): number;
  * Returns the number of segments a circle of this radius gets with this
  * quality.
  *
- * @param quality The circular quality.
  * @param radius For a given radius of circle, determine how many segments
  * there will be.
+ * @param quality The circular quality, see {@link CircularQuality}. Omit it
+ * for the defaults.
  */
-export function segmentsFor(quality: CircularQuality, radius: number): number;
+export function segmentsFor(radius: number, quality?: CircularQuality): number;
 
 /**
  * Returns a quality that makes {@link Manifold.revolve} divide the given angle
