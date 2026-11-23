@@ -452,9 +452,6 @@ public class ManifoldBindings {
 
 		// ===== Composition / decomposition =====
 
-		// ManifoldManifold* manifold_compose(const ManifoldManifoldVec* ms);
-		load("manifold_compose", ValueLayout.ADDRESS, ValueLayout.ADDRESS);
-
 		// ManifoldManifoldVec* manifold_decompose(const ManifoldManifold* m);
 		load("manifold_decompose", ValueLayout.ADDRESS, ValueLayout.ADDRESS);
 
@@ -1425,14 +1422,7 @@ public class ManifoldBindings {
 	// ===== Compose/Decompose =====
 
 	public MemorySegment compose(MemorySegment[] parts) throws Throwable {
-		MemorySegment vec = (MemorySegment) fn("manifold_manifold_empty_vec").invoke();
-		try {
-			for (MemorySegment part : parts)
-				fn("manifold_manifold_vec_push_back").invoke(vec, part);
-			return (MemorySegment) fn("manifold_compose").invoke(vec);
-		} finally {
-			safeDeleteManifoldVec(vec);
-		}
+		return batchUnion(parts);
 	}
 
 	/**
