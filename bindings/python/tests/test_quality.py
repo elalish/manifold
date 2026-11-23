@@ -24,13 +24,12 @@ def test_factories_take_int_or_quality():
     assert len(CrossSection.circle(5, quality=q).to_polygons()[0]) == n
     assert len(CrossSection.circle(5, n).to_polygons()[0]) == n
     assert len(CrossSection.circle(5, quality=n).to_polygons()[0]) == n
-    assert len(CrossSection.circle(5, circular_segments=n).to_polygons()[0]) == n
     assert Manifold.cylinder(2, 5, quality=q).num_vert() == 2 * n
     assert Manifold.cylinder(2, 5, -1, n, True).num_vert() == 2 * n
-    assert Manifold.cylinder(3, 0.3, circular_segments=48).num_vert() == 96
+    assert Manifold.cylinder(3, 0.3, quality=48).num_vert() == 96
     assert Manifold.sphere(5, q).num_tri() == Manifold.sphere(5, n).num_tri()
     ring = CrossSection.square((1, 1)).translate((4.5, 0))
-    assert ring.revolve(q).num_vert() == ring.revolve(circular_segments=n).num_vert()
+    assert ring.revolve(q).num_vert() == ring.revolve(quality=n).num_vert()
     assert (
         Manifold.revolve(ring, quality=q).num_vert()
         == Manifold.revolve(ring, n).num_vert()
@@ -38,10 +37,11 @@ def test_factories_take_int_or_quality():
     tiny = CrossSection.square((1e-3, 1e-3), True)
     assert (
         tiny.offset(5, JoinType.Round, 2, q).num_vert()
-        == tiny.offset(5, JoinType.Round, 2, circular_segments=n).num_vert()
+        == tiny.offset(5, JoinType.Round, 2, quality=n).num_vert()
     )
+    # The old keyword is gone.
     with pytest.raises(TypeError):
-        Manifold.sphere(5, q, circular_segments=n)
+        Manifold.sphere(5, circular_segments=n)
 
 
 def test_circular_setters_removed():

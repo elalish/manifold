@@ -209,14 +209,9 @@ using namespace manifold_docstrings;
 // ExecutionContext, so another Python thread can cancel them.
 using release_gil = nb::call_guard<nb::gil_scoped_release>;
 
-// The factories take `quality=` (an int or a CircularQuality) or the int
-// keyword `circular_segments=`.
+// The factories take `quality=` as an int or a CircularQuality.
 using QualityArg = std::optional<std::variant<CircularQuality, int>>;
-CircularQuality ToQuality(const QualityArg& quality,
-                          std::optional<int> circularSegments) {
-  if (quality && circularSegments)
-    throw nb::type_error("pass quality or circular_segments, not both");
-  if (circularSegments) return {*circularSegments};
+CircularQuality ToQuality(const QualityArg& quality) {
   if (!quality) return {};
   if (const int* segments = std::get_if<int>(&*quality)) return {*segments};
   return std::get<CircularQuality>(*quality);
@@ -466,14 +461,12 @@ NB_MODULE(manifold3d, m) {
       .def_static(
           "revolve",
           [](const CrossSection& crossSection, const QualityArg& quality,
-             double revolveDegrees, std::optional<int> circularSegments) {
+             double revolveDegrees) {
             return Manifold::Revolve(crossSection.ToPolygons(),
-                                     ToQuality(quality, circularSegments),
-                                     revolveDegrees);
+                                     ToQuality(quality), revolveDegrees);
           },
           nb::arg("crossSection"), nb::arg("quality") = nb::none(),
-          nb::arg("revolve_degrees") = 360.0, nb::kw_only(),
-          nb::arg("circular_segments") = nb::none(),
+          nb::arg("revolve_degrees") = 360.0,
           manifold__revolve__cross_section__quality__revolve_degrees)
       .def_static(
           "level_set",
@@ -498,26 +491,20 @@ NB_MODULE(manifold3d, m) {
       .def_static(
           "cylinder",
           [](double height, double radiusLow, double radiusHigh,
-             const QualityArg& quality, bool center,
-             std::optional<int> circularSegments) {
+             const QualityArg& quality, bool center) {
             return Manifold::Cylinder(height, radiusLow, radiusHigh,
-                                      ToQuality(quality, circularSegments),
-                                      center);
+                                      ToQuality(quality), center);
           },
           nb::arg("height"), nb::arg("radius_low"),
           nb::arg("radius_high") = -1.0f, nb::arg("quality") = nb::none(),
-          nb::arg("center") = false, nb::kw_only(),
-          nb::arg("circular_segments") = nb::none(),
+          nb::arg("center") = false,
           manifold__cylinder__height__radius_low__radius_high__quality__center)
       .def_static(
           "sphere",
-          [](double radius, const QualityArg& quality,
-             std::optional<int> circularSegments) {
-            return Manifold::Sphere(radius,
-                                    ToQuality(quality, circularSegments));
+          [](double radius, const QualityArg& quality) {
+            return Manifold::Sphere(radius, ToQuality(quality));
           },
-          nb::arg("radius"), nb::arg("quality") = nb::none(), nb::kw_only(),
-          nb::arg("circular_segments") = nb::none(),
+          nb::arg("radius"), nb::arg("quality") = nb::none(),
           manifold__sphere__radius__quality)
       .def_static("reserve_ids", Manifold::ReserveIDs, nb::arg("n"),
                   manifold__reserve_ids__n);
@@ -945,14 +932,12 @@ NB_MODULE(manifold3d, m) {
           "offset",
           [](const CrossSection& self, double delta,
              CrossSection::JoinType joinType, double miterLimit,
-             const QualityArg& quality, std::optional<int> circularSegments) {
-            return self.Offset(delta, joinType, miterLimit,
-                               ToQuality(quality, circularSegments));
+             const QualityArg& quality) {
+            return self.Offset(delta, joinType, miterLimit, ToQuality(quality));
           },
           nb::arg("delta"),
           nb::arg("join_type") = CrossSection::JoinType::Round,
           nb::arg("miter_limit") = 2.0, nb::arg("quality") = nb::none(),
-          nb::kw_only(), nb::arg("circular_segments") = nb::none(),
           cross_section__offset__delta__jointype__miter_limit__quality)
       .def(nb::self + nb::self, cross_section__operator_plus__q)
       .def(nb::self - nb::self, cross_section__operator_minus__q)
@@ -987,13 +972,11 @@ NB_MODULE(manifold3d, m) {
       .def(
           "revolve",
           [](const CrossSection& self, const QualityArg& quality,
-             double revolveDegrees, std::optional<int> circularSegments) {
-            return Manifold::Revolve(self.ToPolygons(),
-                                     ToQuality(quality, circularSegments),
+             double revolveDegrees) {
+            return Manifold::Revolve(self.ToPolygons(), ToQuality(quality),
                                      revolveDegrees);
           },
           nb::arg("quality") = nb::none(), nb::arg("revolve_degrees") = 360.0,
-          nb::kw_only(), nb::arg("circular_segments") = nb::none(),
           manifold__revolve__cross_section__quality__revolve_degrees)
 
       .def_static("square", &CrossSection::Square, nb::arg("size"),
@@ -1001,12 +984,9 @@ NB_MODULE(manifold3d, m) {
                   cross_section__square__size__center)
       .def_static(
           "circle",
-          [](double radius, const QualityArg& quality,
-             std::optional<int> circularSegments) {
-            return CrossSection::Circle(radius,
-                                        ToQuality(quality, circularSegments));
+          [](double radius, const QualityArg& quality) {
+            return CrossSection::Circle(radius, ToQuality(quality));
           },
-          nb::arg("radius"), nb::arg("quality") = nb::none(), nb::kw_only(),
-          nb::arg("circular_segments") = nb::none(),
+          nb::arg("radius"), nb::arg("quality") = nb::none(),
           cross_section__circle__radius__quality);
 }
