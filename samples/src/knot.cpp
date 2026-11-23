@@ -48,8 +48,8 @@ Manifold TorusKnot(int p, int q, double majorRadius, double minorRadius,
   int m =
       linearSegments > 2 ? linearSegments : n * q * majorRadius / threadRadius;
 
-  CrossSection circle = CrossSection::Circle(1., n).Translate({2, 0});
-  Manifold knot = Manifold::Revolve(circle.ToPolygons(), m);
+  CrossSection circle = CrossSection::Circle(1., {n}).Translate({2, 0});
+  Manifold knot = Manifold::Revolve(circle.ToPolygons(), {m});
 
   knot = knot.Warp([p, q, majorRadius, minorRadius, threadRadius](vec3& v) {
     double psi = q * atan2(v.x, v.y);

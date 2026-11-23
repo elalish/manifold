@@ -64,7 +64,7 @@ TEST(Measurement, RayCastBehindOrigin) {
 }
 
 TEST(Measurement, RayCastSphere) {
-  Manifold sphere = Manifold::Sphere(1.0, 128);
+  Manifold sphere = Manifold::Sphere(1.0, {128});
 
   auto hits = sphere.RayCast(vec3(0, 0, -5), vec3(0, 0, 5));
   ASSERT_EQ(hits.size(), 2);
@@ -229,8 +229,8 @@ TEST(Measurement, RayCastProvenance) {
   cubeGL.faceID.resize(cubeGL.NumTri());
   for (size_t i = 0; i < cubeGL.NumTri(); ++i) cubeGL.faceID[i] = 100 + i;
   const Manifold cube(cubeGL);
-  const Manifold sphere = Manifold::Sphere(0.6, 48).AsOriginal();
-  const Manifold cyl = Manifold::Cylinder(2, 0.2, 0.2, 32)
+  const Manifold sphere = Manifold::Sphere(0.6, {48}).AsOriginal();
+  const Manifold cyl = Manifold::Cylinder(2, 0.2, 0.2, {32})
                            .AsOriginal()
                            .Translate({0.3, 0.3, -1});
   const Manifold result = (sphere - cube.Translate({0.5, 0.5, 0.5})) + cyl;
@@ -299,7 +299,7 @@ TEST(Measurement, MinGapUnequalResolutionOperands) {
   const Manifold cube = Manifold::Cube();
   for (int segments : {16, 64}) {
     const Manifold sphere =
-        Manifold::Sphere(1, segments).Translate({4, 0.5, 0.5});
+        Manifold::Sphere(1, {segments}).Translate({4, 0.5, 0.5});
     ASSERT_LT(cube.NumTri(), sphere.NumTri());
     for (double limit : {0.0, -0.25, 1.0, 2.01, 3.0}) {
       const double expected = std::min(2.0, std::abs(limit));
@@ -353,7 +353,7 @@ TEST(Measurement, MinGapBoundingBoxClearance) {
   }
 
   // Intersecting bounding boxes do not imply intersecting solids.
-  const auto sphere = Manifold::Sphere(1, 32);
+  const auto sphere = Manifold::Sphere(1, {32});
   const auto diagonal = sphere.Translate({2, 2, 0});
   EXPECT_DOUBLE_EQ(sphere.MinGap(diagonal, 0.5), 0.5);
   EXPECT_NEAR(sphere.MinGap(diagonal, 1), 2 * std::sqrt(2) - 2, 1e-12);
@@ -434,9 +434,9 @@ TEST(Measurement, MinGapClosestPointOnTriangleFace) {
 }
 
 TEST(Measurement, MingapAfterTransformations) {
-  auto a = Manifold::Sphere(1, 512).Rotate(30, 30, 30);
+  auto a = Manifold::Sphere(1, {512}).Rotate(30, 30, 30);
   auto b =
-      Manifold::Sphere(1, 512).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
+      Manifold::Sphere(1, {512}).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
           {3, 0, 0});
 
   float distance = a.MinGap(b, 1.1);
@@ -454,9 +454,9 @@ TEST(Measurement, MingapStretchyBracelet) {
 }
 
 TEST(Measurement, MinGapAfterTransformationsOutOfBounds) {
-  auto a = Manifold::Sphere(1, 512).Rotate(30, 30, 30);
+  auto a = Manifold::Sphere(1, {512}).Rotate(30, 30, 30);
   auto b =
-      Manifold::Sphere(1, 512).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
+      Manifold::Sphere(1, {512}).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
           {3, 0, 0});
 
   float distance = a.MinGap(b, 0.95);
@@ -594,7 +594,7 @@ TEST(Measurement, WindingWatertight) {
 // Hollow shell (sphere - sphere): cavity center must return winding 0, wall
 // point 1, outside 0. Proves real winding number, not just ray parity.
 TEST(Measurement, WindingHollowShell) {
-  Manifold shell = Manifold::Sphere(2, 32) - Manifold::Sphere(1, 32);
+  Manifold shell = Manifold::Sphere(2, {32}) - Manifold::Sphere(1, {32});
   const auto w = shell.WindingNumber({{0, 0, 0}, {0, 0, 1.5}, {0, 0, 3}});
   EXPECT_EQ(w[0], 0);  // cavity
   EXPECT_EQ(w[1], 1);  // wall

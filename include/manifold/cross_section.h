@@ -80,7 +80,6 @@ class CrossSection {
   std::vector<CrossSection> Decompose() const;
   static CrossSection Square(const vec2 dims, bool center = false);
   static CrossSection Circle(double radius, CircularQuality quality = {});
-  static CrossSection Circle(double radius, int circularSegments);
   ///@}
 
   /** @name Information
@@ -108,8 +107,6 @@ class CrossSection {
   CrossSection Offset(double delta, JoinType jt = JoinType::Round,
                       double miter_limit = 2.0,
                       CircularQuality quality = {}) const;
-  CrossSection Offset(double delta, JoinType jt, double miter_limit,
-                      int circularSegments) const;
   ///@}
 
   /** @name Boolean

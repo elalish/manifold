@@ -158,7 +158,7 @@ Manifold Manifold::Cube(vec3 size, bool center) {
  * @param radiusHigh Radius of top circle. Must be finite and can equal zero.
  * Negative values, including the default, use radiusLow.
  * @param quality How many line segments to use around the circle, see
- * CircularQuality. An int sets CircularQuality::segments.
+ * CircularQuality.
  * @param center Set to true to shift the center to the origin. Default is
  * origin at the bottom.
  */
@@ -190,22 +190,15 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
       ExtrudeImpl({circle}, height, 0, 0.0, vec2(scale), zOffset, flip));
 }
 
-Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
-                            int circularSegments, bool center) {
-  return Cylinder(height, radiusLow, radiusHigh,
-                  CircularQuality{circularSegments}, center);
-}
-
 /**
  * Constructs a geodesic sphere of a given radius.
  *
  * @param radius Radius of the sphere. Must be positive and finite; otherwise
  * returns an empty Manifold with InvalidConstruction status.
- * @param quality Number of segments in a full circle, see CircularQuality. An
- * int sets CircularQuality::segments. This number will always be rounded up
- * to the nearest factor of four, as this sphere is constructed by refining an
- * octahedron. This means there are a circle of vertices on all three of the
- * axis planes.
+ * @param quality Number of segments in a full circle, see CircularQuality.
+ * This number will always be rounded up to the nearest factor of four, as this
+ * sphere is constructed by refining an octahedron. This means there are a
+ * circle of vertices on all three of the axis planes.
  */
 Manifold Manifold::Sphere(double radius, CircularQuality quality) {
   if (radius <= 0.0 || !std::isfinite(radius)) {
@@ -232,10 +225,6 @@ Manifold Manifold::Sphere(double radius, CircularQuality quality) {
   pImpl_->SetFaceAndVertNormals();
   pImpl_->InitializeOriginal();
   return Manifold(pImpl_);
-}
-
-Manifold Manifold::Sphere(double radius, int circularSegments) {
-  return Sphere(radius, CircularQuality{circularSegments});
 }
 
 /**
@@ -292,10 +281,10 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
  * output.
  *
  * @param crossSection A set of non-overlapping polygons to revolve.
- * @param quality Number of segments in a full circle, see CircularQuality. An
- * int sets CircularQuality::segments. A partial revolve uses the matching
- * fraction of it, rounded up, ignoring an excess of one unit in the last place.
- * For an exact number of divisions, use CircularQuality::ForDivisions().
+ * @param quality Number of segments in a full circle, see CircularQuality.
+ * A partial revolve uses the matching fraction of it, rounded up, ignoring an
+ * excess of one unit in the last place. For an exact number of divisions, use
+ * CircularQuality::ForDivisions().
  * @param revolveDegrees Number of degrees to revolve. Must be finite and
  * nonzero. A negative value revolves the other way. Default is 360 degrees.
  */
@@ -488,12 +477,6 @@ CircularQuality CircularQuality::ForDivisions(int divisions, double degrees) {
     ++segments;
   }
   return {segments};
-}
-
-Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
-                           double revolveDegrees) {
-  return Revolve(crossSection, CircularQuality{circularSegments},
-                 revolveDegrees);
 }
 
 /**

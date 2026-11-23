@@ -44,7 +44,7 @@ TEST(Smooth, Tetrahedron) {
 }
 
 TEST(Smooth, RefineQuads) {
-  Manifold source = Manifold::Cylinder(2, 1, -1, 12).CalculateNormals();
+  Manifold source = Manifold::Cylinder(2, 1, -1, {12}).CalculateNormals();
   const Box bbox = source.BoundingBox();
   const vec3 size = bbox.Size();
   Manifold cylinder =
@@ -85,7 +85,7 @@ TEST(Smooth, RefineQuads) {
 }
 
 TEST(Smooth, TruncatedCone) {
-  Manifold cone = Manifold::Cylinder(5, 10, 5, 12);
+  Manifold cone = Manifold::Cylinder(5, 10, 5, {12});
   Manifold smooth = cone.CalculateNormals()
                         .SmoothByNormals()
                         .RefineToLength(0.5)
@@ -99,7 +99,7 @@ TEST(Smooth, TruncatedCone) {
 
 TEST(Smooth, ToLength) {
   Manifold cone = Manifold::Extrude(
-      CrossSection::Circle(10, 10).Translate({10, 0}).ToPolygons(), 2, 0, 0,
+      CrossSection::Circle(10, {10}).Translate({10, 0}).ToPolygons(), 2, 0, 0,
       {0, 0});
   cone += cone.Scale({1, 1, -5});
   EXPECT_EQ(cone.NumVert(), 11);
@@ -125,7 +125,7 @@ TEST(Smooth, Sphere) {
   // Tests vertex precision of interpolation
   double precision[5] = {0.04, 0.015, 0.003, 0.0005, 0.00006};
   for (int i = 0; i < 5; ++i) {
-    Manifold sphere = Manifold::Sphere(1, n[i]);
+    Manifold sphere = Manifold::Sphere(1, {n[i]});
     // Refine(3*x) makes a center point, which is the worst case.
     Manifold smoothed =
         sphere.CalculateNormals(180).SmoothByNormals().Refine(6);
@@ -151,7 +151,7 @@ TEST(Smooth, Precision) {
   const double tolerance = 0.001;
   const double radius = 10;
   const double height = 10;
-  Manifold cylinder = Manifold::Cylinder(height, radius, radius, 8);
+  Manifold cylinder = Manifold::Cylinder(height, radius, radius, {8});
   Manifold smoothed =
       cylinder.CalculateNormals().SmoothByNormals().RefineToTolerance(
           tolerance);
@@ -233,7 +233,7 @@ TEST(Smooth, GetMeshGLNormalizesNormals) {
   // Interpolation and a non-uniform transform both leave recorded normals
   // non-unit before GetMeshGL converts them into graphics output.
   const Manifold ellipsoid =
-      Manifold::Sphere(1, 8).CalculateNormals().Scale({2, 3, 4});
+      Manifold::Sphere(1, {8}).CalculateNormals().Scale({2, 3, 4});
   const Manifold source = ellipsoid + ellipsoid.Translate({1, 0, 0});
   auto check = [](const auto& mesh, double tolerance) {
     ASSERT_GE(mesh.numProp, 6);
@@ -251,8 +251,8 @@ TEST(Smooth, GetMeshGLNormalizesNormals) {
 }
 
 TEST(Smooth, MissingNormalsCone) {
-  Manifold cone = Manifold::Cylinder(5, 10, 7, 6).CalculateNormals(60);
-  Manifold peak = Manifold::Cylinder(4, 7, 0, 6);
+  Manifold cone = Manifold::Cylinder(5, 10, 7, {6}).CalculateNormals(60);
+  Manifold peak = Manifold::Cylinder(4, 7, 0, {6});
   Manifold biCone = cone + peak.Translate({0, 0, 5});
   Manifold out = biCone.SmoothByNormals().RefineToTolerance(0.01);
   EXPECT_NEAR(out.Volume(), 1480, 1);
@@ -262,8 +262,8 @@ TEST(Smooth, MissingNormalsCone) {
 
 TEST(Smooth, OperandOrder) {
   auto mk = [](bool unique) {
-    Manifold a = Manifold::Sphere(10, 16).Scale({3, 1, 1});
-    Manifold b = Manifold::Sphere(6, 16);
+    Manifold a = Manifold::Sphere(10, {16}).Scale({3, 1, 1});
+    Manifold b = Manifold::Sphere(6, {16});
     if (unique) {
       a = a.AsOriginal();
       b = b.AsOriginal();
@@ -298,7 +298,7 @@ TEST(Smooth, Fillet) {
   float depth = 3;
   float radius = 10;
   float filletScale = 1 + depth / radius;
-  Manifold cylinder = Manifold::Cylinder(20, radius, radius, 6, true)
+  Manifold cylinder = Manifold::Cylinder(20, radius, radius, {6}, true)
                           .AsOriginal()
                           .CalculateNormals(80)
                           .Rotate(20);
@@ -308,7 +308,7 @@ TEST(Smooth, Fillet) {
                         vec2(filletScale, 1.1 * filletScale))
           .Mirror({0, 0, 1});
   EXPECT_EQ(chamfer.NumTri(), 20);
-  Manifold base = Manifold::Cylinder(10, 15, 15, 6)
+  Manifold base = Manifold::Cylinder(10, 15, 15, {6})
                       .Translate({0, 0, -10 - depth})
                       .Scale({1, 1.2, 1})
                       .CalculateNormals(80);
@@ -325,7 +325,7 @@ TEST(Smooth, Fillet2) {
   float depth = 3;
   float radius = 10;
   float filletScale = 1 + depth / radius;
-  Manifold cylinder = Manifold::Cylinder(40, radius, radius, 6, true)
+  Manifold cylinder = Manifold::Cylinder(40, radius, radius, {6}, true)
                           .AsOriginal()
                           .Rotate(0, 30)
                           .CalculateNormals(80);
@@ -349,7 +349,7 @@ TEST(Smooth, Fillet2) {
 
 TEST(Smooth, Manual) {
   // Unit Octahedron
-  const auto oct = Manifold::Sphere(1, 4);
+  const auto oct = Manifold::Sphere(1, {4});
   MeshGL smooth = oct.CalculateNormals(180).SmoothByNormals().GetMeshGL();
   // Sharpen the edge from vert 4 to 5
   smooth.halfedgeTangent[4 * 6 + 3] = 0;
@@ -377,7 +377,7 @@ TEST(Smooth, Manual) {
 
 TEST(Smooth, ExportTangentsFollowTriangleRuns) {
   const Manifold sphere =
-      Manifold::Sphere(1, 12).CalculateNormals(180).SmoothByNormals();
+      Manifold::Sphere(1, {12}).CalculateNormals(180).SmoothByNormals();
   const Manifold ellipsoid = sphere.Scale({1, 2, 3}).Translate({6, 0, 0});
   const Manifold tetrahedron =
       Manifold::Tetrahedron().CalculateNormals(180).SmoothByNormals().Translate(
@@ -469,7 +469,7 @@ vec4 CircularTangent(const vec3& tangent, const vec3& edgeVec) {
 TEST(Smooth, Torus) {
   MeshGL64 torusMesh =
       Manifold::Revolve(
-          CrossSection::Circle(1, 8).Translate({2, 0}).ToPolygons(), 6)
+          CrossSection::Circle(1, {8}).Translate({2, 0}).ToPolygons(), {6})
           .GetMeshGL64();
   const int numTri = torusMesh.NumTri();
 
@@ -605,7 +605,7 @@ TEST(Smooth, RefineTooLarge) {
             Manifold::Error::ResultTooLarge);
   EXPECT_EQ(cube.Refine(1 << 20).Status(), Manifold::Error::ResultTooLarge);
   const Manifold smooth =
-      Manifold::Cylinder(1, 1, 1, 8).CalculateNormals().SmoothByNormals();
+      Manifold::Cylinder(1, 1, 1, {8}).CalculateNormals().SmoothByNormals();
   ASSERT_GT(smooth.RefineToTolerance(0.01).NumTri(), smooth.NumTri());
   EXPECT_EQ(smooth.RefineToTolerance(1e-30).Status(),
             Manifold::Error::ResultTooLarge);
@@ -618,7 +618,7 @@ TEST(Smooth, RefinePropertiesTooLarge) {
 }
 
 TEST(Smooth, SphereTooLarge) {
-  EXPECT_EQ(Manifold::Sphere(1, 1 << 20).Status(),
+  EXPECT_EQ(Manifold::Sphere(1, {1 << 20}).Status(),
             Manifold::Error::ResultTooLarge);
 }
 

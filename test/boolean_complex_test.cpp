@@ -26,7 +26,8 @@ using namespace manifold;
  */
 
 TEST(BooleanComplex, Sphere) {
-  Manifold sphere = WithPositionColors(Manifold::Sphere(1.0, 12).AsOriginal());
+  Manifold sphere =
+      WithPositionColors(Manifold::Sphere(1.0, {12}).AsOriginal());
   MeshGL sphereGL = sphere.GetMeshGL();
 
   Manifold sphere2 = sphere.Translate(vec3(0.5));
@@ -63,7 +64,7 @@ TEST(BooleanComplex, MeshRelation) {
 }
 
 TEST(BooleanComplex, Cylinders) {
-  Manifold rod = Manifold::Cylinder(1.0, 0.4, -1.0, 12);
+  Manifold rod = Manifold::Cylinder(1.0, 0.4, -1.0, {12});
   double arrays1[][12] = {
       {0, 0, 1, 3,    //
        -1, 0, 0, 3,   //
@@ -213,7 +214,7 @@ TEST(BooleanComplex, Close) {
   ManifoldParams().processOverlaps = true;
 
   const double r = 10;
-  Manifold a = Manifold::Sphere(r, 256);
+  Manifold a = Manifold::Sphere(r, {256});
   Manifold result = a;
   for (int i = 0; i < 10; i++) {
     // std::cout << i << std::endl;
@@ -1645,7 +1646,7 @@ TEST(BooleanComplex, ChainUnion) {
   FloatPrecisionGuard precision;
   const Manifold a =
       Manifold::Cylinder(2.570012185093316, 2.6802331136119388,
-                         1.5474518193522202, 7, true)
+                         1.5474518193522202, {7}, true)
           .Rotate(236.24988144879671, 298.57111371984257, 49.932389749508381);
   const Manifold b =
       a.Rotate(2.0441345969329963e-05, -7.2050467977328956e-05, 0)
@@ -1665,7 +1666,7 @@ TEST(BooleanComplex, ChainDifferenceIntersect) {
   FloatPrecisionGuard precision;
   const Manifold a =
       Manifold::Cylinder(1.7955916755380565, 1.3315655749018656,
-                         2.2124353514877702, 7, true)
+                         2.2124353514877702, {7}, true)
           .Rotate(299.46151847241464, 190.98152211548648, 266.68012554328135);
   const Manifold b =
       a.Rotate(-0.00010151977398783082, -2.3631099741431339e-05, 0)
@@ -1702,7 +1703,7 @@ TEST(BooleanComplex, ChainBoxesDegenerate) {
 TEST(BooleanComplex, ChainConeCCW) {
   FloatPrecisionGuard precision;
   const Manifold a =
-      Manifold::Cylinder(1.7250583185247816, 2.4376133171205265, 0, 10)
+      Manifold::Cylinder(1.7250583185247816, 2.4376133171205265, 0, {10})
           .Rotate(187.43802141475177, 221.23653237080785, 312.45720470388096);
   const Manifold b =
       a.Rotate(5.2402789020943373e-05, 1.9956950666393676e-05, 0)

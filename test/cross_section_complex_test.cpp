@@ -1805,7 +1805,7 @@ TEST(CrossSectionComplex, OffsetRoundMergingContours) {
       delta * delta * (kPi - segments * std::sin(2 * kPi / segments) / 2);
   for (int i = 0; i < 16; ++i) {
     const auto result =
-        input.Offset(delta, CrossSection::JoinType::Round, 2.0, segments);
+        input.Offset(delta, CrossSection::JoinType::Round, 2.0, {segments});
     ASSERT_EQ(result.NumContour(), 1 + (side - 1) * (side - 1));
     ASSERT_EQ(result.NumVert(), 736);
     if (i == 0) {
@@ -1870,7 +1870,7 @@ TEST(CrossSectionComplex, DifferenceManyContoursFewCrossings) {
   for (int j = 0; j < 4; ++j) {
     for (int i = 0; i < 4; ++i) {
       holeCenters.push_back({5.3 + 10 * i, 5.3 + 10 * j});
-      operands.push_back(CrossSection::Circle(holeRadius, segments)
+      operands.push_back(CrossSection::Circle(holeRadius, {segments})
                              .Translate(holeCenters.back()));
     }
   }

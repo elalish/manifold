@@ -439,7 +439,7 @@ TEST(CrossSection, MirrorCheckAxis) {
 TEST(CrossSection, RoundOffset) {
   auto a = CrossSection::Square({20., 20.}, true);
   int segments = 20;
-  auto rounded = a.Offset(5., CrossSection::JoinType::Round, 2, segments);
+  auto rounded = a.Offset(5., CrossSection::JoinType::Round, 2, {segments});
   auto result = Manifold::Extrude(rounded.ToPolygons(), 5.);
 
   if (options.exportModels)
@@ -453,7 +453,7 @@ TEST(CrossSection, RoundOffset) {
 TEST(CrossSection, BevelOffset) {
   auto a = CrossSection::Square({20., 20.}, true);
   int segments = 20;
-  auto rounded = a.Offset(5., CrossSection::JoinType::Bevel, 2, segments);
+  auto rounded = a.Offset(5., CrossSection::JoinType::Bevel, 2, {segments});
   auto result = Manifold::Extrude(rounded.ToPolygons(), 5.);
 
   if (options.exportModels)
@@ -516,41 +516,41 @@ TEST(CrossSection, OffsetMultipleDisjointOuters) {
 
 // An inset past a near-circle's radius must remove it, not leave a phantom.
 TEST(CrossSection, OffsetCollapsedOuterVanishes) {
-  const CrossSection disc = CrossSection::Circle(1, 64);
+  const CrossSection disc = CrossSection::Circle(1, {64});
   for (double delta : {-1.0, -1.5, -3.0}) {
     for (auto jt :
          {CrossSection::JoinType::Round, CrossSection::JoinType::Miter,
           CrossSection::JoinType::Square, CrossSection::JoinType::Bevel}) {
-      EXPECT_TRUE(disc.Offset(delta, jt, 2, 64).IsEmpty())
+      EXPECT_TRUE(disc.Offset(delta, jt, 2, {64}).IsEmpty())
           << "delta " << delta << " join " << static_cast<int>(jt);
     }
   }
-  const CrossSection large = CrossSection::Circle(5, 64).Translate({20, 0});
+  const CrossSection large = CrossSection::Circle(5, {64}).Translate({20, 0});
   const CrossSection inset =
-      (disc + large).Offset(-2, CrossSection::JoinType::Round, 2, 64);
+      (disc + large).Offset(-2, CrossSection::JoinType::Round, 2, {64});
   EXPECT_EQ(inset.NumContour(), 1);
   EXPECT_NEAR(inset.Area(),
-              large.Offset(-2, CrossSection::JoinType::Round, 2, 64).Area(),
+              large.Offset(-2, CrossSection::JoinType::Round, 2, {64}).Area(),
               1e-6);
 }
 
 // The dual case: a hole narrower than twice the dilation fills in.
 TEST(CrossSection, OffsetCollapsedHoleVanishes) {
-  const CrossSection plate = CrossSection::Circle(10, 128);
-  const CrossSection ring = plate - CrossSection::Circle(1, 64);
+  const CrossSection plate = CrossSection::Circle(10, {128});
+  const CrossSection ring = plate - CrossSection::Circle(1, {64});
   ASSERT_EQ(ring.NumContour(), 2);
   for (double delta : {1.0, 1.5, 3.0}) {
     const CrossSection grown =
-        ring.Offset(delta, CrossSection::JoinType::Round, 2, 64);
+        ring.Offset(delta, CrossSection::JoinType::Round, 2, {64});
     const CrossSection solid =
-        plate.Offset(delta, CrossSection::JoinType::Round, 2, 64);
+        plate.Offset(delta, CrossSection::JoinType::Round, 2, {64});
     EXPECT_EQ(grown.NumContour(), 1) << "delta " << delta;
     EXPECT_NEAR(grown.Area(), solid.Area(), 1e-6) << "delta " << delta;
   }
   // A hole wider than twice the dilation must survive.
-  const CrossSection big = plate - CrossSection::Circle(4, 64);
+  const CrossSection big = plate - CrossSection::Circle(4, {64});
   const CrossSection partial =
-      big.Offset(1.5, CrossSection::JoinType::Round, 2, 64);
+      big.Offset(1.5, CrossSection::JoinType::Round, 2, {64});
   EXPECT_EQ(partial.NumContour(), 2);
 }
 
@@ -559,7 +559,7 @@ TEST(CrossSection, OffsetCollapsedHoleVanishes) {
 TEST(CrossSection, OffsetFarCollapsedContoursVanish) {
   const auto round = CrossSection::JoinType::Round;
   const auto rounded = [&](const CrossSection& cs, double r) {
-    return cs.Offset(-r, round, 2, 64).Offset(r, round, 2, 64);
+    return cs.Offset(-r, round, 2, {64}).Offset(r, round, 2, {64});
   };
   SimplePolygon triangle;
   for (int i = 0; i < 3; ++i) {
@@ -567,7 +567,7 @@ TEST(CrossSection, OffsetFarCollapsedContoursVanish) {
     triangle.push_back({2 * std::cos(a), 2 * std::sin(a)});
   }
   const CrossSection annulus =
-      CrossSection::Circle(4, 128) - CrossSection::Circle(3, 128);
+      CrossSection::Circle(4, {128}) - CrossSection::Circle(3, {128});
   const SimplePolygon wedge = {{0, 0}, {8, -4}, {8, 4}};
   struct Case {
     const char* name;
@@ -576,7 +576,7 @@ TEST(CrossSection, OffsetFarCollapsedContoursVanish) {
   };
   const std::vector<Case> cases = {
       {"pill",
-       CrossSection::Square({4, 1e-4}, true).Offset(1, round, 2, 64),
+       CrossSection::Square({4, 1e-4}, true).Offset(1, round, 2, {64}),
        {5, 50}},
       {"rounded rectangle",
        rounded(CrossSection::Square({4, 2}, true), 0.5).Rotate(30),
@@ -585,14 +585,14 @@ TEST(CrossSection, OffsetFarCollapsedContoursVanish) {
       {"triangle", CrossSection(triangle), {4.5, 50}},
       {"rounded C", rounded(annulus - CrossSection(wedge), 0.49), {4.5, 50}},
   };
-  const CrossSection plate = CrossSection::Circle(100, 256);
+  const CrossSection plate = CrossSection::Circle(100, {256});
   for (const auto& c : cases) {
     for (double d : c.deltas) {
-      EXPECT_TRUE(c.shape.Offset(-d, round, 2, 64).IsEmpty())
+      EXPECT_TRUE(c.shape.Offset(-d, round, 2, {64}).IsEmpty())
           << c.name << " inset " << d;
-      const CrossSection grown = (plate - c.shape).Offset(d, round, 2, 64);
+      const CrossSection grown = (plate - c.shape).Offset(d, round, 2, {64});
       EXPECT_EQ(grown.NumContour(), 1) << c.name << " hole dilate " << d;
-      EXPECT_NEAR(grown.Area(), plate.Offset(d, round, 2, 64).Area(), 1e-6)
+      EXPECT_NEAR(grown.Area(), plate.Offset(d, round, 2, {64}).Area(), 1e-6)
           << c.name << " hole dilate " << d;
     }
   }
@@ -1470,7 +1470,7 @@ TEST(CrossSection, OffsetPositiveOnExtremeRadiusStar) {
 
   const double delta = 7.2097955766145416;
   const auto output = input.Offset(delta, CrossSection::JoinType::Bevel,
-                                   /*miter_limit=*/2.0, /*circularSegments=*/0);
+                                   /*miter_limit=*/2.0);
   EXPECT_FALSE(output.IsEmpty());
   // A positive offset on a non-self-intersecting ring should always
   // grow the area. Observed locally: output.Area() ~= input.Area(),
@@ -2412,11 +2412,9 @@ TEST(CrossSection, OffsetInverseTriangleMiter) {
   const double delta = -0.0094938192047002799;
 
   const auto expanded =
-      input.Offset(delta, CrossSection::JoinType::Miter, /*miter_limit=*/2.0,
-                   /*circularSegments=*/0);
+      input.Offset(delta, CrossSection::JoinType::Miter, /*miter_limit=*/2.0);
   const auto roundTrip = expanded.Offset(-delta, CrossSection::JoinType::Miter,
-                                         /*miter_limit=*/2.0,
-                                         /*circularSegments=*/0);
+                                         /*miter_limit=*/2.0);
 
   // For Miter join with miter_limit=2.0 exactly at the equilateral triangle
   // threshold, equality should still take the miter path. Observed:
@@ -2662,7 +2660,7 @@ TEST(CrossSection, NonFiniteCircleIsEmpty) {
   for (double radius : {nan, inf, -inf}) {
     for (int segments : {0, 8}) {
       SCOPED_TRACE(testing::Message() << radius << ", segments=" << segments);
-      const CrossSection circle = CrossSection::Circle(radius, segments);
+      const CrossSection circle = CrossSection::Circle(radius, {segments});
       EXPECT_TRUE(circle.IsEmpty());
       EXPECT_EQ(circle.NumVert(), 0);
       EXPECT_DOUBLE_EQ(circle.Area(), 0);
@@ -2720,10 +2718,10 @@ TEST(CrossSection, NonFiniteRectangleIsEmpty) {
 TEST(CrossSection, OffsetNotInvariantUnderLargeTranslation) {
   const CrossSection square = CrossSection::Square({10.0, 10.0}, true);
   const CrossSection origin =
-      square.Offset(1.0, CrossSection::JoinType::Round, 2.0, 8);
+      square.Offset(1.0, CrossSection::JoinType::Round, 2.0, {8});
   const CrossSection translated =
       square.Translate({1e12, -1e12})
-          .Offset(1.0, CrossSection::JoinType::Round, 2.0, 8)
+          .Offset(1.0, CrossSection::JoinType::Round, 2.0, {8})
           .Translate({-1e12, 1e12});
 
   // The macro shape survives (one contour), but the round join's arc verts are
@@ -2767,7 +2765,7 @@ TEST(CrossSection, SimplifyReducesCurveWithoutCollapsing) {
   // A moderate epsilon reduces a dense curve but must never delete it
   // (regression: feeding epsilon as the boolean merge tolerance collapsed
   // circles to empty once epsilon exceeded the vertex spacing).
-  const CrossSection circle = CrossSection::Circle(10.0, 64);
+  const CrossSection circle = CrossSection::Circle(10.0, {64});
   const double area0 = circle.Area();
   const CrossSection simplified = circle.Simplify(0.5);
   EXPECT_FALSE(simplified.IsEmpty());
@@ -3008,7 +3006,7 @@ TEST(CrossSection, InformationMatchesTransformedContours) {
 TEST(CrossSection, ConcurrentConstAccessorsAreRaceFree) {
   // Meaningful under TSan (the upstream continuous-fuzz lane builds with it):
   // 16 threads materialize the lazy transform and read const accessors.
-  const CrossSection cs = CrossSection::Circle(10, 64).Translate({1e6, -1e6});
+  const CrossSection cs = CrossSection::Circle(10, {64}).Translate({1e6, -1e6});
   std::array<double, 16> results{};
   std::vector<std::thread> threads;
   for (int i = 0; i < 16; ++i) {
@@ -3021,7 +3019,7 @@ TEST(CrossSection, ConcurrentConstAccessorsAreRaceFree) {
 
 TEST(CrossSection, ConcurrentInformationAndMaterialization) {
   const CrossSection cs =
-      CrossSection::Circle(10, 1024).Scale({-2, 3}).Translate({5, -7});
+      CrossSection::Circle(10, {1024}).Scale({-2, 3}).Translate({5, -7});
   std::array<size_t, 16> results{};
   std::vector<std::thread> threads;
   std::atomic<bool> start{false};
@@ -3056,7 +3054,7 @@ TEST(CrossSection, PublicRoundOffsetRoundTripsMismatchCount) {
   CrossSection square = CrossSection::Square({20, 20}, true);
 
   CrossSection rounded =
-      square.Offset(5.0, CrossSection::JoinType::Round, 2.0, segments);
+      square.Offset(5.0, CrossSection::JoinType::Round, 2.0, {segments});
 
   EXPECT_EQ(rounded.NumVert(), segments + 4);
 }
@@ -3169,7 +3167,7 @@ TEST(CrossSection, SquareDegenerateDimIsEmpty) {
 }
 
 TEST(CrossSection, Hull) {
-  auto circ = CrossSection::Circle(10, 360);
+  auto circ = CrossSection::Circle(10, {360});
   auto circs = std::vector<CrossSection>{circ, circ.Translate({0, 30}),
                                          circ.Translate({30, 0})};
   auto circ_tri = CrossSection::Hull(circs);
@@ -3190,7 +3188,7 @@ TEST(CrossSection, Hull) {
 
 TEST(CrossSection, HullError) {
   auto rounded_rectangle = [](double x, double y, double radius, int segments) {
-    auto circ = CrossSection::Circle(radius, segments);
+    auto circ = CrossSection::Circle(radius, {segments});
     std::vector<CrossSection> vl{};
     vl.push_back(circ.Translate(vec2{radius, radius}));
     vl.push_back(circ.Translate(vec2{x - radius, radius}));
@@ -3208,9 +3206,9 @@ TEST(CrossSection, HullError) {
 
 TEST(CrossSection, BatchBoolean) {
   CrossSection square = CrossSection::Square({100, 100});
-  CrossSection circle1 = CrossSection::Circle(30, 30).Translate({-10, 30});
-  CrossSection circle2 = CrossSection::Circle(20, 30).Translate({110, 20});
-  CrossSection circle3 = CrossSection::Circle(40, 30).Translate({50, 110});
+  CrossSection circle1 = CrossSection::Circle(30, {30}).Translate({-10, 30});
+  CrossSection circle2 = CrossSection::Circle(20, {30}).Translate({110, 20});
+  CrossSection circle3 = CrossSection::Circle(40, {30}).Translate({50, 110});
 
   CrossSection intersect = CrossSection::BatchBoolean(
       {square, circle1, circle2, circle3}, OpType::Intersect);
@@ -3292,7 +3290,7 @@ TEST(CrossSection, NegativeOffset) {
   CrossSection plusSign = CrossSection::Square({30, 50}, true) +
                           CrossSection::Square({50, 30}, true);
   CrossSection dilated =
-      plusSign.Offset(-10, CrossSection::JoinType::Round, 2.0, 1024);
+      plusSign.Offset(-10, CrossSection::JoinType::Round, 2.0, {1024});
   EXPECT_NEAR(dilated.Area(), 30 * 30 - 10 * 10 * kPi, 0.01);
 }
 
@@ -3302,13 +3300,13 @@ TEST(CrossSection, ResolvedWindingInputsWithVerticalTJunctions) {
   for (int ix = -3; ix <= 3; ++ix) {
     for (int iy = -3; iy <= 3; ++iy) {
       sections.push_back(
-          CrossSection::Circle(4.0, 32).Translate({ix * 12.0, iy * 12.0}));
+          CrossSection::Circle(4.0, {32}).Translate({ix * 12.0, iy * 12.0}));
     }
   }
   const CrossSection diff =
       CrossSection::BatchBoolean(sections, OpType::Subtract);
   const double expectedArea =
-      100.0 * 100.0 - 49.0 * CrossSection::Circle(4.0, 32).Area();
+      100.0 * 100.0 - 49.0 * CrossSection::Circle(4.0, {32}).Area();
   EXPECT_NEAR(diff.Area(), expectedArea, 1e-6);
   EXPECT_EQ(diff.NumContour(), 50);
   EXPECT_EQ(diff.NumVert(), 4 + 49 * 32);
@@ -3344,7 +3342,7 @@ TEST(CrossSection, WindingSweepCrossingsAndRoundOffsets) {
     comb -= CrossSection::Square({2.5, 14.0}, true).Translate({i * 5.0, 0.0});
   }
   const CrossSection eroded =
-      comb.Offset(-0.625, CrossSection::JoinType::Round, 2.0, 16);
+      comb.Offset(-0.625, CrossSection::JoinType::Round, 2.0, {16});
   EXPECT_GT(eroded.Area(), 0.0);
   EXPECT_EQ(eroded.NumContour(), 8);
   const Manifold mesh = Manifold::Extrude(eroded.ToPolygons(), 2.0);

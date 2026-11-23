@@ -376,7 +376,6 @@ CrossSection CrossSection::Square(const vec2 size, bool center) {
  * @param radius Radius of the circle. Must be positive and finite; otherwise
  * returns an empty CrossSection.
  * @param quality Number of segments in a full circle, see CircularQuality.
- * An int sets CircularQuality::segments.
  */
 CrossSection CrossSection::Circle(double radius, CircularQuality quality) {
   if (radius <= 0.0 || !std::isfinite(radius)) return CrossSection();
@@ -386,10 +385,6 @@ CrossSection CrossSection::Circle(double radius, CircularQuality quality) {
   for (int i = 0; i < n; ++i)
     circle[i] = {radius * cosd(dPhi * i), radius * sind(dPhi * i)};
   return CrossSection(shared_path(std::move(circle)));
-}
-
-CrossSection CrossSection::Circle(double radius, int circularSegments) {
-  return Circle(radius, CircularQuality{circularSegments});
 }
 
 /**
@@ -667,8 +662,7 @@ CrossSection CrossSection::Simplify(double tolerance) const {
  * page for a visual example.
  * @param quality Number of segments per 360 degrees of
  * <B>JoinType::Round</B> corners (roughly, the number of vertices that
- * will be added to each contour), see CircularQuality. An int sets
- * CircularQuality::segments.
+ * will be added to each contour), see CircularQuality.
  */
 CrossSection CrossSection::Offset(double delta, JoinType jointype,
                                   double miterLimit,
@@ -678,12 +672,6 @@ CrossSection CrossSection::Offset(double delta, JoinType jointype,
   Polygons offset = manifold::Offset(GetPaths()->paths_, delta, jointype,
                                      miterLimit, quality);
   return CrossSection(shared_paths(std::move(offset)));
-}
-
-CrossSection CrossSection::Offset(double delta, JoinType jointype,
-                                  double miterLimit,
-                                  int circularSegments) const {
-  return Offset(delta, jointype, miterLimit, CircularQuality{circularSegments});
 }
 
 /**

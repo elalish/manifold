@@ -27,8 +27,9 @@ namespace manifold {
  * Defaults to CircularQuality::SegmentsFor().
  */
 Manifold RoundedFrame(double edgeLength, double radius, int circularSegments) {
-  Manifold edge = Manifold::Cylinder(edgeLength, radius, -1, circularSegments);
-  Manifold corner = Manifold::Sphere(radius, circularSegments);
+  Manifold edge =
+      Manifold::Cylinder(edgeLength, radius, -1, {circularSegments});
+  Manifold corner = Manifold::Sphere(radius, {circularSegments});
 
   Manifold edge1 = corner + edge;
   edge1 = edge1.Rotate(-90).Translate({-edgeLength / 2, -edgeLength / 2, 0});
