@@ -27,6 +27,13 @@ extern "C" {
 // If the function return type is `const T*`,
 // the result is borrowed from input arguments.
 
+// Wherever a rel_precision (relative precision) is passed, 0, negative values,
+// NaN and infinity give the default for that input: the ingest default for a
+// mesh, and FLT_EPSILON for manifold_with_precision. Positive values below
+// MANIFOLD_MIN_RELATIVE_PRECISION are raised to it, except that
+// manifold_meshgl_merge raises them to FLT_EPSILON. Pass it for the finest.
+#define MANIFOLD_MIN_RELATIVE_PRECISION 1e-12
+
 // Polygons
 
 ManifoldSimplePolygon* manifold_simple_polygon(const ManifoldVec2* ps,
@@ -61,7 +68,8 @@ ManifoldMeshGL* manifold_meshgl_w_options(const float* vert_props,
                                           const ManifoldMeshGLOptions* options);
 ManifoldMeshGL* manifold_get_meshgl(const ManifoldManifold* m);
 ManifoldMeshGL* manifold_meshgl_copy(const ManifoldMeshGL* m);
-// rel_precision: relative precision of the mesh; 0 for the default.
+// rel_precision: relative precision of the mesh, raised to at least
+// FLT_EPSILON, which is also the default.
 ManifoldMeshGL* manifold_meshgl_merge(const ManifoldMeshGL* m, float tolerance,
                                       double rel_precision);
 
@@ -80,6 +88,8 @@ ManifoldMeshGL64* manifold_meshgl64_w_options(
     const ManifoldMeshGL64Options* options);
 ManifoldMeshGL64* manifold_get_meshgl64(const ManifoldManifold* m);
 ManifoldMeshGL64* manifold_meshgl64_copy(const ManifoldMeshGL64* m);
+// rel_precision: relative precision of the mesh. The default is
+// MANIFOLD_MIN_RELATIVE_PRECISION.
 ManifoldMeshGL64* manifold_meshgl64_merge(const ManifoldMeshGL64* m,
                                           double tolerance,
                                           double rel_precision);
@@ -189,9 +199,8 @@ ManifoldManifold* manifold_cylinder(double height, double radius_low,
                                     int center);
 ManifoldManifold* manifold_sphere(double radius,
                                   const ManifoldCircularQuality* quality);
-// rel_precision: relative precision of the result. NaN gives the default,
-// FLT_EPSILON for MeshGL and 1e-12 for MeshGL64. Values below 1e-12, including
-// 0, use 1e-12.
+// rel_precision: relative precision of the result. The default is FLT_EPSILON
+// for MeshGL and MANIFOLD_MIN_RELATIVE_PRECISION for MeshGL64.
 ManifoldManifold* manifold_of_meshgl(const ManifoldMeshGL* mesh,
                                      double rel_precision);
 ManifoldManifold* manifold_of_meshgl64(const ManifoldMeshGL64* mesh,
@@ -224,8 +233,7 @@ ManifoldError manifold_status(const ManifoldManifold* m);
 ManifoldManifold* manifold_with_context(const ManifoldManifold* m,
                                         const ManifoldExecutionContext* ctx);
 // Evaluates m and returns it with the given relative precision for later
-// operations, without recomputing it. Values below 1e-12, including 0, use
-// 1e-12. NaN and infinity use FLT_EPSILON.
+// operations, without recomputing it. The default is FLT_EPSILON.
 ManifoldManifold* manifold_with_precision(const ManifoldManifold* m,
                                           double rel_precision);
 double manifold_get_precision(const ManifoldManifold* m);
@@ -532,7 +540,8 @@ void manifold_delete_execution_context(ManifoldExecutionContext* ctx);
 
 // Import a manifold from a Wavefront obj file.
 // The obj_file parameter is the content of the obj file, not the filename,
-// and should be null-terminated. The result has relative precision 1e-12.
+// and should be null-terminated. The result has relative precision
+// MANIFOLD_MIN_RELATIVE_PRECISION.
 ManifoldManifold* manifold_read_obj(const char* obj_file);
 // Import a meshgl from a Wavefront obj file.
 // The obj_file parameter is the content of the obj file, not the filename,

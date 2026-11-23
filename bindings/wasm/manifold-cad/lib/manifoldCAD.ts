@@ -57,7 +57,8 @@ const {
   CrossSection,
   triangulate,
   segmentsFor,
-  forDivisions
+  forDivisions,
+  MIN_RELATIVE_PRECISION
 } = manifoldWasm;
 
 // These methods are not intrinsic to manifold itself, but provided by the scene
@@ -80,6 +81,7 @@ export {
   triangulate,
   segmentsFor,
   forDivisions,
+  MIN_RELATIVE_PRECISION,
   show,
   only,
   setMaterial,

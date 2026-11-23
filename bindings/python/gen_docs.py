@@ -15,6 +15,7 @@ def python_param_modifier(comment):
     comment = re.sub(":param mesh_gl64:", ":param mesh:", comment)
     comment = re.sub("mesh_gl", "mesh", comment)
     comment = re.sub("MeshGL", "Mesh", comment)
+    comment = re.sub("kMinRelativePrecision", "MIN_RELATIVE_PRECISION", comment)
     return comment
 
 

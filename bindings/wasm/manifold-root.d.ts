@@ -24,10 +24,10 @@
  */
 
 export type * from './manifold-global-types';
-export type {MeshOptions, Mesh64Options, triangulate, segmentsFor, forDivisions} from './manifold-encapsulated-types';
+export type {MeshOptions, Mesh64Options, MIN_RELATIVE_PRECISION, triangulate, segmentsFor, forDivisions} from './manifold-encapsulated-types';
 export {CrossSection, Manifold, Mesh, Mesh64} from './manifold-encapsulated-types';
 
-import type {triangulate, segmentsFor, forDivisions} from './manifold-encapsulated-types';
+import type {MIN_RELATIVE_PRECISION, triangulate, segmentsFor, forDivisions} from './manifold-encapsulated-types';
 import {CrossSection, Manifold, Mesh, Mesh64} from './manifold-encapsulated-types';
 
 export interface ManifoldToplevel {
@@ -35,6 +35,7 @@ export interface ManifoldToplevel {
   Manifold: typeof Manifold;
   Mesh: typeof Mesh;
   Mesh64: typeof Mesh64;
+  MIN_RELATIVE_PRECISION: typeof MIN_RELATIVE_PRECISION;
   triangulate: typeof triangulate;
   segmentsFor: typeof segmentsFor;
   forDivisions: typeof forDivisions;

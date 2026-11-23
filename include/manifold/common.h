@@ -79,13 +79,19 @@ constexpr double kHalfPi = 1.57079632679489661923132169163975144;
  * The default relative precision of a Manifold made from MeshGL or built by a
  * factory such as Cube() or LevelSet(): float epsilon. A Manifold's epsilon is
  * its relative precision times its bounding box scale.
+ *
+ * Wherever a relative precision is passed, 0, negative values, NaN and
+ * infinity give the default for that input: the ingest default for a mesh,
+ * and kDefaultRelativePrecision for WithPrecision(). Positive values below
+ * kMinRelativePrecision are raised to it, except that MeshGL::Merge() raises
+ * them to float epsilon.
  */
 constexpr double kDefaultRelativePrecision =
     std::numeric_limits<float>::epsilon();
 
 /**
  * The smallest relative precision allowed, and the default for a Manifold made
- * from MeshGL64.
+ * from MeshGL64. Pass it to request the finest precision.
  */
 constexpr double kMinRelativePrecision = 1e-12;
 

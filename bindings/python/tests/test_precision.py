@@ -19,6 +19,15 @@ def test_precision():
     assert stamped.num_tri() == cube.num_tri()
     assert cube.get_precision() == float_eps
     assert cube.with_precision(1e-12).get_precision() == 1e-12
+    assert md.MIN_RELATIVE_PRECISION == 1e-12
+    fine = md.Manifold(mesh, rel_precision=md.MIN_RELATIVE_PRECISION)
+    assert fine.get_precision() == 1e-12
+    assert md.Manifold(mesh, rel_precision=1e-15).get_precision() == 1e-12
+    # 0, negative values, NaN and infinity give the default.
+    for unset in (0, -1, float("nan"), float("inf")):
+        assert md.Manifold(mesh, rel_precision=unset).get_precision() == float_eps
+        assert md.Manifold(mesh64, rel_precision=unset).get_precision() == 1e-12
+        assert fine.with_precision(unset).get_precision() == float_eps
     assert (stamped + coarse).get_precision() == 1e-3
     assert (coarse + stamped).get_precision() == 1e-3
 

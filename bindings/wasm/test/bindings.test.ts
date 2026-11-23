@@ -131,7 +131,20 @@ suite('Manifold Bindings', () => {
     expect(Manifold.ofMesh(mesh).getPrecision()).toEqual(2 ** -23);
     expect(new Manifold(mesh).getPrecision()).toEqual(2 ** -23);
     expect(Manifold.cube().getPrecision()).toEqual(2 ** -23);
-    expect(Manifold.ofMesh(mesh, 0).getPrecision()).toEqual(1e-12);
+    // 0, negative values, NaN and infinity give the default.
+    for (const unset of [0, -1, NaN, Infinity]) {
+      expect(Manifold.ofMesh(mesh, unset).getPrecision()).toEqual(2 ** -23);
+      expect(Manifold.cube()
+                 .withPrecision(1e-3)
+                 .withPrecision(unset)
+                 .getPrecision())
+          .toEqual(2 ** -23);
+    }
+    const {MIN_RELATIVE_PRECISION} = manifoldModule;
+    expect(MIN_RELATIVE_PRECISION).toEqual(1e-12);
+    expect(Manifold.ofMesh(mesh, MIN_RELATIVE_PRECISION).getPrecision())
+        .toEqual(1e-12);
+    expect(Manifold.ofMesh(mesh, 1e-15).getPrecision()).toEqual(1e-12);
     expect(Manifold.cube().withPrecision(1e-12).getPrecision()).toEqual(1e-12);
     const coarse = Manifold.ofMesh(mesh, 1e-3);
     expect(coarse.getPrecision()).toEqual(1e-3);

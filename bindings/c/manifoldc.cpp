@@ -30,6 +30,8 @@
 
 using namespace manifold;
 
+static_assert(MANIFOLD_MIN_RELATIVE_PRECISION == kMinRelativePrecision);
+
 namespace {
 ManifoldManifold* level_set(double (*sdf_context)(double, double, double,
                                                   void*),

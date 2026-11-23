@@ -624,7 +624,8 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
  * within tolerance (the maximum of the specified tolerance and relPrecision
  * times the bounding box scale), keeping any from the existing merge vectors.
  * relPrecision is raised to at least float epsilon for MeshGL and
- * kMinRelativePrecision for MeshGL64, which are also the defaults.
+ * kMinRelativePrecision for MeshGL64, which are also the defaults that 0,
+ * negative values, NaN and infinity give.
  *
  * There is no guarantee the result will be manifold - this is a best-effort
  * helper function designed primarily to aid in the case where a manifold

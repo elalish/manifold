@@ -38,6 +38,14 @@ export function triangulate(
     polygons: Polygons, epsilon?: number, allowConvex?: boolean): Vec3[];
 
 /**
+ * The finest relative precision a Manifold can have, 1e-12. Pass it to
+ * {@link Manifold.ofMesh} or {@link Manifold.withPrecision} to request the
+ * finest. Wherever a relative precision is passed, 0, negative values, NaN and
+ * infinity give the default for that input.
+ */
+export const MIN_RELATIVE_PRECISION: number;
+
+/**
  * Returns the number of segments a circle of this radius gets with this
  * quality.
  *
@@ -477,8 +485,9 @@ export class Manifold {
    * @param relPrecision The relative precision of the result, which defines
    * what counts as coplanar or degenerate in this and later operations. The
    * default is float epsilon, about 1.2e-7, for a Mesh and 1e-12 for a Mesh64.
-   * Values below 1e-12, including 0, use 1e-12, and NaN or infinity use the
-   * default.
+   * 0, negative values, NaN and infinity give the default. Positive values
+   * below {@link MIN_RELATIVE_PRECISION} (1e-12) are raised to it, so pass it
+   * for the finest.
    * @group Basics
    */
   constructor(mesh: Mesh|Mesh64, relPrecision?: number);
@@ -599,8 +608,9 @@ export class Manifold {
    * @param relPrecision The relative precision of the result, which defines
    * what counts as coplanar or degenerate in this and later operations. The
    * default is float epsilon, about 1.2e-7, for a Mesh and 1e-12 for a Mesh64.
-   * Values below 1e-12, including 0, use 1e-12, and NaN or infinity use the
-   * default.
+   * 0, negative values, NaN and infinity give the default. Positive values
+   * below {@link MIN_RELATIVE_PRECISION} (1e-12) are raised to it, so pass it
+   * for the finest.
    * @group Input & Output
    */
   static ofMesh(mesh: Mesh|Mesh64, relPrecision?: number): Manifold;
@@ -1137,8 +1147,10 @@ export class Manifold {
    * other operations on several Manifolds use the smallest precision among
    * their non-empty inputs.
    *
-   * @param relPrecision The relative precision. Values below 1e-12 use
-   * 1e-12, and NaN or infinity use float epsilon.
+   * @param relPrecision The relative precision. 0, negative values, NaN and
+   * infinity give the default, float epsilon. Positive values below
+   * {@link MIN_RELATIVE_PRECISION} (1e-12) are raised to it, so pass it for the
+   * finest.
    * @group Information
    */
   withPrecision(relPrecision: number): Manifold;
@@ -1373,7 +1385,7 @@ export class Mesh {
    *
    * @param tolerance Default 0, with a bounding-box and precision-based floor.
    * @param relPrecision The relative precision of the mesh, raised to at least
-   * float epsilon.
+   * float epsilon, which is also the default.
    */
   merge(tolerance?: number, relPrecision?: number): Mesh;
 
