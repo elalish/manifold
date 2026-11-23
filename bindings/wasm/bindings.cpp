@@ -237,5 +237,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_SegmentsFor", &js::SegmentsFor);
   function("_ForDivisions", &CircularQuality::ForDivisions);
 
+  constant("MIN_RELATIVE_PRECISION", kMinRelativePrecision);
+
   function("initTBB", &initTBB);
 }

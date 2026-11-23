@@ -178,7 +178,7 @@ struct MeshGLP {
    * @param tolerance Merge open-edge verts closer than this.
    * @param relPrecision The relative precision of the mesh, raised to at least
    * float epsilon for MeshGL and kMinRelativePrecision for MeshGL64. These
-   * are also the defaults.
+   * are also the defaults, which 0, negative values, NaN and infinity give.
    */
   [[nodiscard]] MeshGLP Merge(
       Precision tolerance = 0,

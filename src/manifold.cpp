@@ -199,8 +199,9 @@ CsgLeafNode& Manifold::GetCsgLeafNode(ExecutionContext::Impl* ctx) const {
  * @param meshGL The input MeshGL.
  * @param relPrecision The relative precision of the result, which defines what
  * counts as coplanar or degenerate in this and later operations. The default
- * is kDefaultRelativePrecision (float epsilon). Values below
- * kMinRelativePrecision are raised to it, and NaN or infinity give the default.
+ * is kDefaultRelativePrecision (float epsilon). 0, negative values, NaN and
+ * infinity give the default. Positive values below kMinRelativePrecision are
+ * raised to it, so pass kMinRelativePrecision for the finest.
  */
 Manifold::Manifold(const MeshGL& meshGL, double relPrecision)
     : pNode_(std::make_shared<CsgLeafNode>(
@@ -220,8 +221,8 @@ Manifold::Manifold(const MeshGL& meshGL, double relPrecision)
  * @param meshGL64 The input MeshGL64.
  * @param relPrecision The relative precision of the result, which defines what
  * counts as coplanar or degenerate in this and later operations. The default
- * is kMinRelativePrecision. Values below it are raised to it, and NaN or
- * infinity give the default.
+ * is kMinRelativePrecision, the finest. 0, negative values, NaN and infinity
+ * give the default, and positive values below it are raised to it.
  */
 Manifold::Manifold(const MeshGL64& meshGL64, double relPrecision)
     : pNode_(std::make_shared<CsgLeafNode>(
@@ -338,9 +339,10 @@ double Manifold::GetEpsilon() const {
  * other operations on several Manifolds use the smallest precision among their
  * non-empty inputs.
  *
- * @param relPrecision The relative precision. Values below
- * kMinRelativePrecision are raised to it, and NaN or infinity give
- * kDefaultRelativePrecision.
+ * @param relPrecision The relative precision. 0, negative values, NaN and
+ * infinity give kDefaultRelativePrecision. Positive values below
+ * kMinRelativePrecision are raised to it, so pass kMinRelativePrecision for the
+ * finest.
  */
 Manifold Manifold::WithPrecision(double relPrecision) const {
   return Manifold(GetCsgLeafNode(AtomicLoadShared(&ctx_).get())

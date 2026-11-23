@@ -227,6 +227,10 @@ const std::string manifold__rotate__v =
 NB_MODULE(manifold3d, m) {
   m.doc() = "Python binding for the Manifold library.";
 
+  // The finest relative precision. Wherever a rel_precision is passed, 0,
+  // negative values, NaN and infinity give the default for that input.
+  m.attr("MIN_RELATIVE_PRECISION") = kMinRelativePrecision;
+
   nb::class_<CircularQuality>(m, "CircularQuality")
       .def(
           "__init__",

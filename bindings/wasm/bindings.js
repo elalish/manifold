@@ -686,12 +686,12 @@ Module.setup = function() {
   // Manifold Constructors
 
   const ManifoldCtor = Module.Manifold;
-  // NaN gives the library's default relative precision for float meshes.
-  Module.Manifold = function(mesh, relPrecision = NaN) {
+  // 0 gives the library's default relative precision for float meshes.
+  Module.Manifold = function(mesh, relPrecision = 0) {
     return checkedManifold(new ManifoldCtor(mesh, relPrecision));
   };
 
-  Module.Manifold.ofMesh = function(mesh, relPrecision = NaN) {
+  Module.Manifold.ofMesh = function(mesh, relPrecision = 0) {
     return new Module.Manifold(mesh, relPrecision);
   };
 

@@ -2114,6 +2114,7 @@ TEST(Precision, Merge) {
   EXPECT_EQ(Manifold(mesh.Merge(0, 1e-3)).Status(), Manifold::Error::NoError);
   EXPECT_EQ(Manifold(mesh.Merge(0, INFINITY)).Status(),
             Manifold::Error::NotManifold);
+  EXPECT_EQ(Manifold(mesh.Merge(0, 0)).Status(), Manifold::Error::NotManifold);
 
   const MeshGL stl = CubeSTL();
   MeshGL64 mesh64;
@@ -2139,16 +2140,19 @@ TEST(Precision, Ingest) {
   const Manifold coarse(mesh, 1e-3);
   EXPECT_EQ(coarse.GetPrecision(), 1e-3);
   EXPECT_DOUBLE_EQ(coarse.GetEpsilon(), 1e-3 * coarse.BoundingBox().Scale());
-  // Values below the floor, including 0, use the floor. NaN and infinity use
-  // the default.
-  EXPECT_EQ(Manifold(mesh, 0).GetPrecision(), kMinRelativePrecision);
-  EXPECT_EQ(Manifold(meshF, 0).GetPrecision(), kMinRelativePrecision);
+  // 0, negative values, NaN and infinity give the default for the input.
+  for (const double unset :
+       {0.0, -0.0, -1e-3, -1e-15, -kMinRelativePrecision,
+        static_cast<double>(NAN), static_cast<double>(INFINITY),
+        static_cast<double>(-INFINITY)}) {
+    EXPECT_EQ(Manifold(mesh, unset).GetPrecision(), kMinRelativePrecision);
+    EXPECT_EQ(Manifold(meshF, unset).GetPrecision(), kDefaultRelativePrecision);
+  }
+  // Positive values below the floor use the floor.
+  EXPECT_EQ(Manifold(meshF, 1e-15).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ(Manifold(meshF, kMinRelativePrecision).GetPrecision(),
+            kMinRelativePrecision);
   EXPECT_EQ(Manifold(meshF, 1e-9).GetPrecision(), 1e-9);
-  EXPECT_EQ(Manifold(mesh, NAN).GetPrecision(), kMinRelativePrecision);
-  EXPECT_EQ(Manifold(mesh, INFINITY).GetPrecision(), kMinRelativePrecision);
-  EXPECT_EQ(Manifold(meshF, NAN).GetPrecision(), kDefaultRelativePrecision);
-  EXPECT_EQ(Manifold(meshF, INFINITY).GetPrecision(),
-            kDefaultRelativePrecision);
   // Transforms and single-input operations keep the precision.
   EXPECT_EQ(coarse.Translate({10, 0, 0}).GetPrecision(), 1e-3);
   EXPECT_DOUBLE_EQ(coarse.Translate({10, 0, 0}).GetEpsilon(), 1e-3 * 11);
@@ -2230,8 +2234,13 @@ TEST(Precision, WithPrecisionAffectsOnlyLaterOps) {
   EXPECT_EQ(coarse.GetPrecision(), 1e-2);
   EXPECT_DOUBLE_EQ(coarse.GetEpsilon(), 1e-2 * coarse.BoundingBox().Scale());
   EXPECT_EQ(fine.GetPrecision(), kDefaultRelativePrecision);
-  EXPECT_EQ(fine.WithPrecision(0).GetPrecision(), kMinRelativePrecision);
-  EXPECT_EQ(fine.WithPrecision(1e-12).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ(fine.WithPrecision(kMinRelativePrecision).GetPrecision(),
+            kMinRelativePrecision);
+  EXPECT_EQ(fine.WithPrecision(1e-15).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ(fine.WithPrecision(1e-12).WithPrecision(0).GetPrecision(),
+            kDefaultRelativePrecision);
+  EXPECT_EQ(fine.WithPrecision(1e-12).WithPrecision(-1).GetPrecision(),
+            kDefaultRelativePrecision);
   EXPECT_EQ(fine.WithPrecision(INFINITY).GetPrecision(),
             kDefaultRelativePrecision);
   // Later operations use it.

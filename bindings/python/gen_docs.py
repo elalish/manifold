@@ -14,6 +14,7 @@ def python_param_modifier(comment):
     # python API renames `MeshGL` to `Mesh`
     comment = re.sub("mesh_gl", "mesh", comment)
     comment = re.sub("MeshGL", "Mesh", comment)
+    comment = re.sub("kMinRelativePrecision", "MIN_RELATIVE_PRECISION", comment)
     return comment
 
 

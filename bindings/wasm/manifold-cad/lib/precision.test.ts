@@ -15,7 +15,7 @@
 import {expect, test} from 'vitest';
 
 import * as manifoldCAD from './manifoldCAD.ts';
-import {Manifold} from './manifoldCAD.ts';
+import {Manifold, MIN_RELATIVE_PRECISION} from './manifoldCAD.ts';
 import {cleanup, evaluate} from './worker.ts';
 
 // Float epsilon, the library default for shapes and float meshes.
@@ -35,9 +35,12 @@ test('Each Manifold carries its own precision', () => {
 
 test('Finer precision is set per Manifold', () => {
   const cube = Manifold.cube();
-  expect(cube.withPrecision(1e-12).getPrecision()).toEqual(1e-12);
-  expect(Manifold.ofMesh(cube.getMesh(), 1e-12).getPrecision()).toEqual(1e-12);
-  expect(new Manifold(cube.getMesh(), 1e-12).getPrecision()).toEqual(1e-12);
+  const fine = MIN_RELATIVE_PRECISION;
+  expect(cube.withPrecision(fine).getPrecision()).toEqual(1e-12);
+  expect(Manifold.ofMesh(cube.getMesh(), fine).getPrecision()).toEqual(1e-12);
+  expect(new Manifold(cube.getMesh(), fine).getPrecision()).toEqual(1e-12);
+  expect(Manifold.ofMesh(cube.getMesh(), 0).getPrecision())
+      .toEqual(floatEpsilon);
 });
 
 test('Scripts have no global precision setter or getter', async () => {
@@ -56,6 +59,16 @@ test('A script sets precision with withPrecision', async () => {
 const coarse = Manifold.cube().withPrecision(1e-3);
 if (coarse.getPrecision() !== 1e-3) throw new Error('precision');
 export default coarse;`;
+  await expect(evaluate(code)).resolves.toBeTruthy();
+  cleanup();
+});
+
+test('A script can import the finest precision', async () => {
+  const code =
+      `import {Manifold, MIN_RELATIVE_PRECISION} from 'manifold-cad/manifoldCAD';
+const fine = Manifold.cube().withPrecision(MIN_RELATIVE_PRECISION);
+if (fine.getPrecision() !== 1e-12) throw new Error('precision');
+export default fine;`;
   await expect(evaluate(code)).resolves.toBeTruthy();
   cleanup();
 });
