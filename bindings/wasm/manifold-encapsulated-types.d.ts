@@ -1530,3 +1530,28 @@ export class Mesh64 {
   backside(run: number): boolean;
   hasNormals(run: number): boolean;
 }
+
+/**
+ * The error thrown when a Manifold operation fails with an error status, for
+ * example by the Manifold constructor on an invalid mesh, or by warp() when the
+ * result has a non-finite vertex. Its message is a short description of the
+ * status.
+ *
+ * @group Basics
+ */
+export class ManifoldError extends Error {
+  /**
+   * @param code The error status.
+   */
+  constructor(code: ErrorStatus);
+
+  /**
+   * Always 'ManifoldError'.
+   */
+  name: 'ManifoldError';
+
+  /**
+   * The error status that caused this error.
+   */
+  code: ErrorStatus;
+}
