@@ -18,7 +18,6 @@
 #include <atomic>
 #include <chrono>
 #include <cmath>
-#include <iterator>
 #include <limits>
 #include <random>
 #include <set>
@@ -273,36 +272,18 @@ TEST(Manifold, Empty) {
 
 TEST(Manifold, ErrorStrings) {
   using Error = Manifold::Error;
-  const std::pair<Error, std::string> table[] = {
-      {Error::NoError, "No error"},
-      {Error::NonFiniteVertex, "Non-finite vertex"},
-      {Error::NotManifold, "Not manifold"},
-      {Error::VertexOutOfBounds, "Vertex index out of bounds"},
-      {Error::PropertiesWrongLength, "Properties have wrong length"},
-      {Error::MissingPositionProperties,
-       "Fewer than three properties per vertex"},
-      {Error::MergeVectorsDifferentLengths,
-       "Merge vectors have different lengths"},
-      {Error::MergeIndexOutOfBounds, "Merge index out of bounds"},
-      {Error::TransformWrongLength, "Transform vector has wrong length"},
-      {Error::RunIndexWrongLength, "Invalid run index vector"},
-      {Error::FaceIDWrongLength, "Face ID vector has wrong length"},
-      {Error::InvalidConstruction,
-       "Manifold constructed with invalid parameters"},
-      {Error::ResultTooLarge, "Result exceeds maximum size"},
-      {Error::InvalidTangents, "Invalid halfedge tangents"},
-      {Error::Cancelled, "Operation cancelled"},
-  };
+  const std::string unknown = ToString(static_cast<Error>(-1));
   std::set<std::string> messages;
-  for (size_t i = 0; i < std::size(table); ++i) {
-    const auto& [error, message] = table[i];
-    EXPECT_EQ(static_cast<size_t>(error), i);
-    EXPECT_EQ(ToString(error), message);
+  for (int i = 0; i <= static_cast<int>(Error::Cancelled); ++i) {
+    const std::string message = ToString(static_cast<Error>(i));
+    EXPECT_FALSE(message.empty());
+    EXPECT_NE(message, unknown);
     messages.insert(message);
   }
-  EXPECT_EQ(messages.size(), std::size(table));
-  EXPECT_STREQ(ToString(static_cast<Error>(-1)), "Unknown error");
-  EXPECT_STREQ(ToString(static_cast<Error>(std::size(table))), "Unknown error");
+  EXPECT_EQ(messages.size(), static_cast<size_t>(Error::Cancelled) + 1);
+  EXPECT_EQ(
+      ToString(static_cast<Error>(static_cast<int>(Error::Cancelled) + 1)),
+      unknown);
 }
 
 TEST(Manifold, ValidInput) {

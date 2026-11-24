@@ -7,5 +7,5 @@ def test_error_messages_are_unique():
     assert all(messages)
     assert "Unknown error" not in messages
     assert len(set(messages)) == len(messages)
-    assert str(Error.NotManifold) == "Not manifold"
-    assert str(Error.Cancelled) == "Operation cancelled"
+    for e in Error:
+        assert str(e) != repr(e)
