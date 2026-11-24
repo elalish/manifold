@@ -129,7 +129,7 @@ Constructors</h2></td></tr>
 </td></tr>
 <tr class="memitem:a48f77ce6390caee13a94f681893fb65c" id="r_a48f77ce6390caee13a94f681893fb65c"><td class="memItemLeft">std::vector&lt; <a class="el" href="#acbed403d82ee8d55f3be2c9a5f963ec0">CrossSection</a> &gt;&#160;</td><td class="memItemRight"><a class="el" href="#a48f77ce6390caee13a94f681893fb65c">Decompose</a> () const</td></tr>
 <tr class="memitem:a43e92332e827adee0914baf746fa677b" id="r_a43e92332e827adee0914baf746fa677b"><td class="memItemLeft">static <a class="el" href="#acbed403d82ee8d55f3be2c9a5f963ec0">CrossSection</a>&#160;</td><td class="memItemRight"><a class="el" href="#a43e92332e827adee0914baf746fa677b">Square</a> (const vec2 dims, bool center=false)</td></tr>
-<tr class="memitem:af9c4ae1a5b602abdd9d9d41cfda32ecf" id="r_af9c4ae1a5b602abdd9d9d41cfda32ecf"><td class="memItemLeft">static <a class="el" href="#acbed403d82ee8d55f3be2c9a5f963ec0">CrossSection</a>&#160;</td><td class="memItemRight"><a class="el" href="#af9c4ae1a5b602abdd9d9d41cfda32ecf">Circle</a> (double radius, int circularSegments=0)</td></tr>
+<tr class="memitem:aefd23d6f50d8950751583180d4867a44" id="r_aefd23d6f50d8950751583180d4867a44"><td class="memItemLeft">static <a class="el" href="#acbed403d82ee8d55f3be2c9a5f963ec0">CrossSection</a>&#160;</td><td class="memItemRight"><a class="el" href="#aefd23d6f50d8950751583180d4867a44">Circle</a> (double radius, <a class="el" href="structmanifold_1_1_circular_quality.html">CircularQuality</a> quality={})</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-member-group" class="groupheader"><a id="member-group" name="member-group"></a>
 Information</h2></td></tr>
@@ -151,7 +151,7 @@ Transformation</h2></td></tr>
 <tr class="memitem:ac50618697f91880859f4d536f2569b5e" id="r_ac50618697f91880859f4d536f2569b5e"><td class="memItemLeft"><a class="el" href="#acbed403d82ee8d55f3be2c9a5f963ec0">CrossSection</a>&#160;</td><td class="memItemRight"><a class="el" href="#ac50618697f91880859f4d536f2569b5e">Warp</a> (std::function&lt; void(vec2 &amp;)&gt; warpFunc) const</td></tr>
 <tr class="memitem:a2d4ae264fded90c78cf750ad0dbea33a" id="r_a2d4ae264fded90c78cf750ad0dbea33a"><td class="memItemLeft"><a class="el" href="#acbed403d82ee8d55f3be2c9a5f963ec0">CrossSection</a>&#160;</td><td class="memItemRight"><a class="el" href="#a2d4ae264fded90c78cf750ad0dbea33a">WarpBatch</a> (std::function&lt; void(<a class="el" href="classmanifold_1_1_vec_view.html">VecView</a>&lt; vec2 &gt;)&gt; warpFunc) const</td></tr>
 <tr class="memitem:aa98324971640547bf6f056c0ae1c4909" id="r_aa98324971640547bf6f056c0ae1c4909"><td class="memItemLeft"><a class="el" href="#acbed403d82ee8d55f3be2c9a5f963ec0">CrossSection</a>&#160;</td><td class="memItemRight"><a class="el" href="#aa98324971640547bf6f056c0ae1c4909">Simplify</a> (double tolerance=0) const</td></tr>
-<tr class="memitem:a762b51c6a17e5a5f03e09ab79b4ad2ef" id="r_a762b51c6a17e5a5f03e09ab79b4ad2ef"><td class="memItemLeft"><a class="el" href="#acbed403d82ee8d55f3be2c9a5f963ec0">CrossSection</a>&#160;</td><td class="memItemRight"><a class="el" href="#a762b51c6a17e5a5f03e09ab79b4ad2ef">Offset</a> (double delta, <a class="el" href="group___structs.html#gaef400c43b34e3ecc3f7b342aa821395d">JoinType</a> jt=<a class="el" href="group___structs.html#ggaef400c43b34e3ecc3f7b342aa821395dab7f41fc1412ad2ee75e9b2635d3b9d5c">JoinType::Round</a>, double miter_limit=2.0, int circularSegments=0) const</td></tr>
+<tr class="memitem:acc76f09a11a354440c735d5dba4d9c7a" id="r_acc76f09a11a354440c735d5dba4d9c7a"><td class="memItemLeft"><a class="el" href="#acbed403d82ee8d55f3be2c9a5f963ec0">CrossSection</a>&#160;</td><td class="memItemRight"><a class="el" href="#acc76f09a11a354440c735d5dba4d9c7a">Offset</a> (double delta, <a class="el" href="group___structs.html#gaef400c43b34e3ecc3f7b342aa821395d">JoinType</a> jt=<a class="el" href="group___structs.html#ggaef400c43b34e3ecc3f7b342aa821395dab7f41fc1412ad2ee75e9b2635d3b9d5c">JoinType::Round</a>, double miter_limit=2.0, <a class="el" href="structmanifold_1_1_circular_quality.html">CircularQuality</a> quality={}) const</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-member-group" class="groupheader"><a id="member-group" name="member-group"></a>
 Boolean</h2></td></tr>
@@ -356,7 +356,7 @@ Convex Hull</h2></td></tr>
 </table>
 </div><div class="memdoc">
 <p>Create a 2d cross-section from a set of contours, reading them by the even-odd rule: a sub-region is filled when its winding number is odd, so overlapping an odd number of contours fills and overlapping an even number leaves a hole. The constructors instead use the positive rule (filled where the winding number is greater than zero), which ignores contour count and only cares about direction. Use this to take input authored for an even-odd tool such as OpenSCAD.</p>
-<p>The rule only decides how these contours are read. The result is regularized and normal-oriented like any other <a class="el" href="classmanifold_1_1_cross_section.html" title="Two-dimensional cross sections guaranteed to be without self-intersections, or overlaps between polyg...">CrossSection</a>, so every later operation behaves the same. Note that <a class="el" href="classmanifold_1_1_manifold.html#a37da082109050d748421069e22eff876">Manifold::Extrude</a> and <a class="el" href="classmanifold_1_1_manifold.html#a8c454a293abbf86f520e10266087f5a6">Manifold::Revolve</a> take raw contours straight to the triangulator without applying any fill rule, so even-odd input has to be regularized here first, by passing EvenOdd(contours).<a class="el" href="#a209a83b1c39a84e094da9e854a7b8bc2">ToPolygons()</a> to them.</p>
+<p>The rule only decides how these contours are read. The result is regularized and normal-oriented like any other <a class="el" href="classmanifold_1_1_cross_section.html" title="Two-dimensional cross sections guaranteed to be without self-intersections, or overlaps between polyg...">CrossSection</a>, so every later operation behaves the same. Note that <a class="el" href="classmanifold_1_1_manifold.html#a37da082109050d748421069e22eff876">Manifold::Extrude</a> and <a class="el" href="classmanifold_1_1_manifold.html#a8d93a51d679579e50af9b5a6d6f3a58f">Manifold::Revolve</a> take raw contours straight to the triangulator without applying any fill rule, so even-odd input has to be regularized here first, by passing EvenOdd(contours).<a class="el" href="#a209a83b1c39a84e094da9e854a7b8bc2">ToPolygons()</a> to them.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">contours</td><td>A set of closed paths describing zero or more complex polygons. </td></tr>
@@ -421,7 +421,7 @@ Convex Hull</h2></td></tr>
 </table>
 </div><div class="memdoc">
 <p>Create a 2d cross-section from a set of contours using the nonzero winding rule: a sub-region is filled whenever its signed winding number is not zero. Both clockwise and counter-clockwise contours can enclose solid regions; oppositely wound overlapping contours cancel where their windings sum to zero. Unlike even-odd fill, a winding of two is still filled.</p>
-<p>The rule only controls how the input contours are read. The result has normal-oriented boundaries like any other <a class="el" href="classmanifold_1_1_cross_section.html" title="Two-dimensional cross sections guaranteed to be without self-intersections, or overlaps between polyg...">CrossSection</a>, so later operations retain their usual behavior. <a class="el" href="classmanifold_1_1_manifold.html#a37da082109050d748421069e22eff876">Manifold::Extrude</a> and <a class="el" href="classmanifold_1_1_manifold.html#a8c454a293abbf86f520e10266087f5a6">Manifold::Revolve</a> take raw contours without applying a fill rule; regularize nonzero input here first and pass NonZero(contours).<a class="el" href="#a209a83b1c39a84e094da9e854a7b8bc2">ToPolygons()</a> to them.</p>
+<p>The rule only controls how the input contours are read. The result has normal-oriented boundaries like any other <a class="el" href="classmanifold_1_1_cross_section.html" title="Two-dimensional cross sections guaranteed to be without self-intersections, or overlaps between polyg...">CrossSection</a>, so later operations retain their usual behavior. <a class="el" href="classmanifold_1_1_manifold.html#a37da082109050d748421069e22eff876">Manifold::Extrude</a> and <a class="el" href="classmanifold_1_1_manifold.html#a8d93a51d679579e50af9b5a6d6f3a58f">Manifold::Revolve</a> take raw contours without applying a fill rule; regularize nonzero input here first and pass NonZero(contours).<a class="el" href="#a209a83b1c39a84e094da9e854a7b8bc2">ToPolygons()</a> to them.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">contours</td><td>A set of closed paths describing zero or more complex polygons. </td></tr>
@@ -504,8 +504,8 @@ Convex Hull</h2></td></tr>
 
 </div>
 </div>
-<a id="af9c4ae1a5b602abdd9d9d41cfda32ecf" name="af9c4ae1a5b602abdd9d9d41cfda32ecf"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#af9c4ae1a5b602abdd9d9d41cfda32ecf">&#9670;&#160;</a></span>Circle()</h2>
+<a id="aefd23d6f50d8950751583180d4867a44" name="aefd23d6f50d8950751583180d4867a44"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aefd23d6f50d8950751583180d4867a44">&#9670;&#160;</a></span>Circle()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -521,7 +521,7 @@ Convex Hull</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>circularSegments</em></span><span class="paramdefsep"> = </span><span class="paramdefval">0</span>&#160;)</td>
+          <td class="paramtype"><a class="el" href="structmanifold_1_1_circular_quality.html">CircularQuality</a></td>          <td class="paramname"><span class="paramname"><em>quality</em></span><span class="paramdefsep"> = </span><span class="paramdefval">{}</span>&#160;)</td>
         </tr>
       </table>
   </td>
@@ -534,7 +534,7 @@ Convex Hull</h2></td></tr>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">radius</td><td>Radius of the circle. Must be positive and finite; otherwise returns an empty <a class="el" href="classmanifold_1_1_cross_section.html" title="Two-dimensional cross sections guaranteed to be without self-intersections, or overlaps between polyg...">CrossSection</a>. </td></tr>
-    <tr><td class="paramname">circularSegments</td><td>Number of segments along its diameter. Default is calculated by the static <a class="el" href="classmanifold_1_1_quality.html" title="These static properties control how circular shapes are quantized by default on construction.">Quality</a> defaults according to the radius. </td></tr>
+    <tr><td class="paramname">quality</td><td>Number of segments in a full circle, see <a class="el" href="structmanifold_1_1_circular_quality.html" title="Controls how circular shapes are quantized on construction. Pass one to CrossSection::Circle(),...">CircularQuality</a>. </td></tr>
   </table>
   </dd>
 </dl>
@@ -824,8 +824,8 @@ Convex Hull</h2></td></tr>
 
 </div>
 </div>
-<a id="a762b51c6a17e5a5f03e09ab79b4ad2ef" name="a762b51c6a17e5a5f03e09ab79b4ad2ef"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a762b51c6a17e5a5f03e09ab79b4ad2ef">&#9670;&#160;</a></span>Offset()</h2>
+<a id="acc76f09a11a354440c735d5dba4d9c7a" name="acc76f09a11a354440c735d5dba4d9c7a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#acc76f09a11a354440c735d5dba4d9c7a">&#9670;&#160;</a></span>Offset()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -848,7 +848,7 @@ Convex Hull</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>circularSegments</em></span><span class="paramdefsep"> = </span><span class="paramdefval">0</span>&#160;) const</td>
+          <td class="paramtype"><a class="el" href="structmanifold_1_1_circular_quality.html">CircularQuality</a></td>          <td class="paramname"><span class="paramname"><em>quality</em></span><span class="paramdefsep"> = </span><span class="paramdefval">{}</span>&#160;) const</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -858,7 +858,7 @@ Convex Hull</h2></td></tr>
     <tr><td class="paramname">delta</td><td>Positive deltas will cause the expansion of outlining contours to expand, and retraction of inner (hole) contours. Negative deltas will have the opposite effect. </td></tr>
     <tr><td class="paramname">jointype</td><td>The join type specifying the treatment of contour joins (corners). Defaults to Round. </td></tr>
     <tr><td class="paramname">miter_limit</td><td>The maximum distance in multiples of delta that vertices can be offset from their original positions with before squaring is applied, <b>when the join type is Miter</b> (default is 2, which is the minimum allowed). See the <a href="http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm">Clipper2 MiterLimit</a> page for a visual example. </td></tr>
-    <tr><td class="paramname">circularSegments</td><td>Number of segments per 360 degrees of <b><a class="el" href="group___structs.html#ggaef400c43b34e3ecc3f7b342aa821395dab7f41fc1412ad2ee75e9b2635d3b9d5c">JoinType::Round</a></b> corners (roughly, the number of vertices that will be added to each contour). Default is calculated by the static <a class="el" href="classmanifold_1_1_quality.html" title="These static properties control how circular shapes are quantized by default on construction.">Quality</a> defaults according to the radius. </td></tr>
+    <tr><td class="paramname">quality</td><td>Number of segments per 360 degrees of <b><a class="el" href="group___structs.html#ggaef400c43b34e3ecc3f7b342aa821395dab7f41fc1412ad2ee75e9b2635d3b9d5c">JoinType::Round</a></b> corners (roughly, the number of vertices that will be added to each contour), see <a class="el" href="structmanifold_1_1_circular_quality.html" title="Controls how circular shapes are quantized on construction. Pass one to CrossSection::Circle(),...">CircularQuality</a>. </td></tr>
   </table>
   </dd>
 </dl>

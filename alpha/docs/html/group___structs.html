@@ -105,8 +105,10 @@ Classes</h2></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Axis-aligned 3D box, primarily for bounding.  <a href="structmanifold_1_1_box.html#details">More...</a><br /></td></tr>
 <tr class="memitem:Rect" id="r_Rect"><td class="memItemLeft">struct &#160;</td><td class="memItemRight"><a class="el" href="structmanifold_1_1_rect.html">Rect</a></td></tr>
 <tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Axis-aligned 2D box, primarily for bounding.  <a href="structmanifold_1_1_rect.html#details">More...</a><br /></td></tr>
+<tr class="memitem:CircularQuality" id="r_CircularQuality"><td class="memItemLeft">struct &#160;</td><td class="memItemRight"><a class="el" href="structmanifold_1_1_circular_quality.html">CircularQuality</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Controls how circular shapes are quantized on construction. Pass one to <a class="el" href="classmanifold_1_1_cross_section.html#aefd23d6f50d8950751583180d4867a44">CrossSection::Circle()</a>, <a class="el" href="classmanifold_1_1_cross_section.html#acc76f09a11a354440c735d5dba4d9c7a">CrossSection::Offset()</a>, <a class="el" href="classmanifold_1_1_manifold.html#a421d0654cd84b5e9247d016e312b530c">Manifold::Cylinder()</a>, <a class="el" href="classmanifold_1_1_manifold.html#a3ac76da006069269f45a69faba4aea31">Manifold::Sphere()</a>, and <a class="el" href="classmanifold_1_1_manifold.html#a8d93a51d679579e50af9b5a6d6f3a58f">Manifold::Revolve()</a>.  <a href="structmanifold_1_1_circular_quality.html#details">More...</a><br /></td></tr>
 <tr class="memitem:Quality" id="r_Quality"><td class="memItemLeft">class &#160;</td><td class="memItemRight"><a class="el" href="classmanifold_1_1_quality.html">Quality</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">These static properties control how circular shapes are quantized by default on construction.  <a href="classmanifold_1_1_quality.html#details">More...</a><br /></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Global parameters for geometric computations.  <a href="classmanifold_1_1_quality.html#details">More...</a><br /></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-typedef-members" class="groupheader"><a id="typedef-members" name="typedef-members"></a>
 Typedefs</h2></td></tr>
@@ -135,15 +137,6 @@ Enumerations</h2></td></tr>
 , <a class="el" href="#ggaef400c43b34e3ecc3f7b342aa821395dae4396f81cd926bb129ccf3c147c64514">Miter</a>
 , <a class="el" href="#ggaef400c43b34e3ecc3f7b342aa821395da1b9ae4ca6d43fc984af318046e1e7bb5">Bevel</a>
  }</td></tr>
-</table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 id="header-var-members" class="groupheader"><a id="var-members" name="var-members"></a>
-Variables</h2></td></tr>
-<tr class="memitem:ga1c4fa5acf50c2134c48a3914ecb1520d" id="r_ga1c4fa5acf50c2134c48a3914ecb1520d"><td class="memItemLeft"><a id="ga1c4fa5acf50c2134c48a3914ecb1520d" name="ga1c4fa5acf50c2134c48a3914ecb1520d"></a>
-constexpr int&#160;</td><td class="memItemRight"><b>DEFAULT_SEGMENTS</b> = 0</td></tr>
-<tr class="memitem:gab2e0139af496dd06444656aa40957f45" id="r_gab2e0139af496dd06444656aa40957f45"><td class="memItemLeft"><a id="gab2e0139af496dd06444656aa40957f45" name="gab2e0139af496dd06444656aa40957f45"></a>
-constexpr double&#160;</td><td class="memItemRight"><b>DEFAULT_ANGLE</b> = 10.0</td></tr>
-<tr class="memitem:ga6186f3f519bdc9f3703f5f8abf21e1e6" id="r_ga6186f3f519bdc9f3703f5f8abf21e1e6"><td class="memItemLeft"><a id="ga6186f3f519bdc9f3703f5f8abf21e1e6" name="ga6186f3f519bdc9f3703f5f8abf21e1e6"></a>
-constexpr double&#160;</td><td class="memItemRight"><b>DEFAULT_LENGTH</b> = 1.0</td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Miscellaneous data structures for interfacing with this library. </p>

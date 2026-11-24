@@ -59,6 +59,26 @@ export declare type Box = {
 };
 
 /**
+ * Controls how circular shapes are quantized on construction. A number sets
+ * `segments`. Missing fields use their defaults.
+ *
+ * If segments is greater than two (for a sphere, positive), it takes
+ * precedence. Otherwise the minimum is used of the segments calculated based on
+ * edge length and angle, rounded up to the nearest multiple of four.
+ *
+ * - `segments`: Number of segments in a full 360-degree circle, the same as
+ *   passing a number. Partial revolves use the matching fraction of it,
+ *   rounded up, ignoring an excess of one unit in the last place so
+ *   floating-point error cannot add a division. A sphere rounds it up to a
+ *   multiple of four. Default is 0, meaning no constraint is applied.
+ * - `minAngle`: Minimum angle in degrees between consecutive segments. Default
+ *   is 10.
+ * - `minEdgeLength`: Minimum length of segments. Default is 1.
+ */
+export declare type CircularQuality =
+number|{segments?: number, minAngle?: number, minEdgeLength?: number};
+
+/**
  * Two-dimensional cross sections guaranteed to be without self-intersections,
  * or overlaps between polygons (from construction onwards). Polygon clipping
  * (boolean) and offsetting use Manifold's own robust floating-point predicates.
@@ -96,11 +116,11 @@ export declare class CrossSection {
      * Constructs a circle of a given radius.
      *
      * @param radius Radius of the circle. Must be positive.
-     * @param circularSegments Number of segments along its diameter. Default is
-     * calculated by the static Quality defaults according to the radius.
+     * @param quality Number of segments in a full circle, see
+     * {@link CircularQuality}.
      * @group Constructors
      */
-    static circle(radius: number, circularSegments?: number): CrossSection;
+    static circle(radius: number, quality?: CircularQuality): CrossSection;
 
     // Extrusions (2d to 3d manifold)
 
@@ -131,13 +151,15 @@ export declare class CrossSection {
      * cross the Y-axis, only the part on the positive X side is used.
      * Geometrically valid input will result in geometrically valid output.
      *
-     * @param circularSegments Number of segments along its diameter. Default is
-     * calculated by the static Defaults.
+     * @param quality Number of segments in a full circle, see
+     * {@link CircularQuality}. A partial revolve uses the matching fraction of
+     * it, rounded up, ignoring an excess of one unit in the last place. For an
+     * exact number of divisions, use {@link forDivisions}.
      * @param revolveDegrees Number of degrees to revolve. Must be finite and
      * nonzero. A negative value revolves the other way. Default is 360 degrees.
      * @group Transformations
      */
-    revolve(circularSegments?: number, revolveDegrees?: number): Manifold;
+    revolve(quality?: CircularQuality, revolveDegrees?: number): Manifold;
 
     // Transformations
 
@@ -217,15 +239,14 @@ export declare class CrossSection {
      * minimum allowed). See the [Clipper2
      * MiterLimit](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)
      * page for a visual example.
-     * @param circularSegments Number of segments per 360 degrees of
+     * @param quality Number of segments per 360 degrees of
      * <B>JoinType::Round</B> corners (roughly, the number of vertices that
-     * will be added to each contour). Default is calculated by the static Quality
-     * defaults according to the radius.
+     * will be added to each contour), see {@link CircularQuality}.
      * @group Transformations
      */
     offset(
     delta: number, joinType?: JoinType, miterLimit?: number,
-    circularSegments?: number): CrossSection;
+    quality?: CircularQuality): CrossSection;
 
     /**
      * Remove vertices from the contours in this CrossSection that are less than
@@ -510,6 +531,21 @@ export declare interface ExecutionContext {
 }
 
 /**
+ * Returns a quality that makes {@link Manifold.revolve} divide the given angle
+ * into exactly this many divisions. Like revolve, it uses the angle's
+ * magnitude, clamped to 360 degrees. A revolve of more than 120 degrees needs
+ * at least two divisions, and of more than 240 degrees at least three, and a
+ * tiny angle cannot get more divisions than the largest int count allows.
+ * Past those limits it returns the closest count revolve allows. A non-finite
+ * or zero angle, which revolve rejects, gives the default quality.
+ *
+ * @param divisions Number of divisions. Values below 1 are treated as 1.
+ * @param degrees Angle revolve will sweep.
+ */
+export declare function forDivisions(divisions: number, degrees: number):
+    {segments: number, minAngle: number, minEdgeLength: number};
+
+/**
  * Get the current duruation of the animation, in seconds.
  */
 export declare function getAnimationDuration(): number;
@@ -525,14 +561,6 @@ export declare function getAnimationFPS(): number;
 export declare function getAnimationMode(): AnimationMode;
 
 /**
- * Determine the appropriate number of segments for a given radius.
- *
- * @param radius For a given radius of circle, determine how many default
- * segments there will be.
- */
-export declare function getCircularSegments(radius: number): number;
-
-/**
  * Get a list of GLTF nodes that have been created in this model.
  *
  * This function only works in scripts directly evaluated by the manifoldCAD
@@ -544,23 +572,6 @@ export declare function getCircularSegments(radius: number): number;
  * @returns An array of GLTFNodes.
  */
 export declare function getGLTFNodes(): BaseGLTFNode[];
-
-/**
- * Get the current angle constraint.
- *
- * @returns The minimum angle in degrees between consecutive segments. The
- * angle will increase if the the segments hit the minimum edge length.
- * Default is 10 degrees.
- */
-export declare function getMinCircularAngle(): number;
-
-/**
- * Get the current edge length constraint.
- *
- * @returns The minimum length of segments. The length will
- * increase if the the segments hit the minimum angle. Default is 1.0.
- */
-export declare function getMinCircularEdgeLength(): number;
 
 /**
  * @inline
@@ -797,28 +808,28 @@ export declare class Manifold {
      * @param radiusLow Radius of bottom circle. Must be positive.
      * @param radiusHigh Radius of top circle. Can equal zero. Default is equal to
      * radiusLow.
-     * @param circularSegments How many line segments to use around the circle.
-     * Default is calculated by the static Defaults.
+     * @param quality How many line segments to use around the circle, see
+     * {@link CircularQuality}.
      * @param center Set to true to shift the center to the origin. Default is
      * origin at the bottom.
      * @group Constructors
      */
     static cylinder(
     height: number, radiusLow: number, radiusHigh?: number,
-    circularSegments?: number, center?: boolean): Manifold;
+    quality?: CircularQuality, center?: boolean): Manifold;
 
     /**
      * Constructs a geodesic sphere of a given radius.
      *
      * @param radius Radius of the sphere. Must be positive.
-     * @param circularSegments Number of segments along its
-     * diameter. This number will always be rounded up to the nearest factor of
-     * four, as this sphere is constructed by refining an octahedron. This means
-     * there are a circle of vertices on all three of the axis planes. Default is
-     * calculated by the static Defaults.
+     * @param quality Number of segments in a full circle, see
+     * {@link CircularQuality}. This number will always be rounded up to the
+     * nearest factor of four, as this sphere is constructed by refining an
+     * octahedron. This means there are a circle of vertices on all three of the
+     * axis planes.
      * @group Constructors
      */
-    static sphere(radius: number, circularSegments?: number): Manifold;
+    static sphere(radius: number, quality?: CircularQuality): Manifold;
 
     // Extrusions from 2d shapes
 
@@ -854,14 +865,16 @@ export declare class Manifold {
      * output.
      *
      * @param polygons A set of non-overlapping polygons to revolve.
-     * @param circularSegments Number of segments along its diameter. Default is
-     * calculated by the static Defaults.
+     * @param quality Number of segments in a full circle, see
+     * {@link CircularQuality}. A partial revolve uses the matching fraction of
+     * it, rounded up, ignoring an excess of one unit in the last place. For an
+     * exact number of divisions, use {@link forDivisions}.
      * @param revolveDegrees Number of degrees to revolve. Must be finite and
      * nonzero. A negative value revolves the other way. Default is 360 degrees.
      * @group Polygons
      */
     static revolve(
-    polygons: CrossSection|Polygons, circularSegments?: number,
+    polygons: CrossSection|Polygons, quality?: CircularQuality,
     revolveDegrees?: number): Manifold;
 
     // Mesh Conversion
@@ -1783,6 +1796,17 @@ export declare interface SealedFloat32Array<N extends number> extends Float32Arr
 export declare interface SealedUint32Array<N extends number> extends Uint32Array {
     length: N;
 }
+
+/**
+ * Returns the number of segments a circle of this radius gets with this
+ * quality.
+ *
+ * @param radius For a given radius of circle, determine how many segments
+ * there will be.
+ * @param quality The circular quality, see {@link CircularQuality}. Omit it
+ * for the defaults.
+ */
+export declare function segmentsFor(radius: number, quality?: CircularQuality): number;
 
 /**
  * Return a shallow copy of the input manifold with the given material

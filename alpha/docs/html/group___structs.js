@@ -60,14 +60,15 @@ var group___structs =
       [ "operator*=", "structmanifold_1_1_rect.html#a02fcd8a4fd938f130493a48349dcbabe", null ],
       [ "Transform", "structmanifold_1_1_rect.html#a9e0b6af248c25d0154dbf0d0b1cddb1c", null ]
     ] ],
+    [ "CircularQuality", "structmanifold_1_1_circular_quality.html", [
+      [ "SegmentsFor", "structmanifold_1_1_circular_quality.html#a92192ebb955898b1948cf906d21694bf", null ],
+      [ "ForDivisions", "structmanifold_1_1_circular_quality.html#a7fcc9a3d95af2f779174bb3b2d1aab71", null ],
+      [ "segments", "structmanifold_1_1_circular_quality.html#a32e4172d8952ac9f1db668982da57128", null ],
+      [ "minAngle", "structmanifold_1_1_circular_quality.html#a289eb8988776f812f50ee3e8d9cbbad2", null ],
+      [ "minEdgeLength", "structmanifold_1_1_circular_quality.html#aa03b4243ac640556600e2357551db20f", null ]
+    ] ],
     [ "Quality", "classmanifold_1_1_quality.html", [
       [ "SetRelativePrecision", "classmanifold_1_1_quality.html#a0b788f3338b1e3a4728dc61e3b00c583", null ],
-      [ "SetMinCircularAngle", "classmanifold_1_1_quality.html#a0c2040a91412e38387568d9886dc0a0d", null ],
-      [ "SetMinCircularEdgeLength", "classmanifold_1_1_quality.html#a83bab95001e6106324ec1da89b916518", null ],
-      [ "SetCircularSegments", "classmanifold_1_1_quality.html#a6333f6c738389041fd0fe9ac6575dc3e", null ],
-      [ "GetMinCircularAngle", "classmanifold_1_1_quality.html#aaa1a8e4bae899e60a3bbb7479d49ee07", null ],
-      [ "GetMinCircularEdgeLength", "classmanifold_1_1_quality.html#a3a9ac33d81933ba697c2950a55543b70", null ],
-      [ "GetCircularSegments", "classmanifold_1_1_quality.html#a76616b17d51c30b88fabe3d66cdb2aa1", null ],
       [ "ResetToDefaults", "classmanifold_1_1_quality.html#a44e4d5610bee38664e43a437892aa0c0", null ]
     ] ],
     [ "manifold::SimplePolygonIdx", "group___structs.html#gae59111461370c22408ad3690c1844555", null ],

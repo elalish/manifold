@@ -119,6 +119,7 @@ var annotated_dup =
         [ "Impl", "structmanifold_1_1_polygon_triangulator_1_1_impl.html", null ]
       ] ],
       [ "Box", "structmanifold_1_1_box.html", "structmanifold_1_1_box" ],
+      [ "CircularQuality", "structmanifold_1_1_circular_quality.html", "structmanifold_1_1_circular_quality" ],
       [ "CrossSection", "classmanifold_1_1_cross_section.html", "classmanifold_1_1_cross_section" ],
       [ "ExecutionContext", "classmanifold_1_1_execution_context.html", "classmanifold_1_1_execution_context" ],
       [ "ExecutionParams", "group___debug.html#structmanifold_1_1_execution_params", "group___debug_structmanifold_1_1_execution_params" ],

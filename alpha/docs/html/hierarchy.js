@@ -27,6 +27,7 @@ var hierarchy =
     [ "apply&lt; F, scalars_t&lt;&gt;, vec&lt; A, M &gt;, vec&lt; B, M &gt; &gt;", "structlinalg_1_1detail_1_1apply_3_01_f_00_01scalars__t_3_4_00_01vec_3_01_a_00_01_m_01_4_00_01vec_3_01_b_00_01_m_01_4_01_4.html", null ],
     [ "apply&lt; F, scalars_t&lt;&gt;, vec&lt; A, M &gt;, vec&lt; B, M &gt;, vec&lt; C, M &gt; &gt;", "structlinalg_1_1detail_1_1apply_3_01_f_00_01scalars__t_3_4_00_01vec_3_01_a_00_01_m_01_4_00_01vec9e57e2f9d53ba71e1bb5381f1a156b44.html", null ],
     [ "Box", "structmanifold_1_1_box.html", null ],
+    [ "CircularQuality", "structmanifold_1_1_circular_quality.html", null ],
     [ "clamp", "structlinalg_1_1detail_1_1clamp.html", null ],
     [ "converter&lt; T, U &gt;", "structlinalg_1_1converter.html", null ],
     [ "converter&lt; mat&lt; T, 1, 1 &gt;, identity_t &gt;", "structlinalg_1_1converter_3_01mat_3_01_t_00_011_00_011_01_4_00_01identity__t_01_4.html", null ],

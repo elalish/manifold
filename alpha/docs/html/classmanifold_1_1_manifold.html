@@ -154,8 +154,8 @@ Constructors</h2></td></tr>
 <tr class="memitem:a7f20b130779680156ce0d28d91e5d106" id="r_a7f20b130779680156ce0d28d91e5d106"><td class="memItemLeft">std::vector&lt; <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> &gt;&#160;</td><td class="memItemRight"><a class="el" href="#a7f20b130779680156ce0d28d91e5d106">Decompose</a> () const</td></tr>
 <tr class="memitem:afbd42733f05fb87dec1b3dae9ff9f582" id="r_afbd42733f05fb87dec1b3dae9ff9f582"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#afbd42733f05fb87dec1b3dae9ff9f582">Tetrahedron</a> ()</td></tr>
 <tr class="memitem:ad5486e9d0cff020565c3c20c1f496ab9" id="r_ad5486e9d0cff020565c3c20c1f496ab9"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#ad5486e9d0cff020565c3c20c1f496ab9">Cube</a> (vec3 size=vec3(1.0), bool center=false)</td></tr>
-<tr class="memitem:a879b867522c562c7166af539894a2815" id="r_a879b867522c562c7166af539894a2815"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a879b867522c562c7166af539894a2815">Cylinder</a> (double height, double radiusLow, double radiusHigh=-1.0, int circularSegments=0, bool center=false)</td></tr>
-<tr class="memitem:a606301a59534ef00a89dc7d7a132abe6" id="r_a606301a59534ef00a89dc7d7a132abe6"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a606301a59534ef00a89dc7d7a132abe6">Sphere</a> (double radius, int circularSegments=0)</td></tr>
+<tr class="memitem:a421d0654cd84b5e9247d016e312b530c" id="r_a421d0654cd84b5e9247d016e312b530c"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a421d0654cd84b5e9247d016e312b530c">Cylinder</a> (double height, double radiusLow, double radiusHigh=-1.0, <a class="el" href="structmanifold_1_1_circular_quality.html">CircularQuality</a> quality={}, bool center=false)</td></tr>
+<tr class="memitem:a3ac76da006069269f45a69faba4aea31" id="r_a3ac76da006069269f45a69faba4aea31"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a3ac76da006069269f45a69faba4aea31">Sphere</a> (double radius, <a class="el" href="structmanifold_1_1_circular_quality.html">CircularQuality</a> quality={})</td></tr>
 <tr class="memitem:a098fe7bfec8a178d3d2113ba33b09d26" id="r_a098fe7bfec8a178d3d2113ba33b09d26"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a098fe7bfec8a178d3d2113ba33b09d26">LevelSet</a> (std::function&lt; double(vec3)&gt; sdf, <a class="el" href="structmanifold_1_1_box.html">Box</a> bounds, double edgeLength, double level=0, double tolerance=-1, bool canParallel=true)</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-member-group" class="groupheader"><a id="member-group" name="member-group"></a>
@@ -165,7 +165,7 @@ Polygons</h2></td></tr>
 <tr class="memitem:ad03837de2290a269fa14e0773c9913fa" id="r_ad03837de2290a269fa14e0773c9913fa"><td class="memItemLeft"><a class="el" href="group___structs.html#ga60a66d8ddacc086bb45d8afc37f646d1">Polygons</a>&#160;</td><td class="memItemRight"><a class="el" href="#ad03837de2290a269fa14e0773c9913fa">Slice</a> (double height=0) const</td></tr>
 <tr class="memitem:a328657b69e9bbaaee148572ca314677c" id="r_a328657b69e9bbaaee148572ca314677c"><td class="memItemLeft"><a class="el" href="group___structs.html#ga60a66d8ddacc086bb45d8afc37f646d1">Polygons</a>&#160;</td><td class="memItemRight"><a class="el" href="#a328657b69e9bbaaee148572ca314677c">Project</a> () const</td></tr>
 <tr class="memitem:a37da082109050d748421069e22eff876" id="r_a37da082109050d748421069e22eff876"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a37da082109050d748421069e22eff876">Extrude</a> (const <a class="el" href="group___structs.html#ga60a66d8ddacc086bb45d8afc37f646d1">Polygons</a> &amp;crossSection, double height, int nDivisions=0, double twistDegrees=0.0, vec2 scaleTop=vec2(1.0))</td></tr>
-<tr class="memitem:a8c454a293abbf86f520e10266087f5a6" id="r_a8c454a293abbf86f520e10266087f5a6"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a8c454a293abbf86f520e10266087f5a6">Revolve</a> (const <a class="el" href="group___structs.html#ga60a66d8ddacc086bb45d8afc37f646d1">Polygons</a> &amp;crossSection, int circularSegments=0, double revolveDegrees=360.0f)</td></tr>
+<tr class="memitem:a8d93a51d679579e50af9b5a6d6f3a58f" id="r_a8d93a51d679579e50af9b5a6d6f3a58f"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a8d93a51d679579e50af9b5a6d6f3a58f">Revolve</a> (const <a class="el" href="group___structs.html#ga60a66d8ddacc086bb45d8afc37f646d1">Polygons</a> &amp;crossSection, <a class="el" href="structmanifold_1_1_circular_quality.html">CircularQuality</a> quality={}, double revolveDegrees=360.0f)</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-member-group" class="groupheader"><a id="member-group" name="member-group"></a>
 Information</h2></td></tr>
@@ -266,8 +266,8 @@ I/O</h2></td></tr>
 <div class="line">  }</div>
 <div class="line">  ifile.close();</div>
 <div class="line">}</div>
-<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:347</div></div>
-<div class="ttc" id="aclassmanifold_1_1_manifold_html_ad5f60691d05e3402630122740cdf3a0b"><div class="ttname"><a href="#ad5f60691d05e3402630122740cdf3a0b">manifold::Manifold::Manifold</a></div><div class="ttdeci">Manifold()</div><div class="ttdef"><b>Definition</b> manifold.cpp:174</div></div>
+<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:286</div></div>
+<div class="ttc" id="aclassmanifold_1_1_manifold_html_ad5f60691d05e3402630122740cdf3a0b"><div class="ttname"><a href="#ad5f60691d05e3402630122740cdf3a0b">manifold::Manifold::Manifold</a></div><div class="ttdeci">Manifold()</div><div class="ttdef"><b>Definition</b> manifold.cpp:113</div></div>
 </div><!-- fragment --><p>Writing: </p><div class="fragment"><div class="line">std::ofstream ofile;</div>
 <div class="line">ofile.open(filename);</div>
 <div class="line"><span class="keywordflow">if</span> (ofile.is_open()) {</div>
@@ -488,8 +488,8 @@ Testing Hooks</h2></td></tr>
 
 </div>
 </div>
-<a id="a879b867522c562c7166af539894a2815" name="a879b867522c562c7166af539894a2815"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a879b867522c562c7166af539894a2815">&#9670;&#160;</a></span>Cylinder()</h2>
+<a id="a421d0654cd84b5e9247d016e312b530c" name="a421d0654cd84b5e9247d016e312b530c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a421d0654cd84b5e9247d016e312b530c">&#9670;&#160;</a></span>Cylinder()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -515,7 +515,7 @@ Testing Hooks</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>circularSegments</em></span><span class="paramdefsep"> = </span><span class="paramdefval">0</span>, </td>
+          <td class="paramtype"><a class="el" href="structmanifold_1_1_circular_quality.html">CircularQuality</a></td>          <td class="paramname"><span class="paramname"><em>quality</em></span><span class="paramdefsep"> = </span><span class="paramdefval">{}</span>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -536,7 +536,7 @@ Testing Hooks</h2></td></tr>
     <tr><td class="paramname">height</td><td>Z-extent. Must be positive and finite. </td></tr>
     <tr><td class="paramname">radiusLow</td><td>Radius of bottom circle. Must be non-negative and finite. If zero, radiusHigh must be positive and a cone with apex at the bottom is created. </td></tr>
     <tr><td class="paramname">radiusHigh</td><td>Radius of top circle. Must be finite and can equal zero. Negative values, including the default, use radiusLow. </td></tr>
-    <tr><td class="paramname">circularSegments</td><td>How many line segments to use around the circle. Default is calculated by the static Defaults. </td></tr>
+    <tr><td class="paramname">quality</td><td>How many line segments to use around the circle, see <a class="el" href="structmanifold_1_1_circular_quality.html" title="Controls how circular shapes are quantized on construction. Pass one to CrossSection::Circle(),...">CircularQuality</a>. </td></tr>
     <tr><td class="paramname">center</td><td>Set to true to shift the center to the origin. Default is origin at the bottom. </td></tr>
   </table>
   </dd>
@@ -544,8 +544,8 @@ Testing Hooks</h2></td></tr>
 
 </div>
 </div>
-<a id="a606301a59534ef00a89dc7d7a132abe6" name="a606301a59534ef00a89dc7d7a132abe6"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a606301a59534ef00a89dc7d7a132abe6">&#9670;&#160;</a></span>Sphere()</h2>
+<a id="a3ac76da006069269f45a69faba4aea31" name="a3ac76da006069269f45a69faba4aea31"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a3ac76da006069269f45a69faba4aea31">&#9670;&#160;</a></span>Sphere()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -561,7 +561,7 @@ Testing Hooks</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>circularSegments</em></span><span class="paramdefsep"> = </span><span class="paramdefval">0</span>&#160;)</td>
+          <td class="paramtype"><a class="el" href="structmanifold_1_1_circular_quality.html">CircularQuality</a></td>          <td class="paramname"><span class="paramname"><em>quality</em></span><span class="paramdefsep"> = </span><span class="paramdefval">{}</span>&#160;)</td>
         </tr>
       </table>
   </td>
@@ -574,7 +574,7 @@ Testing Hooks</h2></td></tr>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">radius</td><td>Radius of the sphere. Must be positive and finite; otherwise returns an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with InvalidConstruction status. </td></tr>
-    <tr><td class="paramname">circularSegments</td><td>Number of segments along its diameter. This number will always be rounded up to the nearest factor of four, as this sphere is constructed by refining an octahedron. This means there are a circle of vertices on all three of the axis planes. Default is calculated by the static Defaults. </td></tr>
+    <tr><td class="paramname">quality</td><td>Number of segments in a full circle, see <a class="el" href="structmanifold_1_1_circular_quality.html" title="Controls how circular shapes are quantized on construction. Pass one to CrossSection::Circle(),...">CircularQuality</a>. This number will always be rounded up to the nearest factor of four, as this sphere is constructed by refining an octahedron. This means there are a circle of vertices on all three of the axis planes. </td></tr>
   </table>
   </dd>
 </dl>
@@ -733,8 +733,8 @@ Testing Hooks</h2></td></tr>
 
 </div>
 </div>
-<a id="a8c454a293abbf86f520e10266087f5a6" name="a8c454a293abbf86f520e10266087f5a6"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#a8c454a293abbf86f520e10266087f5a6">&#9670;&#160;</a></span>Revolve()</h2>
+<a id="a8d93a51d679579e50af9b5a6d6f3a58f" name="a8d93a51d679579e50af9b5a6d6f3a58f"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a8d93a51d679579e50af9b5a6d6f3a58f">&#9670;&#160;</a></span>Revolve()</h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -750,7 +750,7 @@ Testing Hooks</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">int</td>          <td class="paramname"><span class="paramname"><em>circularSegments</em></span><span class="paramdefsep"> = </span><span class="paramdefval">0</span>, </td>
+          <td class="paramtype"><a class="el" href="structmanifold_1_1_circular_quality.html">CircularQuality</a></td>          <td class="paramname"><span class="paramname"><em>quality</em></span><span class="paramdefsep"> = </span><span class="paramdefval">{}</span>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
@@ -768,7 +768,7 @@ Testing Hooks</h2></td></tr>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">crossSection</td><td>A set of non-overlapping polygons to revolve. </td></tr>
-    <tr><td class="paramname">circularSegments</td><td>Number of segments along its diameter. Default is calculated by the static Defaults. </td></tr>
+    <tr><td class="paramname">quality</td><td>Number of segments in a full circle, see <a class="el" href="structmanifold_1_1_circular_quality.html" title="Controls how circular shapes are quantized on construction. Pass one to CrossSection::Circle(),...">CircularQuality</a>. A partial revolve uses the matching fraction of it, rounded up, ignoring an excess of one unit in the last place. For an exact number of divisions, use <a class="el" href="structmanifold_1_1_circular_quality.html#a7fcc9a3d95af2f779174bb3b2d1aab71">CircularQuality::ForDivisions()</a>. </td></tr>
     <tr><td class="paramname">revolveDegrees</td><td>Number of degrees to revolve. Must be finite and nonzero. A negative value revolves the other way. Default is 360 degrees. </td></tr>
   </table>
   </dd>

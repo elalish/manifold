@@ -31,9 +31,11 @@ var searchData=
   ['meshglp_3c_20double_2c_20uint64_5ft_20_3e_28',['MeshGLP&lt; double, uint64_t &gt;',['../structmanifold_1_1_mesh_g_l_p.html',1,'manifold']]],
   ['meshglp_3c_20float_20_3e_29',['MeshGLP&lt; float &gt;',['../structmanifold_1_1_mesh_g_l_p.html',1,'manifold']]],
   ['min_30',['min',['../structlinalg_1_1detail_1_1min.html',1,'linalg::detail']]],
-  ['mingap_31',['MinGap',['../classmanifold_1_1_manifold.html#a1b7ab47f4da039eb3dff5b46ba71658b',1,'manifold::Manifold']]],
-  ['minkowskidifference_32',['MinkowskiDifference',['../classmanifold_1_1_manifold.html#a47715067c292eeaafdc48aab3a604829',1,'manifold::Manifold']]],
-  ['minkowskisum_33',['MinkowskiSum',['../classmanifold_1_1_manifold.html#ae174a8240802779eca5a0416af7ea78b',1,'manifold::Manifold']]],
-  ['mirror_34',['Mirror',['../classmanifold_1_1_manifold.html#ad76d89178ca970900c81f2927f8c7f11',1,'manifold::Manifold::Mirror()'],['../classmanifold_1_1_cross_section.html#a3bdcbaf979a769af24a9d61624e639e8',1,'manifold::CrossSection::Mirror()']]],
-  ['miter_35',['Miter',['../group___structs.html#ggaef400c43b34e3ecc3f7b342aa821395dae4396f81cd926bb129ccf3c147c64514',1,'manifold']]]
+  ['minangle_31',['minAngle',['../structmanifold_1_1_circular_quality.html#a289eb8988776f812f50ee3e8d9cbbad2',1,'manifold::CircularQuality']]],
+  ['minedgelength_32',['minEdgeLength',['../structmanifold_1_1_circular_quality.html#aa03b4243ac640556600e2357551db20f',1,'manifold::CircularQuality']]],
+  ['mingap_33',['MinGap',['../classmanifold_1_1_manifold.html#a1b7ab47f4da039eb3dff5b46ba71658b',1,'manifold::Manifold']]],
+  ['minkowskidifference_34',['MinkowskiDifference',['../classmanifold_1_1_manifold.html#a47715067c292eeaafdc48aab3a604829',1,'manifold::Manifold']]],
+  ['minkowskisum_35',['MinkowskiSum',['../classmanifold_1_1_manifold.html#ae174a8240802779eca5a0416af7ea78b',1,'manifold::Manifold']]],
+  ['mirror_36',['Mirror',['../classmanifold_1_1_manifold.html#ad76d89178ca970900c81f2927f8c7f11',1,'manifold::Manifold::Mirror()'],['../classmanifold_1_1_cross_section.html#a3bdcbaf979a769af24a9d61624e639e8',1,'manifold::CrossSection::Mirror()']]],
+  ['miter_37',['Miter',['../group___structs.html#ggaef400c43b34e3ecc3f7b342aa821395dae4396f81cd926bb129ccf3c147c64514',1,'manifold']]]
 ];
