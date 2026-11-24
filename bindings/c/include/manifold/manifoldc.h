@@ -277,7 +277,7 @@ int manifold_winding_number(const ManifoldManifold* m, double x, double y,
 // long-running Manifold evaluation. Attach it with manifold_with_context,
 // then call manifold_status or one of the eager ops listed there on the
 // result. Safe to read/write from any thread. See the ExecutionContext
-// class in common.h for full semantics (sticky cancel, per-boolean
+// class in common.h for full semantics (sticky cancel, cancellation
 // granularity).
 ManifoldExecutionContext* manifold_execution_context(void);
 void manifold_execution_context_cancel(ManifoldExecutionContext* ctx);
@@ -457,7 +457,6 @@ ManifoldCircularQuality manifold_circular_quality_for_divisions(int divisions,
 
 // Manifold Mesh Extraction
 
-// The buffer is borrowed from `m` and is only valid for the lifetime of `m`.
 size_t manifold_meshgl_num_prop(const ManifoldMeshGL* m);
 size_t manifold_meshgl_num_vert(const ManifoldMeshGL* m);
 size_t manifold_meshgl_num_tri(const ManifoldMeshGL* m);
@@ -470,6 +469,7 @@ size_t manifold_meshgl_run_transform_length(const ManifoldMeshGL* m);
 size_t manifold_meshgl_face_id_length(const ManifoldMeshGL* m);
 size_t manifold_meshgl_tangent_length(const ManifoldMeshGL* m);
 size_t manifold_meshgl_run_flags_length(const ManifoldMeshGL* m);
+// The buffer is borrowed from `m` and is only valid for the lifetime of `m`.
 const float* manifold_meshgl_vert_properties(const ManifoldMeshGL* m);
 const uint32_t* manifold_meshgl_tri_verts(const ManifoldMeshGL* m);
 const uint32_t* manifold_meshgl_merge_from_vert(const ManifoldMeshGL* m);
@@ -561,8 +561,8 @@ void manifold_write_obj(const ManifoldManifold* manifold,
 // 1. Temporary null-terminated string buffer, containing the content of the
 //    file. This buffer will be freed automatically after returning from the
 //    callback.
-// 2. An arg value (the third parameter in the manifold_write_obj function), for
-//    passing additional data into the callback.
+// 2. An arg value (the third parameter in the manifold_meshgl64_write_obj
+//    function), for passing additional data into the callback.
 void manifold_meshgl64_write_obj(const ManifoldMeshGL64* mesh,
                                  void (*callback)(char*, void*), void* args);
 #endif
