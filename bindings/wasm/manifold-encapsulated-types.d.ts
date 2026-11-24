@@ -1156,8 +1156,8 @@ export class Manifold {
    * of points has float epsilon, about 1.2e-7. One made from a Mesh64 has
    * {@link MIN_RELATIVE_PRECISION} (1e-12). withPrecision() sets it, other
    * operations on one Manifold keep it, and operations on several take the
-   * smallest among their non-empty inputs. An empty Boolean result takes the
-   * smallest among all its inputs.
+   * smallest among their non-empty inputs. An empty Boolean or Minkowski result
+   * takes the smallest among all its inputs.
    *
    * @group Information
    */

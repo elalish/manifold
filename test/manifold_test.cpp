@@ -2314,6 +2314,13 @@ TEST(Precision, SmallestKeepsFineDetail) {
             1e-3);
   EXPECT_EQ(Manifold::Hull({Manifold(), far}).GetPrecision(), 1e-2);
   EXPECT_EQ(sphere.WithPrecision(1e-3).MinkowskiSum(far).GetPrecision(), 1e-3);
+  // An empty Minkowski result has the smaller precision, in either order.
+  const Manifold empty2 = Manifold().WithPrecision(1e-2);
+  const Manifold empty3 = Manifold().WithPrecision(1e-3);
+  EXPECT_EQ(empty2.MinkowskiSum(empty3).GetPrecision(), 1e-3);
+  EXPECT_EQ(empty3.MinkowskiSum(empty2).GetPrecision(), 1e-3);
+  EXPECT_EQ(empty2.MinkowskiDifference(cube.WithPrecision(1e-3)).GetPrecision(),
+            1e-3);
   EXPECT_EQ(far.MinkowskiDifference(cube.WithPrecision(1e-3).Scale(vec3(0.1)))
                 .GetPrecision(),
             1e-3);

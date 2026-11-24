@@ -356,8 +356,8 @@ Manifold Manifold::WithPrecision(double relPrecision) const {
  * of points has kDefaultRelativePrecision. One made from MeshGL64 or by
  * ReadOBJ() has kMinRelativePrecision. WithPrecision() sets it, other
  * operations on one Manifold keep it, and operations on several take the
- * smallest among their non-empty inputs. An empty Boolean result takes the
- * smallest among all its inputs.
+ * smallest among their non-empty inputs. An empty Boolean or Minkowski result
+ * takes the smallest among all its inputs.
  */
 double Manifold::GetPrecision() const {
   return GetCsgLeafNode(AtomicLoadShared(&ctx_).get()).RelPrecision();

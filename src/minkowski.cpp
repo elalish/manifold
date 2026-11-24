@@ -52,8 +52,16 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
   };
   if (IsCancelled(ctx)) return cancelled();
 
+  // The result has the finer precision of the two operands, including an
+  // empty result. A non-empty result ignores an empty operand.
+  const double relPrecision = std::min(relPrecision_, other.relPrecision_);
+
   // Eroding an empty base must not return the other operand.
-  if (inset && IsEmpty()) return Manifold(std::make_shared<Impl>(*this));
+  if (inset && IsEmpty()) {
+    auto result = std::make_shared<Impl>(*this);
+    result->relPrecision_ = relPrecision;
+    return Manifold(result);
+  }
 
   const Impl* aImpl = this;
   const Impl* bImpl = &other;
@@ -72,6 +80,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
   // Early-exit if either input is empty
   if (bImpl->IsEmpty()) {
     std::shared_ptr<Impl> result = std::make_shared<Impl>(*aImpl);
+    if (aImpl->IsEmpty()) result->relPrecision_ = relPrecision;
     return Manifold(result);
   }
   if (aImpl->IsEmpty()) {
@@ -79,10 +88,8 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
     return Manifold(result);
   }
 
-  // The hulls use the finer precision of the two operands, so the Booleans
-  // that combine them do too.
-  const double relPrecision =
-      std::min(aImpl->relPrecision_, bImpl->relPrecision_);
+  // The hulls use the finer precision, so the Booleans that combine them do
+  // too.
   auto hull = [relPrecision](const std::vector<vec3>& pts) {
     auto impl = std::make_shared<Impl>();
     impl->relPrecision_ = relPrecision;
