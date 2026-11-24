@@ -62,11 +62,6 @@ export function segmentsFor(radius: number, quality?: CircularQuality): number;
  */
 export function forDivisions(divisions: number, degrees: number):
     {segments: number, minAngle: number, minEdgeLength: number};
-
-/**
- * Resets the relative precision to its default.
- */
-export function resetToCircularDefaults(): void;
 ///@}
 
 /**

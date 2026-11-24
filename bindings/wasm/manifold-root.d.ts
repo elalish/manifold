@@ -24,10 +24,10 @@
  */
 
 export type * from './manifold-global-types';
-export type {MeshOptions, triangulate, segmentsFor, forDivisions, resetToCircularDefaults} from './manifold-encapsulated-types';
+export type {MeshOptions, triangulate, segmentsFor, forDivisions} from './manifold-encapsulated-types';
 export {CrossSection, Manifold, Mesh} from './manifold-encapsulated-types';
 
-import type {triangulate, segmentsFor, forDivisions, resetToCircularDefaults} from './manifold-encapsulated-types';
+import type {triangulate, segmentsFor, forDivisions} from './manifold-encapsulated-types';
 import {CrossSection, Manifold, Mesh} from './manifold-encapsulated-types';
 
 export interface ManifoldToplevel {
@@ -37,7 +37,6 @@ export interface ManifoldToplevel {
   triangulate: typeof triangulate;
   segmentsFor: typeof segmentsFor;
   forDivisions: typeof forDivisions;
-  resetToCircularDefaults: typeof resetToCircularDefaults;
   setup: () => void;
 }
 

@@ -233,9 +233,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
       "_manifoldHullPoints",
       select_overload<Manifold(const std::vector<vec3>&)>(&Manifold::Hull));
 
-  // Quality Globals
-  function("resetToCircularDefaults", &Quality::ResetToDefaults);
-
   function("_DefaultCircularQuality", &js::DefaultCircularQuality);
   function("_SegmentsFor", &js::SegmentsFor);
   function("_ForDivisions", &CircularQuality::ForDivisions);

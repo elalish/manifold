@@ -91,11 +91,6 @@ int CircularQuality::SegmentsFor(double radius) const {
 }
 
 /**
- * Quality has no settings left, so this does nothing.
- */
-void Quality::ResetToDefaults() {}
-
-/**
  * Construct an empty Manifold.
  *
  */
