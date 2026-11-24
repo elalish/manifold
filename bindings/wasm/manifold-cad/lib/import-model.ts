@@ -160,7 +160,7 @@ function getSourceFilename(source: string|Blob|URL|ArrayBuffer): string|
  * Returns true if a given extension or mimetype can be imported.
  *
  * @param filetype
- * @param throwOnFailure If true, throw an `UnsupportedFormatException` rather
+ * @param throwOnFailure If true, throw an `UnsupportedFormatError` rather
  *     than return false.
  * @group Management
  */

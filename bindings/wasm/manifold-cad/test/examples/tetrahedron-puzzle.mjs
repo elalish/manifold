@@ -44,9 +44,9 @@ const result =
 
 // Assigned materials are only applied to a GLTFNode. Note that material
 // definitions cascade, applying recursively to all child surfaces, but
-// overridden by any materials defined lower down. The default material
-// properties, as well as animation parameters can be set via
-// globalDefaults.
+// overridden by any materials defined lower down. Animation parameters
+// can be set with setAnimationDuration(), setAnimationFPS() and
+// setAnimationMode().
 
 const layFlat = new GLTFNode();
 layFlat.rotation =
