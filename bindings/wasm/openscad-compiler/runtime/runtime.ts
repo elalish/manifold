@@ -3,7 +3,7 @@
  * Loaded via import from compiled files. Initializes manifold-3d and provides
  * OpenSCAD built-ins and helpers. Exports all symbols for use by compiled code.
  */
-import Module, {type Polygons, type SimplePolygon} from 'manifold-3d';
+import Module, {type JoinType, type Mat3, type Mat4, type Polygons, type SimplePolygon, type Vec3} from 'manifold-3d';
 import * as opentype from 'opentype.js';
 
 import {computeFontData} from './utils/font.js';
@@ -12,35 +12,44 @@ import {computeSurfaceData} from './utils/surface.js';
 const opentypeParse = opentype.parse || (opentype).default?.parse;
 
 declare const document: Document|undefined;
-declare const OffscreenCanvas: OffscreenCanvas|undefined;
+declare const OffscreenCanvas:
+    {new (width: number, height: number): OffscreenCanvas}|undefined;
 type Vec = (number|Vec)[];
+
+type ScadFunction = ((...args: ScadValue[]) => ScadValue)&{__oscadSrc?: string};
+type ScadValue = number|string|boolean|undefined|ScadValue[]|ScadFunction;
 
 const wasm = await Module();
 wasm.setup();
 const {Manifold, CrossSection, Mesh} = wasm;
 
-function is_undef(x: any): boolean|undefined {
+type Shape = InstanceType<typeof Manifold|typeof CrossSection>;
+
+function is_undef(x: ScadValue): boolean|undefined {
   return arguments.length === 1 ? (x === undefined || x === null) : undefined;
 }
-function is_bool(x: any): boolean|undefined {
+function is_bool(x: ScadValue): boolean|undefined {
   return arguments.length === 1 ? (typeof x === 'boolean') : undefined;
 }
-function is_num(x: any): boolean|undefined {
+function is_num(x: ScadValue): boolean|undefined {
   return arguments.length === 1 ? (typeof x === 'number' && !Number.isNaN(x)) :
                                   undefined;
 }
-function is_string(x: any): boolean|undefined {
+function is_string(x: ScadValue): boolean|undefined {
   return arguments.length === 1 ? (typeof x === 'string') : undefined;
 }
-function is_list(x: any): boolean|undefined {
+function is_list(x: ScadValue): boolean|undefined {
   return arguments.length === 1 ? Array.isArray(x) : undefined;
 }
-function is_function(x: any): boolean|undefined {
+function is_function(x: ScadValue): boolean|undefined {
   return arguments.length === 1 ? (typeof x === 'function') : undefined;
 }
+function is_finite_number(v: ScadValue): v is number {
+  return typeof v === 'number' && Number.isFinite(v);
+}
 
-// unknown/undefined function or disabled experimental builting function calls
-function unknown_fn(_name: string, ..._args: any[]): undefined {
+// unknown/undefined function or disabled experimental builtin function calls
+function unknown_fn(_name: string, ..._args: ScadValue[]): undefined {
   return undefined;
 }
 
@@ -206,8 +215,9 @@ function log<B extends number, X extends number>(base: B, x?: X): number|
 
 type NumericReducer = (a: number, b: number) => number;
 
-function minmax(reduce: NumericReducer, a: unknown[]): number|undefined {
-  const vals: unknown[] = a.length === 1 && Array.isArray(a[0]) ? a[0] : a;
+function minmax(reduce: NumericReducer, args: ScadValue[]): number|undefined {
+  const vals: ScadValue[] =
+      args.length === 1 && Array.isArray(args[0]) ? args[0] : args;
 
   if (vals.length === 0) return undefined;
 
@@ -215,18 +225,17 @@ function minmax(reduce: NumericReducer, a: unknown[]): number|undefined {
 
   for (const v of vals) {
     if (typeof v !== 'number') return undefined;
-
     acc = acc === undefined ? v : reduce(acc, v);
   }
 
   return acc;
 }
 
-function min(...a: unknown[]): number|undefined {
+function min(...a: ScadValue[]): number|undefined {
   return minmax(Math.min, a);
 }
 
-function max(...a: unknown[]): number|undefined {
+function max(...a: ScadValue[]): number|undefined {
   return minmax(Math.max, a);
 }
 
@@ -284,26 +293,20 @@ function len<T extends string|Vec>(x: T): number|undefined {
   return undefined;
 }
 
-function ostr<T>(x: T): string {
-  if (x === undefined || x === null) return 'undef';
+function ostr(x: ScadValue): string {
+  if (x === undefined) return 'undef';
   if (typeof x === 'boolean') return x ? 'true' : 'false';
   if (typeof x === 'string') return x;
   if (Array.isArray(x)) return '[' + x.map(ostrInner).join(', ') + ']';
-  if (typeof x === 'function') return (x as any).__oscadSrc ?? String(x);
+  if (typeof x === 'function') return x.__oscadSrc ?? String(x);
 
   return String(x);
 }
 
 // prints `function(args) body` like OpenSCAD
-type OpenSCADFunction = (...args: never[]) => unknown;
-
-type OpenSCADFunctionWithSource = OpenSCADFunction&{
-  __oscadSrc?: string;
-};
-
-function fnlit<F extends OpenSCADFunction>(fn: F, src: string): F {
+function fnlit<F extends ScadFunction>(fn: F, src: string): F {
   try {
-    (fn as OpenSCADFunctionWithSource).__oscadSrc = src;
+    fn.__oscadSrc = src;
   } catch {
     // Ignore if the function is not extensible
   }
@@ -314,37 +317,27 @@ function fnlit<F extends OpenSCADFunction>(fn: F, src: string): F {
 // Trampolines tail calls made via function values by wrapping them in `TC`
 // thunks that `call` iterates instead of recursing, keeping self-recursion
 // through function values off the JS call stack
-type AnyFunction = (...args: never[]) => unknown;
-class TC {
-  fn: unknown;
-  args: unknown[];
-
-  constructor(fn: unknown, args: unknown[]) {
-    this.fn = fn;
-    this.args = args;
-  }
+class TC<R extends ScadValue> {
+  constructor(readonly next: () => R | TC<R>) {}
 }
-function tc<F extends AnyFunction>(fn: F, ...args: Parameters<F>): TC {
-  return new TC(fn, args);
+
+function tc<A extends ScadValue[], R extends ScadValue>(
+    fn: (...args: A) => R | TC<R>, ...args: A): TC<R> {
+  return new TC(() => fn(...args));
 }
-function call<F extends AnyFunction>(
-    fn: F, ...args: Parameters<F>): ReturnType<F>|undefined {
-  if (typeof fn !== 'function') return undefined;
 
-  let r: unknown = fn(...args);
-
-  while (r instanceof TC) {
-    if (typeof r.fn !== 'function') return undefined;
-
-    r = (r.fn as AnyFunction)(...(r.args as never[]));
-  }
-
-  return r as ReturnType<F>;
+function call<A extends ScadValue[], R extends ScadValue>(
+    fn: (...args: A) => R | TC<R>, ...args: A): R {
+  let r = fn(...args);
+  while (r instanceof TC) r = r.next();
+  return r;
 }
-function ostrInner(x: unknown): string {
+
+
+function ostrInner(x: ScadValue): string {
   return typeof x === 'string' ? `"${x}"` : ostr(x);
 }
-function str(...a: unknown[]): string {
+function str(...a: ScadValue[]): string {
   return a.map(ostr).join('');
 }
 
@@ -369,7 +362,7 @@ function echoEscape(s: string): string {
   return r;
 }
 
-function oecho(x: unknown): string {
+function oecho(x: ScadValue): string {
   if (typeof x === 'string') return '"' + echoEscape(x) + '"';
   if (Array.isArray(x)) return '[' + x.map(oecho).join(', ') + ']';
   return ostr(x);
@@ -388,7 +381,7 @@ function chrOne(c: number): string {
 }
 
 
-function chrCollect(x: unknown, out: string[]): void {
+function chrCollect(x: ScadValue, out: string[]): void {
   if (Array.isArray(x)) {
     for (const e of x) {
       chrCollect(e, out);
@@ -403,14 +396,14 @@ function chrCollect(x: unknown, out: string[]): void {
 }
 
 // OpenSCAD chr()
-function chr(...args: unknown[]): string {
+function chr(...args: ScadValue[]): string {
   const out: string[] = [];
   for (const a of args) chrCollect(a, out);
   return out.join('');
 }
 
 // OpenSCAD ord()
-function ord(...args: unknown[]): number|undefined {
+function ord(...args: ScadValue[]): number|undefined {
   if (args.length !== 1) return undefined;
 
   const s = args[0];
@@ -419,8 +412,8 @@ function ord(...args: unknown[]): number|undefined {
 }
 
 // OpenSCAD's concat
-function concat(...a: unknown[]): unknown[] {
-  const out: unknown[] = [];
+function concat(...a: ScadValue[]): ScadValue[] {
+  const out: ScadValue[] = [];
 
   for (const x of a) {
     if (isVec(x)) {
@@ -523,7 +516,7 @@ function generateCanonical(): number {
   return ret;
 }
 
-function rands(...args: unknown[]): number[]|undefined {
+function rands(...args: ScadValue[]): number[]|undefined {
   // Requires 3 or 4 numeric arguments
   if (args.length < 3 || args.length > 4) return undefined;
   if (!args.every((a): a is number => typeof a === 'number')) return undefined;
@@ -568,7 +561,7 @@ function rands(...args: unknown[]): number[]|undefined {
 }
 
 function search_match(
-    needle: unknown, entry: unknown, idx_col: number|undefined): boolean {
+    needle: ScadValue, entry: ScadValue, idx_col: number|undefined): boolean {
   const col = idx_col !== undefined ? idx_col : 0;
 
   if (col === 0 && eq(entry, needle)) return true;
@@ -577,8 +570,8 @@ function search_match(
 }
 
 function search(
-    needle: unknown, haystack: unknown, num_returns: number|undefined,
-    idx_col: number|undefined): unknown {
+    needle: ScadValue, haystack: ScadValue, num_returns: number|undefined,
+    idx_col: number|undefined): ScadValue|undefined {
   if (needle === undefined || haystack === undefined) {
     console.warn(
         'WARNING: search() needs to be called with at least 2 arguments');
@@ -602,7 +595,7 @@ function search(
   }
 
   if (is_string(needle) && is_string(haystack)) {
-    const result: unknown[] = [];
+    const result: ScadValue[] = [];
     const hs = [...(haystack as string)];
 
     for (const ch of (needle as string)) {
@@ -624,11 +617,11 @@ function search(
   }
 
   if (is_list(haystack) && is_list(needle)) {
-    return (needle as unknown[]).map((n: unknown) => {
+    return (needle as ScadValue[]).map((n: ScadValue) => {
       const indices: number[] = [];
 
-      for (let i = 0; i < (haystack as unknown[]).length; i++) {
-        if (search_match(n, (haystack as unknown[])[i], idx_col)) {
+      for (let i = 0; i < (haystack as ScadValue[]).length; i++) {
+        if (search_match(n, (haystack as ScadValue[])[i], idx_col)) {
           indices.push(i);
         }
       }
@@ -639,13 +632,13 @@ function search(
 
   if (is_string(needle) && is_list(haystack)) {
     const col = idx_col !== undefined ? idx_col : 0;
-    const result: unknown[] = [];
+    const result: ScadValue[] = [];
 
     for (const n of (needle as string)) {
       const indices: number[] = [];
 
-      for (let i = 0; i < (haystack as unknown[]).length; i++) {
-        const entry: unknown = (haystack as unknown[])[i];
+      for (let i = 0; i < (haystack as ScadValue[]).length; i++) {
+        const entry: ScadValue = (haystack as ScadValue[])[i];
 
         if (!Array.isArray(entry) || col >= entry.length) {
           console.warn(
@@ -676,8 +669,8 @@ function search(
   return undefined;
 }
 
-function lookup(key: unknown, table: unknown, ...rest: unknown[]): number|
-    unknown|undefined {
+function lookup(key: ScadValue, table: ScadValue, ...rest: ScadValue[]): number|
+    ScadValue {
   // OpenSCAD's lookup() takes exactly 2 parameters.
   if (rest.length > 0) {
     console.warn(
@@ -707,14 +700,14 @@ function lookup(key: unknown, table: unknown, ...rest: unknown[]): number|
   let low_p = 0;
   let high_p = 0;
 
-  let low_v: unknown;
-  let high_v: unknown;
+  let low_v: ScadValue = undefined;
+  let high_v: ScadValue = undefined;
 
   for (const entry of table) {
     if (!Array.isArray(entry) || entry.length < 2) continue;
 
-    const this_p: unknown = entry[0];
-    const this_v: unknown = entry[1];
+    const this_p: ScadValue = entry[0];
+    const this_v: ScadValue = entry[1];
 
     if (typeof this_p !== 'number') continue;
 
@@ -744,7 +737,7 @@ function lookup(key: unknown, table: unknown, ...rest: unknown[]): number|
   return (low_v + ((high_v - low_v) * (key - low_p)) / (high_p - low_p));
 }
 
-function truthy(x: unknown): boolean {
+function truthy(x: ScadValue): boolean {
   if (x === undefined || x === null || x === false) return false;
   if (typeof x === 'number') return x !== 0;
   if (typeof x === 'string' || Array.isArray(x)) return x.length > 0;
@@ -753,7 +746,7 @@ function truthy(x: unknown): boolean {
 }
 
 // Control
-function assert(cond: unknown, msg: unknown): asserts cond {
+function assert(cond: ScadValue, msg: ScadValue): asserts cond {
   if (!truthy(cond)) {
     console.trace('Assertion failed:', msg);
     throw new Error(
@@ -761,7 +754,7 @@ function assert(cond: unknown, msg: unknown): asserts cond {
   }
 }
 
-function eq(a: unknown, b: unknown): boolean {
+function eq(a: ScadValue, b: ScadValue): boolean {
   if (a === b) return true;
   if (Array.isArray(a) && Array.isArray(b)) {
     if (a.length !== b.length) return false;
@@ -777,17 +770,17 @@ function eq(a: unknown, b: unknown): boolean {
 }
 
 
-function cmpCat(x: unknown): string {
+
+function cmpCat(x: ScadValue): string {
   if (typeof x === 'number') return 'n';
   if (typeof x === 'boolean') return 'b';
   if (typeof x === 'string') return 's';
 
-  if (Array.isArray(x))
-    return (x as {__isRange?: boolean}).__isRange ? 'r' : 'v';
+  if (Array.isArray(x)) return x instanceof RangeArray ? 'r' : 'v';
 
   return 'u';
 }
-function veccmp(a: unknown[], b: unknown[]): number {
+function veccmp(a: ScadValue[], b: ScadValue[]): number {
   const n = Math.min(a.length, b.length);
 
   for (let i = 0; i < n; i++) {
@@ -808,47 +801,49 @@ function veccmp(a: unknown[], b: unknown[]): number {
 
   return Math.sign(a.length - b.length);
 }
-function lt(a: unknown, b: unknown): boolean|undefined {
-  const ca = cmpCat(a);
-
-  if (ca !== cmpCat(b) || ca === 'u') return undefined;
-
-  return ca === 'v' || ca === 'r' ? veccmp(a as unknown[], b as unknown[]) < 0 :
-                                    a! < b!;
-}
-function gt(a: unknown, b: unknown): boolean|undefined {
-  const ca = cmpCat(a);
-
-  if (ca !== cmpCat(b) || ca === 'u') return undefined;
-
-  return ca === 'v' || ca === 'r' ? veccmp(a as unknown[], b as unknown[]) > 0 :
-                                    a! > b!;
-}
-function le(a: unknown, b: unknown): boolean|undefined {
+function lt(a: ScadValue, b: ScadValue): boolean|undefined {
   const ca = cmpCat(a);
 
   if (ca !== cmpCat(b) || ca === 'u') return undefined;
 
   return ca === 'v' || ca === 'r' ?
-      veccmp(a as unknown[], b as unknown[]) <= 0 :
+      veccmp(a as ScadValue[], b as ScadValue[]) < 0 :
+      a! < b!;
+}
+function gt(a: ScadValue, b: ScadValue): boolean|undefined {
+  const ca = cmpCat(a);
+
+  if (ca !== cmpCat(b) || ca === 'u') return undefined;
+
+  return ca === 'v' || ca === 'r' ?
+      veccmp(a as ScadValue[], b as ScadValue[]) > 0 :
+      a! > b!;
+}
+function le(a: ScadValue, b: ScadValue): boolean|undefined {
+  const ca = cmpCat(a);
+
+  if (ca !== cmpCat(b) || ca === 'u') return undefined;
+
+  return ca === 'v' || ca === 'r' ?
+      veccmp(a as ScadValue[], b as ScadValue[]) <= 0 :
       a! <= b!;
 }
-function ge(a: unknown, b: unknown): boolean|undefined {
+function ge(a: ScadValue, b: ScadValue): boolean|undefined {
   const ca = cmpCat(a);
 
   if (ca !== cmpCat(b) || ca === 'u') return undefined;
 
   return ca === 'v' || ca === 'r' ?
-      veccmp(a as unknown[], b as unknown[]) >= 0 :
+      veccmp(a as ScadValue[], b as ScadValue[]) >= 0 :
       a! >= b!;
 }
 
 
-function isNum(x: unknown): x is number {
+function isNum(x: ScadValue): x is number {
   return typeof x === 'number';
 }
-function isVec(x: unknown): x is Vec {
-  return Array.isArray(x) && !(x as any).__isRange;
+function isVec(x: ScadValue): x is Vec {
+  return Array.isArray(x) && !(x instanceof RangeArray);
 }
 
 type NumOrVec = number|NumOrVec[];
@@ -1071,7 +1066,7 @@ function mod<A extends number, B extends number>(a: A, b: B): number|undefined {
 }
 
 
-function toI64(x: unknown): bigint|undefined {
+function toI64(x: ScadValue): bigint|undefined {
   if (typeof x !== 'number' || !Number.isFinite(x)) {
     return undefined;
   }
@@ -1080,7 +1075,7 @@ function toI64(x: unknown): bigint|undefined {
 }
 
 // Bitwise operators
-function band(a: unknown, b: unknown): number|undefined {
+function band(a: ScadValue, b: ScadValue): number|undefined {
   const ia = toI64(a);
   const ib = toI64(b);
 
@@ -1088,7 +1083,7 @@ function band(a: unknown, b: unknown): number|undefined {
 
   return Number(BigInt.asIntN(64, ia & ib));
 }
-function bor(a: unknown, b: unknown): number|undefined {
+function bor(a: ScadValue, b: ScadValue): number|undefined {
   const ia = toI64(a);
   const ib = toI64(b);
 
@@ -1096,14 +1091,14 @@ function bor(a: unknown, b: unknown): number|undefined {
 
   return Number(BigInt.asIntN(64, ia | ib));
 }
-function bnot(a: unknown): number|undefined {
+function bnot(a: ScadValue): number|undefined {
   const ia = toI64(a);
 
   if (ia === undefined) return undefined;
 
   return Number(BigInt.asIntN(64, ~ia));
 }
-function shl(a: unknown, b: unknown): number|undefined {
+function shl(a: ScadValue, b: ScadValue): number|undefined {
   const ia = toI64(a);
   const ib = toI64(b);
 
@@ -1112,7 +1107,7 @@ function shl(a: unknown, b: unknown): number|undefined {
 
   return Number(BigInt.asIntN(64, ia << ib));
 }
-function shr(a: unknown, b: unknown): number|undefined {
+function shr(a: ScadValue, b: ScadValue): number|undefined {
   const ia = toI64(a);
   const ib = toI64(b);
 
@@ -1123,19 +1118,20 @@ function shr(a: unknown, b: unknown): number|undefined {
 }
 
 // Unary operators
-function neg(a: unknown): number|Vec|undefined {
+function neg(a: ScadValue): number|Vec|undefined {
   if (isNum(a)) return -a;
   if (isVec(a)) return a.map(neg) as Vec;
   return undefined;
 }
-function pos(a: unknown): number|Vec|undefined {
+function pos(a: ScadValue): number|Vec|undefined {
   if (isNum(a)) return +a;
   if (isVec(a)) return a.map(pos) as Vec;
   return undefined;
 }
 
 
-function index(obj: unknown, idx: unknown): unknown {
+
+function index(obj: ScadValue, idx: ScadValue): ScadValue|undefined {
   if (typeof idx !== 'number' || obj == null) return undefined;
 
   const i = Math.floor(idx);
@@ -1166,7 +1162,7 @@ let undef = undefined;
 let _EPSILON = 1e-9;
 
 // Special-variable context
-const ctx: Record<string, any> = {
+const ctx: Record<string, ScadValue> = {
   $fn: 0,
   $fa: 12,
   $fs: 2,
@@ -1181,11 +1177,12 @@ const ctx: Record<string, any> = {
   $idx: undefined,
 };
 
-function withSpecials(overrides: Record<string, any>, body: () => any) {
-  const saved: Record<string, any> = {};
-  for (const k in overrides) {
+function withSpecials<R>(
+    overrides: Readonly<Record<string, ScadValue>>, body: () => R): R {
+  const saved: Record<string, ScadValue> = {};
+  for (const [k, v] of Object.entries(overrides)) {
     saved[k] = ctx[k];
-    ctx[k] = overrides[k];
+    ctx[k] = v;
   }
   try {
     return body();
@@ -1195,30 +1192,40 @@ function withSpecials(overrides: Record<string, any>, body: () => any) {
 }
 
 interface ChildrenFrame {
-  fn: ((i?: any) => any)|undefined;
+  fn: ((i?: ScadValue) => ScadValue)|undefined;
   count: number;
   name?: string|undefined;
 }
 let children_stack: ChildrenFrame[] = [];
 const color_prop_layout = new WeakMap();
-function with_children(
-    fn: ChildrenFrame['fn'], count: number, call: () => any, name?: string) {
-  children_stack.push({fn: fn, count: count, name: name});
+function with_children<R>(
+    fn: ChildrenFrame['fn'], count: number, call: () => Promise<R>,
+    name?: string): Promise<R>;
+function with_children<R>(
+    fn: ChildrenFrame['fn'], count: number, call: () => R, name?: string): R;
+function with_children<R>(
+    fn: ChildrenFrame['fn'], count: number, call: () => R | Promise<R>,
+    name?: string): R|Promise<R> {
+  children_stack.push({fn, count, name});
+
+  let result: R|Promise<R>;
   try {
-    const result = call();
-    if (result && typeof result.then === 'function') {
-      return Promise.resolve(result).finally(() => children_stack.pop());
-    }
-    children_stack.pop();
-    return result;
+    result = call();
   } catch (error) {
     children_stack.pop();
     throw error;
   }
+
+  if (result instanceof Promise) {
+    return result.finally(() => children_stack.pop());
+  }
+
+  children_stack.pop();
+  return result;
 }
 
 // Resolve a children() selector into the ordered list of child fns to invoke
-function pick_children<T>(childFns: T[], i: unknown): T[] {
+function pick_children<T>(childFns: T[], i: ScadValue): T[] {
   if (i === undefined) return childFns;
 
   if (Array.isArray(i)) {
@@ -1242,7 +1249,7 @@ function pick_children<T>(childFns: T[], i: unknown): T[] {
   return [];
 }
 
-function parent_module(d: unknown = 1): string {
+function parent_module(d: ScadValue = 1): string {
   const depth = Number(d);
 
   if (!Number.isInteger(depth) || depth < 0) return '';
@@ -1254,13 +1261,13 @@ function parent_module(d: unknown = 1): string {
   return children_stack[idx]?.name || '';
 }
 
-function is_finite_matrix4(m: unknown): m is number[][] {
+function is_finite_matrix4(m: ScadValue): m is number[][] {
   return (
       Array.isArray(m) && m.length === 4 &&
       m.every(
-          (row: unknown) => Array.isArray(row) && row.length === 4 &&
+          (row: ScadValue) => Array.isArray(row) && row.length === 4 &&
               row.every(
-                  (v: unknown) =>
+                  (v: ScadValue) =>
                       typeof v === 'number' && Number.isFinite(v))));
 }
 
@@ -1308,60 +1315,47 @@ function to_manifold_mat3(m: number[][]) {
   return [n[0]![0], n[1]![0], 0, n[0]![1], n[1]![1], 0, n[0]![3], n[1]![3], 1];
 }
 
-interface TransformableShape<TResult = unknown> {
-  transform(matrix: unknown): TResult;
-}
-
-function transform<T extends TransformableShape>(shape: T, m: number[][]): T|
-    ReturnType<T['transform']> {
-  const mm = is2D(shape) ? to_manifold_mat3(m) : to_manifold_mat4(m);
-
-  if (!mm) return shape;
-
+function transform(shape: InstanceType<typeof CrossSection>, m: number[][]):
+    InstanceType<typeof CrossSection>;
+function transform(shape: InstanceType<typeof Manifold>, m: number[][]):
+    InstanceType<typeof Manifold>;
+function transform(shape: Shape, m: number[][]): Shape;
+function transform(shape: Shape, m: number[][]): Shape {
   try {
-    return shape.transform(mm) as ReturnType<T['transform']>;
+    if (shape instanceof CrossSection) {
+      const mm = to_manifold_mat3(m);
+      return mm ? shape.transform(mm as Mat3) : shape;
+    }
+    const mm = to_manifold_mat4(m);
+    return mm ? shape.transform(mm as Mat4) : shape;
   } catch {
     return shape;
   }
 }
 
-function identity4() {
+function identity4(): number[][] {
   return [[1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]];
 }
 
 // 2D helpers used by offset()/projection() fallbacks
 function offset(
-    shape: unknown, delta: number, joinType = 'Round', miterLimit = 2,
-    circularSegments = 0, fa = 12, fs = 2) {
+    shape: Shape, delta: number, joinType: JoinType = 'Round', miterLimit = 2,
+    circularSegments = 0, fa = 12, fs = 2): Shape {
   try {
-    if (shape &&
-        typeof (shape as InstanceType<typeof CrossSection>).offset ===
-            'function') {
-      if (circularSegments <= 0) {
-        sync_quality(fa, fs);
-      }
-      return (shape as InstanceType<typeof CrossSection>)
-          .offset(
-              delta, joinType as 'Miter' | 'Round', miterLimit,
-              circularSegments);
+    if (shape instanceof CrossSection) {
+      if (circularSegments <= 0) sync_quality(fa, fs);
+      return shape.offset(delta, joinType, miterLimit, circularSegments);
     }
   } catch {
   }
   return shape;
 }
 
-function projection(shape: unknown, cut = false) {
+function projection(
+    shape: Shape, cut = false): InstanceType<typeof CrossSection> {
   try {
-    if (shape) {
-      if (cut &&
-          typeof (shape as InstanceType<typeof Manifold>).slice ===
-              'function') {
-        return (shape as InstanceType<typeof Manifold>).slice(0);
-      }
-      if (typeof (shape as InstanceType<typeof Manifold>).project ===
-          'function') {
-        return (shape as InstanceType<typeof Manifold>).project();
-      }
+    if (shape instanceof Manifold) {
+      return cut ? shape.slice(0) : shape.project();
     }
   } catch {
   }
@@ -1405,7 +1399,7 @@ const named_colors: Record<string, number[]> = {
   yellow: [1, 1, 0],
 };
 
-function clamp01(v: unknown): number {
+function clamp01(v: ScadValue): number {
   const n = Number(v);
 
   if (!Number.isFinite(n)) return 0;
@@ -1415,23 +1409,19 @@ function clamp01(v: unknown): number {
   return n;
 }
 
-function parse_hex_color(s: unknown): number[]|undefined {
-  if (typeof s !== 'string' || !s.startsWith('#')) {
-    return undefined;
-  }
+type RGBA = [r: number, g: number, b: number, a: number];
+
+function parse_hex_color(s: ScadValue): RGBA|undefined {
+  if (typeof s !== 'string' || !s.startsWith('#')) return undefined;
 
   const h = s.slice(1);
+  if (!/^[0-9a-fA-F]+$/.test(h)) return undefined;
 
   if (h.length === 3 || h.length === 4) {
-    const r = parseInt(h[0] + h[0]!, 16);
-    const g = parseInt(h[1] + h[1]!, 16);
-    const b = parseInt(h[2] + h[2]!, 16);
-    const a = h.length === 4 ? parseInt(h[3] + h[3]!, 16) : 255;
-
-    if ([r, g, b, a].some((x) => Number.isNaN(x))) {
-      return undefined;
-    }
-
+    const r = parseInt(h.charAt(0).repeat(2), 16);
+    const g = parseInt(h.charAt(1).repeat(2), 16);
+    const b = parseInt(h.charAt(2).repeat(2), 16);
+    const a = h.length === 4 ? parseInt(h.charAt(3).repeat(2), 16) : 255;
     return [r / 255, g / 255, b / 255, a / 255];
   }
 
@@ -1440,39 +1430,31 @@ function parse_hex_color(s: unknown): number[]|undefined {
     const g = parseInt(h.slice(2, 4), 16);
     const b = parseInt(h.slice(4, 6), 16);
     const a = h.length === 8 ? parseInt(h.slice(6, 8), 16) : 255;
-
-    if ([r, g, b, a].some((x) => Number.isNaN(x))) {
-      return undefined;
-    }
-
     return [r / 255, g / 255, b / 255, a / 255];
   }
 
   return undefined;
 }
 
-function parse_color_value(c: unknown): number[]|undefined {
+function parse_color_value(c: ScadValue): RGBA|undefined {
   if (Array.isArray(c)) {
     if (c.length < 3) return undefined;
 
-    let r = Number(c[0]);
-    let g = Number(c[1]);
-    let b = Number(c[2]);
-    let a = c.length >= 4 ? Number(c[3]) : 1;
+    const hasAlpha = c.length >= 4;
+    const [r, g, b] = c;
+    const a = hasAlpha ? c[3] : 1;
 
-    if (![r, g, b, a].every(Number.isFinite)) {
+    if (!is_finite_number(r) || !is_finite_number(g) || !is_finite_number(b) ||
+        !is_finite_number(a)) {
       return undefined;
     }
 
-    const maxChan =
-        Math.max(Math.abs(r), Math.abs(g), Math.abs(b), Math.abs(a));
+    const maxChan = Math.max(
+        Math.abs(r), Math.abs(g), Math.abs(b), hasAlpha ? Math.abs(a) : 0);
 
     // Support accidental [0..255] style vectors.
     if (maxChan > 1) {
-      r /= 255;
-      g /= 255;
-      b /= 255;
-      a /= 255;
+      return [r / 255, g / 255, b / 255, hasAlpha ? a / 255 : a];
     }
 
     return [r, g, b, a];
@@ -1480,13 +1462,13 @@ function parse_color_value(c: unknown): number[]|undefined {
 
   if (typeof c === 'string') {
     const key = c.trim().toLowerCase();
-
     if (key === '' || key === 'default') return undefined;
 
     const named = named_colors[key];
-
     if (named) {
-      return named.length === 4 ? named : [named[0]!, named[1]!, named[2]!, 1];
+      return [
+        named[0]!, named[1]!, named[2]!, named.length === 4 ? named[3]! : 1
+      ];
     }
 
     return parse_hex_color(key);
@@ -1495,106 +1477,71 @@ function parse_color_value(c: unknown): number[]|undefined {
   return undefined;
 }
 
-// Apply OpenSCAD color() by appending custom RGBA + marker channels.
-type ColorPropertyLayout = {
-  colorOffset: number; markerOffset: number;
-};
-
-type SetPropertiesCallback =
-    (newProp: number[], position: number[], oldProp: number[]) => void;
-
-interface ColorableShape<TResult = unknown> {
-  setProperties(
-      numProperties: number,
-      callback:
-          (newProp: number[], position: number[], oldProp: number[]) => void):
-      TResult;
-
-  numProp(): number;
-}
-
-function color<T>(shape: T, c: unknown, alpha: unknown): T|unknown {
-  if (shape == null || typeof shape !== 'object' ||
-      !('setProperties' in shape) ||
-      typeof shape.setProperties !== 'function' || !('numProp' in shape) ||
-      typeof shape.numProp !== 'function') {
-    return shape;
-  }
+// Apply OpenSCAD color() by appending custom RGBA + marker channels
+function color(
+    shape: InstanceType<typeof Manifold>, c: ScadValue,
+    alpha: ScadValue): InstanceType<typeof Manifold>;
+function color(
+    shape: InstanceType<typeof CrossSection>, c: ScadValue,
+    alpha: ScadValue): InstanceType<typeof CrossSection>;
+function color(shape: Shape, c: ScadValue, alpha: ScadValue): Shape;
+function color(shape: Shape, c: ScadValue, alpha: ScadValue): Shape {
+  if (!(shape instanceof Manifold)) return shape;
 
   let base = parse_color_value(c);
 
   if (!base) {
-    // Allow color(alpha = x) by assuming white as the base color.
-    if (alpha === undefined || alpha === null) return shape;
+    if (alpha === undefined) return shape;
     base = [1, 1, 1, 1];
   }
 
-  let outAlpha = base[3];
+  const outAlpha = is_finite_number(alpha) ? alpha : base[3];
 
-  if (alpha !== undefined && alpha !== null && Number.isFinite(Number(alpha))) {
-    outAlpha = Number(alpha);
-  }
-
-  const rgba = [
+  const rgba: RGBA = [
     clamp01(base[0]),
     clamp01(base[1]),
     clamp01(base[2]),
     clamp01(outAlpha),
   ];
 
-  const oldNumProp = Math.max(0, Number(shape.numProp()) || 0);
+  const oldNumProp = Math.max(0, shape.numProp());
   const trackedLayout = color_prop_layout.get(shape);
 
   let colorOffset = Math.max(3, oldNumProp);
   let markerOffset = colorOffset + 4;
   let newNumProp = markerOffset + 1;
 
-  if (trackedLayout && Number.isInteger(trackedLayout.colorOffset) &&
-      Number.isInteger(trackedLayout.markerOffset)) {
-    const trackedColorOffset = trackedLayout.colorOffset;
-    const trackedMarkerOffset = trackedLayout.markerOffset;
-
-    if (trackedColorOffset >= 0 &&
-        trackedMarkerOffset === trackedColorOffset + 4 &&
-        trackedMarkerOffset < oldNumProp) {
-      colorOffset = trackedColorOffset;
-      markerOffset = trackedMarkerOffset;
-      newNumProp = oldNumProp;
-    }
+  if (trackedLayout && trackedLayout.colorOffset >= 0 &&
+      trackedLayout.markerOffset === trackedLayout.colorOffset + 4 &&
+      trackedLayout.markerOffset < oldNumProp) {
+    colorOffset = trackedLayout.colorOffset;
+    markerOffset = trackedLayout.markerOffset;
+    newNumProp = oldNumProp;
   }
 
   try {
-    const painted = shape.setProperties(
-        newNumProp,
-        (newProp: number[], position: number[], oldProp: number[]) => {
+    const painted =
+        shape.setProperties(newNumProp, (newProp, position, oldProp) => {
           for (let i = 0; i < newNumProp; i++) {
-            if (i < oldProp.length) {
-              newProp[i] = oldProp[i]!;
-            } else if (i < 3) {
-              newProp[i] = position[i]!;
-            } else {
-              newProp[i] = 0;
-            }
+            newProp[i] = oldProp[i] ?? (i < 3 ? position[i] ?? 0 : 0);
           }
 
-          newProp[colorOffset] = rgba[0]!;
-          newProp[colorOffset + 1] = rgba[1]!;
-          newProp[colorOffset + 2] = rgba[2]!;
-          newProp[colorOffset + 3] = rgba[3]!;
+          newProp[colorOffset] = rgba[0];
+          newProp[colorOffset + 1] = rgba[1];
+          newProp[colorOffset + 2] = rgba[2];
+          newProp[colorOffset + 3] = rgba[3];
 
-          // Marker channel distinguishes custom RGBA from built-in properties.
           newProp[markerOffset] = 1;
         });
 
     color_prop_layout.set(painted, {colorOffset, markerOffset});
-
     return painted;
   } catch {
     return shape;
   }
 }
 
-function each(v: unknown): unknown[] {
+function each(v: ScadValue): ScadValue[] {
   if (v === undefined || v === null) return [];
   if (Array.isArray(v)) return v;
   if (typeof v === 'string') return Array.from(v);
@@ -1602,10 +1549,9 @@ function each(v: unknown): unknown[] {
 }
 
 function flat_map_iter<T>(
-    v: unknown, fn: (item: unknown, index: number) => T | T[]): T[] {
-  if (v === undefined || v === null) return [];
-  if (Array.isArray(v))
-    return v.flatMap((item: unknown, i: number) => fn(item, i));
+    v: ScadValue, fn: (item: ScadValue, index: number) => T | T[]): T[] {
+  if (v === undefined) return [];
+  if (Array.isArray(v)) return v.flatMap((item, i) => fn(item, i));
   if (typeof v === 'string')
     return Array.from(v).flatMap((item, i) => fn(item, i));
   return [v].flatMap((item, i) => fn(item, i));
@@ -1635,7 +1581,7 @@ function rangeNumValues(start: number, step: number, end: number): number {
   return numSteps >= UINT32_MAX ? UINT32_MAX : numSteps + 1;
 }
 
-function rangeCount(start: unknown, step: unknown, end: unknown): number {
+function rangeCount(start: ScadValue, step: ScadValue, end: ScadValue): number {
   if (typeof start !== 'number' || typeof step !== 'number' ||
       typeof end !== 'number') {
     return 0;
@@ -1656,12 +1602,15 @@ function rangeCount(start: unknown, step: unknown, end: unknown): number {
   return n;
 }
 
-type RangeArray = number[]&{
-  __isRange?: boolean;
-};
 
-function range(start: unknown, step: unknown, end: unknown): RangeArray {
-  const result: RangeArray = [];
+class RangeArray extends Array<number> {
+  static override get[Symbol.species]() {
+    return Array;
+  }
+}
+
+function range(start: ScadValue, step: ScadValue, end: ScadValue): RangeArray {
+  const result = new RangeArray();
 
   if (typeof start !== 'number' || typeof step !== 'number' ||
       typeof end !== 'number') {
@@ -1675,221 +1624,175 @@ function range(start: unknown, step: unknown, end: unknown): RangeArray {
     result.push(i === 0 ? start : start + i * step);
   }
 
-  Object.defineProperty(result, '__isRange', {
-    value: true,
-    enumerable: false,
-    writable: true,
-    configurable: true,
-  });
-
   return result;
 }
 
 // Detect CrossSection (2D) vs Manifold (3D) for dispatch
-function is2D(x: unknown): boolean {
-  if (x === null || typeof x !== 'object') return false;
-
-  const obj = x as Record<string, unknown>;
-
-  return (
-      typeof obj.offset === 'function' && typeof obj.toPolygons === 'function');
+function is2D(x: Shape): x is InstanceType<typeof CrossSection> {
+  return x instanceof CrossSection;
 }
 
-function isEmpty(x: unknown): boolean {
-  if (!x) return true;
-  if (typeof x !== 'object') return false;
+function isEmpty(x: Shape|undefined): boolean {
+  return x === undefined || x.isEmpty();
+}
 
-  const obj = x as Record<string, unknown>;
-
-  if (typeof obj.isEmpty === 'function' && obj.isEmpty()) return true;
-  if (typeof obj.numTri === 'function' && obj.numTri() === 0) return true;
-  if (typeof obj.numVert === 'function' && obj.numVert() === 0) return true;
-
-  return false;
+function isNonEmpty(x: Shape|undefined): x is Shape {
+  return !isEmpty(x);
 }
 
 const TOL_FACTOR = Math.pow(2, -24);
-type Vec3 = [number, number, number];
 
-type BoundingBox3D = {
-  min: Vec3; max: Vec3;
-};
+function maxBBoxDim3d(items: readonly Shape[]): number {
+  const lo: Vec3 = [Infinity, Infinity, Infinity];
+  const hi: Vec3 = [-Infinity, -Infinity, -Infinity];
 
-type Item3D = {
-  boundingBox?: () => BoundingBox3D|null|undefined;
-  setTolerance?: (tolerance: number) => unknown;
-  tolerance?: () => number;
-};
+  for (const item of items) {
+    if (!(item instanceof Manifold)) continue;
 
-function maxBBoxDim3d(items: unknown[]): number {
-  const lo = [Infinity, Infinity, Infinity];
-  const hi = [-Infinity, -Infinity, -Infinity];
+    const {min, max} = item.boundingBox();
 
-  for (const it of items) {
-    if (!it || typeof it !== 'object') continue;
-
-    const item = it as Item3D;
-    if (typeof item.boundingBox !== 'function') continue;
-
-    const bb = item.boundingBox();
-    if (!bb || !bb.min || !bb.max) continue;
-
-    for (let i = 0; i < 3; i++) {
-      const min = bb.min[i];
-      const max = bb.max[i];
-
-      if (typeof min === 'number' && min < lo[i]!) lo[i] = min;
-      if (typeof max === 'number' && max > hi[i]!) hi[i] = max;
+    for (const i of [0, 1, 2] as const) {
+      if (min[i] < lo[i]) lo[i] = min[i];
+      if (max[i] > hi[i]) hi[i] = max[i];
     }
   }
 
   let maxDim = 0;
 
-  for (let i = 0; i < 3; i++) {
-    const d = hi[i]! - lo[i]!;
+  for (const i of [0, 1, 2] as const) {
+    const d = hi[i] - lo[i];
     if (Number.isFinite(d) && d > maxDim) maxDim = d;
   }
 
   return maxDim;
 }
 
-function withTol3d(items: unknown[]): unknown[] {
+function withTol3d<S extends Shape>(items: readonly S[]): S[];
+function withTol3d(items: readonly Shape[]): Shape[] {
   const maxDim = maxBBoxDim3d(items);
-  if (!(maxDim > 0)) return items;
+  if (!(maxDim > 0)) return [...items];
 
   const tol = maxDim * TOL_FACTOR;
 
-  return items.map(it => {
-    if (!it || typeof it !== 'object') return it;
-
-    const item = it as Item3D;
-
-    if (typeof item.setTolerance === 'function' &&
-        typeof item.tolerance === 'function') {
-      return tol > item.tolerance() ? item.setTolerance(tol) : it;
-    }
-
-    return it;
-  });
+  return items.map(
+      item => item instanceof Manifold && tol > item.tolerance() ?
+          item.setTolerance(tol) :
+          item);
 }
 
 // OpenSCAD cannot mix 2D and 3D in a boolean op - it keeps the dimension of the
 // first child and ignores (with a warning) any children of the other dimension.
-function sameDim<T>(items: T[], ref2D: boolean): T[] {
+function sameDim(
+    items: readonly Shape[], ref2D: true): InstanceType<typeof CrossSection>[];
+function sameDim(
+    items: readonly Shape[], ref2D: false): InstanceType<typeof Manifold>[];
+function sameDim(items: readonly Shape[], ref2D: boolean): Shape[];
+function sameDim(items: readonly Shape[], ref2D: boolean): Shape[] {
   return items.filter(x => is2D(x) === ref2D);
 }
 
 // Root modifier (!): the first geometry evaluated under a `!` statement becomes
 // the design root - OpenSCAD renders only that subtree and ignores the rest of
 // the design
-let root_item: unknown = null;
+let root_item: Shape|undefined = undefined;
 
-function rootMod<T>(g: T): T {
-  if (root_item === null && g !== null && g !== undefined) root_item = g;
+function rootMod<S extends Shape|undefined>(g: S): S {
+  if (root_item === undefined && g !== undefined) root_item = g;
   return g;
 }
 
-function applyRoot<T>(items: T[], isBackground = false): T[] {
-  if (root_item === null) return items;
-  return isBackground ? [] : [root_item as T];
+function applyRoot(items: readonly Shape[], isBackground = false): Shape[] {
+  if (root_item === undefined) return [...items];
+  return isBackground ? [] : [root_item];
 }
 
 // Boolean ops: use CrossSection for 2D, Manifold for 3D
-function union(items: unknown[]): unknown {
-  const valid = items.filter(x => !isEmpty(x));
+function union(items: readonly(Shape | undefined)[]): Shape {
+  const valid = items.filter(isNonEmpty);
+  const [first] = valid;
 
-  if (valid.length === 0) return Manifold.union([]);
+  if (first === undefined) return Manifold.union([]);
 
-  const flat = is2D(valid[0]);
-  const same = sameDim(valid, flat);
-
-  return flat ?
-      CrossSection.union(same as InstanceType<typeof CrossSection>[]) :
-      Manifold.union(withTol3d(same) as InstanceType<typeof Manifold>[]);
+  return is2D(first) ? CrossSection.union(sameDim(valid, true)) :
+                       Manifold.union(withTol3d(sameDim(valid, false)));
 }
 
-function difference(first: unknown, rest: unknown[]): unknown {
+function difference(
+    first: Shape|undefined, rest: readonly(Shape | undefined)[]): Shape|
+    undefined {
   if (isEmpty(first)) return first;
 
-  const flat = is2D(first);
-  const validRest = sameDim(rest.filter(x => !isEmpty(x)), flat);
+  const valid = rest.filter(isNonEmpty);
 
-  if (validRest.length === 0) return first;
-
-  if (flat) {
-    return CrossSection.difference([
-      first as InstanceType<typeof CrossSection>| Polygons,
-      ...(validRest as InstanceType<typeof CrossSection>[] | Polygons[])
-    ]);
+  if (is2D(first as Shape)) {
+    const others = sameDim(valid, true);
+    if (others.length === 0) return first;
+    return CrossSection.difference(
+        [first as InstanceType<typeof CrossSection>| Polygons, ...others]);
   }
 
-  const [tf, ...tr] = withTol3d([first, ...validRest]);
+  const others = sameDim(valid, false);
+  if (others.length === 0) return first;
 
-  return tr.length === 1 ?
-      (tf as InstanceType<typeof Manifold>)
-          .subtract(tr[0] as InstanceType<typeof Manifold>) :
-      (tf as InstanceType<typeof Manifold>)
-          .subtract(Manifold.union(tr as InstanceType<typeof Manifold>[]));
+  return Manifold.difference(
+      withTol3d([first as InstanceType<typeof Manifold>, ...others]));
 }
 
-function intersection(items: unknown[]): unknown {
-  if (items.length === 0) return Manifold.union([]);
+function intersection(items: readonly(Shape | undefined)[]): Shape {
+  const valid = items.filter(isNonEmpty);
 
-  const valid = items.filter(x => !isEmpty(x));
-
+  // Intersecting with an empty shape is empty
   if (valid.length < items.length) {
-    const firstValid2D = valid.find(is2D);
-    return firstValid2D ? CrossSection.union([]) : Manifold.union([]);
+    return valid.some(is2D) ? CrossSection.union([]) : Manifold.union([]);
   }
 
-  const flat = is2D(valid[0]);
-  const same = sameDim(valid, flat);
+  const [first] = valid;
+  if (first === undefined) return Manifold.union([]);
 
   // Intersecting across dimensions (e.g. a 3D solid with a 2D shape) has no
   // common volume, so OpenSCAD yields an empty result.
-  if (same.length < valid.length) {
-    return flat ? CrossSection.union([]) : Manifold.union([]);
+  if (is2D(first)) {
+    const same = sameDim(valid, true);
+    return same.length < valid.length ? CrossSection.union([]) :
+                                        CrossSection.intersection(same);
   }
 
-  return flat ?
-      CrossSection.intersection(
-          same as InstanceType<typeof CrossSection>[] | Polygons[]) :
-      Manifold.intersection(withTol3d(same) as InstanceType<typeof Manifold>[]);
+  const same = sameDim(valid, false);
+  return same.length < valid.length ? Manifold.union([]) :
+                                      Manifold.intersection(withTol3d(same));
 }
 
-function hull(items: unknown[]): unknown {
-  const valid = items.filter(x => !isEmpty(x));
+function hull(items: readonly(Shape | undefined)[]): Shape {
+  const valid = items.filter(isNonEmpty);
+  const [first] = valid;
 
-  if (valid.length === 0) return Manifold.union([]);
+  if (first === undefined) return Manifold.union([]);
 
-  return is2D(valid[0]) ?
-      CrossSection.hull(
-          valid as InstanceType<typeof CrossSection>[] | Polygons[]) :
-      Manifold.hull(valid as InstanceType<typeof Manifold>[]);
+  return is2D(first) ? CrossSection.hull(sameDim(valid, true)) :
+                       Manifold.hull(sameDim(valid, false));
 }
 
-function minkowski(items: unknown[]) {
-  const valid = items.filter(x => !isEmpty(x));
-  if (valid.length === 0) return Manifold.union([]);
-  if (valid.length === 1) return valid[0];
+function minkowski(items: readonly(Shape | undefined)[]): Shape {
+  const valid = items.filter(isNonEmpty);
+  const [first] = valid;
 
-  // Check ALL items upfront
-  for (const item of valid) {
-    if (is2D(item)) throw new Error('2D minkowski not implemented');
-    if (typeof (item as InstanceType<typeof Manifold>).minkowskiSum !==
-        'function')
-      throw new Error('Your manifold-3d build does not expose minkowskiSum');
+  if (first === undefined) return Manifold.union([]);
+  if (valid.length === 1) return first;
+
+  const solids = sameDim(valid, false);
+  if (solids.length < valid.length) {
+    throw new Error('2D minkowski not implemented');
   }
 
-  let acc = valid[0] as InstanceType<typeof Manifold>;
-  for (let i = 1; i < valid.length; i++) {
-    acc = acc.minkowskiSum(valid[i] as InstanceType<typeof Manifold>);
+  if (typeof Manifold.prototype.minkowskiSum !== 'function') {
+    throw new Error('Your manifold-3d build does not expose minkowskiSum');
   }
-  return acc;
+
+  return solids.reduce((acc, m) => acc.minkowskiSum(m));
 }
 
 // Returns `x` when it is a finite number, otherwise `dflt`
-function finiteOr(x: unknown, dflt: number): number {
+function finiteOr(x: ScadValue, dflt: number): number {
   return (typeof x === 'number' && Number.isFinite(x)) ? x : dflt;
 }
 
@@ -1900,7 +1803,7 @@ function normalizeScale(scale: number|number[]|undefined): [number, number]|
   // scaling; anything else is treated as no scaling
   let sx: number, sy: number;
   if (Array.isArray(scale)) {
-    if ((scale as any).__isRange || scale.length !== 2) return undefined;
+    if (scale instanceof RangeArray || scale.length !== 2) return undefined;
     if (!Number.isFinite(scale[0]) || !Number.isFinite(scale[1]))
       return undefined;
     sx = scale[0] as number;
@@ -1918,7 +1821,7 @@ function archimedesLength(a: number, theta: number): number {
 }
 
 // Slice calculation logic for curves, helices, and conical helices
-function computeExtrudeDivisions(shape: unknown, height: number, options: {
+function computeExtrudeDivisions(shape: Shape, height: number, options: {
   twist?: number;
   scale?: number | number[] | undefined;
   fn?: number;
@@ -2142,7 +2045,7 @@ function dropCollinear(poly: [number, number][]): [number, number][] {
 }
 
 function extrudeTwisted(
-    shape: unknown, height: number, twistDeg: number, slices: number,
+    shape: Shape, height: number, twistDeg: number, slices: number,
     scaleVec: [number, number]|undefined, center: boolean|undefined, fn: number,
     fa: number, fs: number, segments?: number): InstanceType<typeof Manifold> {
   const rawPolys: [number, number][][] =
@@ -2303,12 +2206,14 @@ function extrudeTwisted(
     }
   }
 
-  return new Manifold(
-      {vertProperties: verts, triVerts: new Uint32Array(tris), numProp: 3} as
-      any);
+  return new Manifold(new Mesh({
+    numProp: 3,
+    vertProperties: verts,
+    triVerts: new Uint32Array(tris),
+  }));
 }
 
-function linear_extrude(shape: unknown, height?: number, options: {
+function linear_extrude(shape: Shape, height?: number, options: {
   twist?: number;
   scale?: number | number[] | undefined;
   center?: boolean;
@@ -2409,7 +2314,7 @@ function linear_extrude(shape: unknown, height?: number, options: {
   return result;
 }
 
-function rotate_extrude(shape: unknown, fn = 0, fa = 12, fs = 2, angle = 360) {
+function rotate_extrude(shape: Shape, fn = 0, fa = 12, fs = 2, angle = 360) {
   if (isEmpty(shape)) {
     return Manifold.union([]);
   }
@@ -2706,7 +2611,9 @@ function canvasGlyphContours(ch: string, font: string, size: number):
   if (cached) return cached;
 
   const canvas = canvasForText();
-  const ctx = canvas?.getContext('2d', {willReadFrequently: true});
+  const ctx = canvas?.getContext('2d', {willReadFrequently: true}) as
+          CanvasRenderingContext2D |
+      OffscreenCanvasRenderingContext2D | null | undefined;
   if (!canvas || !ctx) return undefined;
 
   ctx.font = fontToCss(font, px);
@@ -2732,7 +2639,7 @@ function canvasGlyphContours(ch: string, font: string, size: number):
   let minX = widthPx, minY = heightPx, maxX = -1, maxY = -1;
   for (let y = 0; y < heightPx; y++) {
     for (let x = 0; x < widthPx; x++) {
-      if (image.data[(y * widthPx + x) * 4 + 3] > 32) {
+      if (image.data[(y * widthPx + x) * 4 + 3]! > 32) {
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
         if (y < minY) minY = y;
@@ -2754,9 +2661,9 @@ function canvasGlyphContours(ch: string, font: string, size: number):
   for (let y = minY; y <= maxY; y++) {
     let x = minX;
     while (x <= maxX) {
-      while (x <= maxX && image.data[(y * widthPx + x) * 4 + 3] <= 32) x++;
+      while (x <= maxX && image.data[(y * widthPx + x) * 4 + 3]! <= 32) x++;
       const start = x;
-      while (x <= maxX && image.data[(y * widthPx + x) * 4 + 3] > 32) x++;
+      while (x <= maxX && image.data[(y * widthPx + x) * 4 + 3]! > 32) x++;
       if (start < x) {
         const x0 = (start - minX) * scale;
         const x1 = (x - minX) * scale;
@@ -2869,28 +2776,30 @@ async function text(
   return CrossSection.ofPolygons(shifted, 'EvenOdd');
 }
 
-function sync_quality(fa: unknown, fs: unknown): void {
-  if (typeof wasm.setMinCircularAngle === 'function') {
-    if (typeof fa === 'number' && fa > 0) {
-      wasm.setMinCircularAngle(fa);
-    }
-  }
-
-  if (typeof wasm.setMinCircularEdgeLength === 'function') {
-    if (typeof fs === 'number' && fs > 0) {
-      wasm.setMinCircularEdgeLength(fs);
-    }
-  }
+function sync_quality(fa: ScadValue, fs: ScadValue): void {
+  if (is_finite_number(fa) && fa > 0) wasm.setMinCircularAngle(fa);
+  if (is_finite_number(fs) && fs > 0) wasm.setMinCircularEdgeLength(fs);
 }
 
 // Only accepts actual finite numbers here; strings like "45", undefined, bools,
 // etc. silently become 0
-function rot_angle(x: unknown): number {
+function rot_angle(x: ScadValue): number {
   return typeof x === 'number' && Number.isFinite(x) ? x : 0;
 }
 
-function rotate(shape: unknown, a: Vec, v?: Vec) {
-  if (!shape) return shape;
+function rotate(
+    shape: InstanceType<typeof Manifold>, a: ScadValue,
+    v?: ScadValue): InstanceType<typeof Manifold>;
+function rotate(
+    shape: InstanceType<typeof CrossSection>, a: ScadValue,
+    v?: ScadValue): InstanceType<typeof CrossSection>;
+function rotate(shape: Shape, a: ScadValue, v?: ScadValue): Shape;
+function rotate(shape: undefined, a: ScadValue, v?: ScadValue): undefined;
+function rotate(shape: Shape|undefined, a: ScadValue, v?: ScadValue): Shape|
+    undefined;
+function rotate(shape: Shape|undefined, a: ScadValue, v?: ScadValue): Shape|
+    undefined {
+  if (shape === undefined) return undefined;
 
   // Vector angle: XYZ euler rotation. OpenSCAD ignores 'v' entirely, uses only
   // the first three elements, and treats invalid ones as 0
@@ -2898,10 +2807,7 @@ function rotate(shape: unknown, a: Vec, v?: Vec) {
     const ex = rot_angle(a[0]);
     const ey = rot_angle(a[1]);
     const ez = rot_angle(a[2]);
-    if (is2D(shape)) {
-      return (shape as InstanceType<typeof CrossSection>).rotate(ez);
-    }
-    return (shape as InstanceType<typeof Manifold>).rotate([ex, ey, ez]);
+    return is2D(shape) ? shape.rotate(ez) : shape.rotate([ex, ey, ez]);
   }
 
   // Scalar angle: rotate about axis 'v'. Defaults to Z and keeps that default
@@ -2909,33 +2815,21 @@ function rotate(shape: unknown, a: Vec, v?: Vec) {
   const angle = rot_angle(a);
   let vx = 0, vy = 0, vz = 1;
   if (Array.isArray(v) && (v.length === 2 || v.length === 3) &&
-      v.every((c: unknown) => typeof c === 'number' && isFinite(c))) {
-    vx = v[0] as number;
-    vy = v[1] as number;
-    vz = v.length === 3 ? v[2] as number : 0;
-  } else if (
-      v !== undefined && v !== null && !Array.isArray(v) &&
-      typeof v === 'object') {
-    vx = Number((v as {x: unknown}).x) || 0;
-    vy = Number((v as {y: unknown}).y) || 0;
-    vz = Number((v as {z: unknown}).z) || 0;
+      v.every(is_finite_number)) {
+    vx = v[0] ?? 0;
+    vy = v[1] ?? 0;
+    vz = v[2] ?? 0;
   }
 
   const len = Math.sqrt(vx * vx + vy * vy + vz * vz);
   if (len < 1e-9) return shape;
 
   if (is2D(shape)) {
-    if (Math.abs(vz) > 1e-9) {
-      return (shape as InstanceType<typeof CrossSection>)
-          .rotate(angle * Math.sign(vz));
-    }
-    return shape;
+    return Math.abs(vz) > 1e-9 ? shape.rotate(angle * Math.sign(vz)) : shape;
   }
 
   if (vx === 0 && vy === 0) {
-    return (shape as InstanceType<typeof Manifold>).rotate([
-      0, 0, angle * Math.sign(vz)
-    ]);
+    return shape.rotate([0, 0, angle * Math.sign(vz)]);
   }
 
   const theta = angle * Math.PI / 180;
@@ -2947,7 +2841,7 @@ function rotate(shape: unknown, a: Vec, v?: Vec) {
   const uy = vy / len;
   const uz = vz / len;
 
-  const R = [
+  const R: number[][] = [
     [
       oneMinusCosT * ux * ux + cosT, oneMinusCosT * ux * uy - sinT * uz,
       oneMinusCosT * ux * uz + sinT * uy, 0
@@ -2960,159 +2854,129 @@ function rotate(shape: unknown, a: Vec, v?: Vec) {
       oneMinusCosT * ux * uz - sinT * uy, oneMinusCosT * uy * uz + sinT * ux,
       oneMinusCosT * uz * uz + cosT, 0
     ],
-    [0, 0, 0, 1]
+    [0, 0, 0, 1],
   ];
 
-  return transform(
-      shape as InstanceType<typeof Manifold>| InstanceType<typeof CrossSection>,
-      R);
+  return transform(shape, R);
 }
 
-function translate(shape: unknown, v: Vec) {
-  if (!shape) return shape;
-  if (is2D(shape)) {
-    let x = 0, y = 0;
-    if (Array.isArray(v)) {
-      x = Number(v[0]) || 0;
-      y = Number(v[1]) || 0;
-    } else if (v && typeof v === 'object') {
-      x = Number((v as {x: unknown}).x || v[0]) || 0;
-      y = Number((v as {y: unknown}).y || v[1]) || 0;
-    } else {
-      x = Number(v) || 0;
-    }
-    return (shape as InstanceType<typeof CrossSection>).translate([x, y]);
-  } else {
-    let x = 0, y = 0, z = 0;
-    if (Array.isArray(v)) {
-      x = Number(v[0]) || 0;
-      y = Number(v[1]) || 0;
-      z = Number(v[2]) || 0;
-    } else if (v && typeof v === 'object') {
-      x = Number((v as {x: unknown}).x || v[0]) || 0;
-      y = Number((v as {y: unknown}).y || v[1]) || 0;
-      z = Number((v as {z: unknown}).z || v[2]) || 0;
-    } else {
-      x = Number(v) || 0;
-    }
-    return (shape as InstanceType<typeof Manifold>).translate([x, y, z]);
-  }
+function coord(v: readonly ScadValue[], i: number, fallback = 0): number {
+  const c = v[i];
+  return is_finite_number(c) ? c : fallback;
 }
 
-function scale(shape: unknown, v: Vec) {
-  if (!shape) return shape;
-  if (is2D(shape)) {
-    let x = 1, y = 1;
-    if (Array.isArray(v)) {
-      x = v[0] !== undefined && v[0] !== null ? Number(v[0]) : 1;
-      y = v[1] !== undefined && v[1] !== null ? Number(v[1]) : 1;
-    } else if (v && typeof v === 'object') {
-      x = (v as {x: unknown}).x !== undefined ? Number((v as {x: unknown}).x) :
-                                                1;
-      y = (v as {y: unknown}).y !== undefined ? Number((v as {y: unknown}).y) :
-                                                1;
-    } else if (typeof v === 'number' && !Number.isNaN(v)) {
-      x = y = v;
-    }
-    return (shape as InstanceType<typeof CrossSection>).scale([x, y]);
-  } else {
-    let x = 1, y = 1, z = 1;
-    if (Array.isArray(v)) {
-      x = v[0] !== undefined && v[0] !== null ? Number(v[0]) : 1;
-      y = v[1] !== undefined && v[1] !== null ? Number(v[1]) : 1;
-      z = v[2] !== undefined && v[2] !== null ? Number(v[2]) : 1;
-    } else if (v && typeof v === 'object') {
-      x = (v as {x: unknown}).x !== undefined ? Number((v as {x: unknown}).x) :
-                                                1;
-      y = (v as {y: unknown}).y !== undefined ? Number((v as {y: unknown}).y) :
-                                                1;
-      z = (v as {z: unknown}).z !== undefined ? Number((v as {z: unknown}).z) :
-                                                1;
-    } else if (typeof v === 'number' && !Number.isNaN(v)) {
-      x = y = z = v;
-    }
-    return (shape as InstanceType<typeof Manifold>).scale([x, y, z]);
-  }
+function translate(shape: InstanceType<typeof Manifold>, v: ScadValue):
+    InstanceType<typeof Manifold>;
+function translate(shape: InstanceType<typeof CrossSection>, v: ScadValue):
+    InstanceType<typeof CrossSection>;
+function translate(shape: Shape, v: ScadValue): Shape;
+function translate(shape: undefined, v: ScadValue): undefined;
+function translate(shape: Shape|undefined, v: ScadValue): Shape|undefined;
+function translate(shape: Shape|undefined, v: ScadValue): Shape|undefined {
+  if (shape === undefined) return undefined;
+
+  // a scalar is treated as an X offset
+  const vec = Array.isArray(v) ? v : [v];
+  const x = coord(vec, 0);
+  const y = coord(vec, 1);
+
+  return is2D(shape) ? shape.translate([x, y]) :
+                       shape.translate([x, y, coord(vec, 2)]);
+}
+
+function scale(shape: InstanceType<typeof Manifold>, v: ScadValue):
+    InstanceType<typeof Manifold>;
+function scale(shape: InstanceType<typeof CrossSection>, v: ScadValue):
+    InstanceType<typeof CrossSection>;
+function scale(shape: Shape, v: ScadValue): Shape;
+function scale(shape: undefined, v: ScadValue): undefined;
+function scale(shape: Shape|undefined, v: ScadValue): Shape|undefined;
+function scale(shape: Shape|undefined, v: ScadValue): Shape|undefined {
+  if (shape === undefined) return undefined;
+
+  // a scalar scales uniformly; missing or invalid components default to 1
+  const vec = Array.isArray(v) ? v : [v, v, v];
+  const x = coord(vec, 0, 1);
+  const y = coord(vec, 1, 1);
+
+  return is2D(shape) ? shape.scale([x, y]) :
+                       shape.scale([x, y, coord(vec, 2, 1)]);
 }
 
 // Scale about the origin to fit `newsize`, preserving zero-sized axes unless
 // `auto` is enabled, with the auto scale taken from the largest requested
 // dimension
+type Axis = 0|1|2;
 function resize(
-    shape: unknown, newsizeRaw: number[], autoRaw: unknown): unknown {
-  if (!shape || isEmpty(shape)) return shape;
+    shape: InstanceType<typeof Manifold>, newsizeRaw: ScadValue,
+    autoRaw: ScadValue): InstanceType<typeof Manifold>;
+function resize(
+    shape: InstanceType<typeof CrossSection>, newsizeRaw: ScadValue,
+    autoRaw: ScadValue): InstanceType<typeof CrossSection>;
+function resize(shape: Shape, newsizeRaw: ScadValue, autoRaw: ScadValue): Shape;
+function resize(
+    shape: undefined, newsizeRaw: ScadValue, autoRaw: ScadValue): undefined;
+function resize(
+    shape: Shape|undefined, newsizeRaw: ScadValue, autoRaw: ScadValue): Shape|
+    undefined;
+function resize(
+    shape: Shape|undefined, newsizeRaw: ScadValue, autoRaw: ScadValue): Shape|
+    undefined {
+  if (shape === undefined || isEmpty(shape)) return shape;
 
-  const newsize = [0, 0, 0];
+  const ns = Array.isArray(newsizeRaw) ? newsizeRaw : [];
+  const newsize: Vec3 = [coord(ns, 0), coord(ns, 1), coord(ns, 2)];
 
-  if (is_list(newsizeRaw)) {
-    for (let i = 0; i < 3 && i < newsizeRaw.length; i++) {
-      const n = Number(newsizeRaw[i]);
-      if (Number.isFinite(n)) newsize[i] = n;
-    }
-  }
+  const autosize: [boolean, boolean, boolean] = Array.isArray(autoRaw) ?
+      [truthy(autoRaw[0]), truthy(autoRaw[1]), truthy(autoRaw[2])] :
+      typeof autoRaw === 'boolean' ? [autoRaw, autoRaw, autoRaw] :
+                                     [false, false, false];
 
-  const autosize = [false, false, false];
+  let bboxSize: Vec3;
+  let axes: readonly Axis[];
 
-  if (is_list(autoRaw)) {
-    for (let i = 0; i < 3 && i < (autoRaw as boolean[]).length; i++) {
-      autosize[i] = truthy((autoRaw as boolean[])[i]);
-    }
-  } else if (typeof autoRaw === 'boolean') {
-    autosize[0] = autosize[1] = autosize[2] = autoRaw;
-  }
-
-  const flat = is2D(shape);
-  const dim = flat ? 2 : 3;
-
-  const bb = flat ? (shape as InstanceType<typeof CrossSection>).bounds() :
-                    (shape as InstanceType<typeof Manifold>).boundingBox();
-
-  const bboxSize = [0, 0, 0];
-
-  for (let i = 0; i < dim; i++) {
-    bboxSize[i] = bb.max[i]! - bb.min[i]!;
+  if (is2D(shape)) {
+    const {min, max} = shape.bounds();
+    bboxSize = [max[0] - min[0], max[1] - min[1], 0];
+    axes = [0, 1];
+  } else {
+    const {min, max} = shape.boundingBox();
+    bboxSize = [max[0] - min[0], max[1] - min[1], max[2] - min[2]];
+    axes = [0, 1, 2];
   }
 
   // Non-positive `newsize` components are treated as unspecified, and `auto`
   // uses the scale of the largest requested dimension
-  let maxIdx = 0;
-
-  for (let i = 1; i < 3; i++) {
-    if (newsize[i]! > newsize[maxIdx]!) maxIdx = i;
+  let maxIdx: Axis = 0;
+  for (const i of [1, 2] as const) {
+    if (newsize[i] > newsize[maxIdx]) maxIdx = i;
   }
 
-  const scale = [1, 1, 1];
+  const scale: Vec3 = [1, 1, 1];
 
-  for (let i = 0; i < dim; i++) {
-    if (newsize[i]! > 0) {
+  for (const i of axes) {
+    if (newsize[i] > 0) {
       if (bboxSize[i] === 0) {
         console.warn(
             'WARNING: Resize in direction normal to flat object is not implemented');
         return shape;
       }
-
-      scale[i] = newsize[i]! / bboxSize[i]!;
+      scale[i] = newsize[i] / bboxSize[i];
     }
   }
 
-  const autoscale = scale[maxIdx]!;
+  const autoscale = scale[maxIdx];
 
-  for (let i = 0; i < dim; i++) {
-    if (autosize[i] && !(newsize[i]! > 0)) {
-      scale[i] = autoscale;
-    }
+  for (const i of axes) {
+    if (autosize[i] && !(newsize[i] > 0)) scale[i] = autoscale;
   }
 
-  return flat ? (shape as InstanceType<typeof CrossSection>).scale([
-    scale[0]!, scale[1]!
-  ]) :
-                (shape as InstanceType<typeof Manifold>)
-                    .scale(scale as [number, number, number]);
+  return is2D(shape) ? shape.scale([scale[0], scale[1]]) : shape.scale(scale);
 }
 
 // Build the reflection matrix to avoid rounding artifacts, and treat a
 // zero-length normal as an identity transform
-function mirror(shape: unknown, v: Vec) {
+function mirror(shape: Shape, v: Vec) {
   if (!shape) return shape;
   if (is2D(shape)) {
     let x = 0, y = 0;
@@ -3189,7 +3053,7 @@ function square(
       v = [size, size];
     } else if (
         is_list(size) && size.length === 2 &&
-        size.every((x: unknown) => typeof x === 'number')) {
+        size.every((x: number) => typeof x === 'number')) {
       v = [size[0]!, size[1]!];
     }
   }
@@ -3402,11 +3266,10 @@ function polygon(
 }
 
 
-type Point3D = [number, number, number];
 type Face = number[];
-function polyhedron(
-    points: Point3D[], faces: Face|Face[]): InstanceType<typeof Manifold> {
-  // A point with a non-finite coordinate yields no geometry
+function polyhedron(points: [number, number, number][], faces: Face|Face[]):
+    InstanceType<typeof Manifold> {
+  // a point with a non-finite coordinate yields no geometry
   if (Array.isArray(points) &&
       points.some(
           (p) =>
@@ -3503,20 +3366,14 @@ function polyhedron(
   }
 }
 
-type RGBA = [number, number, number, number];
-
-function parse_color_for_scope(c: unknown, alpha: unknown): RGBA|undefined {
+function parse_color_for_scope(c: ScadValue, alpha: ScadValue): RGBA|undefined {
   const base = parse_color_value(c);
   if (!base) return undefined;
 
-  const a =
-      alpha !== undefined && alpha !== null && Number.isFinite(Number(alpha)) ?
-      Number(alpha) :
-      base[3];
+  const a = is_finite_number(alpha) ? alpha : base[3];
 
-  return [base[0]!, base[1]!, base[2]!, a!];
+  return [base[0], base[1], base[2], a];
 }
-
 
 // A PNG decoded from disk at runtime
 export interface SurfaceImage {
