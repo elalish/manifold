@@ -107,7 +107,7 @@ function geometry2mesh(geometry: BufferGeometry) {
   indices.sort((a, b) => starts[a] - starts[b])
   const runIndex = new Uint32Array(indices.map(i => starts[i]));
   const runOriginalID = new Uint32Array(indices.map(i => originalIDs[i]));
-  // Create the MeshGL for I/O with Manifold library.
+  // Create the Mesh for I/O with Manifold library.
   const mesh =
       new Mesh({numProp: 3, vertProperties, triVerts, runIndex, runOriginalID});
   // Automatically merge vertices with nearly identical positions to create a
