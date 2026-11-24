@@ -409,8 +409,7 @@ void Manifold::Impl::Decimate(double tolerance) {
   Vec<double> totalCost(vertPos_.size(), 0);
   size_t totalCollapsed = 0;
   Vec<Merger> merger(edges.size(), {});
-  if (std::isnan(tolerance)) tolerance = 0;
-  tolerance = std::max(tolerance, epsilon_);
+  tolerance = std::max(epsilon_, tolerance);
   const double maxCost = tolerance * tolerance;
   Vec<int> scratchBuffer;
   scratchBuffer.reserve(10);
