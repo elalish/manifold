@@ -87,7 +87,7 @@ export interface ImportOptions {
   mimetype?: string;
   /**
    * When an imported model is not manifold, try closing gaps smaller than
-   * tolerance in an effort to make it manifold.
+   * tolerance, in millimeters, in an effort to make it manifold.
    */
   tolerance?: number;
 }
@@ -482,6 +482,10 @@ function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
   const {Manifold} = getManifoldModuleSync()!;
   const manifolds = [];
   for (const mesh of meshes) {
+    // The mesh is in the local coordinate system of the original
+    // glTF-transform node.  Find that node, so the result can be transformed
+    // back if possible.
+    const matrix = mesh2sourceNode.get(mesh)?.getWorldMatrix();
     let manifold = tryToMakeManifold(mesh);
     let merged = mesh;
     if (!manifold) {
@@ -491,21 +495,18 @@ function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
     }
     if (!manifold && tolerance) {
       // That didn't work either.
-      // Can we adjust the model within tolerance?
-      merged = merged.merge(tolerance);
+      // Can we adjust the model within tolerance?  The tolerance is in world
+      // units, so divide it by the largest scale of the node.
+      const scale = matrix ?
+          Math.max(...[0, 4, 8].map(
+              i => Math.hypot(matrix[i], matrix[i + 1], matrix[i + 2]))) :
+          1;
+      merged = merged.merge(tolerance / scale);
       manifold = tryToMakeManifold(merged);
     }
     if (!manifold) continue;
 
-    // We have a manifold object, but it is in the local coordinate system of
-    // the original glTF-transform node.  Find that node, and transform it back
-    // if possible.
-    const sourceNode = mesh2sourceNode.get(mesh);
-    if (sourceNode) {
-      manifolds.push(manifold.transform(sourceNode.getWorldMatrix()));
-    } else {
-      manifolds.push(manifold);
-    }
+    manifolds.push(matrix ? manifold.transform(matrix) : manifold);
   }
 
   if (!manifolds?.length) {
