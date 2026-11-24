@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 import manifold3d as md
 
@@ -79,3 +80,11 @@ def test_merge_floor():
     mesh = md.Mesh(vert_properties=verts, tri_verts=tris.astype(np.uint32))
     assert md.Manifold(mesh.merge()).status() == md.Error.NotManifold
     assert md.Manifold(mesh.merge(1e-3)).status() == md.Error.NoError
+
+
+def test_no_precision_argument():
+    mesh = md.Manifold.cube().to_mesh()
+    with pytest.raises(TypeError):
+        md.Manifold(mesh, 1e-3)
+    with pytest.raises(TypeError):
+        mesh.merge(0, 1e-3)

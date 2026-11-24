@@ -2141,6 +2141,9 @@ TEST(Precision, Merge) {
 }
 
 TEST(Precision, Ingest) {
+  // WithPrecision is the only way to set the precision.
+  static_assert(!std::is_constructible_v<Manifold, const MeshGL&, double>);
+  static_assert(!std::is_constructible_v<Manifold, const MeshGL64&, double>);
   const MeshGL64 mesh = Manifold::Sphere(1, {64}).GetMeshGL64();
   const MeshGL meshF = Manifold::Sphere(1, {64}).GetMeshGL();
   // The default follows the representation.
