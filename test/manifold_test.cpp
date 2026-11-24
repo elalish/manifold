@@ -1987,6 +1987,16 @@ TEST(Manifold, Simplify) {
   if (options.exportModels) WriteTestOBJ("torus.obj", simplified);
 }
 
+TEST(Manifold, SimplifyNaNTolerance) {
+  Polygons polyCircle =
+      CrossSection::Circle(1, {20}).Translate({10, 0}).ToPolygons();
+  const Manifold torus = Manifold::Revolve(polyCircle, {100});
+  // NaN simplifies like 0, at the Manifold's epsilon.
+  const Manifold simplified = torus.Simplify(NAN);
+  EXPECT_EQ(simplified.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(simplified.NumTri(), torus.Simplify().NumTri());
+}
+
 TEST(Manifold, MeshID) {
   const Manifold cube = Manifold::Cube();
   MeshGL cubeGL = cube.GetMeshGL();
@@ -2105,6 +2115,19 @@ TEST(Manifold, MergeTolerance) {
   MeshGL mesh = CubeSTL();
   mesh.vertProperties[0] += 1e-4f;
   EXPECT_EQ(Manifold(mesh.Merge(1e-3f)).Status(), Manifold::Error::NoError);
+}
+
+TEST(Manifold, MergeNaNTolerance) {
+  const MeshGL mesh = CubeSTL();
+  MeshGL64 mesh64;
+  mesh64.numProp = mesh.numProp;
+  mesh64.vertProperties.assign(mesh.vertProperties.begin(),
+                               mesh.vertProperties.end());
+  mesh64.triVerts.assign(mesh.triVerts.begin(), mesh.triVerts.end());
+  // NaN merges like 0, at the floor of each mesh type.
+  EXPECT_FALSE(mesh.Merge().mergeFromVert.empty());
+  EXPECT_EQ(mesh.Merge(NAN).mergeFromVert, mesh.Merge().mergeFromVert);
+  EXPECT_EQ(mesh64.Merge(NAN).mergeFromVert, mesh64.Merge().mergeFromVert);
 }
 
 TEST(Precision, Merge) {
