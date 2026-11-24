@@ -2158,6 +2158,32 @@ TEST(Precision, Ingest) {
   }
 }
 
+TEST(Precision, IngestIgnoresUnusedVerts) {
+  MeshGL64 mesh = Manifold::Cube(vec3(1)).Refine(2).GetMeshGL64();
+  int raised = 0;
+  for (size_t v = 0; v < mesh.NumVert(); ++v) {
+    double* p = &mesh.vertProperties[mesh.numProp * v];
+    if (p[0] == 0.5 && p[1] == 0.5 && p[2] == 1) {
+      p[2] += 1e-4;
+      ++raised;
+    }
+  }
+  ASSERT_EQ(raised, 1);
+  const size_t numVert = Manifold(mesh, 1e-6).Simplify().NumVert();
+
+  // A far unused vertex must not widen the tolerance.
+  mesh.vertProperties.push_back(1000);
+  for (size_t i = 1; i < mesh.numProp; ++i) mesh.vertProperties.push_back(0);
+  const Manifold m(mesh, 1e-6);
+  EXPECT_DOUBLE_EQ(m.GetEpsilon(), 1e-6 * m.BoundingBox().Scale());
+  EXPECT_EQ(m.Simplify().NumVert(), numVert);
+
+  ExecutionContext ctx;
+  const Manifold viaCtx = ctx.FromMeshGL(mesh);
+  EXPECT_DOUBLE_EQ(viaCtx.GetEpsilon(),
+                   kDefaultRelativePrecision * viaCtx.BoundingBox().Scale());
+}
+
 TEST(Precision, WithPrecisionAffectsOnlyLaterOps) {
   const Manifold fine =
       Manifold::Sphere(1, {256}) - Manifold::Cube(vec3(1)).Rotate(10, 20, 30);

@@ -524,8 +524,6 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL, double relPrecision,
   }
   ADVANCE_PHASE_OR_RETURN(ctx);
 
-  CalculateBBox();
-
   // we need to split pinched verts before calculating vertex normals, because
   // the algorithm doesn't work with pinched verts
   CleanupTopology();
@@ -540,6 +538,7 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL, double relPrecision,
   RemoveUnreferencedVerts();
   ADVANCE_PHASE_OR_RETURN(ctx);
 
+  CalculateBBox();
   SortGeometry(ctx);
   ADVANCE_PHASE_OR_RETURN(ctx);
 
