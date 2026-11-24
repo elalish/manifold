@@ -1826,3 +1826,47 @@ TEST(Boolean, PointWithinToleranceOfCoincidentEdge) {
     EXPECT_EQ(w[1], 0);
   }
 }
+
+// Faces of the two cubes meet at an angle near tolerance over size, so a band
+// as wide as a face is within tolerance. Tie decisions there assemble a
+// reversed face loop, which cleanup removes. The result must be the cube.
+TEST(Boolean, ReversedFaceNearCoincidentCubes) {
+  const std::vector<double> vertA = {
+      0.99734743141841853,  -1.0847200733239233, 2.1397851442542604,
+      -1.909632850343659,   -0.4950347305107915, 1.6906339025573989,
+      1.1952912847113493,   -2.2189604661831654, -0.63047061327970055,
+      -1.7116889970507283,  -1.6292751233700336, -1.0796218549765622,
+      1.7116889970507283,   1.6292751233700336,  1.0796218549765622,
+      -1.1952912847113493,  2.2189604661831654,  0.63047061327970055,
+      1.909632850343659,    0.4950347305107915,  -1.6906339025573989,
+      -0.99734743141841853, 1.0847200733239233,  -2.1397851442542604,
+  };
+  const std::vector<double> vertB = {
+      0.99734748557661035,  -1.0847201064306684,  2.1397850493602868,
+      -1.90963279564509,    -0.49503475852363438, 1.6906338108537413,
+      1.1952913347783287,   -2.2189604960784139,  -0.63047070978090436,
+      -1.7116889464433718,  -1.6292751481713801,  -1.0796219482874501,
+      1.7116890545416337,   1.6292750904986646,   1.0796217629307401,
+      -1.1952912266800668,  2.2189604384056985,   0.63047052442419416,
+      1.9096329037433519,   0.49503470085091889,  -1.6906339962104513,
+      -0.99734737747834867, 1.0847200487579529,   -2.1397852347169972,
+  };
+  const std::vector<uint64_t> tri = {
+      1, 0, 4, 2, 4, 0, 1, 3, 0, 3, 1, 5, 3, 2, 0, 3, 7, 2,
+      5, 4, 6, 5, 1, 4, 6, 4, 2, 7, 6, 2, 7, 3, 5, 7, 5, 6,
+  };
+  struct PrecisionGuard {
+    ~PrecisionGuard() { Quality::ResetToDefaults(); }
+  } guard;
+  Quality::SetRelativePrecision(1e-7);
+  MeshGL64 ma, mb;
+  ma.numProp = mb.numProp = 3;
+  ma.vertProperties = vertA;
+  mb.vertProperties = vertB;
+  ma.triVerts = mb.triVerts = tri;
+  const Manifold a(ma), b(mb);
+  const Manifold r = a ^ b;
+  EXPECT_EQ(r.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(r.Genus(), 0);
+  EXPECT_NEAR(r.Volume(), 27, 1e-5);
+}
