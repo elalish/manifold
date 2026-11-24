@@ -17,7 +17,9 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <limits>
+#include <random>
 #include <stdexcept>
 #include <thread>
 #include <tuple>
@@ -56,7 +58,7 @@ int NumUnique(const std::vector<T>& in) {
 // Impl::Transform / Compose / CreateProperties was added to support.
 Manifold MixedNormalsCubePlusSphere(double sphereRadius = 5.0) {
   return Manifold(CubeSTL().Merge()).Translate({20, 0, 0}) +
-         Manifold::Sphere(sphereRadius, 32).CalculateNormals();
+         Manifold::Sphere(sphereRadius, {32}).CalculateNormals();
 }
 
 // Count verts on the sphere surface (|pos| ~ sphereRadius) whose stored
@@ -100,7 +102,7 @@ TEST(Manifold, GetMeshGL) {
 
 TEST(Manifold, SharedTopologyCopyIsolation) {
   const Manifold sphere =
-      Manifold::Sphere(1, 16).CalculateNormals(180).SmoothByNormals();
+      Manifold::Sphere(1, {16}).CalculateNormals(180).SmoothByNormals();
   const Manifold cube = Manifold::Cube().Refine(2).CalculateNormals(30);
   for (const Manifold& source : {sphere, cube}) {
     const MeshGL64 original = source.GetMeshGL64();
@@ -163,7 +165,7 @@ TEST(Manifold, SharedTopologyThrowingCallbacks) {
 
 #ifndef __EMSCRIPTEN__
 TEST(Manifold, SharedTopologyConcurrentCopies) {
-  const Manifold source = Manifold::Sphere(1, 16).CalculateNormals(180);
+  const Manifold source = Manifold::Sphere(1, {16}).CalculateNormals(180);
   const MeshGL64 original = source.GetMeshGL64();
   std::atomic<bool> intact = true;
   std::vector<std::thread> threads;
@@ -534,7 +536,7 @@ TEST(Manifold, ErrorPropagationCalculateNormals) {
 TEST(Manifold, NormalsCavity) {
   // The #1712 repro: inner-sphere normals from a Boolean diff should point
   // toward the origin (outward from the surrounding solid).
-  MeshGL mesh = (Manifold::Sphere(10.0, 32) - Manifold::Sphere(3.0, 32))
+  MeshGL mesh = (Manifold::Sphere(10.0, {32}) - Manifold::Sphere(3.0, {32}))
                     .CalculateNormals()
                     .GetMeshGL();
   ASSERT_GE(mesh.numProp, 6);
@@ -547,7 +549,7 @@ TEST(Manifold, NormalsCavity) {
 TEST(Manifold, NormalsRotateBeforeCalc) {
   // Rotation before CalculateNormals: SetNormals computes from already-
   // rotated faceNormal_ and stores world-frame at slot 0.
-  MeshGL mesh = Manifold::Sphere(10.0, 32)
+  MeshGL mesh = Manifold::Sphere(10.0, {32})
                     .Rotate(45, 0, 0)
                     .CalculateNormals()
                     .GetMeshGL();
@@ -572,7 +574,7 @@ TEST(Manifold, LargeRotationsPreserveVolume) {
 TEST(Manifold, NormalsRotateAfterCalc) {
   // Rotation *after* CalculateNormals: Impl::Transform eager-transforms the
   // stored slot 0..2 so it tracks the new orientation.
-  MeshGL mesh = Manifold::Sphere(10.0, 32)
+  MeshGL mesh = Manifold::Sphere(10.0, {32})
                     .CalculateNormals()
                     .Rotate(45, 0, 0)
                     .GetMeshGL();
@@ -584,7 +586,7 @@ TEST(Manifold, NormalsRotateAfterCalc) {
 TEST(Manifold, NormalsAutoSubstitute) {
   // No-arg invocation: defaults to slot 0 and sets the per-run hasNormals
   // bit on every output run.
-  MeshGL mesh = Manifold::Sphere(10.0, 32).CalculateNormals().GetMeshGL();
+  MeshGL mesh = Manifold::Sphere(10.0, {32}).CalculateNormals().GetMeshGL();
   ASSERT_GE(mesh.numProp, 6);
   ASSERT_GT(mesh.NumRun(), 0u);
   EXPECT_TRUE(mesh.HasNormals(0));
@@ -593,7 +595,7 @@ TEST(Manifold, NormalsAutoSubstitute) {
 TEST(Manifold, NormalsRoundTrip) {
   // getMesh -> ofMesh -> getMesh preserves the per-run flag, so the second
   // getMesh still emits world-frame normals.
-  Manifold round = (Manifold::Sphere(10.0, 32) - Manifold::Sphere(3.0, 32))
+  Manifold round = (Manifold::Sphere(10.0, {32}) - Manifold::Sphere(3.0, {32}))
                        .CalculateNormals();
   MeshGL out1 = round.GetMeshGL();
   EXPECT_TRUE(out1.HasNormals(0));
@@ -609,7 +611,7 @@ TEST(Manifold, NormalsRefinePreserved) {
   // Refine keeps the recording: linearly-interpolated normals at the new
   // verts are less precise than recomputed ones but still meaningful.
   MeshGL mesh =
-      Manifold::Sphere(10.0, 32).CalculateNormals().Refine(2).GetMeshGL();
+      Manifold::Sphere(10.0, {32}).CalculateNormals().Refine(2).GetMeshGL();
   ASSERT_GT(mesh.NumRun(), 0u);
   EXPECT_TRUE(mesh.HasNormals(0));
 }
@@ -618,14 +620,14 @@ TEST(Manifold, NormalsSmoothByNormalsNoArg) {
   // Smoke test that the no-arg SmoothByNormals reads from the recorded
   // slot 0 and produces a valid manifold.
   Manifold smoothed =
-      Manifold::Sphere(10.0, 32).CalculateNormals().SmoothByNormals();
+      Manifold::Sphere(10.0, {32}).CalculateNormals().SmoothByNormals();
   EXPECT_EQ(smoothed.Status(), Manifold::Error::NoError);
 }
 
 TEST(Manifold, NormalsDroppedWithChannels) {
   // With fewer than three properties left, the recorded normals no longer
   // exist, so export must not write them into the next vertex.
-  const Manifold m = (Manifold::Cube(vec3(2), true) + Manifold::Sphere(5, 8))
+  const Manifold m = (Manifold::Cube(vec3(2), true) + Manifold::Sphere(5, {8}))
                          .CalculateNormals()
                          .SetProperties(1, nullptr);
   const MeshGL64 mesh = m.GetMeshGL64();
@@ -649,7 +651,7 @@ TEST(Manifold, NormalsNormalizedPerRun) {
             newProp[1] = 0;
             newProp[2] = 2;
           });
-  const Manifold mixed = Manifold::Sphere(5, 32).CalculateNormals() + cube;
+  const Manifold mixed = Manifold::Sphere(5, {32}).CalculateNormals() + cube;
   auto check = [](const auto& gl) {
     int flagged = 0;
     int unflagged = 0;
@@ -775,7 +777,7 @@ TEST(Manifold, MixedNormalsDefaultIDRoundTrip) {
   // Both operands use the default originalID 0, but only the sphere records
   // normals. A MeshGL round trip must keep that per run, in either operand
   // order, so the sphere's normals still rotate afterward.
-  const Manifold sphere = Manifold::Sphere(5, 32).CalculateNormals();
+  const Manifold sphere = Manifold::Sphere(5, {32}).CalculateNormals();
   const Manifold overlap = Manifold::Cube(vec3(6), true).Translate({4, 0, 0});
   const Manifold apart = Manifold::Cube(vec3(6), true).Translate({20, 0, 0});
   for (const Manifold& mixed :
@@ -835,7 +837,7 @@ TEST(Manifold, AsOriginalMixedNormalsKept) {
   // keeps both runs. The overlap interleaves the two kinds of triangles, and
   // the IDs cover untracked, reserved, above the reserved range, and equal to
   // the next reserved ID.
-  const Manifold sphere = Manifold::Sphere(5, 32).CalculateNormals();
+  const Manifold sphere = Manifold::Sphere(5, {32}).CalculateNormals();
   const Manifold cube = Manifold::Cube(vec3(6), true).Translate({4, 0, 0});
   for (const Manifold& mixed : {sphere + cube, cube + sphere}) {
     for (const int id : {-1, 0, 1 << 29, -2}) {
@@ -868,9 +870,9 @@ TEST(Manifold, MinkowskiKeepsNormals) {
   // Minkowski unions the input with hulls that have no normals and calls
   // AsOriginal(0), so only the input's surviving triangles keep their normals.
   const Manifold nonConvex =
-      (Manifold::Cube(vec3(2), true) - Manifold::Sphere(0.75, 8))
+      (Manifold::Cube(vec3(2), true) - Manifold::Sphere(0.75, {8}))
           .CalculateNormals();
-  const Manifold ball = Manifold::Sphere(0.1, 8);
+  const Manifold ball = Manifold::Sphere(0.1, {8});
   const MeshGL sum = nonConvex.MinkowskiSum(ball).GetMeshGL();
   ASSERT_EQ(sum.NumRun(), 2u);
   EXPECT_TRUE(sum.HasNormals(0));
@@ -1092,7 +1094,7 @@ TEST(Manifold, Decompose) {
   manifoldList.emplace_back(Manifold::Tetrahedron().AsOriginal());
   manifoldList.emplace_back(Manifold::Cube().Translate({2, 0, 0}).AsOriginal());
   manifoldList.emplace_back(
-      Manifold::Sphere(1, 4).Translate({4, 0, 0}).AsOriginal());
+      Manifold::Sphere(1, {4}).Translate({4, 0, 0}).AsOriginal());
   Manifold manifolds = Manifold::BatchBoolean(manifoldList, OpType::Add);
 
   ExpectMeshes(manifolds, {{8, 12}, {6, 8}, {4, 4}});
@@ -1174,7 +1176,7 @@ TEST(Manifold, DecomposeProps) {
   manifoldList.emplace_back(cube);
   input.emplace_back(cube.GetMeshGL());
   auto sphere = WithPositionColors(
-      Manifold::Sphere(1, 4).Translate({4, 0, 0}).AsOriginal());
+      Manifold::Sphere(1, {4}).Translate({4, 0, 0}).AsOriginal());
   manifoldList.emplace_back(sphere);
   input.emplace_back(sphere.GetMeshGL());
   Manifold manifolds = Manifold::BatchBoolean(manifoldList, OpType::Add);
@@ -1194,7 +1196,7 @@ TEST(Manifold, DecomposeManyUnequalComponents) {
   for (int i = 0; i < 24; ++i) {
     const Manifold shape = i % 3 == 0   ? Manifold::Cube()
                            : i % 3 == 1 ? Manifold::Tetrahedron()
-                                        : Manifold::Sphere(1, 12);
+                                        : Manifold::Sphere(1, {12});
     originals.push_back(
         WithPositionColors(shape.Translate({5.0 * i, 0, 0}).AsOriginal()));
     input.push_back(originals.back().GetMeshGL());
@@ -1221,93 +1223,197 @@ TEST(Manifold, DecomposeManyUnequalComponents) {
  */
 TEST(Manifold, Sphere) {
   int n = 25;
-  Manifold sphere = Manifold::Sphere(1.0, 4 * n);
+  Manifold sphere = Manifold::Sphere(1.0, {4 * n});
   EXPECT_EQ(sphere.NumTri(), n * n * 8);
 }
 
 // Native-only: the WASM build is single-threaded (no pthread), so std::thread
 // construction throws, which aborts under -fno-exceptions.
 #ifndef __EMSCRIPTEN__
-TEST(Manifold, CircularSegmentsWhileReset) {
-  // Both states of the setting give 8 segments for radius 1, so any other
-  // result means the reader saw a mix of the two.
-  std::atomic<bool> stop{false};
+TEST(Manifold, CircularQualityPerThread) {
+  // Each thread builds with its own quality, so neither can see the other's.
+  const CircularQuality coarse{0, 90.0};
+  const CircularQuality fine{0, 5.0, 0.01};
+  const size_t coarseTri = Manifold::Sphere(10, coarse).NumTri();
+  const size_t fineTri = Manifold::Sphere(10, fine).NumTri();
+  ASSERT_NE(coarseTri, fineTri);
   std::atomic<int> wrong{0};
-  std::thread writer([&] {
-    while (!stop) {
-      Quality::SetCircularSegments(8);
-      Quality::SetCircularSegments(0);
-    }
-  });
-  std::vector<std::thread> readers;
-  for (int i = 0; i < 3; ++i) {
-    readers.emplace_back([&] {
-      while (!stop) {
-        if (Quality::GetCircularSegments(1.0) != 8) ++wrong;
+  std::vector<std::thread> threads;
+  for (int i = 0; i < 4; ++i) {
+    threads.emplace_back([&, i] {
+      const CircularQuality& q = i % 2 ? fine : coarse;
+      const size_t expected = i % 2 ? fineTri : coarseTri;
+      for (int j = 0; j < 20; ++j) {
+        if (Manifold::Sphere(10, q).NumTri() != expected) ++wrong;
       }
     });
   }
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  stop = true;
-  writer.join();
-  for (auto& t : readers) t.join();
-  Quality::ResetToDefaults();
+  for (auto& t : threads) t.join();
   EXPECT_EQ(wrong.load(), 0);
 }
 #endif
 
-TEST(Manifold, CircularConstraintsRestore) {
-  Quality::ResetToDefaults();
-  EXPECT_DOUBLE_EQ(Quality::GetMinCircularAngle(), DEFAULT_ANGLE);
-  EXPECT_DOUBLE_EQ(Quality::GetMinCircularEdgeLength(), DEFAULT_LENGTH);
+TEST(Manifold, CircularQualitySegmentsFor) {
+  const CircularQuality defaults;
+  EXPECT_EQ(defaults.segments, 0);
+  EXPECT_DOUBLE_EQ(defaults.minAngle, 10.0);
+  EXPECT_DOUBLE_EQ(defaults.minEdgeLength, 1.0);
+  EXPECT_EQ(defaults.SegmentsFor(1.0), 8);
+  EXPECT_EQ(defaults.SegmentsFor(100.0), 36);
 
-  Quality::SetMinCircularAngle(22.5);
-  Quality::SetMinCircularEdgeLength(0.125);
-  const double angle = Quality::GetMinCircularAngle();
-  const double length = Quality::GetMinCircularEdgeLength();
-  const int segments = Quality::GetCircularSegments(2.0);
-  EXPECT_DOUBLE_EQ(angle, 22.5);
-  EXPECT_DOUBLE_EQ(length, 0.125);
-  EXPECT_EQ(segments, 16);
-
-  Quality::SetCircularSegments(12);
-  EXPECT_DOUBLE_EQ(Quality::GetMinCircularAngle(), angle);
-  EXPECT_DOUBLE_EQ(Quality::GetMinCircularEdgeLength(), length);
-  Quality::SetCircularSegments(0);
-
-  Quality::SetMinCircularAngle(5);
-  Quality::SetMinCircularEdgeLength(0.25);
-  EXPECT_NE(Quality::GetCircularSegments(2.0), segments);
-  Quality::SetMinCircularAngle(angle);
-  Quality::SetMinCircularEdgeLength(length);
-  EXPECT_EQ(Quality::GetCircularSegments(2.0), segments);
-
-  for (const double invalid : {0.0, -1.0, static_cast<double>(NAN)}) {
-    Quality::SetMinCircularAngle(invalid);
-    Quality::SetMinCircularEdgeLength(invalid);
-    EXPECT_DOUBLE_EQ(Quality::GetMinCircularAngle(), angle);
-    EXPECT_DOUBLE_EQ(Quality::GetMinCircularEdgeLength(), length);
+  const CircularQuality q{0, 22.5, 0.125};
+  EXPECT_EQ(q.SegmentsFor(2.0), 16);
+  EXPECT_EQ((CircularQuality{12, 22.5, 0.125}.SegmentsFor(2.0)), 12);
+  EXPECT_NE((CircularQuality{0, 5, 0.25}.SegmentsFor(2.0)), 16);
+  // segments below 3 apply no constraint.
+  for (const int segments : {-1, 1, 2}) {
+    EXPECT_EQ((CircularQuality{segments, 22.5, 0.125}.SegmentsFor(2.0)), 16);
   }
-  Quality::ResetToDefaults();
-  EXPECT_DOUBLE_EQ(Quality::GetMinCircularAngle(), DEFAULT_ANGLE);
-  EXPECT_DOUBLE_EQ(Quality::GetMinCircularEdgeLength(), DEFAULT_LENGTH);
+
+  // A non-positive or NaN angle or edge length uses the default.
+  for (const double invalid : {0.0, -1.0, static_cast<double>(NAN)}) {
+    for (const double r : {1.0, 2.0, 100.0}) {
+      EXPECT_EQ((CircularQuality{0, invalid, 0.125}.SegmentsFor(r)),
+                (CircularQuality{0, 10.0, 0.125}.SegmentsFor(r)));
+      EXPECT_EQ((CircularQuality{0, 22.5, invalid}.SegmentsFor(r)),
+                (CircularQuality{0, 22.5, 1.0}.SegmentsFor(r)));
+    }
+  }
+}
+
+TEST(Manifold, CircularQualityFactories) {
+  const CircularQuality q{0, 30.0, 0.1};
+  const int n = q.SegmentsFor(5);
+  EXPECT_EQ(n, 12);
+  EXPECT_EQ(CrossSection::Circle(5, q).NumVert(), n);
+  EXPECT_EQ(Manifold::Cylinder(2, 5, -1, q).NumVert(), 2 * n);
+  EXPECT_EQ(Manifold::Sphere(5, q).NumTri(), Manifold::Sphere(5, {n}).NumTri());
+  CrossSection ring = CrossSection::Square({1, 1}).Translate({4.5, 0});
+  EXPECT_EQ(Manifold::Revolve(ring.ToPolygons(), q).NumVert(),
+            Manifold::Revolve(ring.ToPolygons(), {n}).NumVert());
+  // A round offset of a point-like square adds n vertices per 360 degrees.
+  CrossSection tiny = CrossSection::Square({1e-3, 1e-3}, true);
+  EXPECT_EQ(tiny.Offset(5, CrossSection::JoinType::Round, 2, q).NumVert(),
+            tiny.Offset(5, CrossSection::JoinType::Round, 2, {n}).NumVert());
+
+  // Sphere takes any positive count, rounding it up to a multiple of four.
+  for (const int segments : {1, 2, 4}) {
+    EXPECT_EQ(Manifold::Sphere(5, {segments}).NumTri(), 8);
+    EXPECT_EQ(Manifold::Sphere(5, CircularQuality{segments, 30.0}).NumTri(), 8);
+  }
+  EXPECT_EQ(Manifold::Sphere(5, {5}).NumTri(), 32);
+
+  // {} matches the defaults.
+  EXPECT_EQ(Manifold::Sphere(5, {}).NumTri(), Manifold::Sphere(5).NumTri());
+  EXPECT_EQ(CrossSection::Circle(5, {}).NumVert(),
+            CircularQuality{}.SegmentsFor(5));
+#if __cplusplus >= 202002L
+  EXPECT_EQ(
+      CrossSection::Circle(5, {.minAngle = 30, .minEdgeLength = 0.1}).NumVert(),
+      n);
+#endif
+}
+
+TEST(Manifold, RevolveDivisionsForAngle) {
+  // A partial revolve of a ring off the axis has 4 vertices per slice, and a
+  // full one shares its first and last slice.
+  const Polygons ring =
+      CrossSection::Square({1, 1}).Translate({4.5, 0}).ToPolygons();
+  auto numDivisions = [&](CircularQuality q, double degrees) {
+    const size_t numVert = Manifold::Revolve(ring, q, degrees).NumVert();
+    return static_cast<int>(numVert / 4) - (std::abs(degrees) < 360 ? 1 : 0);
+  };
+  // A partial revolve rounds the matching fraction of a full circle up.
+  EXPECT_EQ(numDivisions({30}, 90), 8);
+  EXPECT_EQ(numDivisions({32}, 90), 8);
+  EXPECT_EQ(numDivisions({30}, 100), 9);
+  EXPECT_EQ(numDivisions({30}, 360), 30);
+  EXPECT_EQ(numDivisions({30}, 1), 1);
+  // The product underflows to zero for a subnormal angle.
+  EXPECT_EQ(numDivisions({3}, 5e-324), 1);
+  // Both sides of the boundaries where three segments need another division.
+  EXPECT_EQ(numDivisions({3}, 120), 1);
+  EXPECT_EQ(numDivisions({3}, 120.001), 2);
+  EXPECT_EQ(numDivisions({3}, 240), 2);
+  EXPECT_EQ(numDivisions({3}, 240.001), 3);
+  // An excess of one ulp is treated as floating-point error, two is not. Two
+  // and three ulps above 120 degrees give 30 segments one and two ulps above
+  // 10.
+  const double up1 = std::nextafter(120.0, 360.0);
+  const double up2 = std::nextafter(up1, 360.0);
+  const double up3 = std::nextafter(up2, 360.0);
+  EXPECT_EQ(30 * up2 / 360, std::nextafter(10.0, 11.0));
+  EXPECT_EQ(numDivisions({30}, up2), 10);
+  EXPECT_EQ(30 * up3 / 360, std::nextafter(std::nextafter(10.0, 11.0), 11.0));
+  EXPECT_EQ(numDivisions({30}, up3), 11);
+  EXPECT_EQ(numDivisions({30}, 120.00000000001), 11);
+
+  // An explicit count and a count derived from the angle and edge length
+  // round the same way. The ring's outer radius 5.5 gets 36 by default.
+  const CircularQuality derived{0, 12.5, 0.1};
+  ASSERT_EQ(derived.SegmentsFor(5.5), 28);
+  ASSERT_EQ(CircularQuality{}.SegmentsFor(5.5), 36);
+  for (const double degrees : {10.0, 90.0, 100.0, 250.0, 359.0, 360.0}) {
+    const int expected = static_cast<int>(std::ceil(28 * degrees / 360));
+    EXPECT_EQ(numDivisions({28}, degrees), expected) << degrees;
+    EXPECT_EQ(numDivisions(derived, degrees), expected) << degrees;
+    EXPECT_EQ(numDivisions({}, degrees),
+              static_cast<int>(std::ceil(36 * degrees / 360)))
+        << degrees;
+  }
+
+  // A count that is whole in exact arithmetic is not rounded up by
+  // floating-point error, here from k * 3.6 not being exact in binary (k = 19
+  // gives 19.000000000000004 without the tolerance).
+  for (int k = 1; k <= 100; ++k) {
+    ASSERT_EQ(numDivisions({100}, k * 3.6), k) << k;
+  }
+  for (int k = 1; k <= 19; ++k) {
+    ASSERT_EQ(numDivisions({19 * 7}, k * (360.0 / 19)), 7 * k) << k;
+  }
+
+  for (const double degrees :
+       {1.0, 45.0, 90.0, 120.0, 179.0, 240.0, 241.0, 359.0, 359.999999, 360.0,
+        0.7, 1e-4, 360.0 / 19, 7.5, 100.0 / 3, 0.1 * 3, -90.0, 720.0}) {
+    for (int n = 1; n <= 40; ++n) {
+      const double d = std::min(std::abs(degrees), 360.0);
+      // The documented limits: more than 120 degrees needs 2, more than 240
+      // needs 3.
+      const int fewest = d > 240 ? 3 : d > 120 ? 2 : 1;
+      EXPECT_EQ(
+          numDivisions(CircularQuality::ForDivisions(n, degrees), degrees),
+          std::max(n, fewest))
+          << degrees << " degrees, " << n << " divisions";
+    }
+  }
+
+  // Randomized angles and counts.
+  std::mt19937 gen(12345);
+  std::uniform_real_distribution<double> angle(0.01, 360);
+  std::uniform_int_distribution<int> count(1, 300);
+  for (int i = 0; i < 1000; ++i) {
+    const double degrees = angle(gen);
+    const int n = count(gen);
+    const int fewest = degrees > 240 ? 3 : degrees > 120 ? 2 : 1;
+    EXPECT_EQ(numDivisions(CircularQuality::ForDivisions(n, degrees), degrees),
+              std::max(n, fewest))
+        << degrees << " degrees, " << n << " divisions";
+  }
+  // A tiny angle gets no more divisions than the largest count gives.
+  const int maxInt = std::numeric_limits<int>::max();
+  EXPECT_EQ(CircularQuality::ForDivisions(40, 1e-6).segments, maxInt);
+  EXPECT_EQ(numDivisions({maxInt}, 1e-6), 6);
+  EXPECT_EQ(CircularQuality::ForDivisions(5, 0).segments, 0);
+  EXPECT_EQ(CircularQuality::ForDivisions(5, NAN).segments, 0);
 }
 
 TEST(Manifold, CircularSegmentsTinyAngle) {
   // 360 / angle doesn't fit in an int here, so the edge length should decide.
-  Quality::SetMinCircularAngle(1e-9);
-  const int small = Quality::GetCircularSegments(1.0);
-  const int large = Quality::GetCircularSegments(100.0);
-  const int huge = Quality::GetCircularSegments(1e300);
-  Quality::ResetToDefaults();
-  Quality::SetMinCircularAngle(NAN);
-  Quality::SetMinCircularEdgeLength(NAN);
-  const int nan = Quality::GetCircularSegments(1.0);
-  Quality::ResetToDefaults();
-  EXPECT_EQ(nan, 8);
-  EXPECT_EQ(small, 8);
-  EXPECT_EQ(large, 628);
-  EXPECT_GT(huge, 1000000);
+  const CircularQuality tiny{0, 1e-9};
+  EXPECT_EQ(tiny.SegmentsFor(1.0), 8);
+  EXPECT_EQ(tiny.SegmentsFor(100.0), 628);
+  EXPECT_GT(tiny.SegmentsFor(1e300), 1000000);
+  EXPECT_EQ((CircularQuality{0, NAN, NAN}.SegmentsFor(1.0)), 8);
 }
 
 TEST(Manifold, AssignToMovedFrom) {
@@ -1330,7 +1436,7 @@ TEST(Manifold, AssignToMovedFrom) {
 
 TEST(Manifold, Cylinder) {
   int n = 10000;
-  Manifold cylinder = Manifold::Cylinder(2, 2, 2, n);
+  Manifold cylinder = Manifold::Cylinder(2, 2, 2, {n});
   EXPECT_EQ(cylinder.NumTri(), 4 * n - 4);
 }
 
@@ -1339,8 +1445,8 @@ TEST(Manifold, CylinderZeroRadiusLow) {
   // Use enough segments for accurate volume.
   const int n = 256;
   const double h = 5.0, r = 3.0;
-  Manifold coneApexBottom = Manifold::Cylinder(h, 0.0, r, n);
-  Manifold coneApexTop = Manifold::Cylinder(h, r, 0.0, n);
+  Manifold coneApexBottom = Manifold::Cylinder(h, 0.0, r, {n});
+  Manifold coneApexTop = Manifold::Cylinder(h, r, 0.0, {n});
 
   EXPECT_EQ(coneApexBottom.Status(), Manifold::Error::NoError);
   EXPECT_FALSE(coneApexBottom.IsEmpty());
@@ -1361,9 +1467,9 @@ TEST(Manifold, CylinderZeroRadiusLow) {
 TEST(Manifold, CylinderCenter) {
   const int n = 256;
   const double h = 5.0, r = 3.0;
-  const Manifold cylinder = Manifold::Cylinder(h, r, r, n, true);
-  const Manifold coneApexTop = Manifold::Cylinder(h, r, 0.0, n, true);
-  const Manifold coneApexBottom = Manifold::Cylinder(h, 0.0, r, n, true);
+  const Manifold cylinder = Manifold::Cylinder(h, r, r, {n}, true);
+  const Manifold coneApexTop = Manifold::Cylinder(h, r, 0.0, {n}, true);
+  const Manifold coneApexBottom = Manifold::Cylinder(h, 0.0, r, {n}, true);
 
   for (const Manifold& m : {cylinder, coneApexTop, coneApexBottom}) {
     EXPECT_EQ(m.Status(), Manifold::Error::NoError);
@@ -1371,7 +1477,8 @@ TEST(Manifold, CylinderCenter) {
     EXPECT_DOUBLE_EQ(box.min.z, -h / 2);
     EXPECT_DOUBLE_EQ(box.max.z, h / 2);
   }
-  EXPECT_NEAR(cylinder.Volume(), Manifold::Cylinder(h, r, r, n).Volume(), 1e-6);
+  EXPECT_NEAR(cylinder.Volume(), Manifold::Cylinder(h, r, r, {n}).Volume(),
+              1e-6);
 
   // Same orientation check as CylinderZeroRadiusLow, on the centered cones.
   const double totalVol = coneApexTop.Volume();
@@ -1391,13 +1498,13 @@ TEST(Manifold, ConstructorsOriginalID) {
       Manifold::Cube(vec3(1.0), true),
       Manifold::Sphere(1.0),
       Manifold::Cylinder(2, 1),
-      Manifold::Cylinder(2, 1, 1, 0, true),
+      Manifold::Cylinder(2, 1, 1, {}, true),
       Manifold::Cylinder(2, 0, 1),
-      Manifold::Cylinder(2, 0, 1, 0, true),
+      Manifold::Cylinder(2, 0, 1, {}, true),
       Manifold::Extrude(square, 1.0),
       Manifold::Revolve(square),
       Manifold::Hull({vec3(0.0), vec3(1, 0, 0), vec3(0, 1, 0), vec3(0, 0, 1)}),
-      Manifold::Cube().MinkowskiSum(Manifold::Sphere(0.1, 8)),
+      Manifold::Cube().MinkowskiSum(Manifold::Sphere(0.1, {8})),
   };
   for (const Manifold& m : shapes) {
     EXPECT_EQ(m.Status(), Manifold::Error::NoError);
@@ -1430,9 +1537,10 @@ TEST(Manifold, ShortContours) {
   const SimplePolygon square = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
   EXPECT_DOUBLE_EQ(Manifold::Extrude({square, {{5, 5}}, {}}, 1).Volume(), 1);
   const SimplePolygon offset = {{1, 0}, {2, 0}, {2, 1}, {1, 1}};
-  const Manifold revolved = Manifold::Revolve({offset}, 32);
+  const Manifold revolved = Manifold::Revolve({offset}, {32});
   EXPECT_DOUBLE_EQ(
-      Manifold::Revolve({offset, {{5, 5}}, {{1, 2}, {2, 2}}, {}}, 32).Volume(),
+      Manifold::Revolve({offset, {{5, 5}}, {{1, 2}, {2, 2}}, {}}, {32})
+          .Volume(),
       revolved.Volume());
 }
 
@@ -1475,7 +1583,7 @@ TEST(Manifold, Revolve) {
   Manifold vug;
   for (size_t i = 0; i < polys[0].size(); i++) {
     Polygons rotatedPolys = RotatePolygons(polys, i);
-    vug = Manifold::Revolve(rotatedPolys, 48);
+    vug = Manifold::Revolve(rotatedPolys, {48});
     EXPECT_EQ(vug.Genus(), -1);
     EXPECT_NEAR(vug.Volume(), 14.0 * kPi, 0.2);
     EXPECT_NEAR(vug.SurfaceArea(), 30.0 * kPi, 0.2);
@@ -1484,15 +1592,15 @@ TEST(Manifold, Revolve) {
 
 TEST(Manifold, Revolve2) {
   Polygons polys = SquareHole(2.0);
-  Manifold donutHole = Manifold::Revolve(polys, 48);
+  Manifold donutHole = Manifold::Revolve(polys, {48});
   EXPECT_EQ(donutHole.Genus(), 0);
   EXPECT_NEAR(donutHole.Volume(), 48.0 * kPi, 1.0);
   EXPECT_NEAR(donutHole.SurfaceArea(), 96.0 * kPi, 1.0);
 }
 
 TEST(Manifold, Revolve3) {
-  CrossSection circle = CrossSection::Circle(1, 32);
-  Manifold sphere = Manifold::Revolve(circle.ToPolygons(), 32);
+  CrossSection circle = CrossSection::Circle(1, {32});
+  Manifold sphere = Manifold::Revolve(circle.ToPolygons(), {32});
   EXPECT_NEAR(sphere.Volume(), 4.0 / 3.0 * kPi, 0.1);
   EXPECT_NEAR(sphere.SurfaceArea(), 4 * kPi, 0.15);
 }
@@ -1500,8 +1608,8 @@ TEST(Manifold, Revolve3) {
 TEST(Manifold, RevolveClip) {
   Polygons polys = {{{-5, -10}, {5, 0}, {-5, 10}}};
   Polygons clipped = {{{0, -5}, {5, 0}, {0, 5}}};
-  Manifold first = Manifold::Revolve(polys, 48);
-  Manifold second = Manifold::Revolve(clipped, 48);
+  Manifold first = Manifold::Revolve(polys, {48});
+  Manifold second = Manifold::Revolve(clipped, {48});
   EXPECT_EQ(first.Genus(), second.Genus());
   EXPECT_EQ(first.Volume(), second.Volume());
   EXPECT_EQ(first.SurfaceArea(), second.SurfaceArea());
@@ -1514,7 +1622,7 @@ TEST(Manifold, PartialRevolveOnYAxis) {
   Manifold revolute;
   for (size_t i = 0; i < polys[0].size(); i++) {
     Polygons rotatedPolys = RotatePolygons(polys, i);
-    revolute = Manifold::Revolve(rotatedPolys, 48, 180);
+    revolute = Manifold::Revolve(rotatedPolys, {48}, 180);
     EXPECT_EQ(revolute.Genus(), 1);
     EXPECT_NEAR(revolute.Volume(), 24.0 * kPi, 1.0);
     EXPECT_NEAR(revolute.SurfaceArea(),
@@ -1528,7 +1636,7 @@ TEST(Manifold, PartialRevolveOffset) {
   Manifold revolute;
   for (size_t i = 0; i < polys[0].size(); i++) {
     Polygons rotatedPolys = RotatePolygons(polys, i);
-    revolute = Manifold::Revolve(rotatedPolys, 48, 180);
+    revolute = Manifold::Revolve(rotatedPolys, {48}, 180);
     EXPECT_EQ(revolute.Genus(), 1);
     EXPECT_NEAR(revolute.SurfaceArea(), 777.0, 1.0);
     EXPECT_NEAR(revolute.Volume(), 376.0, 1.0);
@@ -1539,7 +1647,7 @@ TEST(Manifold, PartialRevolveSmallAngle) {
   // The default 12 segments for radius 2 cover 30 degrees each, so 10 degrees
   // is less than one segment.
   Polygons square = CrossSection::Square({1, 1}).Translate({1, 0}).ToPolygons();
-  Manifold revolute = Manifold::Revolve(square, 0, 10);
+  Manifold revolute = Manifold::Revolve(square, {}, 10);
   EXPECT_EQ(revolute.Genus(), 0);
   // Area 1 at mean radius 1.5, swept 10 degrees.
   EXPECT_NEAR(revolute.Volume(), 1.5 * kPi / 18, 0.01);
@@ -1551,7 +1659,7 @@ TEST(Manifold, RevolveInvalidAngle) {
   for (const double degrees :
        {0.0, std::numeric_limits<double>::quiet_NaN(), inf, -inf}) {
     for (const int segments : {0, 12}) {
-      EXPECT_EQ(Manifold::Revolve(square, segments, degrees).Status(),
+      EXPECT_EQ(Manifold::Revolve(square, {segments}, degrees).Status(),
                 Manifold::Error::InvalidConstruction)
           << "degrees " << degrees << ", segments " << segments;
     }
@@ -1562,9 +1670,38 @@ TEST(Manifold, RevolveSliceCountOverflow) {
   const SimplePolygon profile = {{1, 0}, {2, 0}, {2, 1}, {1, 1}};
   const int maxInt = std::numeric_limits<int>::max();
   for (double degrees : {180.0, -180.0}) {
-    EXPECT_EQ(Manifold::Revolve({profile}, maxInt, degrees).Status(),
+    EXPECT_EQ(Manifold::Revolve({profile}, {maxInt}, degrees).Status(),
               Manifold::Error::ResultTooLarge);
   }
+  // A 15-gon with two triangular holes has 21 vertices and caps of 23
+  // triangles each, so this many divisions over 180 degrees makes
+  // 3 * (2 * 21 * 17043520 + 2 * 23) halfedges, just past INT_MAX.
+  Polygons holed(1);
+  for (int i = 0; i < 15; ++i) {
+    holed[0].push_back(vec2(20, 0) + 10.0 * vec2(cosd(24 * i), sind(24 * i)));
+  }
+  holed.push_back({{14, -2}, {16, 2}, {18, -2}});
+  holed.push_back({{22, -2}, {24, 2}, {26, -2}});
+  EXPECT_EQ(Manifold::Revolve(holed, {6}, 180).NumTri(), 2 * 21 * 3 + 2 * 23);
+  EXPECT_EQ(Manifold::Revolve(holed,
+                              CircularQuality::ForDivisions(17043520, 180), 180)
+                .Status(),
+            Manifold::Error::ResultTooLarge);
+  // Few enough vertices, but too many halfedges.
+  const SimplePolygon triangle = {{0, 0}, {1, 1}, {0, 2}};
+  EXPECT_EQ(Manifold::Revolve({triangle}, {maxInt - 2}).Status(),
+            Manifold::Error::ResultTooLarge);
+}
+
+TEST(Manifold, RevolveAxisVerticesNotRepeated) {
+  // Vertices on the axis appear once, so this stays well under the index
+  // limit even though profile size times slices exceeds it.
+  SimplePolygon profile;
+  for (int i = 0; i < 10000; ++i) profile.push_back({0, i * 1e-4});
+  profile.push_back({1, 0.5});
+  const Manifold m = Manifold::Revolve({profile}, {220000});
+  EXPECT_EQ(m.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(m.NumVert(), 10000 + 220000);
 }
 
 TEST(Manifold, RevolveNegativeAngle) {
@@ -1574,8 +1711,8 @@ TEST(Manifold, RevolveNegativeAngle) {
         CrossSection::Square({1, 1}).Translate(offset).ToPolygons();
     for (const int segments : {0, 12}) {
       for (const double degrees : {10.0, 90.0, 360.0, 400.0}) {
-        Manifold positive = Manifold::Revolve(square, segments, degrees);
-        Manifold negative = Manifold::Revolve(square, segments, -degrees);
+        Manifold positive = Manifold::Revolve(square, {segments}, degrees);
+        Manifold negative = Manifold::Revolve(square, {segments}, -degrees);
         EXPECT_EQ(negative.Status(), Manifold::Error::NoError);
         EXPECT_GE(negative.OriginalID(), 0);
         EXPECT_EQ(negative.Genus(), positive.Genus());
@@ -1611,7 +1748,8 @@ TEST(Manifold, Warp) {
 }
 
 TEST(Manifold, Warp2) {
-  CrossSection circle = CrossSection::Circle(5, 20).Translate(vec2(10.0, 10.0));
+  CrossSection circle =
+      CrossSection::Circle(5, {20}).Translate(vec2(10.0, 10.0));
 
   Manifold shape =
       Manifold::Extrude(circle.ToPolygons(), 2, 10).Warp([](vec3& v) {
@@ -1749,7 +1887,7 @@ TEST(Manifold, ProjectRefinedSphereContours) {
   // known area. Mirroring must preserve the winding of the projected solid.
   for (int segments : {128, 132, 256, 260}) {
     SCOPED_TRACE(segments);
-    const Manifold sphere = Manifold::Sphere(1, segments);
+    const Manifold sphere = Manifold::Sphere(1, {segments});
     const double area = 0.5 * segments * sind(360.0 / segments);
     for (const vec3 scale : {vec3(1), vec3(-2, 3, -1)}) {
       const Polygons projected = sphere.Scale(scale).Project();
@@ -1769,8 +1907,8 @@ TEST(Manifold, ProjectRefinedSphereContours) {
 TEST(Manifold, ProjectGrowingContoursAndHoles) {
   EXPECT_TRUE(Manifold().Project().empty());
   const CrossSection section =
-      CrossSection::Circle(3, 132) - CrossSection::Circle(1, 132) +
-      CrossSection::Circle(0.5, 260).Translate({10, 0});
+      CrossSection::Circle(3, {132}) - CrossSection::Circle(1, {132}) +
+      CrossSection::Circle(0.5, {260}).Translate({10, 0});
   const Manifold prism =
       Manifold::Extrude(section.ToPolygons(), 2, 4).Refine(2);
   ASSERT_EQ(prism.Status(), Manifold::Error::NoError);
@@ -1839,8 +1977,8 @@ TEST(Manifold, SliceEmptyObject) {
 
 TEST(Manifold, Simplify) {
   Polygons polyCircle =
-      CrossSection::Circle(1, 20).Translate({10, 0}).ToPolygons();
-  Manifold torus = Manifold::Revolve(polyCircle, 100);
+      CrossSection::Circle(1, {20}).Translate({10, 0}).ToPolygons();
+  Manifold torus = Manifold::Revolve(polyCircle, {100});
   Manifold simplified = torus.Simplify(0.4);
   EXPECT_NEAR(torus.Volume(), simplified.Volume(), 5);
   EXPECT_NEAR(torus.SurfaceArea(), simplified.SurfaceArea(), 12);
@@ -2133,7 +2271,7 @@ TEST(Manifold, MirroredNormals) {
   // mirrored along with it, so the resulting mesh vertices do not get
   // duplicated. We check that the MeshGL vertex count remains the same, and
   // that the mirrored normals remain outward-pointing.
-  const Manifold s = Manifold::Sphere(1.0, 32).CalculateNormals(180);
+  const Manifold s = Manifold::Sphere(1.0, {32}).CalculateNormals(180);
   const MeshGL mesh = s.GetMeshGL();
   const MeshGL mirrored = s.Mirror({1, 0, 0}).GetMeshGL();
   EXPECT_EQ(mesh.NumVert(), mirrored.NumVert());
@@ -2186,7 +2324,7 @@ TEST(Manifold, NonFiniteSphereIsInvalid) {
   for (double radius : {nan, inf, -inf}) {
     for (int segments : {0, 8}) {
       SCOPED_TRACE(testing::Message() << radius << ", segments=" << segments);
-      const Manifold sphere = Manifold::Sphere(radius, segments);
+      const Manifold sphere = Manifold::Sphere(radius, {segments});
       EXPECT_EQ(sphere.Status(), Manifold::Error::InvalidConstruction);
       EXPECT_TRUE(sphere.IsEmpty());
     }
@@ -2204,13 +2342,13 @@ TEST(Manifold, NonFiniteCylinderIsInvalid) {
     for (bool center : {false, true}) {
       SCOPED_TRACE(testing::Message() << value << ", center=" << center);
       EXPECT_NO_THROW(
-          expectInvalid(Manifold::Cylinder(value, 1, 1, 8, center)));
+          expectInvalid(Manifold::Cylinder(value, 1, 1, {8}, center)));
       EXPECT_NO_THROW(
-          expectInvalid(Manifold::Cylinder(1, value, 1, 8, center)));
+          expectInvalid(Manifold::Cylinder(1, value, 1, {8}, center)));
       EXPECT_NO_THROW(
-          expectInvalid(Manifold::Cylinder(1, 1, value, 8, center)));
+          expectInvalid(Manifold::Cylinder(1, 1, value, {8}, center)));
       EXPECT_NO_THROW(
-          expectInvalid(Manifold::Cylinder(1, 0, value, 8, center)));
+          expectInvalid(Manifold::Cylinder(1, 0, value, {8}, center)));
     }
   }
 }
@@ -2229,7 +2367,7 @@ TEST(Manifold, NonFiniteRevolveCoordinatesAreInvalid) {
           SimplePolygon invalid = square;
           invalid[1][axis] = value;
           const Manifold result =
-              Manifold::Revolve({invalid}, segments, degrees);
+              Manifold::Revolve({invalid}, {segments}, degrees);
           EXPECT_EQ(result.Status(), Manifold::Error::InvalidConstruction);
           EXPECT_TRUE(result.IsEmpty());
         }
@@ -2239,7 +2377,7 @@ TEST(Manifold, NonFiniteRevolveCoordinatesAreInvalid) {
     // must not conceal a non-finite coordinate beside a valid contour.
     SimplePolygon clipped{{-2, 0}, {-1, 0}, {-1, 1}, {-2, 1}};
     clipped[1].y = value;
-    EXPECT_EQ(Manifold::Revolve({square, clipped}, 16).Status(),
+    EXPECT_EQ(Manifold::Revolve({square, clipped}, {16}).Status(),
               Manifold::Error::InvalidConstruction);
   }
 }
@@ -2249,9 +2387,9 @@ TEST(Manifold, RevolveStillIgnoresShortContours) {
   const double inf = std::numeric_limits<double>::infinity();
   const SimplePolygon square{{1, 0}, {2, 0}, {2, 1}, {1, 1}};
   for (double degrees : {180.0, -180.0, 360.0}) {
-    const Manifold expected = Manifold::Revolve({square}, 16, degrees);
+    const Manifold expected = Manifold::Revolve({square}, {16}, degrees);
     const Manifold result = Manifold::Revolve(
-        {square, {}, {{nan, inf}}, {{inf, nan}, {-inf, nan}}}, 16, degrees);
+        {square, {}, {{nan, inf}}, {{inf, nan}, {-inf, nan}}}, {16}, degrees);
     EXPECT_EQ(result.Status(), Manifold::Error::NoError);
     EXPECT_DOUBLE_EQ(result.Volume(), expected.Volume());
     EXPECT_EQ(result.NumVert(), expected.NumVert());
@@ -2260,9 +2398,9 @@ TEST(Manifold, RevolveStillIgnoresShortContours) {
 }
 
 TEST(Manifold, CylinderFiniteNegativeTopRadiusUsesBottomRadius) {
-  const Manifold expected = Manifold::Cylinder(2, 3, 3, 8);
+  const Manifold expected = Manifold::Cylinder(2, 3, 3, {8});
   for (double radiusHigh : {-1.0, -2.0}) {
-    const Manifold cylinder = Manifold::Cylinder(2, 3, radiusHigh, 8);
+    const Manifold cylinder = Manifold::Cylinder(2, 3, radiusHigh, {8});
     EXPECT_EQ(cylinder.Status(), Manifold::Error::NoError);
     EXPECT_FALSE(cylinder.IsEmpty());
     EXPECT_DOUBLE_EQ(cylinder.Volume(), expected.Volume());

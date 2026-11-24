@@ -63,9 +63,6 @@ std::array<int, 3> Version() {
 }
 
 static std::atomic<double> relativePrecision_ = kPrecision;
-static std::atomic<int> circularSegments_ = DEFAULT_SEGMENTS;
-static std::atomic<double> circularAngle_ = DEFAULT_ANGLE;
-static std::atomic<double> circularEdgeLength_ = DEFAULT_LENGTH;
 
 /**
  * Sets the relative precision for geometric computations, defining what counts
@@ -81,74 +78,23 @@ void Quality::SetRelativePrecision(double p) {
 double Quality::GetRelativePrecision() { return relativePrecision_; }
 
 /**
- * Sets an angle constraint the default number of circular segments for the
- * CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and
- * Manifold::Revolve() constructors. The number of segments will be rounded up
- * to the nearest factor of four.
+ * Returns the number of segments a circle of this radius gets with these
+ * settings. A minAngle or minEdgeLength that is not positive (or is NaN) uses
+ * the member default instead.
  *
- * @param angle The minimum angle in degrees between consecutive segments. The
- * angle will increase if the the segments hit the minimum edge length.
- * Default is 10 degrees.
+ * @param radius For a given radius of circle, determine how many segments
+ * there will be.
  */
-void Quality::SetMinCircularAngle(double angle) {
-  if (!(angle > 0)) return;  // also rejects NaN
-  circularAngle_ = angle;
-}
-
-/**
- * Returns the configured minimum angle in degrees between circular segments.
- * This is the angle constraint, even when SetCircularSegments() overrides it.
- */
-double Quality::GetMinCircularAngle() { return circularAngle_; }
-
-/**
- * Sets a length constraint the default number of circular segments for the
- * CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and
- * Manifold::Revolve() constructors. The number of segments will be rounded up
- * to the nearest factor of four.
- *
- * @param length The minimum length of segments. The length will
- * increase if the the segments hit the minimum angle. Default is 1.0.
- */
-void Quality::SetMinCircularEdgeLength(double length) {
-  if (!(length > 0)) return;  // also rejects NaN
-  circularEdgeLength_ = length;
-}
-
-/**
- * Returns the configured minimum length of circular segments. This is the
- * length constraint, even when SetCircularSegments() overrides it.
- */
-double Quality::GetMinCircularEdgeLength() { return circularEdgeLength_; }
-
-/**
- * Sets the default number of circular segments for the
- * CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and
- * Manifold::Revolve() constructors. Overrides the edge length and angle
- * constraints and sets the number of segments to exactly this value.
- *
- * @param number Number of circular segments. Default is 0, meaning no
- * constraint is applied.
- */
-void Quality::SetCircularSegments(int number) {
-  if (number < 3 && number != 0) return;
-  circularSegments_ = number;
-}
-
-/**
- * Determine the result of the SetMinCircularAngle(),
- * SetMinCircularEdgeLength(), and SetCircularSegments() defaults.
- *
- * @param radius For a given radius of circle, determine how many default
- * segments there will be.
- */
-int Quality::GetCircularSegments(double radius) {
-  const int segments = circularSegments_;
-  if (segments > 0) return segments;
+int CircularQuality::SegmentsFor(double radius) const {
+  if (segments > 2) return segments;
+  const CircularQuality kDefault;
+  const double angle = minAngle > 0 ? minAngle : kDefault.minAngle;
+  const double length =
+      minEdgeLength > 0 ? minEdgeLength : kDefault.minEdgeLength;
   // Clamp in double before the truncating cast, which is undefined for a
   // non-finite or huge radius, or a tiny angle.
-  const double nSegA = 360.0 / circularAngle_;
-  const double nSegL = 2.0 * std::abs(radius) * kPi / circularEdgeLength_;
+  const double nSegA = 360.0 / angle;
+  const double nSegL = 2.0 * std::abs(radius) * kPi / length;
   const double kMaxSeg = std::numeric_limits<int>::max() - 3;
   int nSeg = std::min(fmin(nSegA, nSegL), kMaxSeg) + 3;
   nSeg -= nSeg % 4;
@@ -156,16 +102,9 @@ int Quality::GetCircularSegments(double radius) {
 }
 
 /**
- * Resets the circular construction parameters to their defaults if
- * SetMinCircularAngle, SetMinCircularEdgeLength, or SetCircularSegments have
- * been called.
+ * Resets the relative precision to its default.
  */
-void Quality::ResetToDefaults() {
-  relativePrecision_ = kPrecision;
-  circularSegments_ = DEFAULT_SEGMENTS;
-  circularAngle_ = DEFAULT_ANGLE;
-  circularEdgeLength_ = DEFAULT_LENGTH;
-}
+void Quality::ResetToDefaults() { relativePrecision_ = kPrecision; }
 
 /**
  * Construct an empty Manifold.
@@ -219,10 +158,11 @@ Manifold& Manifold::operator=(const Manifold& other) {
 
 /**
  * Returns a copy of this Manifold with the given ExecutionContext attached.
- * The attachment is consumed by the next eager op on the result (Status,
- * Refine family). Deferred ops produce a result with no attached ctx; raw
- * copy preserves the attachment. See ExecutionContext in common.h for the
- * full model.
+ * The attachment is consumed by the eager ops on the result (Status, the
+ * Refine family, Hull, MinkowskiSum / MinkowskiDifference). Every other op
+ * that returns a Manifold produces a result with no attached ctx. A raw copy
+ * preserves the attachment. See ExecutionContext in common.h for the full
+ * model.
  */
 Manifold Manifold::WithContext(const ExecutionContext& ctx) const {
   Manifold result = *this;

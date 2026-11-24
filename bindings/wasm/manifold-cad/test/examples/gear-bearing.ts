@@ -17,9 +17,11 @@ const planetTeeth = 7;
 const sunTeeth = 9;      // approximate
 const pressureDeg = 45;  // degrees
 const depthRatio = 0.5;
-const holeWidth = 6.7;          // mm
-setMinCircularAngle(2);         // degrees
-setMinCircularEdgeLength(0.5);  // mm
+const holeWidth = 6.7;  // mm
+const quality = {
+  minAngle: 2,
+  minEdgeLength: 0.5
+};
 
 // Calculations
 const m = round(planets);
@@ -40,7 +42,8 @@ const gearParams = {
   pressureDeg,
   clearance,
   depthRatio,
-  twist
+  twist,
+  quality
 };
 
 function chevronGear(teeth, clearanceFactor = 1) {
@@ -52,8 +55,9 @@ function chevronGear(teeth, clearanceFactor = 1) {
 
 const sun = chevronGear(ns).mirror([0, 1, 0]).subtract(
     Manifold.cylinder(thickness + 1, holeRadius, holeRadius, 6, true));
-const ring = Manifold.cylinder(thickness, diameter / 2, diameter / 2, 0, true)
-                 .subtract(chevronGear(nr, -1));
+const ring =
+    Manifold.cylinder(thickness, diameter / 2, diameter / 2, quality, true)
+        .subtract(chevronGear(nr, -1));
 const planet = chevronGear(np);
 
 const shift = new GLTFNode();

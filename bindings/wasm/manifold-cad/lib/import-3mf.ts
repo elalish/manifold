@@ -21,6 +21,7 @@
  */
 
 import * as GLTFTransform from '@gltf-transform/core';
+import {transformMesh} from '@gltf-transform/functions';
 import {XMLParser} from 'fast-xml-parser';
 import {unzipSync} from 'fflate';
 
@@ -39,9 +40,36 @@ export const importFormats = [{extension: '3mf', mimetype: 'model/3mf'}];
 export async function fromArrayBuffer(buffer: ArrayBuffer):
     Promise<GLTFTransform.Document> {
   const files = unzipSync(new Uint8Array(buffer));
-  const modelData = files['3D/3dmodel.model'];
+  let modelPath = '3D/3dmodel.model';
+  const relsData = files['_rels/.rels'];
+  if (relsData) {
+    const parser = new XMLParser({
+      ignoreAttributes: false,
+      attributeNamePrefix: '',
+      removeNSPrefix: true,
+    });
+    const rels = parser.parse(new TextDecoder().decode(relsData));
+    const startPart =
+        asArray<{Type?: string; Target?: string; TargetMode?: string;}>(
+            rels.Relationships?.Relationship)
+            .find(
+                rel => rel.Type ===
+                    'http://schemas.microsoft.com/3dmanufacturing/2013/01/3dmodel');
+    if (startPart) {
+      if (!startPart.Target)
+        throw new Error('Invalid 3MF file: StartPart has no target');
+      const base = 'https://3mf.invalid/';
+      const target = new URL(startPart.Target, base);
+      if (startPart.TargetMode === 'External' ||
+          target.origin !== new URL(base).origin)
+        throw new Error('External 3MF model relationships are not supported');
+      modelPath = target.pathname.slice(1);
+      if (!files[modelPath]) modelPath = decodeURIComponent(modelPath);
+    }
+  }
+  const modelData = files[modelPath];
   if (!modelData) {
-    throw new Error('Invalid 3MF file: missing 3D/3dmodel.model');
+    throw new Error(`Invalid 3MF file: missing ${modelPath}`);
   }
   return parse3mfXml(new TextDecoder().decode(modelData));
 }
@@ -61,6 +89,8 @@ interface Triangle3MF {
   v1?: number|string;
   v2?: number|string;
   v3?: number|string;
+  pid?: number|string;
+  p1?: number|string;
 }
 
 interface Mesh3MF {
@@ -76,13 +106,28 @@ interface ComponentRef3MF {
 interface ObjectNode3MF {
   id?: number|string;
   name?: string;
+  pid?: number|string;
+  pindex?: number|string;
   mesh?: Mesh3MF;
   components?: {component?: ComponentRef3MF|Array<ComponentRef3MF>;};
 }
 
+interface BaseMaterial3MF {
+  name?: string;
+  displaycolor?: string;
+}
+
+interface BaseMaterialGroup3MF {
+  id?: number|string;
+  base?: BaseMaterial3MF|Array<BaseMaterial3MF>;
+}
+
 interface Model3MF {
   unit?: string;
-  resources?: {object?: ObjectNode3MF|Array<ObjectNode3MF>;};
+  resources?: {
+    object?: ObjectNode3MF|Array<ObjectNode3MF>;
+    basematerials?: BaseMaterialGroup3MF | Array<BaseMaterialGroup3MF>;
+  };
   build?: {item?: ComponentRef3MF|Array<ComponentRef3MF>;};
 }
 
@@ -101,8 +146,17 @@ function asArray<T>(value?: T|Array<T>): Array<T> {
 }
 
 function toFiniteNumber(value: unknown): number|null {
+  if (value == null || (typeof value === 'string' && value.trim() === '')) {
+    return null;
+  }
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+function isVertexIndex(
+    index: number|null, vertexCount: number): index is number {
+  return index != null && Number.isInteger(index) && index >= 0 &&
+      index < vertexCount;
 }
 
 function parseUnitMeters(unit?: string): number {
@@ -150,47 +204,94 @@ function parseTransform(value?: string): number[] {
 }
 
 function parseMesh(
-    mesh: Mesh3MF|undefined, doc: GLTFTransform.Document,
-    buf: GLTFTransform.Buffer,
-    defaultMaterial: GLTFTransform.Material): GLTFTransform.Mesh|null {
+    object: ObjectNode3MF, doc: GLTFTransform.Document,
+    buf: GLTFTransform.Buffer, defaultMaterial: GLTFTransform.Material,
+    baseMaterials: Map<string, GLTFTransform.Material[]>): GLTFTransform.Mesh|
+    null {
+  const mesh = object.mesh;
   if (!mesh) return null;
 
   // --- vertices ---
   const positions: number[] = [];
-  for (const vertex of asArray(mesh.vertices?.vertex)) {
+  for (const [index, vertex] of asArray(mesh.vertices?.vertex).entries()) {
     const x = toFiniteNumber(vertex.x);
     const y = toFiniteNumber(vertex.y);
     const z = toFiniteNumber(vertex.z);
-    if (x == null || y == null || z == null) continue;
+    if (x == null || y == null || z == null) {
+      throw new Error(
+          `Invalid 3MF mesh: vertex ${index} has invalid coordinates`);
+    }
 
     positions.push(x, y, z);
   }
   if (!positions.length) return null;
 
   // --- triangles ---
-  const indices: number[] = [];
-  for (const tri of asArray(mesh.triangles?.triangle)) {
+  const byMaterial = new Map<GLTFTransform.Material, number[]>();
+  const vertexCount = positions.length / 3;
+  for (const [triangleIndex, tri] of asArray(mesh.triangles?.triangle)
+           .entries()) {
     const v1 = toFiniteNumber(tri.v1);
     const v2 = toFiniteNumber(tri.v2);
     const v3 = toFiniteNumber(tri.v3);
-    if (v1 == null || v2 == null || v3 == null) continue;
+    if (!isVertexIndex(v1, vertexCount) || !isVertexIndex(v2, vertexCount) ||
+        !isVertexIndex(v3, vertexCount)) {
+      throw new Error(`Invalid 3MF mesh: triangle ${
+          triangleIndex} has an invalid vertex index`);
+    }
+    const group = baseMaterials.get((tri.pid ?? object.pid)?.toString() ?? '');
+    const index = toFiniteNumber(tri.p1 ?? object.pindex);
+    // The core specification permits consumers without gradient support to
+    // apply p1 to the entire triangle.
+    const material = index != null && Number.isInteger(index) ?
+        (group?.[index] ?? defaultMaterial) :
+        defaultMaterial;
+    let indices = byMaterial.get(material);
+    if (!indices) byMaterial.set(material, indices = []);
     indices.push(v1, v2, v3);
   }
-  if (!indices.length) return null;
+  if (!byMaterial.size) return null;
 
   const posAcc = doc.createAccessor()
                      .setBuffer(buf)
                      .setType(GLTFTransform.Accessor.Type.VEC3)
                      .setArray(new Float32Array(positions));
-  const indAcc = doc.createAccessor()
-                     .setBuffer(buf)
-                     .setType(GLTFTransform.Accessor.Type.SCALAR)
-                     .setArray(new Uint32Array(indices));
-  const prim = doc.createPrimitive()
-                   .setAttribute('POSITION', posAcc)
-                   .setIndices(indAcc)
-                   .setMaterial(defaultMaterial);
-  return doc.createMesh().addPrimitive(prim);
+  const out = doc.createMesh();
+  for (const [material, indices] of byMaterial) {
+    const indAcc = doc.createAccessor()
+                       .setBuffer(buf)
+                       .setType(GLTFTransform.Accessor.Type.SCALAR)
+                       .setArray(new Uint32Array(indices));
+    out.addPrimitive(doc.createPrimitive()
+                         .setAttribute('POSITION', posAcc)
+                         .setIndices(indAcc)
+                         .setMaterial(material));
+  }
+  return out;
+}
+
+function parseBaseMaterials(model: Model3MF, doc: GLTFTransform.Document):
+    Map<string, GLTFTransform.Material[]> {
+  const groups = new Map<string, GLTFTransform.Material[]>();
+  for (const group of asArray(model.resources?.basematerials)) {
+    if (group.id == null) continue;
+    const materials = asArray(group.base).map(base => {
+      const material = doc.createMaterial(base.name);
+      const color = base.displaycolor;
+      if (color && /^#[\da-f]{6}([\da-f]{2})?$/i.test(color)) {
+        const alpha =
+            color.length === 9 ? parseInt(color.slice(7), 16) / 255 : 1;
+        const factor = GLTFTransform.ColorUtils.hexToFactor<GLTFTransform.vec4>(
+            parseInt(color.slice(1, 7), 16), [0, 0, 0, alpha]);
+        material.setBaseColorFactor(factor);
+        if (alpha < 1)
+          material.setAlphaMode(GLTFTransform.Material.AlphaMode.BLEND);
+      }
+      return material;
+    });
+    groups.set(group.id.toString(), materials);
+  }
+  return groups;
 }
 
 function parseComponentRefs(object: ObjectNode3MF): Array<ObjectRef3MF> {
@@ -213,6 +314,37 @@ function parseBuildRefs(model: Model3MF): Array<ObjectRef3MF> {
   return refs;
 }
 
+function matchesTransform(node: GLTFTransform.Node, matrix: number[]): boolean {
+  const restored = node.getMatrix();
+  for (let column = 0; column < 4; column++) {
+    const start = column * 4;
+    const tolerance = 64 * Number.EPSILON *
+        Math.max(
+            Math.abs(matrix[start]), Math.abs(matrix[start + 1]),
+            Math.abs(matrix[start + 2]));
+    for (let row = 0; row < 4; row++) {
+      if (!(Math.abs(restored[start + row] - matrix[start + row]) <=
+            tolerance)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
+function multiplyTransforms(parent: number[], child: number[]): number[] {
+  const result = [...identityMatrix];
+  for (let column = 0; column < 4; column++) {
+    for (let row = 0; row < 3; row++) {
+      result[column * 4 + row] = parent[row] * child[column * 4] +
+          parent[row + 4] * child[column * 4 + 1] +
+          parent[row + 8] * child[column * 4 + 2] +
+          (column === 3 ? parent[row + 12] : 0);
+    }
+  }
+  return result;
+}
+
 function instantiateObjectNode(
     doc: GLTFTransform.Document, objects: Map<string, Object3MF>,
     ref: ObjectRef3MF, visiting: Set<string>): GLTFTransform.Node|null {
@@ -222,10 +354,25 @@ function instantiateObjectNode(
 
   visiting.add(object.id);
   const node = doc.createNode(object.name);
-  if (object.mesh) node.setMesh(object.mesh);
-  node.setMatrix(ref.transform as any);
+  node.setMatrix(ref.transform as GLTFTransform.mat4);
+  // glTF nodes store TRS, which cannot represent every 3MF affine matrix.
+  // Allow decomposition roundoff, but bake shear into this instance's mesh.
+  const bake = !matchesTransform(node, ref.transform);
+  if (bake) node.setMatrix(identityMatrix as GLTFTransform.mat4);
+  if (object.mesh) {
+    const mesh = bake ? object.mesh.clone() : object.mesh;
+    if (bake) transformMesh(mesh, ref.transform as GLTFTransform.mat4);
+    node.setMesh(mesh);
+  }
   for (const childRef of object.children) {
-    const childNode = instantiateObjectNode(doc, objects, childRef, visiting);
+    // An identity parent leaves its full affine transform to each child.
+    const transformedRef = bake ? {
+      ...childRef,
+      transform: multiplyTransforms(ref.transform, childRef.transform)
+    } :
+                                  childRef;
+    const childNode =
+        instantiateObjectNode(doc, objects, transformedRef, visiting);
     if (childNode) node.addChild(childNode);
   }
   visiting.delete(object.id);
@@ -236,6 +383,7 @@ function parse3mfXml(xml: string): GLTFTransform.Document {
   const parser = new XMLParser({
     ignoreAttributes: false,
     attributeNamePrefix: '',
+    removeNSPrefix: true,
     trimValues: true,
     parseTagValue: false,
     parseAttributeValue: false
@@ -251,6 +399,7 @@ function parse3mfXml(xml: string): GLTFTransform.Document {
   // A default material is required so that gltfDocToManifold can process
   // the primitives (it calls getMaterial() on each primitive).
   const defaultMaterial = doc.createMaterial();
+  const baseMaterials = parseBaseMaterials(model, doc);
   const scene = doc.createScene();
   const unitToMeters = parseUnitMeters(model.unit);
   const objects = new Map<string, Object3MF>();
@@ -270,7 +419,7 @@ function parse3mfXml(xml: string): GLTFTransform.Document {
     objects.set(id, {
       id,
       name: object.name,
-      mesh: parseMesh(object.mesh, doc, buf, defaultMaterial),
+      mesh: parseMesh(object, doc, buf, defaultMaterial, baseMaterials),
       children: parseComponentRefs(object)
     });
   }

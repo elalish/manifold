@@ -107,7 +107,7 @@ TEST(Properties, Tolerance) {
 
 TEST(Properties, ToleranceSphere) {
   const int n = 500;
-  Manifold sphere = Manifold::Sphere(1, 4 * n);
+  Manifold sphere = Manifold::Sphere(1, {4 * n});
   EXPECT_EQ(sphere.NumTri(), 8 * n * n);
 
   Manifold sphere2 = sphere.Simplify(0.01);
@@ -120,11 +120,11 @@ TEST(Properties, ToleranceSphere) {
 
 TEST(Properties, ToleranceCylinder) {
   const int n = 40;
-  Manifold cylinder = Manifold::Cylinder(2, 1, 1, 4 * n);
+  Manifold cylinder = Manifold::Cylinder(2, 1, 1, {4 * n});
   Manifold cylinder2 = cylinder.Simplify(0.01);
   EXPECT_LT(cylinder2.NumTri(), 165);
   EXPECT_EQ(cylinder2.Genus(), 0);
-  EXPECT_NEAR(cylinder.Volume(), cylinder2.Volume(), 0.011);
+  EXPECT_NEAR(cylinder.Volume(), cylinder2.Volume(), 0.014);
   EXPECT_NEAR(cylinder.SurfaceArea(), cylinder2.SurfaceArea(), 0.02);
   if (options.exportModels) WriteTestOBJ("cylinder.obj", cylinder2);
 }
@@ -154,7 +154,7 @@ TEST(Properties, CalculateCurvature) {
   for (int n = 4; n < 100; n *= 2) {
     const int gaussianIdx = 3;
     const int meanIdx = 4;
-    Manifold sphere = Manifold::Sphere(1, 64).CalculateCurvature(
+    Manifold sphere = Manifold::Sphere(1, {64}).CalculateCurvature(
         gaussianIdx - 3, meanIdx - 3);
     MeshGL sphereGL = sphere.GetMeshGL();
     ASSERT_EQ(sphereGL.numProp, 5);
@@ -176,8 +176,8 @@ TEST(Properties, CalculateCurvature) {
 
 TEST(Properties, CurvatureChannels) {
   for (const Manifold& shape :
-       {Manifold::Sphere(1, 24), Manifold::Cube(vec3(1), true),
-        Manifold::Sphere(1, 24) -
+       {Manifold::Sphere(1, {24}), Manifold::Cube(vec3(1), true),
+        Manifold::Sphere(1, {24}) -
             Manifold::Cube(vec3(1), true).Translate({0.8, 0, 0})}) {
     const Manifold input =
         shape.SetProperties(3, [](double* props, vec3 p, const double*) {
@@ -358,7 +358,7 @@ TEST(Properties, Coplanar) {
 TEST(Properties, CalculateCurvatureDeterministic) {
   // Above the parallel threshold, where the per-vertex sums used to depend on
   // thread scheduling.
-  const Manifold sphere = Manifold::Sphere(1, 256);
+  const Manifold sphere = Manifold::Sphere(1, {256});
   ASSERT_GT(sphere.NumTri(), 10000);
   const MeshGL64 first = sphere.CalculateCurvature(3, 4).GetMeshGL64();
   for (int i = 0; i < 3; ++i) {

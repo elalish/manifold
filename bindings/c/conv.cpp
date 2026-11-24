@@ -61,21 +61,6 @@ ManifoldMeshGL64* to_c(manifold::MeshGL64* m) {
   return reinterpret_cast<ManifoldMeshGL64*>(m);
 }
 
-ManifoldOpType to_c(manifold::OpType optype) {
-  ManifoldOpType op = MANIFOLD_ADD;
-  switch (optype) {
-    case manifold::OpType::Add:
-      break;
-    case manifold::OpType::Subtract:
-      op = MANIFOLD_SUBTRACT;
-      break;
-    case manifold::OpType::Intersect:
-      op = MANIFOLD_INTERSECT;
-      break;
-  };
-  return op;
-}
-
 ManifoldError to_c(manifold::Manifold::Error error) {
   ManifoldError e = MANIFOLD_NO_ERROR;
   switch (error) {
@@ -88,7 +73,7 @@ ManifoldError to_c(manifold::Manifold::Error error) {
       e = MANIFOLD_NOT_MANIFOLD;
       break;
     case Manifold::Error::VertexOutOfBounds:
-      e = MANIFOLD_VERTEX_INDEX_OUT_OF_BOUNDS;
+      e = MANIFOLD_VERTEX_OUT_OF_BOUNDS;
       break;
     case Manifold::Error::PropertiesWrongLength:
       e = MANIFOLD_PROPERTIES_WRONG_LENGTH;
@@ -138,8 +123,6 @@ ManifoldRect* to_c(manifold::Rect* m) {
 ManifoldVec2 to_c(vec2 v) { return {v.x, v.y}; }
 
 ManifoldVec3 to_c(vec3 v) { return {v.x, v.y, v.z}; }
-
-ManifoldIVec3 to_c(ivec3 v) { return {v.x, v.y, v.z}; }
 
 ManifoldTriangulation* to_c(std::vector<int>* m) {
   return reinterpret_cast<ManifoldTriangulation*>(m);
@@ -230,6 +213,11 @@ CrossSection::JoinType from_c(ManifoldJoinType join_type) {
   return jt;
 }
 
+CircularQuality from_c(const ManifoldCircularQuality* q) {
+  if (q == nullptr) return {};
+  return {q->segments, q->min_angle, q->min_edge_length};
+}
+
 manifold::Box* from_c(ManifoldBox* m) {
   return reinterpret_cast<manifold::Box*>(m);
 }
@@ -249,10 +237,6 @@ const manifold::Rect* from_c(const ManifoldRect* m) {
 vec2 from_c(ManifoldVec2 v) { return vec2(v.x, v.y); }
 
 vec3 from_c(ManifoldVec3 v) { return vec3(v.x, v.y, v.z); }
-
-ivec3 from_c(ManifoldIVec3 v) { return ivec3(v.x, v.y, v.z); }
-
-vec4 from_c(ManifoldVec4 v) { return vec4(v.x, v.y, v.z, v.w); }
 
 const std::vector<int>* from_c(const ManifoldTriangulation* m) {
   return reinterpret_cast<const std::vector<int>*>(m);

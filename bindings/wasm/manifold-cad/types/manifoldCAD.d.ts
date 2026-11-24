@@ -66,14 +66,14 @@ export type {GLTFAttribute, GLTFMaterial} from '../lib/gltf-node';
 export {BaseGLTFNode, getGLTFNodes, GLTFNode, resetGLTFNodes, VisualizationGLTFNode, CrossSectionGLTFNode} from '../lib/gltf-node';
 /** @group Input & Output */
 export {importManifold, importModel} from '../lib/import-model';
-/** @group Level of Detail */
-export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength} from '../lib/level-of-detail'
 /** @group Material */
 export {setMaterial} from '../lib/material';
 /** @group Basics */
 export {CrossSection, Manifold} from 'manifold-3d';
 /** @group Polygons */
 export {triangulate} from 'manifold-3d';
+/** @group Level of Detail */
+export {segmentsFor, forDivisions} from 'manifold-3d';
 // clang-format on
 
 /**
@@ -89,7 +89,7 @@ export type {
   Mat3, Mat4, Vec2, Vec3,
   Polygons, SimplePolygon, JoinType,
   Box, Rect, RayHit, ExecutionContext,
-  ErrorStatus
+  ErrorStatus, CircularQuality
 } from 'manifold-3d';
 
 /* See the Developer Guide for more detail on these: */

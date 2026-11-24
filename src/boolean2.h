@@ -133,7 +133,7 @@ Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op,
 
 // Polygon offset backing CrossSection::Offset.
 Polygons Offset(const Polygons& in, double delta, JoinType jt,
-                double miterLimit = 2.0, int circularSegments = 0);
+                double miterLimit = 2.0, const CircularQuality& quality = {});
 
 // Group regularized simple loops into outer-ring components with their
 // directly contained holes, backing CrossSection::Decompose.

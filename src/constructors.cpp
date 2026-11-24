@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cmath>
 #include <limits>
 
 #include "csg_tree.h"
@@ -23,6 +24,17 @@
 
 namespace manifold {
 namespace {
+// Divisions a revolve of degrees, already in (0, 360], makes from a positive
+// full-circle segment count, rounded up, and at least one for an angle so small
+// the product underflows. The multiply and divide each round by at most half
+// an ulp, so for an exact angle a whole count n comes out below n + 2 ulp(n),
+// at most one ulp above n. Stepping down one ulp before rounding up removes
+// that, and also absorbs the rounding of a computed angle such as k * 3.6.
+int RevolveDivisions(int segments, double degrees) {
+  return std::max(1, static_cast<int>(std::ceil(
+                         std::nextafter(segments * degrees / 360, 0.0))));
+}
+
 std::shared_ptr<Manifold::Impl> ExtrudeImpl(const Polygons& crossSection,
                                             double height, int nDivisions,
                                             double twistDegrees, vec2 scaleTop,
@@ -145,13 +157,13 @@ Manifold Manifold::Cube(vec3 size, bool center) {
  * created.
  * @param radiusHigh Radius of top circle. Must be finite and can equal zero.
  * Negative values, including the default, use radiusLow.
- * @param circularSegments How many line segments to use around the circle.
- * Default is calculated by the static Defaults.
+ * @param quality How many line segments to use around the circle, see
+ * CircularQuality.
  * @param center Set to true to shift the center to the origin. Default is
  * origin at the bottom.
  */
 Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
-                            int circularSegments, bool center) {
+                            CircularQuality quality, bool center) {
   if (!std::isfinite(height) || !std::isfinite(radiusLow) ||
       !std::isfinite(radiusHigh) || height <= 0.0 || radiusLow < 0.0) {
     return Invalid();
@@ -165,8 +177,7 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
   }
   const double scale = radiusHigh >= 0.0 ? radiusHigh / radiusLow : 1.0;
   const double radius = fmax(radiusLow, radiusHigh);
-  const int n = circularSegments > 2 ? circularSegments
-                                     : Quality::GetCircularSegments(radius);
+  const int n = quality.SegmentsFor(radius);
 
   SimplePolygon circle(n);
   const double dPhi = 360.0 / n;
@@ -184,18 +195,19 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
  *
  * @param radius Radius of the sphere. Must be positive and finite; otherwise
  * returns an empty Manifold with InvalidConstruction status.
- * @param circularSegments Number of segments along its
- * diameter. This number will always be rounded up to the nearest factor of
- * four, as this sphere is constructed by refining an octahedron. This means
- * there are a circle of vertices on all three of the axis planes. Default is
- * calculated by the static Defaults.
+ * @param quality Number of segments in a full circle, see CircularQuality.
+ * This number will always be rounded up to the nearest factor of four, as this
+ * sphere is constructed by refining an octahedron. This means there are a
+ * circle of vertices on all three of the axis planes.
  */
-Manifold Manifold::Sphere(double radius, int circularSegments) {
+Manifold Manifold::Sphere(double radius, CircularQuality quality) {
   if (radius <= 0.0 || !std::isfinite(radius)) {
     return Invalid();
   }
-  int n = circularSegments > 0 ? (circularSegments + 3) / 4
-                               : Quality::GetCircularSegments(radius) / 4;
+  // Round an explicit count up to a multiple of four without overflowing.
+  const int segments = quality.segments;
+  int n = segments > 0 ? segments / 4 + (segments % 4 != 0)
+                       : quality.SegmentsFor(radius) / 4;
   auto pImpl_ = std::make_shared<Impl>(Impl::Shape::Octahedron);
   pImpl_->Subdivide([n](vec3, vec4, vec4) { return n - 1; });
   if (pImpl_->status_ != Error::NoError) return Manifold(pImpl_);
@@ -269,13 +281,15 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
  * output.
  *
  * @param crossSection A set of non-overlapping polygons to revolve.
- * @param circularSegments Number of segments along its diameter. Default is
- * calculated by the static Defaults.
+ * @param quality Number of segments in a full circle, see CircularQuality.
+ * A partial revolve uses the matching fraction of it, rounded up, ignoring an
+ * excess of one unit in the last place. For an exact number of divisions, use
+ * CircularQuality::ForDivisions().
  * @param revolveDegrees Number of degrees to revolve. Must be finite and
  * nonzero. A negative value revolves the other way. Default is 360 degrees.
  */
-Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
-                           double revolveDegrees) {
+Manifold Manifold::Revolve(const Polygons& crossSection,
+                           CircularQuality quality, double revolveDegrees) {
   ZoneScoped;
   if (!std::isfinite(revolveDegrees) || revolveDegrees == 0.0) {
     return Invalid();
@@ -328,10 +342,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   const bool isFullRevolution = revolveDegrees == 360.0;
 
   const int nDivisions =
-      circularSegments > 2
-          ? circularSegments
-          : std::max(1, static_cast<int>(Quality::GetCircularSegments(radius) *
-                                         revolveDegrees / 360));
+      RevolveDivisions(quality.SegmentsFor(radius), revolveDegrees);
 
   auto pImpl_ = std::make_shared<Impl>();
   auto& vertPos = pImpl_->vertPos_;
@@ -343,9 +354,25 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
 
   const double dPhi = revolveDegrees / nDivisions;
   // first and last slice are distinguished if not a full revolution.
-  if (!isFullRevolution && nDivisions == std::numeric_limits<int>::max())
+  const int64_t slices = isFullRevolution ? nDivisions : nDivisions + 1LL;
+  // A partial revolve closes each end with the triangulated cross-section.
+  const std::vector<ivec3> capTriangles =
+      isFullRevolution ? std::vector<ivec3>()
+                       : Triangulate(polygons, pImpl_->epsilon_);
+  // Vertices on the axis are not repeated per slice. Each vertex off the axis
+  // adds two triangles per division.
+  int64_t numVert = 0;
+  int64_t numTri = 2 * static_cast<int64_t>(capTriangles.size());
+  for (const auto& poly : polygons) {
+    for (const vec2& pt : poly) {
+      numVert += pt.x > 0 ? slices : 1;
+      if (pt.x > 0) numTri += 2LL * nDivisions;
+    }
+  }
+  if (numVert > std::numeric_limits<int>::max() ||
+      3 * numTri > std::numeric_limits<int>::max())
     return PropagateStatus(Error::ResultTooLarge);
-  const int nSlices = isFullRevolution ? nDivisions : nDivisions + 1;
+  const int nSlices = static_cast<int>(slices);
 
   for (const auto& poly : polygons) {
     size_t nPosVerts = 0;
@@ -401,16 +428,11 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
     }
   }
 
-  // Add front and back triangles if not a full revolution.
-  if (!isFullRevolution) {
-    std::vector<ivec3> frontTriangles = Triangulate(polygons, pImpl_->epsilon_);
-    for (auto& t : frontTriangles) {
-      triVerts.push_back({startPoses[t.x], startPoses[t.y], startPoses[t.z]});
-    }
-
-    for (auto& t : frontTriangles) {
-      triVerts.push_back({endPoses[t.z], endPoses[t.y], endPoses[t.x]});
-    }
+  for (auto& t : capTriangles) {
+    triVerts.push_back({startPoses[t.x], startPoses[t.y], startPoses[t.z]});
+  }
+  for (auto& t : capTriangles) {
+    triVerts.push_back({endPoses[t.z], endPoses[t.y], endPoses[t.x]});
   }
 
   // Mirror in y for a negative angle, and flip the winding to keep the volume
@@ -426,6 +448,35 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   pImpl_->SetFaceAndVertNormals();
   pImpl_->InitializeOriginal();
   return Manifold(pImpl_);
+}
+
+/**
+ * Returns a quality that makes Manifold::Revolve() divide the given angle into
+ * exactly this many divisions. Like Revolve, it uses the angle's magnitude,
+ * clamped to 360 degrees. A revolve of more than 120 degrees needs at least two
+ * divisions, and of more than 240 degrees at least three, and a tiny angle
+ * cannot get more divisions than the largest int count allows. Past those
+ * limits it returns the closest count Revolve allows. A non-finite or zero
+ * angle, which Revolve rejects, gives the default quality.
+ *
+ * @param divisions Number of divisions. Values below 1 are treated as 1.
+ * @param degrees Angle Revolve will sweep.
+ */
+CircularQuality CircularQuality::ForDivisions(int divisions, double degrees) {
+  if (!std::isfinite(degrees) || degrees == 0) return {};
+  degrees = std::min(std::abs(degrees), 360.0);
+  divisions = std::max(divisions, 1);
+  // Aim for the middle of the range of counts that give these divisions, then
+  // step once if rounding put it just outside.
+  const double target = std::round((divisions - 0.5) * 360 / degrees);
+  int segments = static_cast<int>(
+      std::min(std::max(target, 3.0), double(std::numeric_limits<int>::max())));
+  const int got = RevolveDivisions(segments, degrees);
+  if (got > divisions && segments > 3) --segments;
+  if (got < divisions && segments < std::numeric_limits<int>::max()) {
+    ++segments;
+  }
+  return {segments};
 }
 
 /**

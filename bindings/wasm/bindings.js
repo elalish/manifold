@@ -31,11 +31,50 @@ Module.setup = function() {
     return vec;
   }
 
+  // A number sets the segments, an object any of the CircularQuality fields.
+  function toQuality(quality = 0) {
+    if (typeof quality != 'object') quality = {segments: quality};
+    return {...Module._DefaultCircularQuality(), ...quality};
+  }
+
+  Module.segmentsFor = function(radius, quality) {
+    return Module._SegmentsFor(toQuality(quality), radius);
+  };
+
+  Module.forDivisions = function(divisions, degrees) {
+    return Module._ForDivisions(divisions, degrees);
+  };
+
   function fromVec(vec, f = x => x) {
     const result = [];
     const size = vec.size();
     for (let i = 0; i < size; i++) result.push(f(vec.get(i)));
     return result;
+  }
+
+  function withCallback(makeCallback, signature, operation) {
+    const state = {failed: false, failure: undefined};
+    const pointer = addFunction(makeCallback(state), signature);
+    let result;
+    try {
+      result = operation(pointer);
+    } finally {
+      removeFunction(pointer);
+    }
+    if (state.failed) {
+      result.delete();
+      throw state.failure;
+    }
+    return result;
+  }
+
+  function checkedManifold(manifold) {
+    const status = manifold.status();
+    if (status !== 'NoError') {
+      manifold.delete();
+      throw new Module.ManifoldError(status);
+    }
+    return manifold;
   }
 
   function vec2polygons(vec, f = x => x) {
@@ -125,17 +164,21 @@ Module.setup = function() {
   };
 
   Module.CrossSection.prototype.warp = function(func) {
-    const wasmFuncPtr = addFunction(function(vec2Ptr) {
-      const x = getValue(vec2Ptr, 'double');
-      const y = getValue(vec2Ptr + 8, 'double');
-      const vert = [x, y];
-      func(vert);
-      setValue(vec2Ptr, vert[0], 'double');
-      setValue(vec2Ptr + 8, vert[1], 'double');
-    }, 'vi');
-    const out = this._Warp(wasmFuncPtr);
-    removeFunction(wasmFuncPtr);
-    return out;
+    return withCallback(state => function(vec2Ptr) {
+      if (state.failed) return;
+      try {
+        const x = getValue(vec2Ptr, 'double');
+        const y = getValue(vec2Ptr + 8, 'double');
+        const vert = [x, y];
+        func(vert);
+        setValue(vec2Ptr, vert[0], 'double');
+        setValue(vec2Ptr + 8, vert[1], 'double');
+      } catch (error) {
+        // Return normally so C++ can destroy its local allocations.
+        state.failed = true;
+        state.failure = error;
+      }
+    }, 'vi', pointer => this._Warp(pointer));
   };
 
   Module.CrossSection.prototype.decompose = function() {
@@ -154,9 +197,9 @@ Module.setup = function() {
   };
 
   Module.CrossSection.prototype.offset = function(
-      delta, joinType = 'Round', miterLimit = 2.0, circularSegments = 0) {
+      delta, joinType = 'Round', miterLimit = 2.0, quality = 0) {
     return this._Offset(
-        delta, joinTypeToInt(joinType), miterLimit, circularSegments);
+        delta, joinTypeToInt(joinType), miterLimit, toQuality(quality));
   };
 
   Module.CrossSection.prototype.simplify = function(tolerance = 0) {
@@ -182,9 +225,10 @@ Module.setup = function() {
   };
 
   Module.CrossSection.prototype.revolve = function(
-      circularSegments = 0, revolveDegrees = 360.0) {
+      quality = 0, revolveDegrees = 360.0) {
     const polygonsVec = this._ToPolygons();
-    const man = Module._Revolve(polygonsVec, circularSegments, revolveDegrees);
+    const man =
+        Module._Revolve(polygonsVec, toQuality(quality), revolveDegrees);
     polygonsVec.delete();
     return man;
   };
@@ -211,45 +255,47 @@ Module.setup = function() {
   // Manifold methods
 
   Module.Manifold.prototype.warp = function(func) {
-    const wasmFuncPtr = addFunction(function(vec3Ptr) {
-      const x = getValue(vec3Ptr, 'double');
-      const y = getValue(vec3Ptr + 8, 'double');
-      const z = getValue(vec3Ptr + 16, 'double');
-      const vert = [x, y, z];
-      func(vert);
-      setValue(vec3Ptr, vert[0], 'double');
-      setValue(vec3Ptr + 8, vert[1], 'double');
-      setValue(vec3Ptr + 16, vert[2], 'double');
-    }, 'vi');
-    const out = this._Warp(wasmFuncPtr);
-    removeFunction(wasmFuncPtr);
-
-    const status = out.status();
-    if (status !== 'NoError') {
-      throw new Module.ManifoldError(status);
-    }
-    return out;
+    const out = withCallback(state => function(vec3Ptr) {
+      if (state.failed) return;
+      try {
+        const x = getValue(vec3Ptr, 'double');
+        const y = getValue(vec3Ptr + 8, 'double');
+        const z = getValue(vec3Ptr + 16, 'double');
+        const vert = [x, y, z];
+        func(vert);
+        setValue(vec3Ptr, vert[0], 'double');
+        setValue(vec3Ptr + 8, vert[1], 'double');
+        setValue(vec3Ptr + 16, vert[2], 'double');
+      } catch (error) {
+        // Return normally so C++ can destroy its local allocations.
+        state.failed = true;
+        state.failure = error;
+      }
+    }, 'vi', pointer => this._Warp(pointer));
+    return checkedManifold(out);
   };
 
   Module.Manifold.prototype.warpBatch = function(func) {
-    const wasmFuncPtr = addFunction(function(ptr, count) {
-      const heapF64 = Module.HEAPF64 ?? HEAPF64;
-      if (!heapF64) {
-        throw new Error('WASM heap is not initialized (HEAPF64 unavailable)');
+    const out = withCallback(state => function(ptr, count) {
+      if (state.failed) return;
+      try {
+        const heapF64 = Module.HEAPF64 ?? HEAPF64;
+        if (!heapF64) {
+          throw new Error('WASM heap is not initialized (HEAPF64 unavailable)');
+        }
+        // Commit only after success, as in scalar warp. The temporary also
+        // stays valid if the callback allocates enough to grow WASM memory.
+        const verts = new Float64Array(heapF64.buffer, ptr, count * 3).slice();
+        func(verts, count);
+        const currentHeap = Module.HEAPF64 ?? HEAPF64;
+        new Float64Array(currentHeap.buffer, ptr, count * 3).set(verts);
+      } catch (error) {
+        // Return normally so C++ can destroy its local allocations.
+        state.failed = true;
+        state.failure = error;
       }
-      const verts = new Float64Array(heapF64.buffer, ptr, count * 3);
-
-      func(verts, count);
-    }, 'vii');
-
-    const out = this._WarpBatch(wasmFuncPtr);
-    removeFunction(wasmFuncPtr);
-
-    const status = out.status();
-    if (status !== 'NoError') {
-      throw new Module.ManifoldError(status);
-    }
-    return out;
+    }, 'vii', pointer => this._WarpBatch(pointer));
+    return checkedManifold(out);
   };
 
   Module.Manifold.prototype.calculateNormals = function(minSharpAngle = 52.5) {
@@ -262,29 +308,33 @@ Module.setup = function() {
 
   Module.Manifold.prototype.setProperties = function(numProp, func) {
     const oldNumProp = this.numProp();
-    const wasmFuncPtr = addFunction(function(newPtr, vec3Ptr, oldPtr) {
-      const newProp = [];
-      for (let i = 0; i < numProp; ++i) {
-        newProp[i] = getValue(newPtr + 8 * i, 'double');
-      }
-      const pos = [];
-      for (let i = 0; i < 3; ++i) {
-        pos[i] = getValue(vec3Ptr + 8 * i, 'double');
-      }
-      const oldProp = [];
-      for (let i = 0; i < oldNumProp; ++i) {
-        oldProp[i] = getValue(oldPtr + 8 * i, 'double');
-      }
+    return withCallback(state => function(newPtr, vec3Ptr, oldPtr) {
+      if (state.failed) return;
+      try {
+        const newProp = [];
+        for (let i = 0; i < numProp; ++i) {
+          newProp[i] = getValue(newPtr + 8 * i, 'double');
+        }
+        const pos = [];
+        for (let i = 0; i < 3; ++i) {
+          pos[i] = getValue(vec3Ptr + 8 * i, 'double');
+        }
+        const oldProp = [];
+        for (let i = 0; i < oldNumProp; ++i) {
+          oldProp[i] = getValue(oldPtr + 8 * i, 'double');
+        }
 
-      func(newProp, pos, oldProp);
+        func(newProp, pos, oldProp);
 
-      for (let i = 0; i < numProp; ++i) {
-        setValue(newPtr + 8 * i, newProp[i], 'double');
+        for (let i = 0; i < numProp; ++i) {
+          setValue(newPtr + 8 * i, newProp[i], 'double');
+        }
+      } catch (error) {
+        // Return normally so C++ can destroy its local allocations.
+        state.failed = true;
+        state.failure = error;
       }
-    }, 'viii');
-    const out = this._SetProperties(numProp, wasmFuncPtr);
-    removeFunction(wasmFuncPtr);
-    return out;
+    }, 'viii', pointer => this._SetProperties(numProp, pointer));
   };
 
   Module.Manifold.prototype.translate = function(...vec) {
@@ -572,8 +622,8 @@ Module.setup = function() {
     return Module._Square(size, center);
   };
 
-  Module.CrossSection.circle = function(radius, circularSegments = 0) {
-    return Module._Circle(radius, circularSegments);
+  Module.CrossSection.circle = function(radius, quality = 0) {
+    return Module._Circle(radius, toQuality(quality));
   };
 
   // allows args to be either CrossSection or polygons (constructed with
@@ -637,14 +687,7 @@ Module.setup = function() {
 
   const ManifoldCtor = Module.Manifold;
   Module.Manifold = function(mesh) {
-    const manifold = new ManifoldCtor(mesh);
-
-    const status = manifold.status();
-    if (status !== 'NoError') {
-      throw new Module.ManifoldError(status);
-    }
-
-    return manifold;
+    return checkedManifold(new ManifoldCtor(mesh));
   };
 
   Module.Manifold.ofMesh = function(mesh) {
@@ -668,14 +711,13 @@ Module.setup = function() {
   };
 
   Module.Manifold.cylinder = function(
-      height, radiusLow, radiusHigh = -1.0, circularSegments = 0,
-      center = false) {
+      height, radiusLow, radiusHigh = -1.0, quality = 0, center = false) {
     return Module._Cylinder(
-        height, radiusLow, radiusHigh, circularSegments, center);
+        height, radiusLow, radiusHigh, toQuality(quality), center);
   };
 
-  Module.Manifold.sphere = function(radius, circularSegments = 0) {
-    return Module._Sphere(radius, circularSegments);
+  Module.Manifold.sphere = function(radius, quality = 0) {
+    return Module._Sphere(radius, toQuality(quality));
   };
 
   Module.Manifold.extrude = function(
@@ -687,9 +729,9 @@ Module.setup = function() {
   };
 
   Module.Manifold.revolve = function(
-      polygons, circularSegments = 0, revolveDegrees = 360.0) {
+      polygons, quality = 0, revolveDegrees = 360.0) {
     return withCrossSection(
-        polygons, cs => cs.revolve(circularSegments, revolveDegrees));
+        polygons, cs => cs.revolve(quality, revolveDegrees));
   };
 
   Module.Manifold.reserveIDs = function(n) {

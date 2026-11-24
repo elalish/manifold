@@ -3,11 +3,9 @@ import numpy as np
 
 
 def all_root_level():
-    set_min_circular_angle(10)
-    set_min_circular_edge_length(1)
-    set_circular_segments(22)
-    n = get_circular_segments(1)
-    assert n == 22
+    q = CircularQuality(segments=22, min_angle=10, min_edge_length=1)
+    assert q.segments_for(1) == 22
+    assert CircularQuality(min_angle=30).segments_for(10) == 12
     poly = [[0, 0], [1, 0], [1, 1]]
     tris = triangulate([poly])
     tris = triangulate([np.array(poly)])

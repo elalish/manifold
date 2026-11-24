@@ -16,7 +16,7 @@ TIMEOUT = 60
 
 def sponge(offset=0.0):
     m = Manifold.cube((2, 2, 2), True)
-    hole = Manifold.cylinder(3, 0.3, circular_segments=48, center=True)
+    hole = Manifold.cylinder(3, 0.3, quality=48, center=True)
     for i in range(6):
         h = hole.translate((0.3 * (i - 2.5) + offset, 0, 0))
         m = m - h - h.rotate((90, 0, 0)) - h.rotate((0, 90, 0))

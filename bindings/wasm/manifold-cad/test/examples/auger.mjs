@@ -6,11 +6,15 @@ const twist = 90;
 import {CrossSection, Manifold} from 'manifold-cad/manifoldCAD';
 const {revolve, sphere, union, extrude} = Manifold;
 const {circle} = CrossSection;
-setMinCircularEdgeLength(0.1);
+const quality = {
+  minEdgeLength: 0.1
+};
 
-const bead1 = revolve(circle(beadRadius).translate([outerRadius, 0]), 50, 90)
-                  .add(sphere(beadRadius).translate([outerRadius, 0, 0]))
-                  .translate([0, -outerRadius, 0]);
+// 200 segments per full circle gives 50 over the 90-degree sweep.
+const bead1 =
+    revolve(circle(beadRadius, quality).translate([outerRadius, 0]), 200, 90)
+        .add(sphere(beadRadius, quality).translate([outerRadius, 0, 0]))
+        .translate([0, -outerRadius, 0]);
 
 const beads = [];
 for (let i = 0; i < 3; i++) {

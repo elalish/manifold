@@ -1,14 +1,13 @@
 // Demonstrates how at 90-degree intersections, the sphere and cylinder
-// facets match up perfectly, for any choice of global resolution
-// parameters.
+// facets match up perfectly, for any choice of circular quality.
 
 import {getGLTFNodes, GLTFNode, Manifold} from 'manifold-cad/manifoldCAD';
 
 const {sphere, cylinder, union, cube} = Manifold;
 
-function roundedFrame(edgeLength, radius, circularSegments = 0) {
-  const edge = cylinder(edgeLength, radius, -1, circularSegments);
-  const corner = sphere(radius, circularSegments);
+function roundedFrame(edgeLength, radius, quality = {}) {
+  const edge = cylinder(edgeLength, radius, -1, quality);
+  const corner = sphere(radius, quality);
 
   const edge1 = union(corner, edge).rotate([-90, 0, 0]).translate([
     -edgeLength / 2, -edgeLength / 2, 0
@@ -24,9 +23,7 @@ function roundedFrame(edgeLength, radius, circularSegments = 0) {
   return union(edge4, edge4.rotate([180, 0, 0]));
 }
 
-setMinCircularAngle(3);
-setMinCircularEdgeLength(0.5);
-const result = roundedFrame(100, 10);
+const result = roundedFrame(100, 10, {minAngle: 3, minEdgeLength: 0.5});
 // Demonstrate how you can use the .split method to perform
 // a subtraction and an intersection at once
 const [inside, outside] = result.split(cube(100, true));

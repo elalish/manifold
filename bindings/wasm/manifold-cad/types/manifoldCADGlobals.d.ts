@@ -24,4 +24,4 @@ export {AnimationMode, setAnimationDuration, setAnimationFPS, setAnimationMode} 
 /**
  * @group Global State
  */
-export {getRelativePrecision, resetToCircularDefaults, setCircularSegments, setMinCircularAngle, setMinCircularEdgeLength, setRelativePrecision} from '../lib/level-of-detail.ts';
+export {getRelativePrecision, setRelativePrecision} from '../lib/level-of-detail.ts';

@@ -23,7 +23,7 @@ extern "C" {
 #endif
 
 // In general, if the function return type is `T*`,
-// you have to cleanup the result by calling `maninfold_delete_*`.
+// you have to cleanup the result by calling `manifold_delete_*`.
 // If the function return type is `const T*`,
 // the result is borrowed from input arguments.
 
@@ -98,7 +98,7 @@ ManifoldManifold* manifold_level_set_seq(ManifoldSdf sdf,
 
 // Manifold Vectors
 
-ManifoldManifoldVec* manifold_manifold_empty_vec();
+ManifoldManifoldVec* manifold_manifold_empty_vec(void);
 ManifoldManifoldVec* manifold_manifold_vec(size_t sz);
 void manifold_manifold_vec_reserve(ManifoldManifoldVec* ms, size_t sz);
 size_t manifold_manifold_vec_length(const ManifoldManifoldVec* ms);
@@ -175,21 +175,24 @@ ManifoldManifold* manifold_simplify(const ManifoldManifold* m,
 
 // Manifold Shapes / Constructors
 
-ManifoldManifold* manifold_empty();
+ManifoldManifold* manifold_empty(void);
 ManifoldManifold* manifold_copy(const ManifoldManifold* m);
-ManifoldManifold* manifold_tetrahedron();
+ManifoldManifold* manifold_tetrahedron(void);
 ManifoldManifold* manifold_cube(double x, double y, double z, int center);
+// quality may be NULL for the default CircularQuality.
 ManifoldManifold* manifold_cylinder(double height, double radius_low,
-                                    double radius_high, int circular_segments,
+                                    double radius_high,
+                                    const ManifoldCircularQuality* quality,
                                     int center);
-ManifoldManifold* manifold_sphere(double radius, int circular_segments);
+ManifoldManifold* manifold_sphere(double radius,
+                                  const ManifoldCircularQuality* quality);
 ManifoldManifold* manifold_of_meshgl(const ManifoldMeshGL* mesh);
 ManifoldManifold* manifold_of_meshgl64(const ManifoldMeshGL64* mesh);
 ManifoldManifold* manifold_extrude(const ManifoldPolygons* cs, double height,
                                    int slices, double twist_degrees,
                                    double scale_x, double scale_y);
 ManifoldManifold* manifold_revolve(const ManifoldPolygons* cs,
-                                   int circular_segments,
+                                   const ManifoldCircularQuality* quality,
                                    double revolve_degrees);
 ManifoldManifoldVec* manifold_decompose(const ManifoldManifold* m);
 
@@ -201,11 +204,15 @@ ManifoldManifold* manifold_as_original(const ManifoldManifold* m, int id);
 int manifold_is_empty(const ManifoldManifold* m);
 ManifoldError manifold_status(const ManifoldManifold* m);
 // Returns a copy of the manifold with the given ExecutionContext attached.
-// The attachment is consumed by the next eager op invoked on the result —
-// manifold_status, or one of the manifold_refine* family. Deferred ops
-// (Boolean operators, transforms, batch ops) ignore any attached ctx and
-// produce a result with no attached ctx. See ExecutionContext in common.h
-// for the full model.
+// Only manifold_status and the eager ops (the manifold_refine* family,
+// manifold_hull, manifold_minkowski_sum and manifold_minkowski_difference)
+// observe it, reporting progress and cancellation through it. Other queries
+// that force evaluation, such as manifold_volume or manifold_get_meshgl, do
+// not. Every other op that returns a manifold ignores the attached ctx and
+// returns a result with no attached ctx. Copies (manifold_copy and the
+// manifold_manifold_vec get/set/push_back calls) keep the attachment. See
+// Manifold::WithContext in manifold.h and ExecutionContext in common.h for
+// the full model.
 ManifoldManifold* manifold_with_context(const ManifoldManifold* m,
                                         const ManifoldExecutionContext* ctx);
 size_t manifold_num_vert(const ManifoldManifold* m);
@@ -218,9 +225,9 @@ size_t manifold_num_prop_vert(const ManifoldManifold* m);
 int manifold_genus(const ManifoldManifold* m);
 double manifold_surface_area(const ManifoldManifold* m);
 double manifold_volume(const ManifoldManifold* m);
-int manifold_get_circular_segments(double radius);
 int manifold_original_id(const ManifoldManifold* m);
 uint32_t manifold_reserve_ids(uint32_t n);
+// A NULL fun sets the new properties to zero.
 ManifoldManifold* manifold_set_properties(
     const ManifoldManifold* m, int num_prop,
     void (*fun)(double* new_prop, ManifoldVec3 position, const double* old_prop,
@@ -229,7 +236,7 @@ ManifoldManifold* manifold_set_properties(
 ManifoldManifold* manifold_calculate_curvature(const ManifoldManifold* m,
                                                int gaussian_idx, int mean_idx);
 double manifold_min_gap(const ManifoldManifold* m,
-                        const ManifoldManifold* other, double searchLength);
+                        const ManifoldManifold* other, double search_length);
 ManifoldManifold* manifold_calculate_normals(const ManifoldManifold* m,
                                              double min_sharp_angle);
 
@@ -245,12 +252,12 @@ int manifold_winding_number(const ManifoldManifold* m, double x, double y,
                             double z);
 
 // ExecutionContext: observe progress and request cancellation of a
-// long-running Manifold evaluation. Attach to a manifold via
-// manifold_with_context; subsequent operations on that manifold observe
-// the context. Safe to read/write from any thread. See the ExecutionContext
+// long-running Manifold evaluation. Attach it with manifold_with_context,
+// then call manifold_status or one of the eager ops listed there on the
+// result. Safe to read/write from any thread. See the ExecutionContext
 // class in common.h for full semantics (sticky cancel, per-boolean
 // granularity).
-ManifoldExecutionContext* manifold_execution_context();
+ManifoldExecutionContext* manifold_execution_context(void);
 void manifold_execution_context_cancel(ManifoldExecutionContext* ctx);
 int manifold_execution_context_cancelled(const ManifoldExecutionContext* ctx);
 double manifold_execution_context_progress(const ManifoldExecutionContext* ctx);
@@ -272,7 +279,7 @@ ManifoldManifold* manifold_execution_context_of_meshgl64(
     ManifoldExecutionContext* ec, const ManifoldMeshGL64* mesh);
 
 // CrossSection Shapes/Constructors
-ManifoldCrossSection* manifold_cross_section_empty();
+ManifoldCrossSection* manifold_cross_section_empty(void);
 ManifoldCrossSection* manifold_cross_section_copy(
     const ManifoldCrossSection* cs);
 ManifoldCrossSection* manifold_cross_section_of_simple_polygon(
@@ -289,14 +296,14 @@ ManifoldCrossSection* manifold_cross_section_non_zero_polygons(
     const ManifoldPolygons* p);
 ManifoldCrossSection* manifold_cross_section_square(double x, double y,
                                                     int center);
-ManifoldCrossSection* manifold_cross_section_circle(double radius,
-                                                    int circular_segments);
+ManifoldCrossSection* manifold_cross_section_circle(
+    double radius, const ManifoldCircularQuality* quality);
 ManifoldCrossSectionVec* manifold_cross_section_decompose(
     const ManifoldCrossSection* cs);
 
 // CrossSection Vectors
 
-ManifoldCrossSectionVec* manifold_cross_section_empty_vec();
+ManifoldCrossSectionVec* manifold_cross_section_empty_vec(void);
 ManifoldCrossSectionVec* manifold_cross_section_vec(size_t sz);
 void manifold_cross_section_vec_reserve(ManifoldCrossSectionVec* csv,
                                         size_t sz);
@@ -346,14 +353,14 @@ ManifoldCrossSection* manifold_cross_section_mirror(
 ManifoldCrossSection* manifold_cross_section_transform(
     const ManifoldCrossSection* cs, double x1, double y1, double x2, double y2,
     double x3, double y3);
-ManifoldCrossSection* manifold_cross_section_warp_context(
+ManifoldCrossSection* manifold_cross_section_warp(
     const ManifoldCrossSection* cs, ManifoldVec2 (*fun)(double, double, void*),
     void* ctx);
 ManifoldCrossSection* manifold_cross_section_simplify(
     const ManifoldCrossSection* cs, double tolerance);
 ManifoldCrossSection* manifold_cross_section_offset(
     const ManifoldCrossSection* cs, double delta, ManifoldJoinType jt,
-    double miter_limit, int circular_segments);
+    double miter_limit, const ManifoldCircularQuality* quality);
 
 // CrossSection Info
 
@@ -422,13 +429,14 @@ void manifold_version(int version[3]);
 // Static Quality Globals
 
 void manifold_set_relative_precision(double precision);
-double manifold_get_relative_precision();
-void manifold_set_min_circular_angle(double degrees);
-void manifold_set_min_circular_edge_length(double length);
-double manifold_get_min_circular_angle();
-double manifold_get_min_circular_edge_length();
-void manifold_set_circular_segments(int number);
-void manifold_reset_to_circular_defaults();
+double manifold_get_relative_precision(void);
+
+// Circular Quality
+// quality may be NULL for the default CircularQuality.
+int manifold_circular_quality_segments_for(
+    double radius, const ManifoldCircularQuality* quality);
+ManifoldCircularQuality manifold_circular_quality_for_divisions(int divisions,
+                                                                double degrees);
 
 // Manifold Mesh Extraction
 
