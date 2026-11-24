@@ -189,8 +189,9 @@ CsgLeafNode& Manifold::GetCsgLeafNode(ExecutionContext::Impl* ctx) const {
 /**
  * Convert a MeshGL into a Manifold, retaining its properties and merging only
  * the positions according to the merge vectors. Will return an empty Manifold
- * and set an Error Status if the result is not an oriented 2-manifold. Will
- * collapse degenerate triangles and unnecessary vertices.
+ * and set an Error Status if the result is not an oriented 2-manifold.
+ * Triangles with a repeated vertex after merging are dropped. Other degenerate
+ * triangles are kept. Use RemoveDegenerates() to collapse them.
  *
  * All fields are read, making this structure suitable for a lossless round-trip
  * of data from GetMeshGL. For multi-material input, use ReserveIDs to set a
@@ -200,24 +201,31 @@ CsgLeafNode& Manifold::GetCsgLeafNode(ExecutionContext::Impl* ctx) const {
  * The result has relative precision kDefaultRelativePrecision. Precision is
  * not stored in the mesh, so use WithPrecision() to change it after ingest.
  *
+ * The conversion runs in this constructor, so it cannot be cancelled or report
+ * progress. Use ExecutionContext::FromMeshGL for that.
+ *
  * @param meshGL The input MeshGL.
  */
 Manifold::Manifold(const MeshGL& meshGL)
     : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(meshGL))) {}
 
 /**
- * Convert a MeshGL into a Manifold, retaining its properties and merging only
+ * Convert a MeshGL64 into a Manifold, retaining its properties and merging only
  * the positions according to the merge vectors. Will return an empty Manifold
- * and set an Error Status if the result is not an oriented 2-manifold. Will
- * collapse degenerate triangles and unnecessary vertices.
+ * and set an Error Status if the result is not an oriented 2-manifold.
+ * Triangles with a repeated vertex after merging are dropped. Other degenerate
+ * triangles are kept. Use RemoveDegenerates() to collapse them.
  *
  * All fields are read, making this structure suitable for a lossless round-trip
- * of data from GetMeshGL. For multi-material input, use ReserveIDs to set a
+ * of data from GetMeshGL64. For multi-material input, use ReserveIDs to set a
  * unique originalID for each material, and sort the materials into triangle
  * runs.
  *
  * The result has relative precision kMinRelativePrecision. Precision is not
  * stored in the mesh, so use WithPrecision() to change it after ingest.
+ *
+ * The conversion runs in this constructor, so it cannot be cancelled or report
+ * progress. Use ExecutionContext::FromMeshGL for that.
  *
  * @param meshGL64 The input MeshGL64.
  */
@@ -734,9 +742,9 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
  *
  * @param minSharpAngle Any edges with angles greater than this value will
  * remain sharp, getting different normal vector properties on each side of the
- * edge. By default, no edges are sharp and all normals are shared. With a value
- * of zero, the model is faceted and all normals match their triangle normals,
- * but in this case it would be better not to calculate normals at all.
+ * edge. Default is 52.5 degrees. With a value of zero, the model is faceted
+ * and all normals match their triangle normals, but in this case it would be
+ * better not to calculate normals at all.
  */
 Manifold Manifold::CalculateNormals(double minSharpAngle) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
@@ -779,7 +787,7 @@ Manifold Manifold::SmoothByNormals() const {
  * instance, with n = 2, each triangle will be split into 4 triangles. Quads
  * will ignore their interior triangle bisector. These will all be coplanar (and
  * will not be immediately collapsed) unless the Mesh/Manifold has
- * halfedgeTangents specified (e.g. from the Smooth() constructor), in which
+ * halfedgeTangents specified (e.g. from SmoothByNormals()), in which
  * case the new vertices will be moved to the interpolated surface according to
  * their barycentric coordinates. Any normals recording set by
  * `CalculateNormals()` is preserved; the new verts get linearly-interpolated
@@ -803,7 +811,7 @@ Manifold Manifold::Refine(int n) const {
  * Increase the density of the mesh by splitting each edge into pieces of
  * roughly the input length. Interior verts are added to keep the rest of the
  * triangulation edges also of roughly the same length. If halfedgeTangents are
- * present (e.g. from the Smooth() constructor), the new vertices will be moved
+ * present (e.g. from SmoothByNormals()), the new vertices will be moved
  * to the interpolated surface according to their barycentric coordinates. Quads
  * will ignore their interior triangle bisector. Any normals recording set by
  * `CalculateNormals()` is preserved; the new verts get linearly-interpolated

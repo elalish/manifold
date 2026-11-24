@@ -851,7 +851,7 @@ void Manifold::Impl::Hull(VecView<const vec3> vertPos,
   RemoveDegenerates();
   SortGeometry(ctx);
   // SortGeometry returns silently on cancel, leaving the Impl in a
-  // partial state; catch that here so SetNormalsAndCoplanar doesn't
+  // partial state; catch that here so InitializeOriginal doesn't
   // run on broken geometry and the caller sees a Cancelled result.
   if (IsCancelled(ctx)) {
     MakeEmpty(Error::Cancelled);
