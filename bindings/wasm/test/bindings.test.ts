@@ -285,6 +285,45 @@ suite('Manifold Bindings', () => {
     cancelCtx.delete();
   });
 
+  test('ManifoldError messages', () => {
+    const ManifoldError = (manifoldModule as any).ManifoldError;
+    const codes = [
+      'NoError', 'NonFiniteVertex', 'NotManifold', 'VertexOutOfBounds',
+      'PropertiesWrongLength', 'MissingPositionProperties',
+      'MergeVectorsDifferentLengths', 'MergeIndexOutOfBounds',
+      'TransformWrongLength', 'RunIndexWrongLength', 'FaceIDWrongLength',
+      'InvalidConstruction', 'ResultTooLarge', 'InvalidTangents', 'Cancelled'
+    ];
+    const messages = codes.map(code => {
+      const error = new ManifoldError(code);
+      expect(error).toBeInstanceOf(Error);
+      expect(error.name).toEqual('ManifoldError');
+      expect(error.code).toEqual(code);
+      return error.message;
+    });
+    expect(messages.every(m => m.length > 0 && m !== 'Unknown error'))
+        .toBe(true);
+    expect(new Set(messages).size).toEqual(codes.length);
+    expect(new ManifoldError('Cancelled').message)
+        .toEqual('Operation cancelled');
+    expect(new ManifoldError('Bogus').message).toEqual('Unknown error');
+
+    const mesh = new manifoldModule.Mesh({
+      numProp: 3,
+      vertProperties: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      triVerts: new Uint32Array([0, 1, 2])
+    });
+    let thrown: any;
+    try {
+      new manifoldModule.Manifold(mesh);
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(ManifoldError);
+    expect(thrown.code).toEqual('NotManifold');
+    expect(thrown.message).toEqual('Not manifold');
+  });
+
   test('refineToTolerance does not throw (issue #1545)', () => {
     // Reproduces the original failing geometry from issue #1545: a flat-faced
     // mesh with normals set via calculateNormals + smoothByNormals. On flat
