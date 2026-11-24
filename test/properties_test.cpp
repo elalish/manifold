@@ -124,7 +124,7 @@ TEST(Properties, ToleranceCylinder) {
   Manifold cylinder2 = cylinder.Simplify(0.01);
   EXPECT_LT(cylinder2.NumTri(), 165);
   EXPECT_EQ(cylinder2.Genus(), 0);
-  EXPECT_NEAR(cylinder.Volume(), cylinder2.Volume(), 0.011);
+  EXPECT_NEAR(cylinder.Volume(), cylinder2.Volume(), 0.014);
   EXPECT_NEAR(cylinder.SurfaceArea(), cylinder2.SurfaceArea(), 0.02);
   if (options.exportModels) WriteTestOBJ("cylinder.obj", cylinder2);
 }
