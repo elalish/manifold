@@ -101,7 +101,7 @@ Example for integrating with [Assimp](https://github.com/assimp/assimp) is in `e
 
 ## Building
 
-Only CMake, a C++ compiler, and Python are required to be installed and set up to build this library (it has been tested with GCC, LLVM, MSVC). However, a variety of optional dependencies can bring in more functionality, see below.
+Only CMake and a C++ compiler are required to be installed and set up to build this library (it has been tested with GCC, LLVM, MSVC). However, a variety of optional dependencies can bring in more functionality, see below.
 
 Build and test (Ubuntu or similar):
 ```
@@ -115,8 +115,8 @@ make test
 
 CMake flags (usage e.g. `-DMANIFOLD_DEBUG=ON`):
 - `MANIFOLD_JSBIND=[OFF, <ON>]`: Build js binding (when using the emscripten toolchain).
-- `MANIFOLD_CBIND=[<OFF>, ON]`: Build C FFI binding.
-- `MANIFOLD_PYBIND=[OFF, <ON>]`: Build python binding, requires `nanobind`.
+- `MANIFOLD_CBIND=[OFF, <ON>]`: Build C FFI binding.
+- `MANIFOLD_PYBIND=[<OFF>, ON]`: Build python binding, requires Python and `nanobind`.
 - `MANIFOLD_PAR=[<OFF>, ON]`: Enables multi-thread parallelization, requires `tbb`.
 - `MANIFOLD_DEBUG=[<OFF>, ON]`: Enables exceptions, timing, verbosity, OBJ test dumps. Has almost no effect on its own, but enables further runtime parameters to dump various outputs.
 - `MANIFOLD_ASSERT=[<OFF>, ON]`: Enables internal assertions. This incurs around 20% runtime overhead. Requires MANIFOLD_DEBUG to work.
@@ -211,7 +211,7 @@ node ./manifold_test.js
 
 ### Python
 
-The CMake script will build the python binding `manifold3d` automatically. To
+Configure with `-DMANIFOLD_PYBIND=ON` to build the python binding `manifold3d`. To
 use the extension, please add `$BUILD_DIR/bindings/python` to your `PYTHONPATH`, where
 `$BUILD_DIR` is the build directory for CMake. Examples using the python binding
 can be found in `bindings/python/examples`. To see exported samples, run:
@@ -236,17 +236,19 @@ GIL disabled, so threads can build and evaluate Manifolds in parallel.
 Manifold and CrossSection objects are immutable and can be shared between
 threads. On regular Python, the calls that report progress to an
 `ExecutionContext` release the GIL, so another thread can watch progress or
-cancel them.
+cancel them. `ExecutionContext.level_set` is the exception: it keeps the GIL
+because it calls back into Python.
 
 ### Windows Shenanigans
 
 Windows users should build with `-DBUILD_SHARED_LIBS=OFF`, as enabling shared
 libraries in general makes things very complicated.
 
-The DLL file for manifoldc (C FFI bindings) when built with msvc is in `${CMAKE_BINARY_DIR}/bin/${BUILD_TYPE}/manifoldc.dll`.
-For example, for the following command, the path relative to the project root directory is `build/bin/Release/manifoldc.dll`.
+The DLL file for manifoldc (C FFI bindings) when built with msvc is in `${CMAKE_BINARY_DIR}/lib/${BUILD_TYPE}/manifoldc.dll`.
+For example, for the following command, the path relative to the project root directory is `build/lib/Release/manifoldc.dll`.
 ```sh
-cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -A x64 -B build
+cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -A x64 -B build
+cmake --build build --config Release
 ```
 
 ## Contributing
@@ -258,7 +260,7 @@ Contributions are welcome! A lower barrier contribution is to simply make a PR t
 There is a formatting script `format.sh` that automatically formats everything.
 It requires clang-format, black formatter for python and [gersemi](https://github.com/BlankSpruce/gersemi) for formatting cmake files.
 
-Note that our script can run with clang-format older than 18, but the GitHub
+Note that our script can run with clang-format older than 20, but the GitHub
 action check may fail due to slight differences between different versions of
 clang-format. In that case, either update your clang-format version or apply the
 patch from the GitHub action log.
