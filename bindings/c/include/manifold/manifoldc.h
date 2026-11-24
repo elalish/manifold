@@ -33,8 +33,9 @@ extern "C" {
 // (FLT_EPSILON in <float.h>). Manifolds made from a MeshGL64 or read from OBJ
 // have MANIFOLD_MIN_RELATIVE_PRECISION, the finest allowed. Booleans,
 // Minkowski and hulls of several manifolds use the smallest precision among
-// their non-empty inputs. Other operations keep the precision of their input.
-// Use manifold_with_precision to change it.
+// their non-empty inputs. An empty Boolean result uses the smallest among all
+// its inputs. Other operations keep the precision of their input. Use
+// manifold_with_precision to change it.
 #define MANIFOLD_MIN_RELATIVE_PRECISION 1e-12
 
 // Polygons

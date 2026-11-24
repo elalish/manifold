@@ -241,8 +241,10 @@ std::shared_ptr<CsgLeafNode> SimpleBoolean(const Manifold::Impl& a,
 std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
     const std::vector<std::shared_ptr<CsgLeafNode>>& nodes) {
   ZoneScoped;
-  // The result keeps the finest precision among the non-empty nodes.
+  // The result keeps the finest precision among the non-empty nodes, or among
+  // all nodes when every node is empty.
   double relPrecision = std::numeric_limits<double>::infinity();
+  double emptyPrecision = relPrecision;
   Box bbox;
   int numVert = 0;
   int numEdge = 0;
@@ -264,8 +266,8 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
       return ErrorLeaf(Manifold::Error::NonFiniteVertex);
     }
     bbox = bbox.Union(node->GetBoundingBox());
-    if (!node->pImpl_->IsEmpty())
-      relPrecision = std::min(relPrecision, node->relPrecision_);
+    double& precision = node->pImpl_->IsEmpty() ? emptyPrecision : relPrecision;
+    precision = std::min(precision, node->relPrecision_);
 
     vertIndices.push_back(numVert);
     edgeIndices.push_back(numEdge * 2);
@@ -282,6 +284,7 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
 
   Manifold::Impl combined;
   combined.bBox_ = bbox;
+  if (!std::isfinite(relPrecision)) relPrecision = emptyPrecision;
   if (std::isfinite(relPrecision)) combined.relPrecision_ = relPrecision;
   combined.epsilon_ = combined.relPrecision_ * combined.bBox_.Scale();
   combined.vertPos_.resize_nofill(numVert);

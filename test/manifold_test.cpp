@@ -2354,6 +2354,41 @@ TEST(Precision, WithPrecisionOnError) {
   EXPECT_EQ(invalid.GetPrecision(), kDefaultRelativePrecision);
 }
 
+TEST(Precision, EmptyBooleanTakesMin) {
+  const Manifold fine(Manifold::Cube().GetMeshGL64());
+  const Manifold cube = Manifold::Cube();
+  const Manifold far = cube.Translate({5, 0, 0});
+  const Manifold empty;
+  const Manifold coarseEmpty = empty.WithPrecision(1e-2);
+  // An empty result has the smaller precision of the two inputs, in either
+  // order, including an empty input.
+  EXPECT_EQ((fine ^ empty).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ((empty ^ fine).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ((empty - fine).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ((fine ^ far).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ((far ^ fine).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ((fine - fine).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ((coarseEmpty + empty.WithPrecision(1e-3)).GetPrecision(), 1e-3);
+  EXPECT_EQ((empty.WithPrecision(1e-3) + coarseEmpty).GetPrecision(), 1e-3);
+  EXPECT_EQ(
+      Manifold::BatchBoolean(
+          {coarseEmpty, empty.WithPrecision(1e-3), coarseEmpty}, OpType::Add)
+          .GetPrecision(),
+      1e-3);
+  EXPECT_EQ((coarseEmpty ^ cube).GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_EQ((cube ^ coarseEmpty).GetPrecision(), kDefaultRelativePrecision);
+  // A non-empty result ignores an empty input.
+  EXPECT_EQ((cube.WithPrecision(1e-2) - empty).GetPrecision(), 1e-2);
+  EXPECT_EQ((empty + cube.WithPrecision(1e-2)).GetPrecision(), 1e-2);
+  // BatchBoolean gives the same in any order.
+  for (const auto& parts : std::vector<std::vector<Manifold>>{
+           {fine, cube, far}, {cube, far, fine}, {far, fine, cube}}) {
+    const Manifold result = Manifold::BatchBoolean(parts, OpType::Intersect);
+    EXPECT_TRUE(result.IsEmpty());
+    EXPECT_EQ(result.GetPrecision(), kMinRelativePrecision);
+  }
+}
+
 TEST(Precision, BooleanTakesMin) {
   const Manifold sphere = Manifold::Sphere(1, {64});
   const Manifold cube = Manifold::Cube(vec3(1));

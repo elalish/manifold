@@ -876,7 +876,7 @@ Manifold Manifold::RefineToTolerance(double tolerance) const {
  * input is empty or their bounding boxes do not overlap.
  *
  * The result uses the smaller relative precision of the two inputs, ignoring
- * an empty input. See WithPrecision().
+ * an empty input unless the result is also empty. See WithPrecision().
  *
  * @param second The other Manifold.
  * @param op The type of operation to perform.
@@ -890,8 +890,8 @@ Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
  * Subtract, all Manifolds in the tail are differenced from the head. The
  * empty-input case returns a default-constructed Manifold; the
  * single-input case returns the input unchanged, without any attached
- * ExecutionContext. The result uses the smallest relative precision among the
- * non-empty inputs.
+ * ExecutionContext. The result's relative precision follows the same rule as
+ * Boolean().
  */
 Manifold Manifold::BatchBoolean(const std::vector<Manifold>& manifolds,
                                 OpType op) {
