@@ -39,6 +39,7 @@ TEST(Properties, BooleanBarycentricWeightsRemainFinite) {
   const double height = std::sqrt(3.0);
   const Manifold prism =
       Manifold::Extrude(Polygons{{{0, 0}, {2, 0}, {1, height}}}, 2)
+          .WithPrecision(1e-12)
           .SetProperties(3, [height](double* color, vec3 p, const double*) {
             color[2] = p.y / height;
             color[1] = (p.x - color[2]) / 2;

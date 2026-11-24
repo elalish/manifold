@@ -1010,6 +1010,7 @@ TEST(Manifold, ObjRoundTrip) {
   Manifold m2 = Manifold::ReadOBJ(ss);
   EXPECT_EQ(m2.Status(), Manifold::Error::NoError);
   EXPECT_EQ(m2.Volume(), 1);
+  EXPECT_EQ(m2.GetPrecision(), kMinRelativePrecision);
 }
 
 // A unit tetrahedron, missing its last face line.
@@ -2127,14 +2128,27 @@ TEST(Precision, Merge) {
 
 TEST(Precision, Ingest) {
   const MeshGL64 mesh = Manifold::Sphere(1, {64}).GetMeshGL64();
-  EXPECT_EQ(Manifold(mesh).GetPrecision(), kDefaultRelativePrecision);
+  const MeshGL meshF = Manifold::Sphere(1, {64}).GetMeshGL();
+  // The default follows the representation.
+  EXPECT_EQ(kDefaultRelativePrecision, std::numeric_limits<float>::epsilon());
+  EXPECT_EQ(Manifold(mesh).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ(Manifold(meshF).GetPrecision(), kDefaultRelativePrecision);
+  ExecutionContext ctx;
+  EXPECT_EQ(ctx.FromMeshGL(mesh).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ(ctx.FromMeshGL(meshF).GetPrecision(), kDefaultRelativePrecision);
   const Manifold coarse(mesh, 1e-3);
   EXPECT_EQ(coarse.GetPrecision(), 1e-3);
   EXPECT_DOUBLE_EQ(coarse.GetEpsilon(), 1e-3 * coarse.BoundingBox().Scale());
-  // Values below the default, including NaN, use the default.
-  EXPECT_EQ(Manifold(mesh, 0).GetPrecision(), kDefaultRelativePrecision);
-  EXPECT_EQ(Manifold(mesh, NAN).GetPrecision(), kDefaultRelativePrecision);
-  EXPECT_EQ(Manifold(mesh, INFINITY).GetPrecision(), kDefaultRelativePrecision);
+  // Values below the floor, including 0, use the floor. NaN and infinity use
+  // the default.
+  EXPECT_EQ(Manifold(mesh, 0).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ(Manifold(meshF, 0).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ(Manifold(meshF, 1e-9).GetPrecision(), 1e-9);
+  EXPECT_EQ(Manifold(mesh, NAN).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ(Manifold(mesh, INFINITY).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ(Manifold(meshF, NAN).GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_EQ(Manifold(meshF, INFINITY).GetPrecision(),
+            kDefaultRelativePrecision);
   // Transforms and single-input operations keep the precision.
   EXPECT_EQ(coarse.Translate({10, 0, 0}).GetPrecision(), 1e-3);
   EXPECT_DOUBLE_EQ(coarse.Translate({10, 0, 0}).GetEpsilon(), 1e-3 * 11);
@@ -2181,7 +2195,29 @@ TEST(Precision, IngestIgnoresUnusedVerts) {
   ExecutionContext ctx;
   const Manifold viaCtx = ctx.FromMeshGL(mesh);
   EXPECT_DOUBLE_EQ(viaCtx.GetEpsilon(),
-                   kDefaultRelativePrecision * viaCtx.BoundingBox().Scale());
+                   kMinRelativePrecision * viaCtx.BoundingBox().Scale());
+}
+
+TEST(Precision, BuiltShapesDefaultToFloat) {
+  const CrossSection square = CrossSection::Square(vec2(1));
+  const std::vector<Manifold> shapes = {
+      Manifold(),
+      Manifold::Tetrahedron(),
+      Manifold::Cube(),
+      Manifold::Cylinder(1, 1),
+      Manifold::Sphere(1),
+      Manifold::Extrude(square.ToPolygons(), 1),
+      Manifold::Revolve(square.Translate({1, 0}).ToPolygons()),
+      Manifold::LevelSet([](vec3 p) { return 1 - la::length(p); },
+                         {vec3(-2), vec3(2)}, 0.5),
+      Manifold::Hull({{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}}),
+  };
+  for (const Manifold& shape : shapes) {
+    EXPECT_EQ(shape.GetPrecision(), kDefaultRelativePrecision);
+  }
+  // A MeshGL64 operand keeps a Boolean at double precision.
+  const Manifold fine(Manifold::Sphere(1).GetMeshGL64());
+  EXPECT_EQ((fine - Manifold::Cube()).GetPrecision(), kMinRelativePrecision);
 }
 
 TEST(Precision, WithPrecisionAffectsOnlyLaterOps) {
@@ -2194,7 +2230,8 @@ TEST(Precision, WithPrecisionAffectsOnlyLaterOps) {
   EXPECT_EQ(coarse.GetPrecision(), 1e-2);
   EXPECT_DOUBLE_EQ(coarse.GetEpsilon(), 1e-2 * coarse.BoundingBox().Scale());
   EXPECT_EQ(fine.GetPrecision(), kDefaultRelativePrecision);
-  EXPECT_EQ(fine.WithPrecision(0).GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_EQ(fine.WithPrecision(0).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ(fine.WithPrecision(1e-12).GetPrecision(), kMinRelativePrecision);
   EXPECT_EQ(fine.WithPrecision(INFINITY).GetPrecision(),
             kDefaultRelativePrecision);
   // Later operations use it.

@@ -249,7 +249,7 @@ TEST(Boolean, Simplify) {
 
   MeshGL resultGL = result.GetMeshGL();
   resultGL.faceID.clear();
-  Manifold result2(resultGL);
+  Manifold result2(resultGL, 1e-12);
   EXPECT_EQ(result2.NumTri(), nStarting);
   EXPECT_EQ(result2.RemoveDegenerates().NumTri(), 34);
   EXPECT_EQ(result2.Simplify().NumTri(), 12);
@@ -1240,12 +1240,13 @@ TEST(Boolean, Precision3) {
   Manifold result2 =
       Manifold(cube1.GetMeshGL64()) + Manifold(cube2.GetMeshGL64());
   EXPECT_EQ(result2.NumTri(), result.NumTri());
-  // MeshGL rounds to single precision, so the results are no longer coplanar.
-  Manifold result3 = Manifold(cube1.GetMeshGL()) + Manifold(cube2.GetMeshGL());
+  // MeshGL rounds to single precision, so at double precision the results are
+  // no longer coplanar.
+  Manifold result3 =
+      Manifold(cube1.GetMeshGL(), 1e-12) + Manifold(cube2.GetMeshGL(), 1e-12);
   EXPECT_GT(result3.NumTri(), result.NumTri());
-  // Setting the precision to reflect this makes the faces coplanar again.
-  Manifold result4 =
-      Manifold(cube1.GetMeshGL(), 1e-7) + Manifold(cube2.GetMeshGL(), 1e-7);
+  // The default precision of MeshGL reflects this, so the faces are coplanar.
+  Manifold result4 = Manifold(cube1.GetMeshGL()) + Manifold(cube2.GetMeshGL());
   EXPECT_EQ(result4.NumTri(), result.NumTri());
 }
 

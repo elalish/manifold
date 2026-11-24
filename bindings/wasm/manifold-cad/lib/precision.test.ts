@@ -18,16 +18,26 @@ import * as manifoldCAD from './manifoldCAD.ts';
 import {Manifold} from './manifoldCAD.ts';
 import {cleanup, evaluate} from './worker.ts';
 
+// Float epsilon, the library default for shapes and float meshes.
+const floatEpsilon = 2 ** -23;
+
 test('Each Manifold carries its own precision', () => {
   const cube = Manifold.cube();
-  expect(cube.getPrecision()).toEqual(1e-12);
+  expect(cube.getPrecision()).toEqual(floatEpsilon);
   const coarse = cube.withPrecision(1e-3);
   expect(coarse.getPrecision()).toEqual(1e-3);
-  expect(cube.getPrecision()).toEqual(1e-12);
-  expect(coarse.add(Manifold.sphere(1)).getPrecision()).toEqual(1e-12);
+  expect(cube.getPrecision()).toEqual(floatEpsilon);
+  expect(coarse.add(Manifold.sphere(1)).getPrecision()).toEqual(floatEpsilon);
   expect(Manifold.ofMesh(cube.getMesh(), 1e-3).getPrecision()).toEqual(1e-3);
   expect(new Manifold(cube.getMesh(), 1e-3).getPrecision()).toEqual(1e-3);
-  expect(Manifold.ofMesh(cube.getMesh()).getPrecision()).toEqual(1e-12);
+  expect(Manifold.ofMesh(cube.getMesh()).getPrecision()).toEqual(floatEpsilon);
+});
+
+test('Finer precision is set per Manifold', () => {
+  const cube = Manifold.cube();
+  expect(cube.withPrecision(1e-12).getPrecision()).toEqual(1e-12);
+  expect(Manifold.ofMesh(cube.getMesh(), 1e-12).getPrecision()).toEqual(1e-12);
+  expect(new Manifold(cube.getMesh(), 1e-12).getPrecision()).toEqual(1e-12);
 });
 
 test('Scripts have no global precision setter or getter', async () => {

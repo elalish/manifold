@@ -1,5 +1,6 @@
 #include "manifold/manifoldc.h"
 
+#include <cfloat>
 #include <cmath>
 #include <cstddef>
 #ifndef MANIFOLD_NO_IOSTREAM
@@ -835,8 +836,19 @@ TEST(CBIND, precision) {
   ManifoldManifold* cube = manifold_cube(1.0, 1.0, 1.0, 0);
   ManifoldMeshGL64* mesh = manifold_get_meshgl64(cube);
   ManifoldManifold* ingested = manifold_of_meshgl64(mesh, 1e-3);
-  EXPECT_EQ(manifold_get_precision(cube), 1e-12);
+  EXPECT_EQ(manifold_get_precision(cube), FLT_EPSILON);
   EXPECT_EQ(manifold_get_precision(ingested), 1e-3);
+  ManifoldManifold* fine = manifold_of_meshgl64(mesh, 0);
+  EXPECT_EQ(manifold_get_precision(fine), 1e-12);
+  manifold_delete_manifold(fine);
+  ManifoldMeshGL* meshF = manifold_get_meshgl(cube);
+  ManifoldManifold* floatDefault = manifold_of_meshgl(meshF, NAN);
+  EXPECT_EQ(manifold_get_precision(floatDefault), FLT_EPSILON);
+  ManifoldManifold* floatFine = manifold_of_meshgl(meshF, 0);
+  EXPECT_EQ(manifold_get_precision(floatFine), 1e-12);
+  manifold_delete_manifold(floatFine);
+  manifold_delete_manifold(floatDefault);
+  manifold_delete_meshgl(meshF);
   ManifoldManifold* stamped = manifold_with_precision(cube, 1e-2);
   EXPECT_EQ(manifold_get_precision(stamped), 1e-2);
   EXPECT_EQ(manifold_num_tri(stamped), manifold_num_tri(cube));
