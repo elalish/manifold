@@ -236,10 +236,10 @@ Manifold Manifold::Sphere(double radius, CircularQuality quality) {
  *
  * @param crossSection A set of non-overlapping polygons to extrude.
  * @param height Z-extent of extrusion.
- * @param nDivisions Number of extra copies of the crossSection to insert into
+ * @param nDivisions Number of extra copies of the cross-section to insert into
  * the shape vertically; especially useful in combination with twistDegrees to
  * avoid interpolation artifacts. Default is none.
- * @param twistDegrees Amount to twist the top crossSection relative to the
+ * @param twistDegrees Amount to twist the top cross-section relative to the
  * bottom, interpolated linearly for the divisions in between.
  * @param scaleTop Amount to scale the top (independently in X and Y). If the
  * scale is {0, 0}, a pure cone is formed with only a single vertex at the top.

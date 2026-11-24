@@ -458,7 +458,7 @@ namespace manifold {
  * @param edgeLength Approximate maximum edge length of the triangles in the
  * final result. This affects grid spacing, and hence has a strong effect on
  * performance. Every positive-length axis has at least one grid interval,
- * including when its extent is smaller than edgeLength.
+ * including when its extent is smaller than the edge length.
  * @param level Extract the surface at this value of your sdf; defaults to
  * zero. You can inset your mesh by using a positive value, or outset it with a
  * negative value.

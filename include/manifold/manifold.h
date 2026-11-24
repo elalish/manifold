@@ -271,7 +271,7 @@ class Manifold {
   ///@{
   Manifold Hull() const;
   static Manifold Hull(const std::vector<Manifold>& manifolds);
-  static Manifold Hull(const std::vector<vec3>& pts);
+  static Manifold Hull(const std::vector<vec3>& points);
   ///@}
 
   /** @name I/O
