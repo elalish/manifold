@@ -24,8 +24,8 @@ Manifold Base(double width, double radius, double decorRadius,
               double outerRadius, double cut, int nCut, int nDivision) {
   Manifold base = Manifold::Cylinder(width, radius + twistRadius / 2);
 
-  CrossSection circle =
-      CrossSection::Circle(decorRadius, nDivision).Translate({twistRadius, 0});
+  CrossSection circle = CrossSection::Circle(decorRadius, {nDivision})
+                            .Translate({twistRadius, 0});
   Manifold decor = Manifold::Extrude(circle.ToPolygons(), width, nDivision, 180)
                        .Scale({1.0, 0.5, 1.0})
                        .Translate({0.0, radius, 0.0});

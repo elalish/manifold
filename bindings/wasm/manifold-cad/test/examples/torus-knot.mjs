@@ -4,7 +4,7 @@
 // an example of using the warp() method, thus avoiding any direct
 // handling of triangles.
 
-import {CrossSection, getCircularSegments, Manifold} from 'manifold-cad/manifoldCAD';
+import {CrossSection, Manifold, segmentsFor} from 'manifold-cad/manifoldCAD';
 
 // The number of times the thread passes through the donut hole.
 const p = 1;
@@ -17,7 +17,7 @@ const minorRadius = 10;
 // Radius of the small cross-section of the actual object.
 const threadRadius = 3.75;
 // Number of linear segments making up the threadRadius circle. Default is
-// getCircularSegments(threadRadius).
+// segmentsFor(threadRadius).
 const circularSegments = -1;
 // Number of segments along the length of the knot. Default makes roughly
 // square facets.
@@ -32,8 +32,7 @@ function gcd(a, b) {
 const kLoops = gcd(p, q);
 const pk = p / kLoops;
 const qk = q / kLoops;
-const n =
-    circularSegments > 2 ? circularSegments : getCircularSegments(threadRadius);
+const n = circularSegments > 2 ? circularSegments : segmentsFor(threadRadius);
 const m =
     linearSegments > 2 ? linearSegments : n * qk * majorRadius / threadRadius;
 

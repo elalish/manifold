@@ -3,7 +3,7 @@
 // This example is based on the involute gear modules from the Gear Bearing by
 // Emmett Lalish: https://www.thingiverse.com/thing:53451
 
-import {CrossSection, getCircularSegments, Vec2} from 'manifold-cad/manifoldCAD';
+import {CircularQuality, CrossSection, segmentsFor, Vec2} from 'manifold-cad/manifoldCAD';
 
 const {sin, cos, tan, atan2, sqrt, pow, max, PI} = Math;
 
@@ -17,8 +17,10 @@ const {sin, cos, tan, atan2, sqrt, pow, max, PI} = Math;
  * @param {number} params.depthRatio - tooth length / tooth spacing - default
  *     0.75
  * @param {number} params.clearance - gap between meshing teeth - default 0mm
+ * @param {CircularQuality} params.quality - quality for the default n -
+ *     default {}
  * @param {number} params.n - number of points per curve - default is
- * calculated by the static Quality defaults according to the circularPitch
+ * calculated from the quality according to the circularPitch
  * @param {number} params.twist - helical pitch twist / height - default 0
  * @returns {Manifold} - the spur gear manifold
  */
@@ -27,7 +29,8 @@ export function spurGear(teeth: number, height: number, {
   pressureDeg = 20,
   depthRatio = 0.75,
   clearance = 0,
-  n = getCircularSegments(circularPitch / 6),
+  quality = {} as CircularQuality,
+  n = segmentsFor(circularPitch / 6, quality),
   twist = 0
 } = {}) {
   const nDiv = n * twist * height / circularPitch;
@@ -43,6 +46,7 @@ export function spurGear(teeth: number, height: number, {
  * @param {number} params.pressureDeg - contact angle
  * @param {number} params.depthRatio - tooth length / tooth spacing
  * @param {number} params.clearance - gap between meshing teeth
+ * @param {CircularQuality} params.quality - quality for the default n
  * @param {number} params.n - number of points per curve
  * @returns {CrossSection} - the spur gear cross section
  */
@@ -51,7 +55,8 @@ export function gear2D(teeth: number, {
   pressureDeg = 20,
   depthRatio = 0.75,
   clearance = 0,
-  n = getCircularSegments(circularPitch / 6),
+  quality = {} as CircularQuality,
+  n = segmentsFor(circularPitch / 6, quality),
 } = {}) {
   const pressureRad = pressureDeg * PI / 180;
   const pitchRadius = teeth * circularPitch / (2 * PI);

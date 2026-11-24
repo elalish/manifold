@@ -257,7 +257,7 @@ TEST(Boolean, Simplify) {
 
 TEST(Boolean, SimplifyCracks) {
   Manifold cylinder =
-      WithPositionColors(Manifold::Cylinder(2, 50, 50, 180))
+      WithPositionColors(Manifold::Cylinder(2, 50, 50, {180}))
           .Rotate(
               -89.999999999999)  // Rotating by -90 makes the result too perfect
           .Translate(vec3(50, 0, 50));
@@ -277,7 +277,7 @@ TEST(Boolean, SimplifyCracks) {
 }
 
 TEST(Boolean, SimplifyShards) {
-  Manifold a = Manifold::Sphere(40, 10);
+  Manifold a = Manifold::Sphere(40, {10});
   Manifold b = a.Translate({0, 0, 40}) ^ a;
   Manifold result = a - b;
   Box bounds = result.BoundingBox();
@@ -375,7 +375,7 @@ TEST(Boolean, DegenerateSplitQuadNormal) {
 
 TEST(Boolean, NoRetainedVerts) {
   Manifold cube = Manifold::Cube(vec3(1), true);
-  Manifold oct = Manifold::Sphere(1, 4);
+  Manifold oct = Manifold::Sphere(1, {4});
   EXPECT_NEAR(cube.Volume(), 1, 0.001);
   EXPECT_NEAR(oct.Volume(), 1.333, 0.001);
   EXPECT_NEAR((cube ^ oct).Volume(), 0.833, 0.001);
@@ -444,11 +444,12 @@ TEST(Boolean, TreeTransforms) {
 }
 
 TEST(Boolean, CreatePropertiesSlow) {
-  Manifold a = Manifold::Sphere(10, 1024).SetProperties(
-      3, [](double* newprop, vec3 pos, const double* old) {
-        for (int i = 0; i < 3; i++) newprop[i] = 0;
-      });
-  Manifold b = Manifold::Sphere(10, 1024).Translate({5, 0, 0});
+  Manifold a =
+      Manifold::Sphere(10, {1024})
+          .SetProperties(3, [](double* newprop, vec3 pos, const double* old) {
+            for (int i = 0; i < 3; i++) newprop[i] = 0;
+          });
+  Manifold b = Manifold::Sphere(10, {1024}).Translate({5, 0, 0});
   Manifold result = a + b;
   EXPECT_EQ(result.NumProp(), 3);
 }
@@ -731,7 +732,7 @@ TEST(Boolean, CornerUnion) {
  */
 TEST(Boolean, Split) {
   Manifold cube = Manifold::Cube(vec3(2.0), true);
-  Manifold oct = Manifold::Sphere(1, 4).Translate(vec3(0.0, 0.0, 1.0));
+  Manifold oct = Manifold::Sphere(1, {4}).Translate(vec3(0.0, 0.0, 1.0));
   std::pair<Manifold, Manifold> splits = cube.Split(oct);
   EXPECT_TRUE(splits.first.MatchesTriNormals());
   EXPECT_TRUE(splits.second.MatchesTriNormals());
@@ -786,7 +787,7 @@ TEST(Boolean, SplitByPlane60) {
 TEST(Boolean, ConvexConvexMinkowski) {
   double r = 0.1;
   double w = 2.0;
-  Manifold sphere = Manifold::Sphere(r, 20);
+  Manifold sphere = Manifold::Sphere(r, {20});
   Manifold cube = Manifold::Cube({w, w, w});
   Manifold sum = cube.MinkowskiSum(sphere);
   // Analytical volume of rounded cuboid: cube + 6 slabs + 12 quarter-cylinders
@@ -810,7 +811,7 @@ TEST(Boolean, ConvexConvexMinkowskiDifference) {
 
   double r = 0.1;
   double w = 2.0;
-  Manifold sphere = Manifold::Sphere(r, 20);
+  Manifold sphere = Manifold::Sphere(r, {20});
   Manifold cube = Manifold::Cube({w, w, w});
   Manifold difference = cube.MinkowskiDifference(sphere);
   // Analytical volume of eroded cube: (w-2r)³
@@ -829,10 +830,10 @@ TEST(Boolean, NonConvexConvexMinkowskiSum) {
   ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
 
-  Manifold sphere = Manifold::Sphere(1.2, 20);
+  Manifold sphere = Manifold::Sphere(1.2, {20});
   Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
   Manifold nonConvex = cube - sphere;
-  Manifold sum = nonConvex.MinkowskiSum(Manifold::Sphere(0.1, 20));
+  Manifold sum = nonConvex.MinkowskiSum(Manifold::Sphere(0.1, {20}));
   EXPECT_NEAR(sum.Volume(), 4.841, 1e-3);
   EXPECT_NEAR(sum.SurfaceArea(), 34.06, 1e-2);
   EXPECT_EQ(sum.Genus(), 5);
@@ -845,11 +846,11 @@ TEST(Boolean, NonConvexConvexMinkowskiDifference) {
   ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
 
-  Manifold sphere = Manifold::Sphere(1.2, 20);
+  Manifold sphere = Manifold::Sphere(1.2, {20});
   Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
   Manifold nonConvex = cube - sphere;
   Manifold difference =
-      nonConvex.MinkowskiDifference(Manifold::Sphere(0.05, 20));
+      nonConvex.MinkowskiDifference(Manifold::Sphere(0.05, {20}));
   EXPECT_NEAR(difference.Volume(), 0.778, 1e-3);
   EXPECT_NEAR(difference.SurfaceArea(), 16.70, 1e-2);
   EXPECT_EQ(difference.Genus(), 5);
@@ -1266,7 +1267,7 @@ TEST(Boolean, BatchBooleanThrowingPair) {
       overlapping.triVerts.push_back(v + firstVert);
   }
   const Manifold halfCube = cube.Scale(vec3(0.5)).Translate({0.6, 0, 0});
-  const Manifold sphere = Manifold::Sphere(1, 256);
+  const Manifold sphere = Manifold::Sphere(1, {256});
   for (int i = 0; i < 5; ++i) {
     EXPECT_THROW(
         Manifold::BatchBoolean({Manifold(overlapping), halfCube, sphere,

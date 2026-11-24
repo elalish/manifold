@@ -31,6 +31,20 @@ Module.setup = function() {
     return vec;
   }
 
+  // A number sets the segments, an object any of the CircularQuality fields.
+  function toQuality(quality = 0) {
+    if (typeof quality != 'object') quality = {segments: quality};
+    return {...Module._DefaultCircularQuality(), ...quality};
+  }
+
+  Module.segmentsFor = function(radius, quality) {
+    return Module._SegmentsFor(toQuality(quality), radius);
+  };
+
+  Module.forDivisions = function(divisions, degrees) {
+    return Module._ForDivisions(divisions, degrees);
+  };
+
   function fromVec(vec, f = x => x) {
     const result = [];
     const size = vec.size();
@@ -183,9 +197,9 @@ Module.setup = function() {
   };
 
   Module.CrossSection.prototype.offset = function(
-      delta, joinType = 'Round', miterLimit = 2.0, circularSegments = 0) {
+      delta, joinType = 'Round', miterLimit = 2.0, quality = 0) {
     return this._Offset(
-        delta, joinTypeToInt(joinType), miterLimit, circularSegments);
+        delta, joinTypeToInt(joinType), miterLimit, toQuality(quality));
   };
 
   Module.CrossSection.prototype.simplify = function(tolerance = 0) {
@@ -211,9 +225,10 @@ Module.setup = function() {
   };
 
   Module.CrossSection.prototype.revolve = function(
-      circularSegments = 0, revolveDegrees = 360.0) {
+      quality = 0, revolveDegrees = 360.0) {
     const polygonsVec = this._ToPolygons();
-    const man = Module._Revolve(polygonsVec, circularSegments, revolveDegrees);
+    const man =
+        Module._Revolve(polygonsVec, toQuality(quality), revolveDegrees);
     polygonsVec.delete();
     return man;
   };
@@ -607,8 +622,8 @@ Module.setup = function() {
     return Module._Square(size, center);
   };
 
-  Module.CrossSection.circle = function(radius, circularSegments = 0) {
-    return Module._Circle(radius, circularSegments);
+  Module.CrossSection.circle = function(radius, quality = 0) {
+    return Module._Circle(radius, toQuality(quality));
   };
 
   // allows args to be either CrossSection or polygons (constructed with
@@ -696,14 +711,13 @@ Module.setup = function() {
   };
 
   Module.Manifold.cylinder = function(
-      height, radiusLow, radiusHigh = -1.0, circularSegments = 0,
-      center = false) {
+      height, radiusLow, radiusHigh = -1.0, quality = 0, center = false) {
     return Module._Cylinder(
-        height, radiusLow, radiusHigh, circularSegments, center);
+        height, radiusLow, radiusHigh, toQuality(quality), center);
   };
 
-  Module.Manifold.sphere = function(radius, circularSegments = 0) {
-    return Module._Sphere(radius, circularSegments);
+  Module.Manifold.sphere = function(radius, quality = 0) {
+    return Module._Sphere(radius, toQuality(quality));
   };
 
   Module.Manifold.extrude = function(
@@ -715,9 +729,9 @@ Module.setup = function() {
   };
 
   Module.Manifold.revolve = function(
-      polygons, circularSegments = 0, revolveDegrees = 360.0) {
+      polygons, quality = 0, revolveDegrees = 360.0) {
     return withCrossSection(
-        polygons, cs => cs.revolve(circularSegments, revolveDegrees));
+        polygons, cs => cs.revolve(quality, revolveDegrees));
   };
 
   Module.Manifold.reserveIDs = function(n) {

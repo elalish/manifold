@@ -67,7 +67,7 @@ TEST(Hull, Tictac) {
   const double tictacHeight = 500;
   const int tictacSeg = 500;
   const double tictacMid = tictacHeight - 2 * tictacRad;
-  const auto sphere = Manifold::Sphere(tictacRad, tictacSeg);
+  const auto sphere = Manifold::Sphere(tictacRad, {tictacSeg});
   const std::vector<Manifold> spheres{sphere,
                                       sphere.Translate({0, 0, tictacMid})};
   const auto tictac = Manifold::Hull(spheres);
@@ -78,7 +78,7 @@ TEST(Hull, Tictac) {
 }
 
 TEST(Hull, Hollow) {
-  auto sphere = Manifold::Sphere(100, 360);
+  auto sphere = Manifold::Sphere(100, {360});
   auto hollow = sphere - sphere.Scale({0.8, 0.8, 0.8});
   const double sphere_vol = sphere.Volume();
   EXPECT_FLOAT_EQ(hollow.Hull().Volume(), sphere_vol);
@@ -112,7 +112,7 @@ TEST(Hull, MengerSponge) {
 }
 
 TEST(Hull, Sphere) {
-  Manifold sphere = Manifold::Sphere(1, 1500);
+  Manifold sphere = Manifold::Sphere(1, {1500});
   sphere = sphere.Translate(vec3(0.5));
   Manifold sphereHull = sphere.Hull();
   EXPECT_EQ(sphereHull.NumTri(), sphere.NumTri());

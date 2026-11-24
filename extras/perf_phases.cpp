@@ -128,7 +128,7 @@ int main(int argc, char** argv) {
   // so Timer output is readable.
   for (int i = 0; i < 8; ++i) {
     const int segments = (8 << i) * 4;
-    Manifold sphere = Manifold::Sphere(1, segments);
+    Manifold sphere = Manifold::Sphere(1, {segments});
     Manifold sphere2 = sphere.Translate(vec3(0.5));
     BenchAll("Sphere(" + std::to_string(segments) + ")", sphere, sphere2);
   }
@@ -200,7 +200,7 @@ int main(int argc, char** argv) {
   // ---- FromMesh ingest phase timings ----
   // Round-trip representative meshes back through the MeshGL ingest pipeline.
   for (int segments : {64, 128, 256}) {
-    const MeshGL gl = Manifold::Sphere(1, segments).GetMeshGL();
+    const MeshGL gl = Manifold::Sphere(1, {segments}).GetMeshGL();
     BenchFromMesh("Sphere(" + std::to_string(segments) + ")", gl);
   }
   {
@@ -213,6 +213,6 @@ int main(int argc, char** argv) {
   // A coarse control cage smoothed (FromMesh ingest + tangent phases) then
   // refined; the phase breakdown comes from the Smooth call.
   for (int refine : {16, 64}) {
-    BenchSmooth("Sphere(32)", Manifold::Sphere(1, 32).GetMeshGL(), refine);
+    BenchSmooth("Sphere(32)", Manifold::Sphere(1, {32}).GetMeshGL(), refine);
   }
 }

@@ -27,7 +27,7 @@ namespace manifold {
 namespace {
 
 // Upper bound on round-join chords per 360 degrees, so a direct caller passing
-// an absurd circularSegments cannot blow up the vertex count.
+// an absurd segment count cannot blow up the vertex count.
 constexpr int kMaxRoundJoinSegments = 1 << 15;
 
 struct ScaledDirection {
@@ -268,16 +268,15 @@ bool CollapsesUnderOffset(const SimplePolygon& contour, double delta) {
 }  // namespace
 
 // Public Offset API. `delta` is the offset distance (positive = inflate,
-// negative = inset). `miterLimit` is relative to |delta|. `circularSegments`
-// is the chord count per 360 degrees of Round join; values < 3 use the Quality
-// default for radius |delta|.
+// negative = inset). `miterLimit` is relative to |delta|. `quality` sets the
+// chord count per 360 degrees of Round join for radius |delta|.
 //
 // Each input contour produces one offset ring, or none if the offset erases
 // it, then all rings are regularized with Positive/Add filling. Collinear
 // vertices are left in place for the caller to `Simplify` if wanted, matching
 // Manifold's tolerance model rather than Clipper2's finishing behaviour.
 Polygons Offset(const Polygons& in, double delta, JoinType jt,
-                double miterLimit, int circularSegments) {
+                double miterLimit, const CircularQuality& quality) {
   // Reject NaN/Inf delta and input coordinates.
   if (!std::isfinite(delta)) return {};
   for (const auto& ring : in) {
@@ -286,13 +285,11 @@ Polygons Offset(const Polygons& in, double delta, JoinType jt,
     }
   }
   if (delta == 0 || in.empty()) return in;
-  // Resolve the round-join segment count once: a public default (< 3) maps to
-  // the Quality default for radius |delta|, and the result is clamped so a
-  // direct caller cannot blow up the vertex count.
-  int segments = circularSegments >= 3
-                     ? circularSegments
-                     : Quality::GetCircularSegments(std::fabs(delta));
-  segments = std::min(std::max(segments, 3), kMaxRoundJoinSegments);
+  // Resolve the round-join segment count once, clamped so a caller cannot blow
+  // up the vertex count.
+  const int segments =
+      std::min(std::max(quality.SegmentsFor(std::fabs(delta)), 3),
+               kMaxRoundJoinSegments);
   Polygons offsetRings;
   offsetRings.reserve(in.size());
   for (const auto& ring : in) {

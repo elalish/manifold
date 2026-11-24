@@ -104,9 +104,9 @@ class Manifold {
   static Manifold Tetrahedron();
   static Manifold Cube(vec3 size = vec3(1.0), bool center = false);
   static Manifold Cylinder(double height, double radiusLow,
-                           double radiusHigh = -1.0, int circularSegments = 0,
-                           bool center = false);
-  static Manifold Sphere(double radius, int circularSegments = 0);
+                           double radiusHigh = -1.0,
+                           CircularQuality quality = {}, bool center = false);
+  static Manifold Sphere(double radius, CircularQuality quality = {});
   static Manifold LevelSet(std::function<double(vec3)> sdf, Box bounds,
                            double edgeLength, double level = 0,
                            double tolerance = -1, bool canParallel = true);
@@ -122,7 +122,7 @@ class Manifold {
                           int nDivisions = 0, double twistDegrees = 0.0,
                           vec2 scaleTop = vec2(1.0));
   static Manifold Revolve(const Polygons& crossSection,
-                          int circularSegments = 0,
+                          CircularQuality quality = {},
                           double revolveDegrees = 360.0f);
   ///@}
 
