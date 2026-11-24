@@ -275,10 +275,24 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
       out.push_back(startNext);
       continue;
     }
-    // Convex corner: apply join.
-    out.push_back(endPrev);
+    // Convex corner: apply the join. Round and Bevel joins connect endPrev to
+    // startNext, so they need both. A Miter or Square join starts on the
+    // previous offset edge and ends on the next one, and the neighboring
+    // vertices' points lie on those edges too, so endPrev and startNext would
+    // only add collinear points. Keep them only when the join emits no points
+    // (a Square join at an exact reversal).
+    if (jt == JoinType::Round || jt == JoinType::Bevel) {
+      out.push_back(endPrev);
+      AppendJoin(out, V, nPrev, nNext, delta, jt, miterLimit, segments);
+      out.push_back(startNext);
+      continue;
+    }
+    const size_t joinStart = out.size();
     AppendJoin(out, V, nPrev, nNext, delta, jt, miterLimit, segments);
-    out.push_back(startNext);
+    if (out.size() == joinStart) {
+      out.push_back(endPrev);
+      out.push_back(startNext);
+    }
   }
   return out;
 }
@@ -314,9 +328,10 @@ bool CollapsesUnderOffset(const SimplePolygon& contour, double delta) {
 // chord count per 360 degrees of Round join for radius |delta|.
 //
 // Each input contour produces one offset ring, or none if the offset erases
-// it, then all rings are regularized with Positive/Add filling. Collinear
-// vertices are left in place for the caller to `Simplify` if wanted, matching
-// Manifold's tolerance model rather than Clipper2's finishing behaviour.
+// it, then all rings are regularized with Positive/Add filling. Joins add no
+// collinear vertices. Collinear input vertices keep their offset copies,
+// consistent with Manifold's tolerance model, and the caller can remove them
+// with `Simplify`; Clipper2 removes them during the offset.
 Polygons Offset(const Polygons& in, double delta, JoinType jt,
                 double miterLimit, const CircularQuality& quality) {
   // Reject NaN/Inf delta and input coordinates.

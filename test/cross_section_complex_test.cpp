@@ -1839,9 +1839,8 @@ TEST(CrossSectionComplex, OffsetMiterWavyRing) {
       SCOPED_TRACE(delta);
       const auto result = input.Offset(delta, CrossSection::JoinType::Miter);
       ASSERT_EQ(result.NumContour(), 1);
-      // The fill rule trims the crossing offset edges to 512 corners, each
-      // with a miter point and two collinear offset endpoints.
-      EXPECT_EQ(result.NumVert(), 1536);
+      // The fill rule trims the crossing offset edges to 512 corners.
+      EXPECT_EQ(result.NumVert(), 512);
       const double reach = delta > 0 ? 2 * delta : delta;
       EXPECT_GT(result.Area(), kPi * (inner + delta) * (inner + delta));
       EXPECT_LT(result.Area(), kPi * (outer + reach) * (outer + reach));
@@ -1883,10 +1882,8 @@ TEST(CrossSectionComplex, OffsetMiterCleanupChain) {
     // input shape.
     EXPECT_NEAR(result.Area(), input.Area(), 1e-9 * input.Area());
   }
-  // Each convex Miter join also emits two offset endpoints collinear with
-  // the miter point, and the next offset keeps them as collinear input
-  // vertices, so every corner ends with three vertices.
-  EXPECT_EQ(result.NumVert(), side * side * 2 * tips * 3);
+  // Each corner stays one vertex through the whole chain.
+  EXPECT_EQ(result.NumVert(), side * side * 2 * tips);
 }
 
 TEST(CrossSectionComplex, DifferenceManyContoursFewCrossings) {

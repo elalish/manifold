@@ -472,10 +472,8 @@ TEST(CrossSection, MiterOffset) {
 
   EXPECT_EQ(result.Genus(), 0);
   EXPECT_NEAR(result.Volume(), 30. * 30., 0.01);
-  // Offset keeps collinear verts on the miter edges; stripping them is
-  // Simplify's job, so the raw offset has more than 4 verts and Simplify
-  // reduces it to the 4 corners (checked backend-agnostically).
-  EXPECT_GT(offset.NumVert(), 4);
+  // Each corner is one miter point.
+  EXPECT_EQ(offset.NumVert(), 4);
   EXPECT_EQ(offset.Simplify().NumVert(), 4);
 }
 
@@ -492,8 +490,7 @@ TEST(CrossSection, OffsetMiterHexagonVertexCount) {
         hexagon.Offset(delta, CrossSection::JoinType::Miter);
     const double r = inradius + delta;
     EXPECT_NEAR(out.Area(), 6 * r * r * std::tan(kPi / 6), 1e-9);
-    // Outward, each corner gets two offset endpoints and a miter point.
-    EXPECT_EQ(out.NumVert(), delta > 0 ? 18 : 6);
+    EXPECT_EQ(out.NumVert(), 6);
     EXPECT_EQ(out.Simplify().NumVert(), 6);
   }
 }
@@ -507,8 +504,8 @@ TEST(CrossSection, OffsetSquareJoinSquareVertexCount) {
   // 5 * (2 - sqrt(2)) from the 30 x 30 square that Miter joins would give.
   const double leg = 5 * (2 - std::sqrt(2.0));
   EXPECT_NEAR(out.Area(), 30. * 30. - 4 * leg * leg / 2, 1e-9);
-  // Each corner gets two offset endpoints and the flat edge's two ends.
-  EXPECT_EQ(out.NumVert(), 16);
+  // Each corner is the flat edge's two ends.
+  EXPECT_EQ(out.NumVert(), 8);
   EXPECT_EQ(out.Simplify().NumVert(), 8);
 }
 
@@ -521,9 +518,8 @@ TEST(CrossSection, OffsetMiterKeepsCollinearInputVerts) {
   ASSERT_EQ(cs.NumVert(), 8);
   const CrossSection out = cs.Offset(1., CrossSection::JoinType::Miter);
   EXPECT_NEAR(out.Area(), 22. * 22., 1e-9);
-  // Four offset midpoints, plus a miter point and two offset endpoints at
-  // each corner.
-  EXPECT_EQ(out.NumVert(), 16);
+  // Four offset midpoints and four miter points.
+  EXPECT_EQ(out.NumVert(), 8);
   const Polygons polys = out.ToPolygons();
   ASSERT_EQ(polys.size(), 1);
   for (const vec2 mid :
@@ -546,6 +542,7 @@ TEST(CrossSection, OffsetMiterNextToSubEpsEdge) {
       cs.Offset(1.0083379023984145, CrossSection::JoinType::Miter);
   EXPECT_EQ(out.NumContour(), 1);
   EXPECT_NEAR(out.Area(), 30.696439315160, 1e-9);
+  EXPECT_EQ(out.NumVert(), 8);
 }
 
 TEST(CrossSection, OffsetWithHole) {
