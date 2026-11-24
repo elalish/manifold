@@ -834,13 +834,11 @@ Module.setup = function() {
 
   Module.Manifold.hull = function(...args) {
     if (args.length == 1) args = args[0];
+    const manifolds = [];
     const pts = new Module.Vector_vec3();
-    let relPrecision = Infinity;
     for (const m of args) {
       if (m instanceof ManifoldCtor) {
-        Module._manifoldCollectVertices(pts, m);
-        if (!m.isEmpty())
-          relPrecision = Math.min(relPrecision, m.getPrecision());
+        manifolds.push(m);
       } else if (
           m instanceof Array && m.length == 3 && typeof m[0] == 'number') {
         pts.push_back({x: m[0], y: m[1], z: m[2]});
@@ -849,6 +847,20 @@ Module.setup = function() {
       } else {
         pushVec3(pts, m);
       }
+    }
+    if (pts.size() == 0) {
+      // The hull of Manifolds alone uses their smallest precision.
+      const vec = new Module.Vector_manifold();
+      toVec(vec, manifolds);
+      pts.delete();
+      const result = Module._manifoldHull(vec);
+      vec.delete();
+      return result;
+    }
+    let relPrecision = Infinity;
+    for (const m of manifolds) {
+      Module._manifoldCollectVertices(pts, m);
+      if (!m.isEmpty()) relPrecision = Math.min(relPrecision, m.getPrecision());
     }
     const result = Module._manifoldHullPoints(pts);
     pts.delete();

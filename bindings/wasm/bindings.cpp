@@ -237,6 +237,9 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function(
       "_manifoldHullPoints",
       select_overload<Manifold(const std::vector<vec3>&)>(&Manifold::Hull));
+  function(
+      "_manifoldHull",
+      select_overload<Manifold(const std::vector<Manifold>&)>(&Manifold::Hull));
 
   function("_DefaultCircularQuality", &js::DefaultCircularQuality);
   function("_SegmentsFor", &js::SegmentsFor);
