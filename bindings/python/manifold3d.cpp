@@ -758,8 +758,9 @@ NB_MODULE(manifold3d, m) {
   nb::class_<ExecutionContext>(
       m, "ExecutionContext",
       "Reports progress and allows cancellation. Another thread can call "
-      "cancel() while Manifold.status(), refine*(), minkowski_*() or hull(), "
-      "or this class's from_mesh() or level_set(), runs. On Python before "
+      "cancel() while Manifold.status(), with_precision(), get_precision(), "
+      "refine*(), minkowski_*() or hull(), or this class's from_mesh() or "
+      "level_set(), runs. On Python before "
       "3.13.8, join any thread running these calls before the interpreter "
       "exits.")
       .def(nb::init<>())

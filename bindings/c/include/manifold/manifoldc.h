@@ -215,12 +215,13 @@ ManifoldManifold* manifold_as_original(const ManifoldManifold* m, int id);
 int manifold_is_empty(const ManifoldManifold* m);
 ManifoldError manifold_status(const ManifoldManifold* m);
 // Returns a copy of the manifold with the given ExecutionContext attached.
-// Only manifold_status and the eager ops (the manifold_refine* family,
-// manifold_hull, manifold_minkowski_sum and manifold_minkowski_difference)
-// observe it, reporting progress and cancellation through it. Other queries
-// that force evaluation, such as manifold_volume or manifold_get_meshgl, do
-// not. Every other op that returns a manifold ignores the attached ctx and
-// returns a result with no attached ctx. Copies (manifold_copy and the
+// Only manifold_status, manifold_with_precision, manifold_get_precision and
+// the eager ops (the manifold_refine* family, manifold_hull,
+// manifold_minkowski_sum and manifold_minkowski_difference) observe it,
+// reporting progress and cancellation through it. Other queries that force
+// evaluation, such as manifold_volume or manifold_get_meshgl, do not. Every
+// other op that returns a manifold ignores the attached ctx and returns a
+// result with no attached ctx. Copies (manifold_copy and the
 // manifold_manifold_vec get/set/push_back calls) keep the attachment. See
 // Manifold::WithContext in manifold.h and ExecutionContext in common.h for
 // the full model.

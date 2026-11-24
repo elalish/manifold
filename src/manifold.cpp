@@ -142,8 +142,9 @@ Manifold& Manifold::operator=(const Manifold& other) {
 
 /**
  * Returns a copy of this Manifold with the given ExecutionContext attached.
- * The attachment is consumed by the eager ops on the result (Status, the
- * Refine family, Hull, MinkowskiSum / MinkowskiDifference). Every other op
+ * The attachment is consumed by the eager ops on the result (Status,
+ * WithPrecision, GetPrecision, the Refine family, Hull, MinkowskiSum /
+ * MinkowskiDifference). Every other op
  * that returns a Manifold produces a result with no attached ctx. A raw copy
  * preserves the attachment. See ExecutionContext in common.h for the full
  * model.
@@ -354,7 +355,7 @@ Manifold Manifold::WithPrecision(double relPrecision) const {
  * level sets and hulls of points have kDefaultRelativePrecision.
  */
 double Manifold::GetPrecision() const {
-  return GetCsgLeafNode().RelPrecision();
+  return GetCsgLeafNode(AtomicLoadShared(&ctx_).get()).RelPrecision();
 }
 
 /**

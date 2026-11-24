@@ -131,6 +131,10 @@ TEST(Context, ExecutionContextCancelBeforeEval) {
                 .WithPrecision(1e-3)
                 .Status(),
             Manifold::Error::Cancelled);
+  // So does GetPrecision.
+  const Manifold lazy = Manifold::BatchBoolean(items, OpType::Add);
+  lazy.WithContext(ctx).GetPrecision();
+  EXPECT_EQ(lazy.Status(), Manifold::Error::Cancelled);
 }
 
 // Cancel from another thread mid-evaluation. Expensive CSG tree so there's

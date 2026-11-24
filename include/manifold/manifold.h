@@ -151,12 +151,13 @@ class Manifold {
   Error Status() const;
 
   /// Returns a copy of this Manifold with the given ExecutionContext attached.
-  /// The attachment is consumed only by `Status()` (for deferred CSG trees)
-  /// and the eager ops (`Refine` / `RefineToLength` / `RefineToTolerance`,
-  /// `Hull`, `MinkowskiSum` / `MinkowskiDifference`); those snapshot the ctx
-  /// and report progress / observe cancellation through it. Other queries
-  /// that force evaluation (`Volume`, `GetMeshGL`, `BoundingBox`, etc.) do
-  /// not currently observe attached ctx.
+  /// The attachment is consumed only by `Status()`, `WithPrecision()` and
+  /// `GetPrecision()` (for deferred CSG trees) and the eager ops (`Refine` /
+  /// `RefineToLength` / `RefineToTolerance`, `Hull`, `MinkowskiSum` /
+  /// `MinkowskiDifference`); those snapshot the ctx and report progress /
+  /// observe cancellation through it. Other queries that force evaluation
+  /// (`Volume`, `GetMeshGL`, `BoundingBox`, etc.) do not currently observe
+  /// attached ctx.
   ///
   /// Every other op that returns a Manifold ignores any attached ctx and
   /// produces a result with no attached ctx. That includes the deferred ops
@@ -351,10 +352,10 @@ class Manifold {
   // the user's ExecutionContext if a ctx-attached Manifold survives it.
   // Propagates through copy ctor / op= (raw copy preserves the attachment).
   // Manifold-returning ops do *not* propagate it: derived Manifolds get a
-  // null ctx_. Eager ops (Status, Refine family, Hull, Minkowski) snapshot ctx_
-  // to observe their in-call work; the snapshot uses an atomic load, which pins
-  // the Impl across long-running evaluations even if a concurrent op= reseats
-  // ctx_ mid-eval.
+  // null ctx_. Eager ops (Status, WithPrecision, GetPrecision, Refine family,
+  // Hull, Minkowski) snapshot ctx_ to observe their in-call work; the snapshot
+  // uses an atomic load, which pins the Impl across long-running evaluations
+  // even if a concurrent op= reseats ctx_ mid-eval.
   //
   // Accessed only atomically (AtomicLoadShared/AtomicStoreShared): no const
   // method mutates ctx_, but op= and the copy ctor write it on a Manifold that
