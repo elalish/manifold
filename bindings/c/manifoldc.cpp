@@ -874,17 +874,13 @@ ManifoldManifold* manifold_execution_context_level_set_seq(
 }
 
 ManifoldManifold* manifold_execution_context_of_meshgl(
-    ManifoldExecutionContext* ec, const ManifoldMeshGL* mesh,
-    double rel_precision) {
-  return to_c(new Manifold(
-      from_c(ec)->FromMeshGL(*from_c(mesh)).WithPrecision(rel_precision)));
+    ManifoldExecutionContext* ec, const ManifoldMeshGL* mesh) {
+  return to_c(new Manifold(from_c(ec)->FromMeshGL(*from_c(mesh))));
 }
 
 ManifoldManifold* manifold_execution_context_of_meshgl64(
-    ManifoldExecutionContext* ec, const ManifoldMeshGL64* mesh,
-    double rel_precision) {
-  return to_c(new Manifold(
-      from_c(ec)->FromMeshGL(*from_c(mesh)).WithPrecision(rel_precision)));
+    ManifoldExecutionContext* ec, const ManifoldMeshGL64* mesh) {
+  return to_c(new Manifold(from_c(ec)->FromMeshGL(*from_c(mesh))));
 }
 
 ManifoldManifold* manifold_calculate_normals(const ManifoldManifold* m,

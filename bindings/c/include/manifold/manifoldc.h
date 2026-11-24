@@ -284,13 +284,10 @@ ManifoldManifold* manifold_execution_context_level_set(
 ManifoldManifold* manifold_execution_context_level_set_seq(
     ManifoldExecutionContext* ec, ManifoldSdf sdf, const ManifoldBox* bounds,
     double edge_length, double level, double tolerance, void* sdf_context);
-// rel_precision: relative precision of the result; 0 for the default.
 ManifoldManifold* manifold_execution_context_of_meshgl(
-    ManifoldExecutionContext* ec, const ManifoldMeshGL* mesh,
-    double rel_precision);
+    ManifoldExecutionContext* ec, const ManifoldMeshGL* mesh);
 ManifoldManifold* manifold_execution_context_of_meshgl64(
-    ManifoldExecutionContext* ec, const ManifoldMeshGL64* mesh,
-    double rel_precision);
+    ManifoldExecutionContext* ec, const ManifoldMeshGL64* mesh);
 
 // CrossSection Shapes/Constructors
 ManifoldCrossSection* manifold_cross_section_empty(void);
