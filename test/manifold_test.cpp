@@ -2364,6 +2364,10 @@ TEST(Precision, WithPrecisionThenTransform) {
   EXPECT_EQ(moved.GetPrecision(), 1e-3);
   EXPECT_DOUBLE_EQ(moved.GetEpsilon(), 1e-3 * 11);
   EXPECT_EQ(moved.Scale(vec3(2)).GetPrecision(), 1e-3);
+  EXPECT_EQ(moved.Mirror(vec3(0.0)).GetPrecision(), 1e-3);
+  const auto halves = Manifold().WithPrecision(1e-3).SplitByPlane({0, 0, 1}, 0);
+  EXPECT_EQ(halves.first.GetPrecision(), 1e-3);
+  EXPECT_EQ(halves.second.GetPrecision(), 1e-3);
   EXPECT_EQ(cube.GetPrecision(), kDefaultRelativePrecision);
   EXPECT_DOUBLE_EQ(cube.GetEpsilon(), kDefaultRelativePrecision);
 }

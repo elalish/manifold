@@ -582,7 +582,7 @@ Manifold Manifold::Mirror(vec3 normal) const {
     auto leafImpl = GetCsgLeafNode().GetImpl();
     if (leafImpl->status_ != Error::NoError)
       return PropagateStatus(leafImpl->status_);
-    return Manifold();
+    return Manifold().WithPrecision(leafImpl->relPrecision_);
   }
   auto n = la::normalize(normal);
   auto m = mat3x4(mat3(la::identity) - 2.0 * la::outerprod(n, n), vec3());
@@ -992,7 +992,10 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(
     Manifold err = PropagateStatus(leafImpl->status_);
     return {err, err};
   }
-  if (IsEmpty()) return {Manifold(), Manifold()};
+  if (IsEmpty()) {
+    const Manifold empty = Manifold().WithPrecision(GetPrecision());
+    return {empty, empty};
+  }
   return Split(Halfspace(BoundingBox(), normal, originOffset, GetPrecision()));
 }
 
