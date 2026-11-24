@@ -971,7 +971,7 @@ class EarClip {
 template <typename GetTriangulator>
 HalfedgeTriangulation TriangulateIdxHalfedgesImpl(
     const PolygonsIdx& polys, double epsilon, bool allowConvex,
-    GetTriangulator getTriangulator) {
+    GetTriangulator getTriangulator, bool checkCCW) {
   // Contours with fewer than 3 verts have no area.
   const auto isShort = [](const SimplePolygonIdx& poly) {
     return poly.size() < 3;
@@ -981,7 +981,7 @@ HalfedgeTriangulation TriangulateIdxHalfedgesImpl(
     std::remove_copy_if(polys.begin(), polys.end(),
                         std::back_inserter(filtered), isShort);
     return TriangulateIdxHalfedgesImpl(filtered, epsilon, allowConvex,
-                                       getTriangulator);
+                                       getTriangulator, checkCCW);
   }
 
   HalfedgeTriangulation result;
@@ -1000,7 +1000,7 @@ HalfedgeTriangulation TriangulateIdxHalfedgesImpl(
 #ifdef MANIFOLD_DEBUG
     if (ManifoldParams().intermediateChecks) {
       CheckTopology(result);
-      if (!ManifoldParams().processOverlaps) {
+      if (checkCCW && !ManifoldParams().processOverlaps) {
         CheckGeometry(result, polys, 2 * updatedEpsilon);
       }
     }
@@ -1075,15 +1075,17 @@ HalfedgeTriangulation TriangulateIdxHalfedges(const PolygonsIdx& polys,
   std::optional<EarClip<>> triangulator;
   return TriangulateIdxHalfedgesImpl(
       polys, epsilon, allowConvex,
-      [&]() -> EarClip<>& { return triangulator.emplace(); });
+      [&]() -> EarClip<>& { return triangulator.emplace(); },
+      /*checkCCW=*/true);
 }
 
-HalfedgeTriangulation TriangulateIdxHalfedges(
-    const PolygonsIdx& polys, double epsilon, bool allowConvex,
-    PolygonTriangulator& triangulator) {
+HalfedgeTriangulation TriangulateIdxHalfedges(const PolygonsIdx& polys,
+                                              double epsilon, bool allowConvex,
+                                              PolygonTriangulator& triangulator,
+                                              bool checkCCW) {
   return TriangulateIdxHalfedgesImpl(
       polys, epsilon, allowConvex,
-      [&]() -> PolygonTriangulator& { return triangulator; });
+      [&]() -> PolygonTriangulator& { return triangulator; }, checkCCW);
 }
 
 std::vector<ivec3> TriangulateIdx(const PolygonsIdx& polys, double epsilon,

@@ -204,8 +204,10 @@ void Manifold::Impl::Face2Tri(const Vec<int>& faceEdge,
                           faceHalfedge.cbegin() + faceEdge[face + 1],
                           faceEdge[face]),
         faceHalfedge, vertPos_, projection);
+    // Tie decisions can assemble a reversed face loop. Cleanup repairs most of
+    // these, so Boolean3::Result checks orientation after cleanup instead.
     return TriangulateIdxHalfedges(polys, epsilon_, allowConvex,
-                                   triangulators.local());
+                                   triangulators.local(), /*checkCCW=*/false);
   };
 
   auto outputFace = [&](int face, size_t firstTri,

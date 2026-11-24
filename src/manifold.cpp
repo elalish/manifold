@@ -470,7 +470,8 @@ uint32_t Manifold::ReserveIDs(uint32_t n) {
  * match their normal vectors within GetEpsilon().
  */
 bool Manifold::MatchesTriNormals() const {
-  return GetCsgLeafNode().GetImpl()->MatchesTriNormals();
+  const auto impl = GetCsgLeafNode().GetImpl();
+  return impl->MatchesTriNormals(impl->epsilon_, /*checkFlat=*/true);
 }
 
 /**

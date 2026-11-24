@@ -1264,7 +1264,7 @@ TEST(Boolean, SimpleCubeRegression) {
 
 #if defined(MANIFOLD_DEBUG) && defined(MANIFOLD_ASSERT)
 // In a parallel BatchBoolean, the small pair below throws from the
-// triangulation check while the pair of spheres is still being computed. The
+// orientation check while the pair of spheres is still being computed. The
 // spheres' Boolean must finish normally and the exception must reach the
 // caller. The two pairs race, so this repeats.
 TEST(Boolean, BatchBooleanThrowingPair) {
@@ -1869,4 +1869,85 @@ TEST(Boolean, ReversedFaceNearCoincidentCubes) {
   EXPECT_EQ(r.Status(), Manifold::Error::NoError);
   EXPECT_EQ(r.Genus(), 0);
   EXPECT_NEAR(r.Volume(), 27, 1e-5);
+}
+
+// Each result is a unit cube cut from two large slabs, so its epsilon is much
+// smaller than the slabs' tie tolerance. Ties reverse a sliver in one result
+// and leave a zero-area triangle far from its input plane in the other, and
+// both results are still correct.
+TEST(Boolean, SmallResultOfLargeOperands) {
+  struct Slabs {
+    double L, angle, dz;
+    vec2 axis;
+    vec3 rot;
+  };
+  const Slabs cases[] = {
+      {10, -1.5302060700305386e-09, 2.0583456248727546e-11,
+       vec2(-0.051629104578829077, -0.18896875767901877),
+       vec3(40.434154788774144, -31.008382069476838, 87.560911149332583)},
+      {100, -1.5759222574005132e-09, 1.3515367384088895e-11,
+       vec2(0.80409122224676888, -0.51422962661727234),
+       vec3(51.37586185344373, 112.55081549824821, 7.7132140902083313)},
+  };
+  for (const Slabs& c : cases) {
+    const Manifold a = Manifold::Cube({c.L + 0.5, c.L + 0.5, 1})
+                           .Translate({-c.L, -0.5, -0.5})
+                           .Rotate(c.rot.x, c.rot.y, c.rot.z);
+    const Manifold b = Manifold::Cube({c.L + 0.5, c.L + 0.5, 1})
+                           .Translate({-0.5, -c.L, -0.5 + c.dz})
+                           .Rotate(c.angle * c.axis.x, c.angle * c.axis.y, 0)
+                           .Rotate(c.rot.x, c.rot.y, c.rot.z);
+    const Manifold r = a ^ b;
+    EXPECT_EQ(r.Status(), Manifold::Error::NoError);
+    EXPECT_EQ(r.Genus(), 0);
+    EXPECT_NEAR(r.Volume(), 1, 1e-9);
+    EXPECT_NEAR(r.SurfaceArea(), 6, 1e-9);
+  }
+}
+
+// At coarse precision, the union of these near-coincident boxes leaves a fin
+// folded back over its neighbors, about 400 epsilon tall and reversed against
+// its input face. MatchesTriNormals must report it.
+TEST(Boolean, FoldedFinNearCoincidentBoxes) {
+  const std::vector<double> vertA = {
+      -0.6936660034033052,  -1.222891477479243,  -0.27309603709979652,
+      -0.80760569126423831, -0.9276506258286451, 0.73379486185570175,
+      -0.10029503297106053, 1.1161688887336911,  -0.89181021166659935,
+      -0.21423472083199363, 1.4114097403842889,  0.11508068728889892,
+      0.21423472083199363,  -1.4114097403842889, -0.11508068728889892,
+      0.10029503297106053,  -1.1161688887336911, 0.89181021166659935,
+      0.80760569126423831,  0.9276506258286451,  -0.73379486185570175,
+      0.6936660034033052,   1.222891477479243,   0.27309603709979652,
+  };
+  const std::vector<double> vertB = {
+      -0.69727681350214143,  -1.2197970040442989,  -0.27826660323721814,
+      -0.81252411163228044,  -0.92766719894581062, 0.72938260784739872,
+      -0.096978146658575043, 1.119877578365253,    -0.88790919866694606,
+      -0.21222544478871405,  1.4120073834637412,   0.11974001241767088,
+      0.20984321434726813,   -1.4110581232234405,  -0.11906814012778644,
+      0.09459591621712915,   -1.1189283181249523,  0.88858107095683048,
+      0.81014188119083463,   0.92861645918611135,  -0.72871073555751431,
+      0.69489458306069563,   1.2207462642845996,   0.27893847552710255,
+  };
+  const std::vector<uint64_t> tri = {
+      1, 0, 4, 2, 4, 0, 1, 3, 0, 3, 1, 5, 3, 2, 0, 3, 7, 2,
+      5, 4, 6, 5, 1, 4, 6, 4, 2, 7, 6, 2, 7, 3, 5, 7, 5, 6,
+  };
+  struct PrecisionGuard {
+    ~PrecisionGuard() { Quality::ResetToDefaults(); }
+  } guard;
+  ManifoldParamGuard paramGuard;
+  ManifoldParams().intermediateChecks = false;
+  Quality::SetRelativePrecision(1e-3);
+  MeshGL64 ma, mb;
+  ma.numProp = mb.numProp = 3;
+  ma.vertProperties = vertA;
+  mb.vertProperties = vertB;
+  ma.triVerts = mb.triVerts = tri;
+  const Manifold r = Manifold(ma) + Manifold(mb);
+  EXPECT_EQ(r.Status(), Manifold::Error::NoError);
+  // The fold adds surface area: the union is 11.9746 at fine precision. If tie
+  // handling stops producing the fold, this no longer pins anything.
+  const bool folded = r.SurfaceArea() > 12;
+  EXPECT_EQ(r.MatchesTriNormals(), !folded);
 }

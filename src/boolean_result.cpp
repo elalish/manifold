@@ -958,6 +958,16 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   if (ManifoldParams().intermediateChecks) {
     DEBUG_ASSERT(outR.Is2Manifold(), logicErr,
                  "simplified mesh is not 2-manifold!");
+    // Ties are decided in the operands' tolerance, which can be much larger
+    // than the result's epsilon. They can also leave zero-area triangles far
+    // from their input planes, so this checks orientation only.
+    if (!ManifoldParams().processOverlaps) {
+      DEBUG_ASSERT(
+          outR.MatchesTriNormals(
+              std::max(outR.epsilon_, std::min(inP_.epsilon_, inQ_.epsilon_)),
+              /*checkFlat=*/false),
+          geometryErr, "triangles do not match their input normals!");
+    }
   }
   if (ManifoldParams().verifyNoDegenerates) {
     DEBUG_ASSERT(outR.NumDegenerateTris() == 0, logicErr,
