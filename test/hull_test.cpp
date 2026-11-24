@@ -292,7 +292,7 @@ TEST(Hull, CoarseDeterministic) {
   } guard;
   for (const double precision : {1e-3, 1e-2}) {
     Quality::SetRelativePrecision(precision);
-    const MeshGL64 s = Manifold::Sphere(0.02, 96).GetMeshGL64();
+    const MeshGL64 s = Manifold::Sphere(0.02, {96}).GetMeshGL64();
     std::vector<vec3> pts;
     for (const vec3 v : {vec3(0, 0, 0), vec3(1, 0, 0), vec3(0, 1, 0)})
       for (size_t j = 0; j < s.NumVert(); ++j)

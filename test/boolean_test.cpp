@@ -663,7 +663,7 @@ TEST(Boolean, SmoothExtrusionCrossing) {
 // Their caps are convex, so the triangulator's convex path splits them.
 TEST(Boolean, ConvexExtrusionCrossing) {
   const Manifold slab =
-      Manifold::Cylinder(2, 10, 10, 20000).Translate({0, 0, -1});
+      Manifold::Cylinder(2, 10, 10, {20000}).Translate({0, 0, -1});
   const Manifold crossed = slab.Rotate(90, 0, 0);
   const Manifold result = slab ^ crossed;
 
