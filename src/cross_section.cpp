@@ -628,7 +628,7 @@ CrossSection CrossSection::Simplify(double tolerance) const {
   // clipper2, the result is NOT re-regularized - a coarse tolerance can
   // self-intersect a ring, so healing is left to a later boolean. Tolerance 0
   // decimates at the cross-section's own tolerance, matching Manifold.
-  tolerance = std::max(tolerance, InferEps(GetPaths()->paths_, {}));
+  tolerance = std::max(InferEps(GetPaths()->paths_, {}), tolerance);
   const Polygons& paths = GetPaths()->paths_;
   Polygons out;
   out.reserve(paths.size());
