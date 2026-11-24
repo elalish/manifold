@@ -60,8 +60,6 @@ ManifoldMeshGL* manifold_meshgl_w_options(const float* vert_props,
                                           size_t n_tris,
                                           const ManifoldMeshGLOptions* options);
 ManifoldMeshGL* manifold_get_meshgl(const ManifoldManifold* m);
-ManifoldMeshGL* manifold_get_meshgl_w_normals(const ManifoldManifold* m,
-                                              int32_t normalIdx);
 ManifoldMeshGL* manifold_meshgl_copy(const ManifoldMeshGL* m);
 ManifoldMeshGL* manifold_meshgl_merge(const ManifoldMeshGL* m, float tolerance);
 
@@ -79,8 +77,6 @@ ManifoldMeshGL64* manifold_meshgl64_w_options(
     const uint64_t* tri_verts, size_t n_tris,
     const ManifoldMeshGL64Options* options);
 ManifoldMeshGL64* manifold_get_meshgl64(const ManifoldManifold* m);
-ManifoldMeshGL64* manifold_get_meshgl64_w_normals(const ManifoldManifold* m,
-                                                  int32_t normalIdx);
 ManifoldMeshGL64* manifold_meshgl64_copy(const ManifoldMeshGL64* m);
 ManifoldMeshGL64* manifold_meshgl64_merge(const ManifoldMeshGL64* m,
                                           double tolerance);
@@ -168,8 +164,7 @@ ManifoldManifold* manifold_warp(const ManifoldManifold* m,
                                 ManifoldVec3 (*fun)(double, double, double,
                                                     void*),
                                 void* ctx);
-ManifoldManifold* manifold_smooth_by_normals(const ManifoldManifold* m,
-                                             int normalIdx);
+ManifoldManifold* manifold_smooth_by_normals(const ManifoldManifold* m);
 ManifoldManifold* manifold_refine(const ManifoldManifold* m, int refine);
 ManifoldManifold* manifold_refine_to_length(const ManifoldManifold* m,
                                             double length);
@@ -196,7 +191,6 @@ ManifoldManifold* manifold_extrude(const ManifoldPolygons* cs, double height,
 ManifoldManifold* manifold_revolve(const ManifoldPolygons* cs,
                                    int circular_segments,
                                    double revolve_degrees);
-ManifoldManifold* manifold_compose(const ManifoldManifoldVec* ms);
 ManifoldManifoldVec* manifold_decompose(const ManifoldManifold* m);
 
 // id: the original ID to assign; pass a negative value (e.g. -1) for a new one.
@@ -237,7 +231,6 @@ ManifoldManifold* manifold_calculate_curvature(const ManifoldManifold* m,
 double manifold_min_gap(const ManifoldManifold* m,
                         const ManifoldManifold* other, double searchLength);
 ManifoldManifold* manifold_calculate_normals(const ManifoldManifold* m,
-                                             int normal_idx,
                                              double min_sharp_angle);
 
 // Ray Casting
@@ -432,6 +425,8 @@ void manifold_set_relative_precision(double precision);
 double manifold_get_relative_precision();
 void manifold_set_min_circular_angle(double degrees);
 void manifold_set_min_circular_edge_length(double length);
+double manifold_get_min_circular_angle();
+double manifold_get_min_circular_edge_length();
 void manifold_set_circular_segments(int number);
 void manifold_reset_to_circular_defaults();
 

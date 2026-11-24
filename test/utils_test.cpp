@@ -26,6 +26,70 @@
 
 using namespace manifold;
 
+TEST(Utils, ColliderLeafCounts) {
+  for (const int count : {0, 1, 2}) {
+    SCOPED_TRACE(count);
+    Vec<Box> boxes(count);
+    Vec<uint32_t> morton(count);
+    for (int i = 0; i < count; ++i) {
+      boxes[i] = Box(vec3(3 * i), vec3(3 * i + 1));
+      morton[i] = i;
+    }
+    Collider collider(boxes, morton);
+    for (const int phase : {0, 1, 2}) {
+      SCOPED_TRACE(phase);
+      if (phase != 0) {
+        for (Box& box : boxes) {
+          box.min += vec3(10.0);
+          box.max += vec3(10.0);
+        }
+        if (phase == 1) {
+          collider.UpdateBoxes(boxes);
+        } else {
+          mat3x4 transform = la::identity;
+          transform[3] = vec3(10.0);
+          collider.Transform(transform);
+        }
+      }
+      Box expectedBounds;
+      for (const Box& box : boxes) expectedBounds = expectedBounds.Union(box);
+      EXPECT_EQ(collider.GetBoundingBox().min, expectedBounds.min);
+      EXPECT_EQ(collider.GetBoundingBox().max, expectedBounds.max);
+
+      const vec3 center(10 * phase + 0.5);
+      const std::vector<Box> queries = {Box(center, center),
+                                        Box(vec3(-1.0), vec3(30.0)), Box()};
+      for (const bool selfCollision : {false, true}) {
+        std::vector<std::pair<int, int>> expected, actual;
+        for (int query = 0; query < 3; ++query)
+          for (int leaf = 0; leaf < count; ++leaf)
+            if ((!selfCollision || query != leaf) &&
+                boxes[leaf].DoesOverlap(queries[query]))
+              expected.emplace_back(query, leaf);
+        auto record = [&](int query, int leaf) {
+          actual.emplace_back(query, leaf);
+        };
+        auto recorder = MakeSimpleRecorder(record);
+        auto query = [&](int i) { return queries[i]; };
+        if (selfCollision)
+          collider.Collisions<true>(recorder, query, 3, false);
+        else
+          collider.Collisions(recorder, query, 3, false);
+        std::sort(actual.begin(), actual.end());
+        EXPECT_EQ(actual, expected);
+      }
+      // Point queries use XY overlap even when their Z is outside the box.
+      std::vector<int> hits;
+      auto record = [&](int, int leaf) { hits.push_back(leaf); };
+      auto recorder = MakeSimpleRecorder(record);
+      collider.Collisions(
+          recorder, [&](int) { return vec3(center.x, center.y, 1000); }, 1,
+          false);
+      EXPECT_EQ(hits, count == 0 ? std::vector<int>{} : std::vector<int>{0});
+    }
+  }
+}
+
 TEST(Utils, TwoDTreeSkipsDisabledPoints) {
   const std::vector<Rect> queries = {
       Rect(vec2(-10.0), vec2(10.0)),   Rect(vec2(-3, -4), vec2(4, 5)),

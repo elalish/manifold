@@ -19,6 +19,19 @@ TEST(CBIND, version) {
   EXPECT_EQ(version[2], MANIFOLD_VERSION_PATCH);
 }
 
+TEST(CBIND, circular_constraints_restore) {
+  const double angle = manifold_get_min_circular_angle();
+  const double length = manifold_get_min_circular_edge_length();
+  manifold_set_min_circular_angle(22.5);
+  manifold_set_min_circular_edge_length(0.125);
+  EXPECT_DOUBLE_EQ(manifold_get_min_circular_angle(), 22.5);
+  EXPECT_DOUBLE_EQ(manifold_get_min_circular_edge_length(), 0.125);
+  manifold_set_min_circular_angle(angle);
+  manifold_set_min_circular_edge_length(length);
+  EXPECT_DOUBLE_EQ(manifold_get_min_circular_angle(), angle);
+  EXPECT_DOUBLE_EQ(manifold_get_min_circular_edge_length(), length);
+}
+
 TEST(CBIND, meshgl_no_props) {
   const float vertProps[] = {0, 0, 0};
   ManifoldMeshGL* mesh = manifold_meshgl(vertProps, 1, 0, NULL, 0);
@@ -390,13 +403,13 @@ TEST(CBIND, extrude) {
   manifold_delete_polygons(polys);
 }
 
-TEST(CBIND, compose_decompose) {
+TEST(CBIND, batch_boolean_decompose) {
   ManifoldManifold* s1 = manifold_sphere(1.0, 100);
   ManifoldManifold* s2 = manifold_translate(s1, 2., 2., 2.);
   ManifoldManifoldVec* ss = manifold_manifold_vec(2);
   manifold_manifold_vec_set(ss, 0, s1);
   manifold_manifold_vec_set(ss, 1, s2);
-  ManifoldManifold* composed = manifold_compose(ss);
+  ManifoldManifold* composed = manifold_batch_boolean(ss, MANIFOLD_ADD);
 
   ManifoldManifoldVec* decomposed = manifold_decompose(composed);
 
@@ -549,6 +562,17 @@ TEST(CBIND, ray_cast) {
   EXPECT_EQ(manifold_ray_hit_vec_length(miss), 0);
   manifold_delete_ray_hit_vec(miss);
 
+  ManifoldManifold* orig = manifold_as_original(cube, -1);
+  ManifoldRayHitVec* origHits =
+      manifold_ray_cast(orig, 0.0, 0.0, -5.0, 0.0, 0.0, 5.0);
+  ASSERT_EQ(manifold_ray_hit_vec_length(origHits), 2);
+  ManifoldRayHit h2 = manifold_ray_hit_vec_get(origHits, 0);
+  EXPECT_EQ(h2.original_id, (uint32_t)manifold_original_id(orig));
+  EXPECT_GT(h2.original_id, 0u);
+  EXPECT_EQ(h2.face_id, 0u);
+  manifold_delete_ray_hit_vec(origHits);
+  manifold_delete_manifold(orig);
+
   manifold_delete_manifold(cube);
 }
 
@@ -625,7 +649,7 @@ TEST(CBIND, run_flag_accessors) {
   ManifoldManifold* oldSphere = manifold_sphere(1.0, 32);
   ManifoldManifold* sphere = manifold_as_original(oldSphere, -1);
   ManifoldManifold* cut = manifold_difference(cube, sphere);
-  ManifoldManifold* with_normals = manifold_calculate_normals(cut, 0, 60.0);
+  ManifoldManifold* with_normals = manifold_calculate_normals(cut, 60.0);
   ManifoldMeshGL* mesh = manifold_get_meshgl(with_normals);
 
   const size_t runs = manifold_meshgl_num_run(mesh);

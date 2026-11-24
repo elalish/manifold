@@ -115,14 +115,16 @@ Manifold Manifold::Tetrahedron() {
 
 /**
  * Constructs a unit cube (edge lengths all one), by default in the first
- * octant, touching the origin. If any dimensions in size are negative, or if
- * all are zero, an empty Manifold will be returned.
+ * octant, touching the origin. If any dimensions in size are negative or
+ * non-finite, or if all are zero, an empty Manifold with InvalidConstruction
+ * status will be returned.
  *
  * @param size The X, Y, and Z dimensions of the box.
  * @param center Set to true to shift the center to the origin.
  */
 Manifold Manifold::Cube(vec3 size, bool center) {
-  if (size.x < 0.0 || size.y < 0.0 || size.z < 0.0 || la::length(size) == 0.) {
+  if (!la::all(la::isfinite(size)) || size.x < 0.0 || size.y < 0.0 ||
+      size.z < 0.0 || la::length(size) == 0.) {
     return Invalid();
   }
   mat3x4 m({{size.x, 0.0, 0.0}, {0.0, size.y, 0.0}, {0.0, 0.0, size.z}},
@@ -134,11 +136,15 @@ Manifold Manifold::Cube(vec3 size, bool center) {
  * A convenience constructor for the common case of extruding a circle. Can also
  * form cones if both radii are specified.
  *
- * @param height Z-extent
- * @param radiusLow Radius of bottom circle. Must be non-negative. If zero,
- * radiusHigh must be positive and a cone with apex at the bottom is created.
- * @param radiusHigh Radius of top circle. Can equal zero. Default is equal to
- * radiusLow.
+ * Non-finite dimensions return an empty Manifold with InvalidConstruction
+ * status.
+ *
+ * @param height Z-extent. Must be positive and finite.
+ * @param radiusLow Radius of bottom circle. Must be non-negative and finite. If
+ * zero, radiusHigh must be positive and a cone with apex at the bottom is
+ * created.
+ * @param radiusHigh Radius of top circle. Must be finite and can equal zero.
+ * Negative values, including the default, use radiusLow.
  * @param circularSegments How many line segments to use around the circle.
  * Default is calculated by the static Defaults.
  * @param center Set to true to shift the center to the origin. Default is
@@ -146,7 +152,8 @@ Manifold Manifold::Cube(vec3 size, bool center) {
  */
 Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
                             int circularSegments, bool center) {
-  if (height <= 0.0 || radiusLow < 0.0) {
+  if (!std::isfinite(height) || !std::isfinite(radiusLow) ||
+      !std::isfinite(radiusHigh) || height <= 0.0 || radiusLow < 0.0) {
     return Invalid();
   }
   const bool flip = radiusLow == 0.0;
@@ -175,7 +182,8 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
 /**
  * Constructs a geodesic sphere of a given radius.
  *
- * @param radius Radius of the sphere. Must be positive.
+ * @param radius Radius of the sphere. Must be positive and finite; otherwise
+ * returns an empty Manifold with InvalidConstruction status.
  * @param circularSegments Number of segments along its
  * diameter. This number will always be rounded up to the nearest factor of
  * four, as this sphere is constructed by refining an octahedron. This means
@@ -183,7 +191,7 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
  * calculated by the static Defaults.
  */
 Manifold Manifold::Sphere(double radius, int circularSegments) {
-  if (radius <= 0.0) {
+  if (radius <= 0.0 || !std::isfinite(radius)) {
     return Invalid();
   }
   int n = circularSegments > 0 ? (circularSegments + 3) / 4
@@ -280,6 +288,11 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
   double radius = 0;
   for (const SimplePolygon& poly : crossSection) {
     if (poly.size() < 3) continue;
+    // Check before clipping so invalid coordinates cannot be discarded
+    // silently.
+    for (const vec2& v : poly) {
+      if (!la::all(la::isfinite(v))) return Invalid();
+    }
     size_t i = 0;
     while (i < poly.size() && poly[i].x < 0) {
       ++i;
@@ -416,24 +429,10 @@ Manifold Manifold::Revolve(const Polygons& crossSection, int circularSegments,
 }
 
 /**
- * Deprecated: Use BatchBoolean with OpType::Add instead.
- *
- * Constructs a new manifold from a vector of other manifolds. This is a purely
- * topological operation, so care should be taken to avoid creating
- * overlapping results. It is the inverse operation of Decompose().
- *
- * @param manifolds A vector of Manifolds to lazy-union together.
- */
-Manifold Manifold::Compose(const std::vector<Manifold>& manifolds) {
-  return BatchBoolean(manifolds, OpType::Add);
-}
-
-/**
  * This operation returns a vector of topologically disconnected Manifolds,
  * keeping enclosed negative-volume shells with their enclosing
  * positive-volume shell. If everything is connected, the vector is length
- * one, containing a copy of the original. It is the inverse operation of
- * Compose().
+ * one, containing a copy of the original.
  */
 std::vector<Manifold> Manifold::Decompose() const {
   ZoneScoped;
@@ -451,41 +450,38 @@ std::vector<Manifold> Manifold::Decompose() const {
   const int numComponents = uf.connectedComponents(componentIndices);
 
   if (numComponents == 1) {
-    std::vector<Manifold> meshes(1);
-    meshes[0] = *this;
-    return meshes;
+    return {Manifold(LoadPNode())};
   }
-  Vec<int> vertLabel(componentIndices);
-
+  const auto& vertLabel = componentIndices;
   const int numVert = NumVert();
+  const size_t numTri = pImpl_->NumTri();
+  std::vector<Vec<int>> componentVerts(numComponents);
+  std::vector<Vec<int>> componentFaces(numComponents);
+  for (int v = 0; v < numVert; ++v) {
+    componentVerts[componentIndices[v]].push_back(v);
+  }
+  const auto& halfedge = pImpl_->halfedge_;
+  for (size_t face = 0; face < numTri; ++face) {
+    const int v = halfedge.Start(static_cast<int>(3 * face));
+    componentFaces[componentIndices[v]].push_back(static_cast<int>(face));
+  }
   std::vector<std::shared_ptr<Impl>> components;
   std::vector<int> componentLabels;
+  components.reserve(numComponents);
+  componentLabels.reserve(numComponents);
   for (int i = 0; i < numComponents; ++i) {
-    auto impl = std::make_shared<Impl>();
+    const Vec<int>& vertNew2Old = componentVerts[i];
+    const Vec<int>& faceNew2Old = componentFaces[i];
+    if (faceNew2Old.empty()) continue;
 
-    Vec<int> vertNew2Old(numVert);
-    const int nVert =
-        copy_if(countAt(0), countAt(numVert), vertNew2Old.begin(),
-                [i, &vertLabel](int v) { return vertLabel[v] == i; }) -
-        vertNew2Old.begin();
+    auto impl = std::make_shared<Impl>();
+    const int nVert = vertNew2Old.size();
     impl->vertPos_.resize(nVert);
     impl->vertNormal_.resize(nVert);
-    vertNew2Old.resize(nVert);
     gather(vertNew2Old.begin(), vertNew2Old.end(), pImpl_->vertPos_.begin(),
            impl->vertPos_.begin());
     gather(vertNew2Old.begin(), vertNew2Old.end(), pImpl_->vertNormal_.begin(),
            impl->vertNormal_.begin());
-
-    Vec<int> faceNew2Old;
-    faceNew2Old.reserve(NumTri());
-    const auto& halfedge = pImpl_->halfedge_;
-    for (size_t face = 0; face < NumTri(); ++face) {
-      if (vertLabel[halfedge.Start(static_cast<int>(3 * face))] == i) {
-        faceNew2Old.push_back(static_cast<int>(face));
-      }
-    }
-
-    if (faceNew2Old.empty()) continue;
 
     impl->GatherFaces(*pImpl_, faceNew2Old);
     impl->ReindexVerts(vertNew2Old, pImpl_->NumVert());
