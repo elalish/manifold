@@ -1997,6 +1997,14 @@ TEST(Manifold, SimplifyNaNTolerance) {
   EXPECT_EQ(simplified.NumTri(), torus.Simplify().NumTri());
 }
 
+TEST(Manifold, SimplifyToEmpty) {
+  const Manifold cube = Manifold::Cube();
+  const Manifold gone = cube.Translate({100, 0, 0}).Simplify(1e9);
+  EXPECT_TRUE(gone.IsEmpty());
+  EXPECT_FALSE(gone.BoundingBox().IsFinite());
+  EXPECT_EQ((gone + cube).GetEpsilon(), cube.GetEpsilon());
+}
+
 TEST(Manifold, MeshID) {
   const Manifold cube = Manifold::Cube();
   MeshGL cubeGL = cube.GetMeshGL();
