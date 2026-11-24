@@ -695,14 +695,6 @@ struct CircularQuality {
   int SegmentsFor(double radius) const;
   static CircularQuality ForDivisions(int divisions, double degrees);
 };
-
-/**
- * @brief Global parameters for geometric computations.
- */
-class Quality {
- public:
-  static void ResetToDefaults();
-};
 /** @} */
 
 /** @addtogroup Debug
