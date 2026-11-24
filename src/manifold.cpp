@@ -324,7 +324,8 @@ Box Manifold::BoundingBox() const { return GetCsgLeafNode().GetImpl()->bBox_; }
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
 double Manifold::GetEpsilon() const {
-  return GetCsgLeafNode().GetImpl()->epsilon_;
+  const auto impl = GetCsgLeafNode().GetImpl();
+  return impl->IsEmpty() ? -1 : impl->epsilon_;
 }
 
 /**

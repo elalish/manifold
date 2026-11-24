@@ -867,7 +867,8 @@ bool WriteOBJ(std::ostream& stream, const MeshGL64& mesh) {
  */
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
   MeshGL64 mesh = GetMeshGLImpl<double, uint64_t>(impl);
-  return WriteOBJWithEpsilon(stream, mesh, {impl.epsilon_});
+  return WriteOBJWithEpsilon(stream, mesh,
+                             {impl.IsEmpty() ? -1 : impl.epsilon_});
 }
 
 /**

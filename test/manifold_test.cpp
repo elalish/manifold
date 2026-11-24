@@ -2354,6 +2354,31 @@ TEST(Precision, WithPrecisionOnError) {
   EXPECT_EQ(invalid.GetPrecision(), kDefaultRelativePrecision);
 }
 
+TEST(Precision, EmptyEpsilon) {
+  const Manifold empty;
+  const Manifold coarseEmpty = empty.WithPrecision(1e-3);
+  EXPECT_EQ(empty.GetEpsilon(), -1);
+  EXPECT_EQ(coarseEmpty.GetEpsilon(), -1);
+  EXPECT_EQ(coarseEmpty.GetPrecision(), 1e-3);
+  EXPECT_EQ(empty.Translate({1, 0, 0}).GetEpsilon(), -1);
+  EXPECT_EQ(coarseEmpty.Translate({1, 0, 0}).GetEpsilon(), -1);
+  EXPECT_EQ(Manifold::BatchBoolean({empty, coarseEmpty, empty}, OpType::Add)
+                .GetEpsilon(),
+            -1);
+  const Manifold cube = Manifold::Cube();
+  EXPECT_EQ((cube - cube).GetEpsilon(), -1);
+  EXPECT_EQ((cube ^ cube.Translate({5, 0, 0})).GetEpsilon(), -1);
+  EXPECT_EQ(cube.Simplify(1e9).GetEpsilon(), -1);
+#ifndef MANIFOLD_NO_IOSTREAM
+  for (const Manifold& m :
+       {coarseEmpty.Translate({1, 0, 0}), cube.Simplify(1e9)}) {
+    std::stringstream obj;
+    m.WriteOBJ(obj);
+    EXPECT_NE(obj.str().find("# epsilon = -1"), std::string::npos);
+  }
+#endif
+}
+
 TEST(Precision, EmptyBooleanTakesMin) {
   const Manifold fine(Manifold::Cube().GetMeshGL64());
   const Manifold cube = Manifold::Cube();

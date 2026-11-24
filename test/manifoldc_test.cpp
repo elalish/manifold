@@ -857,6 +857,13 @@ TEST(CBIND, precision) {
     manifold_delete_manifold(reset);
   }
 
+  ManifoldManifold* empty = manifold_empty();
+  ManifoldManifold* coarseEmpty = manifold_with_precision(empty, 1e-3);
+  EXPECT_EQ(manifold_epsilon(empty), -1);
+  EXPECT_EQ(manifold_epsilon(coarseEmpty), -1);
+
+  manifold_delete_manifold(coarseEmpty);
+  manifold_delete_manifold(empty);
   manifold_delete_manifold(fine);
   manifold_delete_manifold(stamped);
   manifold_delete_manifold(ingested64);
