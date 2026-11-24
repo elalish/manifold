@@ -227,8 +227,8 @@ const std::string manifold__rotate__degrees =
 NB_MODULE(manifold3d, m) {
   m.doc() = "Python binding for the Manifold library.";
 
-  // The finest relative precision. Wherever a rel_precision is passed, 0,
-  // negative values, NaN and infinity give the default for that input.
+  // The finest relative precision, and the precision of a Manifold made from a
+  // Mesh64.
   m.attr("MIN_RELATIVE_PRECISION") = kMinRelativePrecision;
 
   nb::class_<CircularQuality>(m, "CircularQuality")
@@ -256,12 +256,10 @@ NB_MODULE(manifold3d, m) {
 
   nb::class_<Manifold>(m, "Manifold")
       .def(nb::init<>(), manifold__manifold)
-      .def(nb::init<const MeshGL&, double>(), nb::arg("mesh"),
-           nb::arg("rel_precision") = kDefaultRelativePrecision,
-           manifold__manifold__mesh_gl__rel_precision)
-      .def(nb::init<const MeshGL64&, double>(), nb::arg("mesh"),
-           nb::arg("rel_precision") = kMinRelativePrecision,
-           manifold__manifold__mesh_gl64__rel_precision)
+      .def(nb::init<const MeshGL&>(), nb::arg("mesh"),
+           manifold__manifold__mesh_gl)
+      .def(nb::init<const MeshGL64&>(), nb::arg("mesh"),
+           manifold__manifold__mesh_gl64)
       .def(nb::self + nb::self, manifold__operator_plus__q)
       .def(nb::self - nb::self, manifold__operator_minus__q)
       .def(nb::self ^ nb::self, manifold__operator_xor__q)

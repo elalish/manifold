@@ -90,14 +90,14 @@ double ExecutionContext::Progress() const {
 
 Manifold ExecutionContext::FromMeshGL(const MeshGL& mesh) {
   ResetForStaticFactory(impl_.get(), kPhasesPerFromMesh);
-  return Manifold::FromImpl(std::make_shared<Manifold::Impl>(
-      mesh, kDefaultRelativePrecision, impl_.get()));
+  return Manifold::FromImpl(
+      std::make_shared<Manifold::Impl>(mesh, impl_.get()));
 }
 
 Manifold ExecutionContext::FromMeshGL(const MeshGL64& mesh) {
   ResetForStaticFactory(impl_.get(), kPhasesPerFromMesh);
-  return Manifold::FromImpl(std::make_shared<Manifold::Impl>(
-      mesh, kMinRelativePrecision, impl_.get()));
+  return Manifold::FromImpl(
+      std::make_shared<Manifold::Impl>(mesh, impl_.get()));
 }
 
 Manifold ExecutionContext::LevelSet(std::function<double(vec3)> sdf, Box bounds,

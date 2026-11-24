@@ -125,30 +125,30 @@ suite('Manifold Bindings', () => {
     expect(new Manifold(merged).volume()).toBeCloseTo(1);
   });
 
-  test('precision is set at ingest and by withPrecision', () => {
-    const {Manifold} = manifoldModule;
+  test('precision is the mesh default and set by withPrecision', () => {
+    const {Manifold, MIN_RELATIVE_PRECISION} = manifoldModule;
     const mesh = Manifold.sphere(1, 64).getMesh();
     expect(Manifold.ofMesh(mesh).getPrecision()).toEqual(2 ** -23);
     expect(new Manifold(mesh).getPrecision()).toEqual(2 ** -23);
+    expect(new manifoldModule.ExecutionContext().fromMesh(mesh).getPrecision())
+        .toEqual(2 ** -23);
     expect(Manifold.cube().getPrecision()).toEqual(2 ** -23);
     // 0, negative values, NaN and infinity give the default.
     for (const unset of [0, -1, NaN, Infinity]) {
-      expect(Manifold.ofMesh(mesh, unset).getPrecision()).toEqual(2 ** -23);
       expect(Manifold.cube()
                  .withPrecision(1e-3)
                  .withPrecision(unset)
                  .getPrecision())
           .toEqual(2 ** -23);
     }
-    const {MIN_RELATIVE_PRECISION} = manifoldModule;
     expect(MIN_RELATIVE_PRECISION).toEqual(1e-12);
-    expect(Manifold.ofMesh(mesh, MIN_RELATIVE_PRECISION).getPrecision())
+    expect(Manifold.cube().withPrecision(MIN_RELATIVE_PRECISION).getPrecision())
         .toEqual(1e-12);
-    expect(Manifold.ofMesh(mesh, 1e-15).getPrecision()).toEqual(1e-12);
-    expect(Manifold.cube().withPrecision(1e-12).getPrecision()).toEqual(1e-12);
-    const coarse = Manifold.ofMesh(mesh, 1e-3);
+    expect(Manifold.cube().withPrecision(1e-15).getPrecision()).toEqual(1e-12);
+    const coarse = new Manifold(mesh).withPrecision(1e-3);
     expect(coarse.getPrecision()).toEqual(1e-3);
-    expect(new Manifold(mesh, 1e-3).getPrecision()).toEqual(1e-3);
+    // The mesh does not store the precision.
+    expect(new Manifold(coarse.getMesh()).getPrecision()).toEqual(2 ** -23);
     const stamped = Manifold.cube().withPrecision(1e-2);
     expect(stamped.getPrecision()).toEqual(1e-2);
     expect(coarse.add(stamped).getPrecision()).toEqual(1e-3);

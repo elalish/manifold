@@ -196,16 +196,13 @@ CsgLeafNode& Manifold::GetCsgLeafNode(ExecutionContext::Impl* ctx) const {
  * unique originalID for each material, and sort the materials into triangle
  * runs.
  *
+ * The result has relative precision kDefaultRelativePrecision. Precision is
+ * not stored in the mesh, so use WithPrecision() to change it after ingest.
+ *
  * @param meshGL The input MeshGL.
- * @param relPrecision The relative precision of the result, which defines what
- * counts as coplanar or degenerate in this and later operations. The default
- * is kDefaultRelativePrecision (float epsilon). 0, negative values, NaN and
- * infinity give the default. Positive values below kMinRelativePrecision are
- * raised to it, so pass kMinRelativePrecision for the finest.
  */
-Manifold::Manifold(const MeshGL& meshGL, double relPrecision)
-    : pNode_(std::make_shared<CsgLeafNode>(
-          std::make_shared<Impl>(meshGL, relPrecision))) {}
+Manifold::Manifold(const MeshGL& meshGL)
+    : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(meshGL))) {}
 
 /**
  * Convert a MeshGL into a Manifold, retaining its properties and merging only
@@ -218,15 +215,13 @@ Manifold::Manifold(const MeshGL& meshGL, double relPrecision)
  * unique originalID for each material, and sort the materials into triangle
  * runs.
  *
+ * The result has relative precision kMinRelativePrecision. Precision is not
+ * stored in the mesh, so use WithPrecision() to change it after ingest.
+ *
  * @param meshGL64 The input MeshGL64.
- * @param relPrecision The relative precision of the result, which defines what
- * counts as coplanar or degenerate in this and later operations. The default
- * is kMinRelativePrecision, the finest. 0, negative values, NaN and infinity
- * give the default, and positive values below it are raised to it.
  */
-Manifold::Manifold(const MeshGL64& meshGL64, double relPrecision)
-    : pNode_(std::make_shared<CsgLeafNode>(
-          std::make_shared<Impl>(meshGL64, relPrecision))) {}
+Manifold::Manifold(const MeshGL64& meshGL64)
+    : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(meshGL64))) {}
 
 /**
  * Returns a MeshGL that is designed

@@ -1629,7 +1629,8 @@ TEST(BooleanComplex, FloatPrecisionNearlyCoincidentBoxes) {
   a.triVerts = triA;
   b.vertProperties = vertB;
   b.triVerts = triB;
-  Manifold result = Manifold(a, kFloatPrecision) + Manifold(b, kFloatPrecision);
+  Manifold result = Manifold(a).WithPrecision(kFloatPrecision) +
+                    Manifold(b).WithPrecision(kFloatPrecision);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   EXPECT_EQ(result.NumDegenerateTris(), 0);
 }
@@ -1794,7 +1795,8 @@ TEST(BooleanComplex, CoincidentFaceDifferenceSurface) {
        2.4027834289042338,  0.50569026291683494, 1.1891332707636593,    //
        2.3880760387842037,  2.7161521418878753,  -0.22707884361013209,  //
        2.1715648359131081,  2.1444904665265327,  1.6592428315805863});
-  const Manifold result = Manifold(a, 1e-3) - Manifold(b, 1e-3);
+  const Manifold result =
+      Manifold(a).WithPrecision(1e-3) - Manifold(b).WithPrecision(1e-3);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   EXPECT_LE(MaxDistToInputs(result, {a, b}), result.GetEpsilon());
 }
@@ -1822,7 +1824,8 @@ TEST(BooleanComplex, NearCopyBoxUnionSurface) {
        -0.99765371410082826, 0.21422057716622439,  1.0359139424885799});
   for (double precision :
        {1e-7, double(std::numeric_limits<float>::epsilon())}) {
-    const Manifold result = Manifold(a, precision) + Manifold(b, precision);
+    const Manifold result = Manifold(a).WithPrecision(precision) +
+                            Manifold(b).WithPrecision(precision);
     EXPECT_EQ(result.Status(), Manifold::Error::NoError);
     EXPECT_LE(MaxDistToInputs(result, {a, b}), result.GetEpsilon());
   }
@@ -1865,7 +1868,8 @@ TEST(BooleanComplex, SecondSwapPassStaysNearFlat) {
        -0.2724441964951716,  -2.0312218105997148,  -0.5682174444474275,   //
        1.7376247462542911,   -2.0889965529708121,  0.22128052657839192,   //
        0.32170199104068742,  -2.8049877716309952,  0.49217576662621604});
-  const Manifold result = Manifold(a, 0.1) + Manifold(b, 0.1);
+  const Manifold result =
+      Manifold(a).WithPrecision(0.1) + Manifold(b).WithPrecision(0.1);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   EXPECT_EQ(result.NumDegenerateTris(), 0);
 }
@@ -1908,7 +1912,8 @@ TEST(BooleanComplex, NormalsReplacedAfterSecondSwapPass) {
        1.1629618136370967,    0.75150667270100158,  -0.10099763004614742,   //
        0.89939240810068433,   1.0591401156206002,   2.3091991910640299,     //
        1.7685461624693455,    0.3943835474757138,   1.9338696191730673});
-  const Manifold result = Manifold(a, 0.1) + Manifold(b, 0.1);
+  const Manifold result =
+      Manifold(a).WithPrecision(0.1) + Manifold(b).WithPrecision(0.1);
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   EXPECT_EQ(result.NumDegenerateTris(), 0);
 }
@@ -2171,8 +2176,8 @@ TEST(BooleanComplex, ShortEdgeAfterColinearKeepsSurface) {
     m.triVerts = tris;
     return m;
   };
-  const Manifold a(mesh(aVerts, aTris), 0.1);
-  const Manifold b(mesh(bVerts, bTris), 0.1);
+  const Manifold a = Manifold(mesh(aVerts, aTris)).WithPrecision(0.1);
+  const Manifold b = Manifold(mesh(bVerts, bTris)).WithPrecision(0.1);
   const Manifold result = a + b;
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   EXPECT_EQ(result.NumDegenerateTris(), 0);

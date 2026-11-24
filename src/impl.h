@@ -75,7 +75,7 @@ struct Manifold::Impl {
   Impl(Shape, const mat3x4 = la::identity);
 
   template <typename Precision, typename I>
-  Impl(const MeshGLP<Precision, I>& meshGL, double relPrecision,
+  Impl(const MeshGLP<Precision, I>& meshGL,
        ExecutionContext::Impl* ctx = nullptr);
 
   // sdf.cpp. Populates an empty Impl with the level set of `sdf`. `ctx`
@@ -296,12 +296,11 @@ void Manifold::Impl::ForVert(
 }
 
 template <typename Precision, typename I>
-Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL, double relPrecision,
+Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
                      ExecutionContext::Impl* ctx)
-    : relPrecision_(
-          ClampRelPrecision(relPrecision, std::is_same<Precision, float>::value
-                                              ? kDefaultRelativePrecision
-                                              : kMinRelativePrecision)) {
+    : relPrecision_(std::is_same<Precision, float>::value
+                        ? kDefaultRelativePrecision
+                        : kMinRelativePrecision) {
   MANIFOLD_BEGIN_PHASE_TIMING();
   // Entry-time cancel wins over empty/malformed input; past this gate,
   // validation errors win over races.

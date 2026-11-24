@@ -5,28 +5,34 @@ import manifold3d as md
 
 def test_precision():
     float_eps = float(np.finfo(np.float32).eps)
+    assert md.MIN_RELATIVE_PRECISION == 1e-12
     mesh = md.Manifold.sphere(1, 64).to_mesh()
-    assert md.Manifold(mesh).get_precision() == float_eps
     mesh64 = md.Manifold.sphere(1, 64).to_mesh64()
+    assert md.Manifold(mesh).get_precision() == float_eps
     assert md.Manifold(mesh64).get_precision() == 1e-12
-    coarse = md.Manifold(mesh, rel_precision=1e-3)
+    ctx = md.ExecutionContext()
+    assert ctx.from_mesh(mesh).get_precision() == float_eps
+    assert ctx.from_mesh(mesh64).get_precision() == 1e-12
+
+    coarse = md.Manifold(mesh).with_precision(1e-3)
     assert coarse.get_precision() == 1e-3
     assert coarse.translate((1, 0, 0)).get_precision() == 1e-3
+    # The mesh does not store the precision.
+    assert md.Manifold(coarse.to_mesh()).get_precision() == float_eps
+    assert md.Manifold(coarse.to_mesh64()).get_precision() == 1e-12
 
     cube = md.Manifold.cube((1, 1, 1))
     stamped = cube.with_precision(1e-2)
     assert stamped.get_precision() == 1e-2
     assert stamped.num_tri() == cube.num_tri()
     assert cube.get_precision() == float_eps
-    assert cube.with_precision(1e-12).get_precision() == 1e-12
-    assert md.MIN_RELATIVE_PRECISION == 1e-12
-    fine = md.Manifold(mesh, rel_precision=md.MIN_RELATIVE_PRECISION)
+    fine = cube.with_precision(md.MIN_RELATIVE_PRECISION)
     assert fine.get_precision() == 1e-12
-    assert md.Manifold(mesh, rel_precision=1e-15).get_precision() == 1e-12
-    # 0, negative values, NaN and infinity give the default.
+    assert cube.with_precision(1e-15).get_precision() == 1e-12
+    # 0, negative values, NaN and infinity give float epsilon, even for a
+    # Manifold made from a Mesh64.
     for unset in (0, -1, float("nan"), float("inf")):
-        assert md.Manifold(mesh, rel_precision=unset).get_precision() == float_eps
-        assert md.Manifold(mesh64, rel_precision=unset).get_precision() == 1e-12
+        assert md.Manifold(mesh64).with_precision(unset).get_precision() == float_eps
         assert fine.with_precision(unset).get_precision() == float_eps
     assert (stamped + coarse).get_precision() == 1e-3
     assert (coarse + stamped).get_precision() == 1e-3

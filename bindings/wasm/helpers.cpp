@@ -155,8 +155,8 @@ void CollectVertices(std::vector<vec2>& verts, const CrossSection& cs) {
 
 namespace man_js {
 template <typename P, typename I>
-Manifold FromMeshJS(const val& mesh, double relPrecision) {
-  return Manifold(js::MeshJS2GL<P, I>(mesh), relPrecision);
+Manifold FromMeshJS(const val& mesh) {
+  return Manifold(js::MeshJS2GL<P, I>(mesh));
 }
 
 Manifold Union(const Manifold& a, const Manifold& b) { return a + b; }

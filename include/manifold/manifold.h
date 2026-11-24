@@ -90,8 +90,8 @@ class Manifold {
    *  Create and retrieve arbitrary manifolds
    */
   ///@{
-  Manifold(const MeshGL&, double relPrecision = kDefaultRelativePrecision);
-  Manifold(const MeshGL64&, double relPrecision = kMinRelativePrecision);
+  Manifold(const MeshGL&);
+  Manifold(const MeshGL64&);
   MeshGL GetMeshGL() const;
   MeshGL64 GetMeshGL64() const;
   ///@}

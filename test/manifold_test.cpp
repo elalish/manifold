@@ -2137,22 +2137,31 @@ TEST(Precision, Ingest) {
   ExecutionContext ctx;
   EXPECT_EQ(ctx.FromMeshGL(mesh).GetPrecision(), kMinRelativePrecision);
   EXPECT_EQ(ctx.FromMeshGL(meshF).GetPrecision(), kDefaultRelativePrecision);
-  const Manifold coarse(mesh, 1e-3);
+  const Manifold coarse = Manifold(mesh).WithPrecision(1e-3);
   EXPECT_EQ(coarse.GetPrecision(), 1e-3);
   EXPECT_DOUBLE_EQ(coarse.GetEpsilon(), 1e-3 * coarse.BoundingBox().Scale());
-  // 0, negative values, NaN and infinity give the default for the input.
+  // 0, negative values, NaN and infinity give kDefaultRelativePrecision, even
+  // for a Manifold made from MeshGL64.
   for (const double unset :
        {0.0, -0.0, -1e-3, -1e-15, -kMinRelativePrecision,
         static_cast<double>(NAN), static_cast<double>(INFINITY),
         static_cast<double>(-INFINITY)}) {
-    EXPECT_EQ(Manifold(mesh, unset).GetPrecision(), kMinRelativePrecision);
-    EXPECT_EQ(Manifold(meshF, unset).GetPrecision(), kDefaultRelativePrecision);
+    EXPECT_EQ(Manifold(mesh).WithPrecision(unset).GetPrecision(),
+              kDefaultRelativePrecision);
+    EXPECT_EQ(Manifold(meshF).WithPrecision(unset).GetPrecision(),
+              kDefaultRelativePrecision);
   }
   // Positive values below the floor use the floor.
-  EXPECT_EQ(Manifold(meshF, 1e-15).GetPrecision(), kMinRelativePrecision);
-  EXPECT_EQ(Manifold(meshF, kMinRelativePrecision).GetPrecision(),
+  EXPECT_EQ(Manifold(meshF).WithPrecision(1e-15).GetPrecision(),
             kMinRelativePrecision);
-  EXPECT_EQ(Manifold(meshF, 1e-9).GetPrecision(), 1e-9);
+  EXPECT_EQ(Manifold(meshF).WithPrecision(kMinRelativePrecision).GetPrecision(),
+            kMinRelativePrecision);
+  EXPECT_EQ(Manifold(meshF).WithPrecision(1e-9).GetPrecision(), 1e-9);
+  // The mesh does not store the precision.
+  EXPECT_EQ(Manifold(coarse.GetMeshGL64()).GetPrecision(),
+            kMinRelativePrecision);
+  EXPECT_EQ(Manifold(coarse.GetMeshGL()).GetPrecision(),
+            kDefaultRelativePrecision);
   // Transforms and single-input operations keep the precision.
   EXPECT_EQ(coarse.Translate({10, 0, 0}).GetPrecision(), 1e-3);
   EXPECT_DOUBLE_EQ(coarse.Translate({10, 0, 0}).GetEpsilon(), 1e-3 * 11);
@@ -2187,12 +2196,13 @@ TEST(Precision, IngestIgnoresUnusedVerts) {
     }
   }
   ASSERT_EQ(raised, 1);
-  const size_t numVert = Manifold(mesh, 1e-6).Simplify().NumVert();
+  const size_t numVert =
+      Manifold(mesh).WithPrecision(1e-6).Simplify().NumVert();
 
   // A far unused vertex must not widen the tolerance.
   mesh.vertProperties.push_back(1000);
   for (size_t i = 1; i < mesh.numProp; ++i) mesh.vertProperties.push_back(0);
-  const Manifold m(mesh, 1e-6);
+  const Manifold m = Manifold(mesh).WithPrecision(1e-6);
   EXPECT_DOUBLE_EQ(m.GetEpsilon(), 1e-6 * m.BoundingBox().Scale());
   EXPECT_EQ(m.Simplify().NumVert(), numVert);
 
@@ -3065,7 +3075,8 @@ TEST(Manifold, RemoveDegeneratesSplitsAtNewVert) {
       47, 48, 24, 49, 50, 55, 50, 52, 53, 52, 51, 53, 49, 55, 54, 50, 53, 55,
   };
   Manifold result;
-  EXPECT_NO_THROW(result = Manifold(mesh, 0.1).RemoveDegenerates());
+  EXPECT_NO_THROW(result =
+                      Manifold(mesh).WithPrecision(0.1).RemoveDegenerates());
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   EXPECT_EQ(result.NumDegenerateTris(), 0);
 }

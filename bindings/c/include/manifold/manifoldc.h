@@ -27,11 +27,14 @@ extern "C" {
 // If the function return type is `const T*`,
 // the result is borrowed from input arguments.
 
-// Wherever a rel_precision (relative precision) is passed, 0, negative values,
-// NaN and infinity give the default for that input: the ingest default for a
-// mesh, and FLT_EPSILON for manifold_with_precision. Positive values below
-// MANIFOLD_MIN_RELATIVE_PRECISION are raised to it, except that
-// manifold_meshgl_merge raises them to FLT_EPSILON. Pass it for the finest.
+// Relative precision defines what counts as coplanar or degenerate. A
+// manifold's epsilon is its relative precision times its bounding box scale.
+// Manifolds made from a MeshGL and built shapes have float epsilon
+// (FLT_EPSILON in <float.h>). Manifolds made from a MeshGL64 or read from OBJ
+// have MANIFOLD_MIN_RELATIVE_PRECISION, the finest allowed. Booleans,
+// Minkowski and hulls of several manifolds use the smallest precision among
+// their non-empty inputs. Other operations keep the precision of their input.
+// Use manifold_with_precision to change it.
 #define MANIFOLD_MIN_RELATIVE_PRECISION 1e-12
 
 // Polygons
@@ -199,12 +202,8 @@ ManifoldManifold* manifold_cylinder(double height, double radius_low,
                                     int center);
 ManifoldManifold* manifold_sphere(double radius,
                                   const ManifoldCircularQuality* quality);
-// rel_precision: relative precision of the result. The default is FLT_EPSILON
-// for MeshGL and MANIFOLD_MIN_RELATIVE_PRECISION for MeshGL64.
-ManifoldManifold* manifold_of_meshgl(const ManifoldMeshGL* mesh,
-                                     double rel_precision);
-ManifoldManifold* manifold_of_meshgl64(const ManifoldMeshGL64* mesh,
-                                       double rel_precision);
+ManifoldManifold* manifold_of_meshgl(const ManifoldMeshGL* mesh);
+ManifoldManifold* manifold_of_meshgl64(const ManifoldMeshGL64* mesh);
 ManifoldManifold* manifold_extrude(const ManifoldPolygons* cs, double height,
                                    int slices, double twist_degrees,
                                    double scale_x, double scale_y);
@@ -233,9 +232,12 @@ ManifoldError manifold_status(const ManifoldManifold* m);
 ManifoldManifold* manifold_with_context(const ManifoldManifold* m,
                                         const ManifoldExecutionContext* ctx);
 // Evaluates m and returns it with the given relative precision for later
-// operations, without recomputing it. The default is FLT_EPSILON.
+// operations, without recomputing it. 0, negative values, NaN and infinity
+// give FLT_EPSILON, even for a manifold made from a MeshGL64. Positive values
+// below MANIFOLD_MIN_RELATIVE_PRECISION are raised to it.
 ManifoldManifold* manifold_with_precision(const ManifoldManifold* m,
                                           double rel_precision);
+// Returns the relative precision of m. See MANIFOLD_MIN_RELATIVE_PRECISION.
 double manifold_get_precision(const ManifoldManifold* m);
 size_t manifold_num_vert(const ManifoldManifold* m);
 size_t manifold_num_edge(const ManifoldManifold* m);

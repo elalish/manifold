@@ -475,15 +475,13 @@ ManifoldMeshGL64* manifold_meshgl64_w_options(
                                          tri_verts, n_tris, options));
 }
 
-ManifoldManifold* manifold_of_meshgl(const ManifoldMeshGL* mesh,
-                                     double rel_precision) {
-  auto m = Manifold(*from_c(mesh), rel_precision);
+ManifoldManifold* manifold_of_meshgl(const ManifoldMeshGL* mesh) {
+  auto m = Manifold(*from_c(mesh));
   return to_c(new Manifold(m));
 }
 
-ManifoldManifold* manifold_of_meshgl64(const ManifoldMeshGL64* mesh,
-                                       double rel_precision) {
-  auto m = Manifold(*from_c(mesh), rel_precision);
+ManifoldManifold* manifold_of_meshgl64(const ManifoldMeshGL64* mesh) {
+  auto m = Manifold(*from_c(mesh));
   return to_c(new Manifold(m));
 }
 

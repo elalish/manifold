@@ -39,9 +39,7 @@ export function triangulate(
 
 /**
  * The finest relative precision a Manifold can have, 1e-12. Pass it to
- * {@link Manifold.ofMesh} or {@link Manifold.withPrecision} to request the
- * finest. Wherever a relative precision is passed, 0, negative values, NaN and
- * infinity give the default for that input.
+ * {@link Manifold.withPrecision} to request the finest.
  */
 export const MIN_RELATIVE_PRECISION: number;
 
@@ -482,15 +480,13 @@ export class Manifold {
    * rounded to float. A plain object is read as a Mesh. To read a plain object
    * in double precision, wrap it with new Mesh64(obj).
    *
-   * @param relPrecision The relative precision of the result, which defines
-   * what counts as coplanar or degenerate in this and later operations. The
-   * default is float epsilon, about 1.2e-7, for a Mesh and 1e-12 for a Mesh64.
-   * 0, negative values, NaN and infinity give the default. Positive values
-   * below {@link MIN_RELATIVE_PRECISION} (1e-12) are raised to it, so pass it
-   * for the finest.
+   * The result has relative precision float epsilon, about 1.2e-7, for a Mesh
+   * and {@link MIN_RELATIVE_PRECISION} (1e-12) for a Mesh64. Precision is not
+   * stored in the mesh, so use {@link withPrecision} to change it.
+   *
    * @group Basics
    */
-  constructor(mesh: Mesh|Mesh64, relPrecision?: number);
+  constructor(mesh: Mesh|Mesh64);
 
   // Shapes
 
@@ -605,15 +601,13 @@ export class Manifold {
    * rounded to float. A plain object is read as a Mesh. To read a plain object
    * in double precision, wrap it with new Mesh64(obj).
    *
-   * @param relPrecision The relative precision of the result, which defines
-   * what counts as coplanar or degenerate in this and later operations. The
-   * default is float epsilon, about 1.2e-7, for a Mesh and 1e-12 for a Mesh64.
-   * 0, negative values, NaN and infinity give the default. Positive values
-   * below {@link MIN_RELATIVE_PRECISION} (1e-12) are raised to it, so pass it
-   * for the finest.
+   * The result has relative precision float epsilon, about 1.2e-7, for a Mesh
+   * and {@link MIN_RELATIVE_PRECISION} (1e-12) for a Mesh64. Precision is not
+   * stored in the mesh, so use {@link withPrecision} to change it.
+   *
    * @group Input & Output
    */
-  static ofMesh(mesh: Mesh|Mesh64, relPrecision?: number): Manifold;
+  static ofMesh(mesh: Mesh|Mesh64): Manifold;
 
   // Signed Distance Functions
 

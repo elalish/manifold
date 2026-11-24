@@ -28,18 +28,18 @@ test('Each Manifold carries its own precision', () => {
   expect(coarse.getPrecision()).toEqual(1e-3);
   expect(cube.getPrecision()).toEqual(floatEpsilon);
   expect(coarse.add(Manifold.sphere(1)).getPrecision()).toEqual(floatEpsilon);
-  expect(Manifold.ofMesh(cube.getMesh(), 1e-3).getPrecision()).toEqual(1e-3);
-  expect(new Manifold(cube.getMesh(), 1e-3).getPrecision()).toEqual(1e-3);
   expect(Manifold.ofMesh(cube.getMesh()).getPrecision()).toEqual(floatEpsilon);
+  expect(new Manifold(cube.getMesh()).getPrecision()).toEqual(floatEpsilon);
+  // The mesh does not store the precision.
+  expect(Manifold.ofMesh(coarse.getMesh()).getPrecision())
+      .toEqual(floatEpsilon);
 });
 
 test('Finer precision is set per Manifold', () => {
   const cube = Manifold.cube();
   const fine = MIN_RELATIVE_PRECISION;
   expect(cube.withPrecision(fine).getPrecision()).toEqual(1e-12);
-  expect(Manifold.ofMesh(cube.getMesh(), fine).getPrecision()).toEqual(1e-12);
-  expect(new Manifold(cube.getMesh(), fine).getPrecision()).toEqual(1e-12);
-  expect(Manifold.ofMesh(cube.getMesh(), 0).getPrecision())
+  expect(cube.withPrecision(fine).withPrecision(0).getPrecision())
       .toEqual(floatEpsilon);
 });
 

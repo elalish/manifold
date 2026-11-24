@@ -149,7 +149,7 @@ TEST(CBIND, meshgl_options_run_flags_rotate_normals) {
       manifold_meshgl_vert_properties(source), numVert, numProp,
       manifold_meshgl_tri_verts(source), numTri, &options);
 
-  ManifoldManifold* flaggedManifold = manifold_of_meshgl(flagged, 0);
+  ManifoldManifold* flaggedManifold = manifold_of_meshgl(flagged);
   ASSERT_EQ(manifold_status(flaggedManifold), MANIFOLD_NO_ERROR);
   ManifoldManifold* flaggedRotated = manifold_rotate(flaggedManifold, 90, 0, 0);
   ManifoldMeshGL* flaggedOut = manifold_get_meshgl(flaggedRotated);
@@ -172,7 +172,7 @@ TEST(CBIND, meshgl_options_run_flags_rotate_normals) {
   ManifoldMeshGL* plain = manifold_meshgl_w_options(
       manifold_meshgl_vert_properties(source), numVert, numProp,
       manifold_meshgl_tri_verts(source), numTri, &options);
-  ManifoldManifold* plainManifold = manifold_of_meshgl(plain, 0);
+  ManifoldManifold* plainManifold = manifold_of_meshgl(plain);
   ManifoldManifold* plainRotated = manifold_rotate(plainManifold, 90, 0, 0);
   ManifoldMeshGL* plainOut = manifold_get_meshgl(plainRotated);
   const float* plainProps = manifold_meshgl_vert_properties(plainOut);
@@ -804,7 +804,7 @@ TEST(CBIND, meshgl_merge_returns_mem) {
   EXPECT_NE(merged, original);
 
   // The merged mesh should still be valid — construct a Manifold from it.
-  ManifoldManifold* result = manifold_of_meshgl(merged, 0);
+  ManifoldManifold* result = manifold_of_meshgl(merged);
   EXPECT_EQ(manifold_status(result), MANIFOLD_NO_ERROR);
   EXPECT_NEAR(manifold_volume(result), 1.0, 0.0001);
 
@@ -822,7 +822,7 @@ TEST(CBIND, meshgl64_merge_returns_mem) {
 
   EXPECT_NE(merged, original);
 
-  ManifoldManifold* result = manifold_of_meshgl64(merged, 0);
+  ManifoldManifold* result = manifold_of_meshgl64(merged);
   EXPECT_EQ(manifold_status(result), MANIFOLD_NO_ERROR);
   EXPECT_NEAR(manifold_volume(result), 1.0, 0.0001);
 
@@ -834,75 +834,55 @@ TEST(CBIND, meshgl64_merge_returns_mem) {
 
 TEST(CBIND, precision) {
   ManifoldManifold* cube = manifold_cube(1.0, 1.0, 1.0, 0);
-  ManifoldMeshGL64* mesh = manifold_get_meshgl64(cube);
-  ManifoldManifold* ingested = manifold_of_meshgl64(mesh, 1e-3);
+  ManifoldMeshGL* mesh = manifold_get_meshgl(cube);
+  ManifoldMeshGL64* mesh64 = manifold_get_meshgl64(cube);
+  ManifoldManifold* ingested = manifold_of_meshgl(mesh);
+  ManifoldManifold* ingested64 = manifold_of_meshgl64(mesh64);
   EXPECT_EQ(manifold_get_precision(cube), FLT_EPSILON);
-  EXPECT_EQ(manifold_get_precision(ingested), 1e-3);
-  ManifoldManifold* default64 = manifold_of_meshgl64(mesh, 0);
-  EXPECT_EQ(manifold_get_precision(default64), 1e-12);
-  manifold_delete_manifold(default64);
-  ManifoldMeshGL* meshF = manifold_get_meshgl(cube);
-  ManifoldManifold* floatDefault = manifold_of_meshgl(meshF, NAN);
-  EXPECT_EQ(manifold_get_precision(floatDefault), FLT_EPSILON);
-  ManifoldManifold* floatZero = manifold_of_meshgl(meshF, 0);
-  EXPECT_EQ(manifold_get_precision(floatZero), FLT_EPSILON);
-  manifold_delete_manifold(floatZero);
-  ManifoldManifold* floatNegative = manifold_of_meshgl(meshF, -1);
-  EXPECT_EQ(manifold_get_precision(floatNegative), FLT_EPSILON);
-  manifold_delete_manifold(floatNegative);
-  ManifoldManifold* floatFine =
-      manifold_of_meshgl(meshF, MANIFOLD_MIN_RELATIVE_PRECISION);
-  EXPECT_EQ(manifold_get_precision(floatFine), 1e-12);
-  manifold_delete_manifold(floatFine);
-  manifold_delete_manifold(floatDefault);
-  manifold_delete_meshgl(meshF);
+  EXPECT_EQ(manifold_get_precision(ingested), FLT_EPSILON);
+  EXPECT_EQ(manifold_get_precision(ingested64),
+            MANIFOLD_MIN_RELATIVE_PRECISION);
+
   ManifoldManifold* stamped = manifold_with_precision(cube, 1e-2);
   EXPECT_EQ(manifold_get_precision(stamped), 1e-2);
   EXPECT_EQ(manifold_num_tri(stamped), manifold_num_tri(cube));
-  ManifoldManifold* reset = manifold_with_precision(stamped, 0);
-  EXPECT_EQ(manifold_get_precision(reset), FLT_EPSILON);
+  ManifoldManifold* fine = manifold_with_precision(ingested, 1e-20);
+  EXPECT_EQ(manifold_get_precision(fine), MANIFOLD_MIN_RELATIVE_PRECISION);
+  // 0, negative values, NaN and infinity give FLT_EPSILON, even for a
+  // manifold made from a MeshGL64.
+  for (double unset :
+       {0.0, -1.0, static_cast<double>(NAN), static_cast<double>(INFINITY)}) {
+    ManifoldManifold* reset = manifold_with_precision(ingested64, unset);
+    EXPECT_EQ(manifold_get_precision(reset), FLT_EPSILON);
+    manifold_delete_manifold(reset);
+  }
 
-  manifold_delete_manifold(reset);
+  manifold_delete_manifold(fine);
   manifold_delete_manifold(stamped);
+  manifold_delete_manifold(ingested64);
   manifold_delete_manifold(ingested);
-  manifold_delete_meshgl64(mesh);
+  manifold_delete_meshgl64(mesh64);
+  manifold_delete_meshgl(mesh);
   manifold_delete_manifold(cube);
 }
 
-TEST(CBIND, execution_context_of_meshgl_with_precision) {
+TEST(CBIND, execution_context_of_meshgl_precision) {
   ManifoldManifold* cube = manifold_cube(1.0, 1.0, 1.0, 0);
   ManifoldMeshGL* mesh = manifold_get_meshgl(cube);
   ManifoldMeshGL64* mesh64 = manifold_get_meshgl64(cube);
   ManifoldExecutionContext* ec = manifold_execution_context();
+  ManifoldManifold* ingested = manifold_execution_context_of_meshgl(ec, mesh);
+  ManifoldManifold* ingested64 =
+      manifold_execution_context_of_meshgl64(ec, mesh64);
+  EXPECT_EQ(manifold_get_precision(ingested), FLT_EPSILON);
+  EXPECT_EQ(manifold_get_precision(ingested64),
+            MANIFOLD_MIN_RELATIVE_PRECISION);
+  EXPECT_DOUBLE_EQ(manifold_epsilon(ingested), FLT_EPSILON);
+  EXPECT_DOUBLE_EQ(manifold_epsilon(ingested64),
+                   MANIFOLD_MIN_RELATIVE_PRECISION);
 
-  for (double p : {1e-20, 1e-6, 1e-3}) {
-    ManifoldManifold* plain = manifold_of_meshgl(mesh, p);
-    ManifoldManifold* plain64 = manifold_of_meshgl64(mesh64, p);
-    ManifoldManifold* ingested = manifold_execution_context_of_meshgl(ec, mesh);
-    ManifoldManifold* ingested64 =
-        manifold_execution_context_of_meshgl64(ec, mesh64);
-    ManifoldManifold* ctx = manifold_with_precision(ingested, p);
-    ManifoldManifold* ctx64 = manifold_with_precision(ingested64, p);
-    EXPECT_EQ(manifold_status(ctx), MANIFOLD_NO_ERROR);
-    EXPECT_EQ(manifold_status(ctx64), MANIFOLD_NO_ERROR);
-    EXPECT_EQ(manifold_get_precision(ctx), manifold_get_precision(plain));
-    EXPECT_EQ(manifold_get_precision(ctx64), manifold_get_precision(plain64));
-    EXPECT_EQ(manifold_epsilon(ctx), manifold_epsilon(plain));
-    EXPECT_EQ(manifold_epsilon(ctx64), manifold_epsilon(plain64));
-    EXPECT_EQ(manifold_num_tri(ctx), manifold_num_tri(plain));
-    EXPECT_EQ(manifold_num_tri(ctx64), manifold_num_tri(plain64));
-    if (p == 1e-3) {
-      EXPECT_EQ(manifold_get_precision(ctx), 1e-3);
-      EXPECT_EQ(manifold_get_precision(ctx64), 1e-3);
-    }
-    manifold_delete_manifold(plain);
-    manifold_delete_manifold(plain64);
-    manifold_delete_manifold(ingested);
-    manifold_delete_manifold(ingested64);
-    manifold_delete_manifold(ctx);
-    manifold_delete_manifold(ctx64);
-  }
-
+  manifold_delete_manifold(ingested);
+  manifold_delete_manifold(ingested64);
   manifold_delete_execution_context(ec);
   manifold_delete_meshgl(mesh);
   manifold_delete_meshgl64(mesh64);

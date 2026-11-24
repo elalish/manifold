@@ -713,15 +713,13 @@ Module.setup = function() {
   // Manifold Constructors
 
   const ManifoldCtor = Module.Manifold;
-  // 0 gives the library's default relative precision for the mesh type.
-  Module.Manifold = function(mesh, relPrecision = 0) {
+  Module.Manifold = function(mesh) {
     return checkedManifold(
-        mesh?.[isMesh64] ? Module._FromMesh64(mesh, relPrecision) :
-                           Module._FromMesh(mesh, relPrecision));
+        mesh?.[isMesh64] ? Module._FromMesh64(mesh) : Module._FromMesh(mesh));
   };
 
-  Module.Manifold.ofMesh = function(mesh, relPrecision = 0) {
-    return new Module.Manifold(mesh, relPrecision);
+  Module.Manifold.ofMesh = function(mesh) {
+    return new Module.Manifold(mesh);
   };
 
   Module.Manifold.tetrahedron = function() {

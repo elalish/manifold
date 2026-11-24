@@ -848,7 +848,7 @@ MeshGL64 ReadOBJ(std::istream& stream) { return ReadOBJMesh(stream); }
 Manifold Manifold::ReadOBJ(std::istream& stream) {
   if (!stream.good()) return Invalid();
   MeshGL64 mesh = ReadOBJMesh(stream);
-  auto impl = std::make_shared<Impl>(mesh, kMinRelativePrecision);
+  auto impl = std::make_shared<Impl>(mesh);
   return Manifold(impl);
 }
 
