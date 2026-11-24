@@ -128,7 +128,11 @@ suite('Manifold Bindings', () => {
   test('precision is set at ingest and by withPrecision', () => {
     const {Manifold} = manifoldModule;
     const mesh = Manifold.sphere(1, 64).getMesh();
-    expect(Manifold.ofMesh(mesh).getPrecision()).toEqual(1e-12);
+    expect(Manifold.ofMesh(mesh).getPrecision()).toEqual(2 ** -23);
+    expect(new Manifold(mesh).getPrecision()).toEqual(2 ** -23);
+    expect(Manifold.cube().getPrecision()).toEqual(2 ** -23);
+    expect(Manifold.ofMesh(mesh, 0).getPrecision()).toEqual(1e-12);
+    expect(Manifold.cube().withPrecision(1e-12).getPrecision()).toEqual(1e-12);
     const coarse = Manifold.ofMesh(mesh, 1e-3);
     expect(coarse.getPrecision()).toEqual(1e-3);
     expect(new Manifold(mesh, 1e-3).getPrecision()).toEqual(1e-3);
