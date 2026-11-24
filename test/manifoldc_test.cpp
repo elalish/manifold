@@ -521,7 +521,8 @@ TEST(CBIND, execution_context_factories) {
   ManifoldManifold* cube = manifold_cube(2.0, 2.0, 2.0, 1);
   ManifoldMeshGL* mesh = manifold_get_meshgl(cube);
   ManifoldExecutionContext* ec2 = manifold_execution_context();
-  ManifoldManifold* ingested = manifold_execution_context_of_meshgl(ec2, mesh);
+  ManifoldManifold* ingested =
+      manifold_execution_context_of_meshgl(ec2, mesh, 0);
   EXPECT_EQ(manifold_status(ingested), MANIFOLD_NO_ERROR);
   EXPECT_DOUBLE_EQ(manifold_execution_context_progress(ec2), 1.0);
 
@@ -847,6 +848,48 @@ TEST(CBIND, precision) {
   manifold_delete_manifold(stamped);
   manifold_delete_manifold(ingested);
   manifold_delete_meshgl64(mesh);
+  manifold_delete_manifold(cube);
+}
+
+TEST(CBIND, execution_context_of_meshgl_precision) {
+  ManifoldManifold* cube = manifold_cube(1.0, 1.0, 1.0, 0);
+  ManifoldMeshGL* mesh = manifold_get_meshgl(cube);
+  ManifoldMeshGL64* mesh64 = manifold_get_meshgl64(cube);
+  ManifoldExecutionContext* ec = manifold_execution_context();
+
+  for (double p : {0.0, -1.0, 1e-20, 1e-3, (double)INFINITY, (double)NAN}) {
+    ManifoldManifold* plain = manifold_of_meshgl(mesh, p);
+    ManifoldManifold* ctx = manifold_execution_context_of_meshgl(ec, mesh, p);
+    ManifoldManifold* plain64 = manifold_of_meshgl64(mesh64, p);
+    ManifoldManifold* ctx64 =
+        manifold_execution_context_of_meshgl64(ec, mesh64, p);
+    EXPECT_EQ(manifold_status(ctx), MANIFOLD_NO_ERROR);
+    EXPECT_EQ(manifold_status(ctx64), MANIFOLD_NO_ERROR);
+    EXPECT_EQ(manifold_get_precision(ctx), manifold_get_precision(plain));
+    EXPECT_EQ(manifold_get_precision(ctx64), manifold_get_precision(plain64));
+    EXPECT_EQ(manifold_epsilon(ctx), manifold_epsilon(plain));
+    EXPECT_EQ(manifold_epsilon(ctx64), manifold_epsilon(plain64));
+    EXPECT_EQ(manifold_num_tri(ctx), manifold_num_tri(plain));
+    EXPECT_EQ(manifold_num_tri(ctx64), manifold_num_tri(plain64));
+    if (p == 1e-3) {
+      EXPECT_EQ(manifold_get_precision(ctx), 1e-3);
+      EXPECT_EQ(manifold_get_precision(ctx64), 1e-3);
+    }
+    manifold_delete_manifold(plain);
+    manifold_delete_manifold(ctx);
+    manifold_delete_manifold(plain64);
+    manifold_delete_manifold(ctx64);
+  }
+
+  manifold_execution_context_cancel(ec);
+  ManifoldManifold* cancelled =
+      manifold_execution_context_of_meshgl(ec, mesh, 1e-3);
+  EXPECT_EQ(manifold_status(cancelled), MANIFOLD_CANCELLED);
+
+  manifold_delete_manifold(cancelled);
+  manifold_delete_execution_context(ec);
+  manifold_delete_meshgl(mesh);
+  manifold_delete_meshgl64(mesh64);
   manifold_delete_manifold(cube);
 }
 
