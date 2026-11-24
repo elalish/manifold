@@ -85,6 +85,10 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .value("ResultTooLarge", Manifold::Error::ResultTooLarge)
       .value("InvalidTangents", Manifold::Error::InvalidTangents)
       .value("Cancelled", Manifold::Error::Cancelled);
+  function(
+      "_ErrorMessage", +[](int error) {
+        return std::string(ToString(static_cast<Manifold::Error>(error)));
+      });
 
   enum_<CrossSection::JoinType>("jointype")
       .value("Square", CrossSection::JoinType::Square)

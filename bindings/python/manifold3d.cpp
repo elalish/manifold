@@ -826,7 +826,11 @@ NB_MODULE(manifold3d, m) {
       .value("InvalidConstruction", Manifold::Error::InvalidConstruction)
       .value("ResultTooLarge", Manifold::Error::ResultTooLarge)
       .value("InvalidTangents", Manifold::Error::InvalidTangents)
-      .value("Cancelled", Manifold::Error::Cancelled);
+      .value("Cancelled", Manifold::Error::Cancelled)
+      .def(
+          "__str__", [](Manifold::Error e) { return ToString(e); },
+          "A short English description of the error, the same text every "
+          "binding uses.");
 
   nb::enum_<CrossSection::JoinType>(m, "JoinType")
       .value("Square", CrossSection::JoinType::Square,
