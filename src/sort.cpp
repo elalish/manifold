@@ -248,6 +248,7 @@ namespace manifold {
 void Manifold::Impl::SortGeometry(ExecutionContext::Impl* ctx) {
   if (halfedge_.size() == 0) {
     collider_ = {};
+    bBox_ = Box();
     return;
   }
 
@@ -265,6 +266,7 @@ void Manifold::Impl::SortGeometry(ExecutionContext::Impl* ctx) {
   if (IsCancelled(ctx)) return;
   if (halfedge_.size() == 0) {
     collider_ = {};
+    bBox_ = Box();
     return;
   }
   collider_ = Collider(faceBox, faceMorton);
