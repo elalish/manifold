@@ -36,28 +36,12 @@ void ResetForStaticFactory(ExecutionContext::Impl* ctx, int totalPhases) {
   ctx->donePhases.store(0, std::memory_order_relaxed);
   ctx->totalBooleans.store(0, std::memory_order_relaxed);
   ctx->totalPhases.store(totalPhases, std::memory_order_relaxed);
-#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
-  ctx->lastPhase = std::chrono::high_resolution_clock::now();
-#endif
 }
 
 }  // namespace
 namespace manifold {
 
 #if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
-void RecordPhase(ExecutionContext::Impl* ctx, const char* file, int line) {
-  const auto now = std::chrono::high_resolution_clock::now();
-  if (ManifoldParams().verbose >= 2) {
-    const double ms =
-        std::chrono::duration<double, std::milli>(now - ctx->lastPhase).count();
-    const char* slash = std::strrchr(file, '/');
-    std::cout << "  phase " << ctx->donePhases.load(std::memory_order_relaxed)
-              << " (" << (slash ? slash + 1 : file) << ":" << line
-              << ") = " << ms << " ms" << std::endl;
-  }
-  ctx->lastPhase = now;
-}
-
 LocalPhaseTiming BeginLocalPhaseTiming() {
   static std::atomic<int> counter{0};
   return {std::chrono::high_resolution_clock::now(),
@@ -71,7 +55,7 @@ void RecordPhase(LocalPhaseTiming& timing, int phase, const char* file,
     const double ms =
         std::chrono::duration<double, std::milli>(now - timing.last).count();
     const char* slash = std::strrchr(file, '/');
-    std::cout << "  [b" << timing.uid << "] phase " << phase << " ("
+    std::cout << "  [op" << timing.uid << "] phase " << phase << " ("
               << (slash ? slash + 1 : file) << ":" << line << ") = " << ms
               << " ms" << std::endl;
   }

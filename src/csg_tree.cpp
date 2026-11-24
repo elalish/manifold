@@ -18,6 +18,10 @@
 
 #include <algorithm>
 #include <cstdint>
+#ifdef MANIFOLD_DEBUG
+#include <array>
+#include <exception>
+#endif
 
 #include "boolean3.h"
 #include "csg_tree.h"
@@ -238,6 +242,10 @@ std::shared_ptr<CsgLeafNode> CsgLeafNode::Compose(
       impl.status_ = node->pImpl_->status_;
       return ImplToLeaf(std::move(impl));
     }
+    // Compose applies pending transforms directly, bypassing Impl::Transform.
+    if (!all(la::isfinite(node->transform_))) {
+      return ErrorLeaf(Manifold::Error::NonFiniteVertex);
+    }
     bbox = bbox.Union(node->GetBoundingBox());
 
     vertIndices.push_back(numVert);
@@ -442,6 +450,12 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
   std::vector<uint64_t> parallelSerial;
   for (int i = 0; i < 4; i++) parallelTmp.push_back(nullptr);
   for (int i = 0; i < 4; i++) parallelSerial.push_back(0);
+#ifdef MANIFOLD_DEBUG
+  // An exception escaping a task cancels the group, and the nested parallel
+  // loops of the tasks still running would then skip their work, leaving them
+  // to compute on uninitialized data. Each task keeps its own exception.
+  std::array<std::exception_ptr, 4> parallelError;
+#endif
 #endif
   while (heapNodes.size() > 1) {
     if (IsCancelled(ctx)) return ErrorLeaf(Manifold::Error::Cancelled);
@@ -455,8 +469,16 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
 #if MANIFOLD_PAR == 1
       parallelSerial[i] = nextSerial++;
       group.run([&, i, a = std::move(a.first), b = std::move(b.first)]() {
-        parallelTmp[i] =
-            SimpleBoolean(*a->GetImpl(), *b->GetImpl(), operation, ctx);
+#ifdef MANIFOLD_DEBUG
+        try {
+#endif
+          parallelTmp[i] =
+              SimpleBoolean(*a->GetImpl(), *b->GetImpl(), operation, ctx);
+#ifdef MANIFOLD_DEBUG
+        } catch (...) {
+          parallelError[i] = std::current_exception();
+        }
+#endif
       });
 #else
       auto result = SimpleBoolean(*a.first->GetImpl(), *b.first->GetImpl(),
@@ -466,6 +488,10 @@ std::shared_ptr<CsgLeafNode> BatchBoolean(
     }
 #if MANIFOLD_PAR == 1
     group.wait();
+#ifdef MANIFOLD_DEBUG
+    for (const std::exception_ptr& error : parallelError)
+      if (error) std::rethrow_exception(error);
+#endif
     for (int i = 0; i < 4 && parallelTmp[i]; i++)
       tmp.emplace_back(std::move(parallelTmp[i]), parallelSerial[i]);
 #endif
@@ -751,8 +777,10 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode(
       // eval of any op on the stack returns Cancelled.
       auto cancelled = ErrorLeaf(Manifold::Error::Cancelled);
       for (auto& frame : stack) {
+        auto guard = frame->op_node->impl_.GetGuard();
         if (!frame->op_node->cache_) frame->op_node->cache_ = cancelled;
       }
+      auto guard = impl_.GetGuard();
       cache_ = cancelled;
       return cache_;
     }
@@ -837,6 +865,7 @@ std::shared_ptr<CsgLeafNode> CsgOpNode::ToLeafNode(
       }
     }
   }
+  auto guard = impl_.GetGuard();
   return cache_;
 }
 
@@ -857,24 +886,26 @@ size_t CsgOpNode::NumLeaves() const {
   // An already-evaluated CsgOpNode counts as a single leaf for the purposes
   // of estimating remaining boolean work. Iterative walk: `+=` chains can
   // produce very deep CsgOpNode trees that would blow the call stack if
-  // this were recursive.
-  if (cache_ != nullptr) return 1;
+  // this were recursive. Another thread may evaluate a shared op node
+  // meanwhile, so read cache_ under the node's guard and hold each child
+  // op node by shared_ptr, since its evaluation can drop the children.
   size_t total = 0;
-  std::vector<const CsgOpNode*> stack;
-  stack.push_back(this);
+  std::vector<std::shared_ptr<const CsgOpNode>> stack;
+  stack.push_back(
+      std::static_pointer_cast<const CsgOpNode>(shared_from_this()));
   while (!stack.empty()) {
-    const CsgOpNode* op = stack.back();
+    std::shared_ptr<const CsgOpNode> op = stack.back();
     stack.pop_back();
+    auto impl = op->impl_.GetGuard();
     if (op->cache_ != nullptr) {
       total += 1;
       continue;
     }
-    auto impl = op->impl_.GetGuard();
     for (const auto& child : *impl) {
       if (child->GetNodeType() == CsgNodeType::Leaf) {
         total += 1;
       } else {
-        stack.push_back(static_cast<const CsgOpNode*>(child.get()));
+        stack.push_back(std::static_pointer_cast<const CsgOpNode>(child));
       }
     }
   }

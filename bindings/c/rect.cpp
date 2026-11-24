@@ -13,47 +13,47 @@
 // limitations under the License.
 
 #include "conv.h"
+#include "include/manifold/manifoldc.h"
 #include "manifold/common.h"
 #include "manifold/types.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-ManifoldRect* manifold_rect(void* mem, double x1, double y1, double x2,
-                            double y2) {
+ManifoldRect* manifold_rect(double x1, double y1, double x2, double y2) {
   auto p1 = vec2(x1, y1);
   auto p2 = vec2(x2, y2);
-  auto rect = new (mem) Rect(p1, p2);
+  auto rect = new Rect(p1, p2);
   return to_c(rect);
 }
 
-ManifoldVec2 manifold_rect_min(ManifoldRect* r) {
+ManifoldVec2 manifold_rect_min(const ManifoldRect* r) {
   return to_c((*from_c(r)).min);
 }
 
-ManifoldVec2 manifold_rect_max(ManifoldRect* r) {
+ManifoldVec2 manifold_rect_max(const ManifoldRect* r) {
   return to_c((*from_c(r)).max);
 }
 
-ManifoldVec2 manifold_rect_dimensions(ManifoldRect* r) {
+ManifoldVec2 manifold_rect_dimensions(const ManifoldRect* r) {
   auto v = from_c(r)->Size();
   return {v.x, v.y};
 }
 
-ManifoldVec2 manifold_rect_center(ManifoldRect* r) {
+ManifoldVec2 manifold_rect_center(const ManifoldRect* r) {
   auto v = from_c(r)->Center();
   return {v.x, v.y};
 }
 
-double manifold_rect_scale(ManifoldRect* r) { return from_c(r)->Scale(); }
+double manifold_rect_scale(const ManifoldRect* r) { return from_c(r)->Scale(); }
 
-int manifold_rect_contains_pt(ManifoldRect* r, double x, double y) {
+int manifold_rect_contains_pt(const ManifoldRect* r, double x, double y) {
   auto rect = *from_c(r);
   auto p = vec2(x, y);
   return rect.Contains(p);
 }
 
-int manifold_rect_contains_rect(ManifoldRect* a, ManifoldRect* b) {
+int manifold_rect_contains_rect(const ManifoldRect* a, const ManifoldRect* b) {
   auto outer = *from_c(a);
   auto inner = *from_c(b);
   return outer.Contains(inner);
@@ -65,40 +65,45 @@ void manifold_rect_include_pt(ManifoldRect* r, double x, double y) {
   rect.Union(p);
 }
 
-ManifoldRect* manifold_rect_union(void* mem, ManifoldRect* a, ManifoldRect* b) {
+ManifoldRect* manifold_rect_union(const ManifoldRect* a,
+                                  const ManifoldRect* b) {
   auto rect = from_c(a)->Union(*from_c(b));
-  return to_c(new (mem) Rect(rect));
+  return to_c(new Rect(rect));
 }
 
-ManifoldRect* manifold_rect_transform(void* mem, ManifoldRect* r, double x1,
+ManifoldRect* manifold_rect_transform(const ManifoldRect* r, double x1,
                                       double y1, double x2, double y2,
                                       double x3, double y3) {
   auto mat = mat2x3({x1, y1}, {x2, y2}, {x3, y3});
   auto transformed = from_c(r)->Transform(mat);
-  return to_c(new (mem) Rect(transformed));
+  return to_c(new Rect(transformed));
 }
 
-ManifoldRect* manifold_rect_translate(void* mem, ManifoldRect* r, double x,
+ManifoldRect* manifold_rect_translate(const ManifoldRect* r, double x,
                                       double y) {
   auto p = vec2(x, y);
   auto translated = (*from_c(r)) + p;
-  return to_c(new (mem) Rect(translated));
+  return to_c(new Rect(translated));
 }
 
-ManifoldRect* manifold_rect_mul(void* mem, ManifoldRect* r, double x,
-                                double y) {
+ManifoldRect* manifold_rect_mul(const ManifoldRect* r, double x, double y) {
   auto p = vec2(x, y);
   auto scaled = (*from_c(r)) * p;
-  return to_c(new (mem) Rect(scaled));
+  return to_c(new Rect(scaled));
 }
 
-int manifold_rect_does_overlap_rect(ManifoldRect* a, ManifoldRect* r) {
+int manifold_rect_does_overlap_rect(const ManifoldRect* a,
+                                    const ManifoldRect* r) {
   return from_c(a)->DoesOverlap(*from_c(r));
 }
 
-int manifold_rect_is_empty(ManifoldRect* r) { return from_c(r)->IsEmpty(); }
+int manifold_rect_is_empty(const ManifoldRect* r) {
+  return from_c(r)->IsEmpty();
+}
 
-int manifold_rect_is_finite(ManifoldRect* r) { return from_c(r)->IsFinite(); }
+int manifold_rect_is_finite(const ManifoldRect* r) {
+  return from_c(r)->IsFinite();
+}
 #ifdef __cplusplus
 }
 #endif

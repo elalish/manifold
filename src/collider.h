@@ -73,6 +73,58 @@ constexpr inline int Internal2Node(int internal) { return internal * 2 + 1; }
 constexpr inline int Node2Leaf(int node) { return node / 2; }
 constexpr inline int Leaf2Node(int leaf) { return leaf * 2; }
 
+// A segment query keeps the same coarse bounds as a box query, then rejects
+// nodes that the segment cannot reach. In particular, a diagonal segment's
+// box can cover an entire mesh even though the segment crosses only a few
+// faces. The padding preserves the caller's tolerance at grazing hits.
+struct SegmentQuery {
+  Box bounds;
+  vec3 origin;
+  vec3 direction;
+  double padding;
+
+  bool DoesOverlap(const Box& box) const {
+    if (!box.DoesOverlap(bounds)) return false;
+    double enter = 0.0;
+    double exit = 1.0;
+    for (const int axis : {0, 1, 2}) {
+      const double low = box.min[axis] - padding;
+      const double high = box.max[axis] + padding;
+      if (direction[axis] == 0.0) {
+        if (origin[axis] < low || origin[axis] > high) return false;
+      } else {
+        double tNear = (low - origin[axis]) / direction[axis];
+        double tFar = (high - origin[axis]) / direction[axis];
+        if (tNear > tFar) std::swap(tNear, tFar);
+        if (!std::isfinite(tNear) || !std::isfinite(tFar)) continue;
+        // Outward rounding covers the coordinate and direction subtractions
+        // and division. Padding the box alone is insufficient for a very
+        // distant origin: that padding can disappear in low - origin.
+        constexpr double roundoff = 4 * std::numeric_limits<double>::epsilon();
+        const double inf = std::numeric_limits<double>::infinity();
+        tNear = std::nextafter(tNear - std::abs(tNear) * roundoff, -inf);
+        tFar = std::nextafter(tFar + std::abs(tFar) * roundoff, inf);
+        enter = std::max(enter, tNear);
+        exit = std::min(exit, tFar);
+        if (enter > exit) return false;
+      }
+    }
+    return true;
+  }
+};
+
+inline bool Overlaps(const Box& box, const Box& query) {
+  return box.DoesOverlap(query);
+}
+
+inline bool Overlaps(const Box& box, const vec3& query) {
+  return box.DoesOverlap(query);
+}
+
+inline bool Overlaps(const Box& box, const SegmentQuery& query) {
+  return query.DoesOverlap(box);
+}
+
 struct CreateRadixTree {
   VecView<int> nodeParent_;
   VecView<std::pair<int, int>> internalChildren_;
@@ -170,7 +222,7 @@ struct FindCollision {
   inline int RecordCollision(std::invoke_result_t<F, const int> query, int node,
                              const int queryIdx, Local& local) {
     auto box = nodeBBox_[node];
-    bool overlaps = box.DoesOverlap(query);
+    const bool overlaps = Overlaps(box, query);
     if (overlaps && IsLeaf(node)) {
       int leafIdx = Node2Leaf(node);
       if (!selfCollision || leafIdx != queryIdx) {
@@ -195,6 +247,10 @@ struct FindCollision {
     // Depth-first search
     int node = kRoot;
     Local& local = recorder.local();
+    if (internalChildren_.empty()) {
+      RecordCollision(query, Leaf2Node(0), queryIdx, local);
+      return;
+    }
     while (1) {
       int internal = Node2Internal(node);
       int child1 = internalChildren_[internal].first;
@@ -284,6 +340,7 @@ class Collider {
 
   Box GetBoundingBox() const {
     if (nodeBBox_.empty()) return Box();
+    if (internalChildren_.empty()) return nodeBBox_[0];
     return nodeBBox_[collider_internal::Internal2Node(0)];
   }
 
@@ -294,6 +351,8 @@ class Collider {
     // copy in leaf node Boxes
     auto leaves = StridedRange(nodeBBox_.begin(), nodeBBox_.end(), 2);
     copy(leafBB.cbegin(), leafBB.cend(), leaves.begin());
+    // A single leaf is already the root and has no parent box to update.
+    if (internalChildren_.empty()) return;
     // create global counters
     Vec<int> counter(NumInternal(), 0);
     // kernel over leaves to save internal Boxes
@@ -317,7 +376,7 @@ class Collider {
                   ExecutionContext::Impl* ctx = nullptr) const {
     ZoneScoped;
     using collider_internal::FindCollision;
-    if (internalChildren_.empty()) return;
+    if (nodeBBox_.empty()) return;
     for_each_n(parallel ? autoPolicy(n, collider_internal::kSequentialThreshold)
                         : ExecutionPolicy::Seq,
                countAt(0), n, ctx,
@@ -371,7 +430,7 @@ class Collider {
 
   size_t NumInternal() const { return internalChildren_.size(); };
   size_t NumLeaves() const {
-    return internalChildren_.empty() ? 0 : (NumInternal() + 1);
+    return nodeBBox_.empty() ? 0 : (NumInternal() + 1);
   };
 };
 

@@ -15,12 +15,339 @@
 #include <atomic>
 #include <cmath>
 #include <cstdint>
+#include <limits>
+#include <thread>
 
 #include "../src/atomic_compat.h"
+#include "../src/collider.h"
 #include "../src/shared.h"
+#include "../src/tree2d.h"
 #include "gtest/gtest.h"
 
 using namespace manifold;
+
+TEST(Utils, ColliderLeafCounts) {
+  for (const int count : {0, 1, 2}) {
+    SCOPED_TRACE(count);
+    Vec<Box> boxes(count);
+    Vec<uint32_t> morton(count);
+    for (int i = 0; i < count; ++i) {
+      boxes[i] = Box(vec3(3 * i), vec3(3 * i + 1));
+      morton[i] = i;
+    }
+    Collider collider(boxes, morton);
+    for (const int phase : {0, 1, 2}) {
+      SCOPED_TRACE(phase);
+      if (phase != 0) {
+        for (Box& box : boxes) {
+          box.min += vec3(10.0);
+          box.max += vec3(10.0);
+        }
+        if (phase == 1) {
+          collider.UpdateBoxes(boxes);
+        } else {
+          mat3x4 transform = la::identity;
+          transform[3] = vec3(10.0);
+          collider.Transform(transform);
+        }
+      }
+      Box expectedBounds;
+      for (const Box& box : boxes) expectedBounds = expectedBounds.Union(box);
+      EXPECT_EQ(collider.GetBoundingBox().min, expectedBounds.min);
+      EXPECT_EQ(collider.GetBoundingBox().max, expectedBounds.max);
+
+      const vec3 center(10 * phase + 0.5);
+      const std::vector<Box> queries = {Box(center, center),
+                                        Box(vec3(-1.0), vec3(30.0)), Box()};
+      for (const bool selfCollision : {false, true}) {
+        std::vector<std::pair<int, int>> expected, actual;
+        for (int query = 0; query < 3; ++query)
+          for (int leaf = 0; leaf < count; ++leaf)
+            if ((!selfCollision || query != leaf) &&
+                boxes[leaf].DoesOverlap(queries[query]))
+              expected.emplace_back(query, leaf);
+        auto record = [&](int query, int leaf) {
+          actual.emplace_back(query, leaf);
+        };
+        auto recorder = MakeSimpleRecorder(record);
+        auto query = [&](int i) { return queries[i]; };
+        if (selfCollision)
+          collider.Collisions<true>(recorder, query, 3, false);
+        else
+          collider.Collisions(recorder, query, 3, false);
+        std::sort(actual.begin(), actual.end());
+        EXPECT_EQ(actual, expected);
+      }
+      // Point queries use XY overlap even when their Z is outside the box.
+      std::vector<int> hits;
+      auto record = [&](int, int leaf) { hits.push_back(leaf); };
+      auto recorder = MakeSimpleRecorder(record);
+      collider.Collisions(
+          recorder, [&](int) { return vec3(center.x, center.y, 1000); }, 1,
+          false);
+      EXPECT_EQ(hits, count == 0 ? std::vector<int>{} : std::vector<int>{0});
+    }
+  }
+}
+
+TEST(Utils, TwoDTreeSkipsDisabledPoints) {
+  const std::vector<Rect> queries = {
+      Rect(vec2(-10.0), vec2(10.0)),   Rect(vec2(-3, -4), vec2(4, 5)),
+      Rect(vec2(0, -10), vec2(0, 10)), Rect(vec2(-10, 0), vec2(10, 0)),
+      Rect(vec2(0.0), vec2(0.0)),      Rect(vec2(20.0), vec2(30.0)),
+  };
+  for (const int count : {0, 1, 8, 9, 17, 64, 257}) {
+    SCOPED_TRACE(count);
+    Vec<PolyVert> points;
+    std::vector<vec2> original;
+    for (int i = 0; i < count; ++i) {
+      const vec2 position((i * 11) % 13 - 6, (i * 7) % 17 - 8);
+      points.push_back({position, i});
+      original.push_back(position);
+    }
+    BuildTwoDTree(points);
+    for (const int phase : {0, 1, 2}) {
+      SCOPED_TRACE(phase);
+      // Disable internal pivots as well as leaves without changing the split
+      // coordinates or rebuilding the tree.
+      for (auto& point : points) {
+        if (phase == 2 || (phase == 1 && point.idx % 3 == 0)) point.idx = -1;
+      }
+      for (const Rect& query : queries) {
+        std::vector<int> expected;
+        for (int i = 0; i < count; ++i) {
+          const vec2 position = original[i];
+          if (phase != 2 && !(phase == 1 && i % 3 == 0) &&
+              position.x >= query.min.x && position.x <= query.max.x &&
+              position.y >= query.min.y && position.y <= query.max.y)
+            expected.push_back(i);
+        }
+        std::vector<int> actual;
+        QueryTwoDTree(points, query,
+                      [&](PolyVert point) { actual.push_back(point.idx); });
+        std::sort(actual.begin(), actual.end());
+        EXPECT_EQ(actual, expected);
+      }
+    }
+  }
+}
+
+TEST(Utils, SegmentQueryPrunesOffRayLeaves) {
+  // The diagonal crosses 16 cells, but its AABB covers all 256. Count leaf
+  // candidates rather than timing the traversal so this stays deterministic.
+  const Box gridBounds(vec3(0.0), vec3(16, 16, 1));
+  std::vector<std::pair<uint32_t, Box>> cells;
+  for (int x = 0; x < 16; ++x) {
+    for (int y = 0; y < 16; ++y) {
+      const vec3 center(x + 0.5, y + 0.5, 0.5);
+      cells.emplace_back(Collider::MortonCode(center, gridBounds),
+                         Box(center - 0.25, center + 0.25));
+    }
+  }
+  std::sort(cells.begin(), cells.end(),
+            [](const auto& a, const auto& b) { return a.first < b.first; });
+  Vec<Box> boxes(cells.size());
+  Vec<uint32_t> morton(cells.size());
+  for (size_t i = 0; i < cells.size(); ++i) {
+    morton[i] = cells[i].first;
+    boxes[i] = cells[i].second;
+  }
+  const Collider collider(boxes, morton);
+  const vec3 a(-1, -1, 0.5), b(17, 17, 0.5);
+  const Box bounds(a, b);
+  std::vector<int> candidates;
+  auto record = [&](int, int leaf) { candidates.push_back(leaf); };
+  auto recorder = MakeSimpleRecorder(record);
+  auto boxQuery = [&](int) { return bounds; };
+  collider.Collisions(recorder, boxQuery, 1, false);
+  EXPECT_EQ(candidates.size(), 256);
+
+  for (const bool reverse : {false, true}) {
+    candidates.clear();
+    const collider_internal::SegmentQuery segment{bounds, reverse ? b : a,
+                                                  reverse ? a - b : b - a, 0.0};
+    auto query = [&](int) { return segment; };
+    collider.Collisions(recorder, query, 1, false);
+    ASSERT_EQ(candidates.size(), 16);
+    for (const int leaf : candidates)
+      EXPECT_DOUBLE_EQ(boxes[leaf].min.x, boxes[leaf].min.y);
+  }
+}
+
+TEST(Utils, SegmentQueryClosedSlabs) {
+  // A flat face and a point are valid BVH boxes. Include the endpoint, and
+  // handle a direction parallel to a slab without dividing by zero.
+  const Box face(vec3(0, 0, 0), vec3(0, 1, 1));
+  const Box point(vec3(0.0), vec3(0.0));
+  const vec3 a(-1, -1, 0), b(0.0);
+  const collider_internal::SegmentQuery endpoint{Box(a, b), a, b - a, 0.0};
+  EXPECT_TRUE(endpoint.DoesOverlap(face));
+  EXPECT_TRUE(endpoint.DoesOverlap(point));
+
+  const vec3 c(-1, -1, 0), d(1, 1, 0);
+  const collider_internal::SegmentQuery crossing{Box(c, d), c, d - c, 0.0};
+  EXPECT_TRUE(crossing.DoesOverlap(face));
+  EXPECT_TRUE(crossing.DoesOverlap(point));
+  const Box offRay(vec3(-0.5, 0.5, 0), vec3(-0.25, 0.75, 0));
+  EXPECT_FALSE(crossing.DoesOverlap(offRay));
+}
+
+#ifndef __EMSCRIPTEN__
+TEST(Utils, VecAbortsWhenAllocationFails) {
+  // More elements than size_t can address. Abort at the allocation rather
+  // than return a null buffer for later writes to go through.
+#ifdef GTEST_FLAG_SET
+  GTEST_FLAG_SET(death_test_style, "threadsafe");
+#else
+  testing::GTEST_FLAG(death_test_style) = "threadsafe";
+#endif
+  Vec<double> vec;
+  EXPECT_DEATH(vec.reserve(std::numeric_limits<size_t>::max() / 4), "");
+}
+#endif
+
+TEST(Utils, SharedVecCopyConstructionAndDetach) {
+  const int values[] = {2, 3, 5};
+  const SharedVec<int> source(VecView<const int>(values, 3));
+  SharedVec<int> copy(source);
+  EXPECT_EQ(copy.data(), source.data());
+  copy.MakeUnique();
+  EXPECT_NE(copy.data(), source.data());
+  copy.data()[0] = 7;
+  *std::next(copy.begin()) = 11;
+  copy.push_back(13);
+  EXPECT_EQ(source.size(), 3);
+  EXPECT_EQ(source[0], 2);
+  EXPECT_EQ(source[1], 3);
+  EXPECT_EQ(source[2], 5);
+  EXPECT_EQ(copy[0], 7);
+  EXPECT_EQ(copy[1], 11);
+  EXPECT_EQ(copy[3], 13);
+
+  Vec<int> valueCopy(source);
+  EXPECT_NE(valueCopy.data(), source.data());
+  valueCopy[2] = 17;
+  EXPECT_EQ(source[2], 5);
+
+  SharedVec<int> sharedForMove(source);
+  Vec<int> moved(std::move(sharedForMove));
+  EXPECT_NE(moved.data(), source.data());
+  moved[0] = 19;
+  EXPECT_EQ(source[0], 2);
+
+  SharedVec<int> sharedForAssignment(source);
+  Vec<int> assigned;
+  assigned = std::move(sharedForAssignment);
+  EXPECT_NE(assigned.data(), source.data());
+  assigned[1] = 29;
+  EXPECT_EQ(source[1], 3);
+
+  SharedVec<int> empty;
+  SharedVec<int> emptyCopy(empty);
+  emptyCopy.MakeUnique();
+  emptyCopy.push_back(31);
+  EXPECT_TRUE(empty.empty());
+
+  SharedVec<int> sharedMove(std::move(copy));
+  SharedVec<int> movedFromCopy(copy);
+  EXPECT_TRUE(movedFromCopy.empty());
+  movedFromCopy.push_back(37);
+  EXPECT_EQ(sharedMove[0], 7);
+}
+
+TEST(Utils, SharedVecCopyAssignmentFromMovedFrom) {
+  const int values[] = {2, 3, 5};
+  SharedVec<int> source(VecView<const int>(values, 3));
+  const SharedVec<int> owner(std::move(source));
+  const int* const originalData = owner.data();
+
+  const auto assignAndReuse = [&](SharedVec<int> destination) {
+    EXPECT_EQ(&(destination = source), &destination);
+    EXPECT_TRUE(destination.empty());
+    EXPECT_EQ(destination.capacity(), 0);
+    EXPECT_EQ(destination.data(), nullptr);
+    destination.MakeUnique();
+    destination.push_back(7);
+
+    SharedVec<int> copy(destination);
+    copy.MakeUnique();
+    copy[0] = 11;
+    EXPECT_EQ(destination.size(), 1);
+    EXPECT_EQ(destination[0], 7);
+    EXPECT_EQ(copy[0], 11);
+    EXPECT_TRUE(source.empty());
+    EXPECT_EQ(owner.data(), originalData);
+    ASSERT_EQ(owner.size(), 3);
+    for (size_t i = 0; i < owner.size(); ++i) EXPECT_EQ(owner[i], values[i]);
+  };
+
+  {
+    SCOPED_TRACE("empty destination");
+    assignAndReuse(SharedVec<int>());
+  }
+  {
+    SCOPED_TRACE("unique nonempty destination");
+    assignAndReuse(SharedVec<int>(2, 17));
+  }
+  {
+    SCOPED_TRACE("shared nonempty destination");
+    assignAndReuse(owner);
+  }
+
+  source = owner;
+  EXPECT_EQ(source.data(), owner.data());
+  source.MakeUnique();
+  source[0] = 13;
+  EXPECT_EQ(owner[0], 2);
+}
+
+#ifndef __EMSCRIPTEN__
+TEST(Utils, SharedVecConcurrentCopyAndDetach) {
+  const SharedVec<int> source(128, 23);
+  std::atomic<bool> intact = true;
+  std::vector<std::thread> threads;
+  for (int thread = 0; thread < 8; ++thread) {
+    threads.emplace_back([&source, &intact, thread] {
+      for (int iteration = 0; iteration < 100; ++iteration) {
+        SharedVec<int> copy(source);
+        if (copy.data() != source.data()) intact = false;
+        copy.MakeUnique();
+        std::fill(copy.begin(), copy.end(), thread);
+        for (int value : source) {
+          if (value != 23) intact = false;
+        }
+      }
+    });
+  }
+  for (auto& thread : threads) thread.join();
+  EXPECT_TRUE(intact);
+}
+
+#endif  // __EMSCRIPTEN__
+
+TEST(Utils, CosdLargeAngles) {
+  for (const double angle : {1e18, -1e18, 1e20, -1e20, 1e100, -1e100,
+                             std::numeric_limits<double>::max(),
+                             -std::numeric_limits<double>::max()}) {
+    SCOPED_TRACE(testing::Message() << "angle = " << angle);
+    const double reduced = std::remainder(angle, 360.0);
+    EXPECT_NEAR(cosd(angle), std::cos(radians(reduced)), 1e-15);
+    EXPECT_NEAR(sind(angle) * sind(angle) + cosd(angle) * cosd(angle), 1.0,
+                1e-15);
+  }
+}
+
+TEST(Utils, CosdQuadrantBoundaries) {
+  const double expected[] = {1.0, 0.0, -1.0, 0.0};
+  for (int quarter = -8; quarter <= 8; ++quarter) {
+    EXPECT_DOUBLE_EQ(cosd(quarter * 90.0), expected[(quarter + 8) % 4]);
+  }
+  for (const double angle : {std::numeric_limits<double>::infinity(),
+                             -std::numeric_limits<double>::infinity(),
+                             std::numeric_limits<double>::quiet_NaN()}) {
+    EXPECT_TRUE(std::isnan(cosd(angle)));
+  }
+}
 
 TEST(Utils, BarycentricAllWeightsSnappedToZero) {
   // Both points are within tolerance of every edge, but not any vertex.

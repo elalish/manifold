@@ -138,6 +138,22 @@ Polygons SquareHole(double xOffset) {
   return polys;
 }
 
+// A finely sampled, smooth, slightly non-convex contour: a circle with a few
+// small Fourier perturbations, so Triangulate can't use its convex fast path.
+Polygons SmoothBlob(int numVert, double radius) {
+  const int freq[] = {3, 5, 7, 11, 13};
+  Polygons polys(1);
+  polys[0].reserve(numVert);
+  for (int i = 0; i < numVert; ++i) {
+    const double angle = kTwoPi * i / numVert;
+    double r = radius;
+    for (int j = 0; j < 5; ++j)
+      r += 0.02 * radius * std::sin(freq[j] * angle + j);
+    polys[0].push_back({r * std::cos(angle), r * std::sin(angle)});
+  }
+  return polys;
+}
+
 MeshGL Csaszar() {
   MeshGL csaszar;
   csaszar.numProp = 3;
@@ -378,7 +394,17 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
     }
     ASSERT_LT(i, originals.size());
     const MeshGL& inMesh = originals[i];
-    const float tolerance = 3 * std::max(output.tolerance, inMesh.tolerance);
+    auto meshScale = [](const MeshGL& mesh) {
+      Box bounds;
+      for (size_t vertex = 0; vertex < mesh.NumVert(); ++vertex)
+        bounds.Union(vec3(mesh.GetVertPos(vertex)));
+      return bounds.Scale();
+    };
+    const float tolerance =
+        3 *
+        std::max(Quality::GetRelativePrecision(),
+                 static_cast<double>(std::numeric_limits<float>::epsilon())) *
+        std::max(meshScale(output), meshScale(inMesh));
 
     for (uint32_t tri = output.runIndex[run] / 3;
          tri < output.runIndex[run + 1] / 3; ++tri) {

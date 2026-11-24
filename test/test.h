@@ -54,6 +54,7 @@ inline double RawArea(const manifold::SimplePolygon& ring) {
 }
 
 Polygons SquareHole(double xOffset = 0.0);
+Polygons SmoothBlob(int numVert, double radius = 10.0);
 MeshGL Csaszar();
 Manifold Gyroid();
 MeshGL TetGL();

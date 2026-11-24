@@ -16,8 +16,8 @@ import {Document, WebIO} from '@gltf-transform/core';
 import {KHRONOS_EXTENSIONS} from '@gltf-transform/extensions';
 import {prune} from '@gltf-transform/functions';
 import Module from 'manifold-3d';
-import {disposeMesh, Properties, readMesh, writeMesh} from 'manifold-3d/lib/gltf-io';
-import {EXTManifold} from 'manifold-3d/manifold-gltf';
+import {disposeMesh, Properties, readMesh, writeMesh} from 'manifold-cad/lib/gltf-io';
+import {EXTManifold} from 'manifold-cad/manifold-gltf';
 import {SimpleDropzone} from 'simple-dropzone';
 
 // Set up gltf-transform
@@ -126,10 +126,9 @@ async function readGLB(url: string): Promise<Document> {
       tmp.mesh.runOriginalID[i] = firstID + i;
       id2properties.set(firstID + i, tmp.runProperties[i]);
     }
-    const manifoldMesh = new Mesh(tmp.mesh);
     disposeMesh(mesh);
     // Make the mesh manifold if it's close.
-    manifoldMesh.merge();
+    const manifoldMesh = new Mesh(tmp.mesh).merge();
 
     try {
       // Test manifoldness - will throw if not.

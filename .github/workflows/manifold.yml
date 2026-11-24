@@ -3,12 +3,12 @@
 name: CI
 
 # Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the master branch
+# events for the master and release branches
 on:
   push:
-    branches: [ master ]
+    branches: [ master, 'v*-release' ]
   pull_request:
-    branches: [ master ]
+    branches: [ master, 'v*-release' ]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -25,7 +25,7 @@ jobs:
     runs-on: windows-2025
     steps:
     - uses: actions/checkout@v7
-    - uses: lukka/get-cmake@v4.4.2
+    - uses: lukka/get-cmake@v4.5.0
       with:
         cmakeVersion: 4.3.3
     - &clone-tbb
@@ -127,6 +127,13 @@ jobs:
             parallelization: ON
             os: ubuntu-24.04
             std: 20
+          # Runs the Python tests without the GIL.
+          - name: GCC 14 (TBB:ON, Python 3.14t)
+            gcc: 14
+            parallelization: ON
+            os: ubuntu-24.04
+            std: 17
+            python: '3.14t'
     runs-on: ${{ matrix.os }}
     env:
       CC: gcc-${{ matrix.gcc }}
@@ -136,7 +143,7 @@ jobs:
     - &setup-python
       uses: actions/setup-python@v7
       with:
-        python-version: '3.x'
+        python-version: ${{ matrix.python || '3.x' }}
         cache: 'pip'
     - run: pip install -U trimesh pytest
     - name: Install apt packages
@@ -291,9 +298,12 @@ jobs:
     - name: Coverage Report
       run: |
         cd build
-        lcov --capture --gcov-tool gcov-14 --ignore-errors mismatch --initial --directory . --output-file ./code_coverage_init.info
+        lcov --capture --gcov-tool gcov-14 --ignore-errors mismatch --include "/*/manifold/src/*" --initial --directory . --output-file ./code_coverage_init.info
         test/manifold_test
-        lcov --capture --gcov-tool gcov-14 --ignore-errors mismatch --directory . --output-file ./code_coverage_test.info
+        # Tests call the library from several threads, and racing gcov counters
+        # can come out negative, so far only in system headers. Atomic counters
+        # fix that but are 4-7x slower.
+        lcov --capture --gcov-tool gcov-14 --ignore-errors mismatch,negative --include "/*/manifold/src/*" --directory . --output-file ./code_coverage_test.info
         lcov --add-tracefile ./code_coverage_init.info --add-tracefile ./code_coverage_test.info --output-file ./code_coverage_total.info
         lcov --extract ./code_coverage_total.info "/*/manifold/src/*" --output-file ./code_coverage.info
     - uses: codecov/codecov-action@v7
@@ -364,12 +374,12 @@ jobs:
         cd bindings/wasm
         wasmpath=$(pwd)
         npmtestpath=../npmtest
-        # Create an npm package.
-        npm ci && npm pack
-        # Install it in an empty directory.
+        # Create both npm packages.
+        npm ci && npm pack && (cd manifold-cad && npm pack)
+        # Install them in an empty directory.
         mkdir -p ${npmtestpath} && cd ${npmtestpath}
-        npm install ${wasmpath}/manifold-3d*.tgz
-        cp ${wasmpath}/test/fixtures/npm/* .
+        npm install ${wasmpath}/manifold-3d-*.tgz ${wasmpath}/manifold-cad/manifold-cad-*.tgz
+        cp ${wasmpath}/manifold-cad/test/fixtures/npm/* .
         # Positive case smoke test.
         npx manifold-cad ./unitSphere.mjs ./unitSphere.glb && echo "Positive smoke test succeeded"
         # Negative case smoke test.
@@ -595,6 +605,18 @@ jobs:
     - uses: actions/checkout@v7
     - uses: DeterminateSystems/nix-installer-action@main
     - uses: DeterminateSystems/magic-nix-cache-action@main
+    # One cache download has taken over 20 minutes. Fetch the build inputs
+    # on their own so that phase can be retried. Fully fetched store paths
+    # carry over to the next attempt, but an interrupted one starts over.
+    - name: Fetch build inputs
+      run: |
+        for attempt in 1 2 3; do
+          if timeout --kill-after=30s 6m nix develop '.?submodules=1#${{matrix.variant}}' --command true; then
+            exit 0
+          fi
+          echo "Fetch attempt $attempt failed or stalled"
+        done
+        exit 1
     - run: nix build -L '.?submodules=1#${{matrix.variant}}'
 
   build_openscad_compiler:

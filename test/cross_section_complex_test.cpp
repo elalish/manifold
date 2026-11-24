@@ -17,9 +17,11 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <cstring>
 #include <iostream>
 #include <limits>
 #include <map>
+#include <numeric>
 #include <random>
 #include <sstream>
 #include <string>
@@ -513,6 +515,219 @@ TEST(CrossSectionComplex, VertexMergeIdempotenceTightCluster) {
       << ", eps=" << eps << ")";
 }
 
+namespace {
+// Timed: many verts sharing an x, like the ends of stacked horizontal edges.
+void ExpectPairsMerge(const std::vector<vec2>& verts, double eps,
+                      int repetitions) {
+  for (int i = 0; i < repetitions; ++i) {
+    const VertexMerge merged = MergeVerts(verts, eps);
+    ASSERT_EQ(merged.verts.size(), verts.size() / 2);
+    for (size_t v = 0; v < verts.size(); v += 2) {
+      ASSERT_EQ(merged.inputVert2Merged[v], merged.inputVert2Merged[v + 1]);
+    }
+  }
+}
+}  // namespace
+
+TEST(CrossSectionComplex, MergeVertsChainAcrossSlabs) {
+  // Steps of 0.875 eps put neighbors in different 2*eps slabs, so each chain
+  // only connects through pairs that straddle a slab boundary.
+  const double eps = 1.0;
+  std::vector<vec2> verts;
+  for (const double y : {0.0, 10.0}) {
+    for (int i = 0; i < 64; ++i) verts.push_back({0.875 * i, y});
+  }
+  const VertexMerge merged = MergeVerts(verts, eps);
+  ASSERT_EQ(merged.verts.size(), 2);
+  for (int i = 0; i < 64; ++i) {
+    EXPECT_EQ(merged.inputVert2Merged[i], merged.inputVert2Merged[0]);
+    EXPECT_EQ(merged.inputVert2Merged[64 + i], merged.inputVert2Merged[64]);
+  }
+  EXPECT_NE(merged.inputVert2Merged[0], merged.inputVert2Merged[64]);
+}
+
+TEST(CrossSectionComplex, MergeVertsSharedColumns) {
+  const double eps = 1e-6;
+  std::vector<vec2> verts;
+  for (int i = 0; i < 4096; ++i) {
+    for (const double x : {0.0, 100.0}) {
+      verts.push_back({x, 4.0 * i});
+      verts.push_back({x, 4.0 * i + 0.25 * eps});
+    }
+  }
+  ExpectPairsMerge(verts, eps, 16);
+}
+
+TEST(CrossSectionComplex, MergeVertsGrid) {
+  const double eps = 1e-6;
+  std::vector<vec2> verts;
+  for (int i = 0; i < 256; ++i) {
+    for (int j = 0; j < 256; ++j) {
+      verts.push_back({double(i), double(j)});
+      verts.push_back({i + 0.25 * eps, j + 0.25 * eps});
+    }
+  }
+  ExpectPairsMerge(verts, eps, 8);
+}
+
+namespace {
+// Triangle apexes sit on one long edge, just above or below it within eps,
+// or clearly off it; only the first three kinds belong on its list, in order
+// along the edge. With `farSquare`, a small square far away puts nearly every
+// edge in one grid cell, so the lists come from the tree fallback instead.
+void ExpectIncidenceAlongLongEdge(bool farSquare) {
+  const double eps = 1e-6;
+  std::vector<vec2> verts = {{0, 0}, {1000, 0}, {1000, -1}, {0, -1}};
+  std::vector<EdgeM> edges = {{0, 1, 1}, {1, 2, 1}, {2, 3, 1}, {3, 0, 1}};
+  std::vector<int> expected;
+  const double offsets[] = {0.0, 0.5 * eps, -0.5 * eps, 3 * eps};
+  for (int i = 0; i < 396; ++i) {
+    const double x = 2.5 * i + 5;
+    const int apex = static_cast<int>(verts.size());
+    verts.push_back({x, offsets[i % 4]});
+    verts.push_back({x + 1, 1});
+    verts.push_back({x - 1, 1});
+    edges.push_back({apex, apex + 1, 1});
+    edges.push_back({apex + 1, apex + 2, 1});
+    edges.push_back({apex + 2, apex, 1});
+    if (i % 4 != 3) expected.push_back(apex);
+  }
+  if (farSquare) {
+    const int s = static_cast<int>(verts.size());
+    for (const vec2 p : {vec2(1e5, 1e5), vec2(1e5 + 10, 1e5),
+                         vec2(1e5 + 10, 1e5 + 10), vec2(1e5, 1e5 + 10)})
+      verts.push_back(p);
+    for (int k = 0; k < 4; ++k) edges.push_back({s + k, s + (k + 1) % 4, 1});
+  }
+  const auto lists = BuildIncidenceLists(edges, verts, eps);
+  EXPECT_EQ(lists[0], expected);
+  for (size_t e = 1; e < lists.size(); ++e) EXPECT_TRUE(lists[e].empty());
+}
+}  // namespace
+
+TEST(CrossSectionComplex, IncidenceListsAlongLongEdge) {
+  ExpectIncidenceAlongLongEdge(false);
+}
+
+TEST(CrossSectionComplex, IncidenceListsAlongLongEdgeUnevenLayout) {
+  ExpectIncidenceAlongLongEdge(true);
+}
+
+TEST(CrossSectionComplex, IncidenceClusterInRandomOrder) {
+  // Timed: a dense lattice of tiny squares, listed in shuffled order, next to
+  // one far square. Both the grid and coordinate-based Morton codes see the
+  // whole lattice as one cell, so a tree splitting it by input order can't
+  // prune.
+  constexpr int kSide = 80;
+  constexpr double kSize = 1e-4;
+  std::vector<int> order(kSide * kSide);
+  std::iota(order.begin(), order.end(), 0);
+  std::mt19937 rng(1922);
+  for (int i = static_cast<int>(order.size()) - 1; i > 0; --i)
+    std::swap(order[i], order[rng() % (i + 1)]);
+  Polygons input;
+  for (const int k : order) {
+    const vec2 c(k % kSide / double(kSide), k / kSide / double(kSide));
+    input.push_back(
+        {c, c + vec2(kSize, 0), c + vec2(kSize, kSize), c + vec2(0, kSize)});
+  }
+  input.push_back(
+      {{1e4, 1e4}, {1e4 + 1, 1e4}, {1e4 + 1, 1e4 + 1}, {1e4, 1e4 + 1}});
+  for (int i = 0; i < 4; ++i) {
+    const CrossSection result(input);
+    ASSERT_EQ(result.NumContour(), kSide * kSide + 1);
+    ASSERT_NEAR(result.Area(), 1 + kSide * kSide * kSize * kSize, 1e-9);
+  }
+}
+
+TEST(CrossSectionComplex, IncidenceParallelDiagonalSlivers) {
+  // Timed: parallel slivers at 45 degrees, so every edge's box covers many
+  // vertices. Each box also spans many grid cells, too many to bin.
+  constexpr int kSlivers = 2000;
+  constexpr double kWidth = 1e-4;
+  Polygons input;
+  for (int i = 0; i < kSlivers; ++i) {
+    const double x = 100.0 * i / kSlivers;
+    input.push_back(
+        {{x, 0}, {x + kWidth, 0}, {x + 100 + kWidth, 100}, {x + 100, 100}});
+  }
+  for (int i = 0; i < 2; ++i) {
+    const CrossSection result(input);
+    ASSERT_EQ(result.NumContour(), kSlivers);
+    ASSERT_NEAR(result.Area(), kSlivers * kWidth * 100, 1e-9);
+  }
+}
+
+TEST(CrossSectionComplex, IncidenceExtremeExtents) {
+  // At these magnitudes the grid's cell size or scale underflows or overflows.
+  const auto square = [](double side) {
+    return Polygons{{{0, 0}, {side, 0}, {side, side}, {0, side}}};
+  };
+  EXPECT_EQ(CrossSection(square(1e-310)).NumVert(), 4);
+  EXPECT_EQ(CrossSection(square(1e-320)).NumVert(), 4);
+  EXPECT_EQ(CrossSection(square(1e308)).NumVert(), 4);
+
+  // A contour on a vertical line: eps underflows to 0, so the extent in x is 0.
+  EXPECT_EQ(
+      CrossSection(Polygons{{{0, 0}, {0, 1e-320}, {0, 2e-320}}}).NumVert(), 0);
+
+  // Many edges in a subnormal box, so the cell size itself underflows.
+  constexpr int kSide = 64;
+  const double step = 1e-320 / kSide;
+  Polygons triangles;
+  for (int i = 0; i < kSide; ++i) {
+    for (int j = 0; j < kSide; ++j) {
+      const vec2 c(i * step, j * step);
+      triangles.push_back({c, c + vec2(step / 2, 0), c + vec2(0, step / 2)});
+    }
+  }
+  EXPECT_EQ(CrossSection(triangles).NumContour(), kSide * kSide);
+}
+
+TEST(CrossSectionComplex, IncidenceUnevenLayout) {
+  // Timed: detailed shapes plus one far-away square, so a grid sized from the
+  // overall bounds would put almost every edge in one cell.
+  auto circle = [](vec2 c, int n) {
+    SimplePolygon p;
+    for (int k = 0; k < n; ++k) {
+      const double a = 2 * kPi * k / n;
+      p.push_back(c + vec2(std::cos(a), std::sin(a)));
+    }
+    return p;
+  };
+  const Polygons input = {circle({0, 0}, 20000),
+                          circle({0.5, 0}, 20000),
+                          {{1e4, 1e4}, {2e4, 1e4}, {2e4, 2e4}, {1e4, 2e4}}};
+  // Two unit circles 0.5 apart overlap in a lens of area
+  // 2 acos(1/4) - (1/4) sqrt(15/4).
+  const double circles =
+      2 * kPi - (2 * std::acos(0.25) - 0.25 * std::sqrt(3.75));
+  for (int i = 0; i < 4; ++i) {
+    const CrossSection result(input);
+    ASSERT_EQ(result.NumContour(), 2);
+    ASSERT_NEAR(result.Area(), 1e8 + circles, 1e-5);
+  }
+}
+
+TEST(CrossSectionComplex, IncidenceBrickWall) {
+  // Timed: staggered rows of bricks, where every brick corner lands on an
+  // edge of a brick in the next row. The gaps between bricks become holes,
+  // except in the first and last rows.
+  constexpr int kRows = 64, kCols = 48;
+  Polygons bricks;
+  for (int r = 0; r < kRows; ++r) {
+    for (int c = 0; c < kCols; ++c) {
+      const double x = 3.0 * c + (r % 2 ? 1.5 : 0.0), y = r;
+      bricks.push_back({{x, y}, {x + 2, y}, {x + 2, y + 1}, {x, y + 1}});
+    }
+  }
+  for (int i = 0; i < 16; ++i) {
+    const CrossSection wall(bricks);
+    ASSERT_EQ(wall.NumContour(), 1 + (kRows - 2) * (kCols - 1));
+    ASSERT_NEAR(wall.Area(), 2.0 * kRows * kCols, 1e-9);
+  }
+}
+
 TEST(CrossSectionComplex, ValidatorRejectsRetainedVertsWithinEps) {
   const std::vector<vec2> verts = {{0.0, 0.0}, {10.0, 0.0}, {0.0, 10.0},
                                    {0.5, 0.5}, {20.0, 0.0}, {20.0, 10.0}};
@@ -576,25 +791,26 @@ TEST(CrossSectionComplex, CleanupPassMatchesValidAddSinglePass) {
   EXPECT_NEAR(TotalSignedArea(pass1Polys), TotalSignedArea(pass2Polys), 1e-12);
 }
 
-// EvenOdd only changes which sub-edges the winding pass retains: `rule` is
-// read in SweepMode::Winding and nowhere in the arrangement. So on the same
-// self-intersecting input it must produce a graph the independent oracle still
-// accepts, over the same vertex merge Add gets.
-TEST(CrossSectionComplex, EvenOddRetainedGraphMatchesAddArrangement) {
+// Alternate fill rules only change which sub-edges the winding pass retains:
+// `rule` is read in SweepMode::Winding and nowhere in the arrangement. So on
+// the same self-intersecting input it must produce a graph the independent
+// oracle still accepts, over the same vertex merge Add gets.
+TEST(CrossSectionComplex, FillRulesRetainedGraphMatchAddArrangement) {
   Polygons polys{RandomTopologicalRing(8, 15)};
   const double eps = InferEps(polys, {});
   const auto [verts, edges] = PolygonsToInput(polys);
 
   const auto add =
       RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::Add);
-  const auto evenOdd =
-      RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, WindRule::EvenOdd);
-
-  EXPECT_TRUE(CheckRetainedGraphValidity(
-      evenOdd, edges, evenOdd.inputVert2Merged, evenOdd.numMergedVerts, eps));
-  EXPECT_EQ(evenOdd.numMergedVerts, add.numMergedVerts);
-  EXPECT_EQ(evenOdd.inputVert2Merged, add.inputVert2Merged);
-  EXPECT_FALSE(OutEdgesToPolygons(evenOdd.verts, evenOdd.edges).empty());
+  for (WindRule rule : {WindRule::EvenOdd, WindRule::NonZero}) {
+    const auto filled =
+        RemoveOverlaps2D(verts, edges, eps, /*debug=*/false, rule);
+    EXPECT_TRUE(CheckRetainedGraphValidity(
+        filled, edges, filled.inputVert2Merged, filled.numMergedVerts, eps));
+    EXPECT_EQ(filled.numMergedVerts, add.numMergedVerts);
+    EXPECT_EQ(filled.inputVert2Merged, add.inputVert2Merged);
+    EXPECT_FALSE(OutEdgesToPolygons(filled.verts, filled.edges).empty());
+  }
 }
 
 TEST(CrossSectionComplex, OffsetRoundUsesRequestedSegments) {
@@ -602,7 +818,7 @@ TEST(CrossSectionComplex, OffsetRoundUsesRequestedSegments) {
   const int segments = 20;
   const double delta = 5.0;
 
-  Polygons rounded = Offset({square}, delta, JoinType::Round, 2.0, segments);
+  Polygons rounded = Offset({square}, delta, JoinType::Round, 2.0, {segments});
 
   ASSERT_EQ(rounded.size(), 1);
   EXPECT_EQ(rounded[0].size(), segments + 4);
@@ -612,7 +828,7 @@ TEST(CrossSectionComplex, OffsetRoundClampsHugeSegmentCount) {
   // An absurd requested count is clamped so the vertex count cannot blow up;
   // the clamp is kMaxRoundJoinSegments == 1 << 15 (file-local in offset.cpp).
   SimplePolygon square = {{0, 0}, {20, 0}, {20, 20}, {0, 20}};
-  Polygons rounded = Offset({square}, 5.0, JoinType::Round, 2.0, 1 << 20);
+  Polygons rounded = Offset({square}, 5.0, JoinType::Round, 2.0, {1 << 20});
   ASSERT_EQ(rounded.size(), 1);
   EXPECT_EQ(rounded[0].size(), (1 << 15) + 4);
 }
@@ -893,6 +1109,59 @@ TEST(CrossSectionComplex, OutEdgesToPolygonsClosesSimpleRing) {
   EXPECT_EQ(polys[0].size(), 4u);
 }
 
+namespace {
+
+// Also timed by the weekly benchmark suite. Fixed repetitions make the
+// optimized path measurable without machine-dependent timing assertions.
+void ExpectLongLoopExtraction(int numVerts, int repetitions) {
+  std::vector<vec2> verts;
+  std::vector<OutEdge> edges;
+  verts.reserve(numVerts);
+  edges.reserve(numVerts);
+  for (int i = 0; i < numVerts; ++i) {
+    const double angle = 2 * kPi * i / numVerts;
+    const double radius = 10 + std::cos(5 * angle);
+    verts.push_back({radius * std::cos(angle), radius * std::sin(angle)});
+    edges.push_back({i, (i + 1) % numVerts});
+  }
+  const Polygons expected = {verts};
+  for (int i = 0; i < repetitions; ++i) {
+    ASSERT_EQ(OutEdgesToPolygons(verts, edges), expected);
+  }
+}
+
+}  // namespace
+
+TEST(CrossSectionComplex, OutEdgesToPolygonsLongLoop2048) {
+  ExpectLongLoopExtraction(2048, 256);
+}
+
+TEST(CrossSectionComplex, OutEdgesToPolygonsLongLoop8192) {
+  ExpectLongLoopExtraction(8192, 64);
+}
+
+TEST(CrossSectionComplex, OutEdgesToPolygonsManySmallContours) {
+  std::vector<vec2> verts;
+  std::vector<OutEdge> edges;
+  Polygons expected;
+  for (int i = 0; i < 1024; ++i) {
+    const double x = 3 * (i % 32), y = 3 * (i / 32);
+    const SimplePolygon square = {
+        {x, y}, {x + 1, y}, {x + 1, y + 1}, {x, y + 1}};
+    const int base = static_cast<int>(verts.size());
+    verts.insert(verts.end(), square.begin(), square.end());
+    for (int j = 0; j < 4; ++j) {
+      edges.push_back({base + j, base + (j + 1) % 4});
+    }
+    expected.push_back(square);
+  }
+  // Keep this separate from the long-loop cases: per-contour initialization
+  // of a global-sized lookup table can regress inputs with many small loops.
+  for (int i = 0; i < 128; ++i) {
+    ASSERT_EQ(OutEdgesToPolygons(verts, edges), expected);
+  }
+}
+
 TEST(CrossSectionComplex, OutEdgesToPolygonsSplitsExactRepeatedVertex) {
   const std::vector<vec2> verts = {{0, 0}, {1, 0}, {1, -1}, {2, -1}, {1, 1}};
   const std::vector<OutEdge> edges = {{0, 1}, {1, 2}, {2, 3},
@@ -902,6 +1171,25 @@ TEST(CrossSectionComplex, OutEdgesToPolygonsSplitsExactRepeatedVertex) {
   EXPECT_EQ(polys[0].size(), 3u);
   EXPECT_EQ(polys[1].size(), 3u);
   EXPECT_NEAR(TotalSignedArea(polys), 1.0, 1e-12);
+}
+
+TEST(CrossSectionComplex,
+     OutEdgesToPolygonsPreservesSplitOrderAndResetsPositions) {
+  // Two pinches on one walk, followed by a separate walk sharing vertex 1.
+  // Splitting must keep both the emission order and the surviving vertex order,
+  // and clear the position table before processing the final walk.
+  const std::vector<vec2> verts = {{0, 0},  {1, 0},  {1, -1}, {2, -1}, {2, 0},
+                                   {2, -1}, {3, -1}, {3, 1},  {1, 1},  {0, 1}};
+  const std::vector<OutEdge> edges = {{0, 1}, {1, 2}, {2, 3}, {3, 1}, {1, 4},
+                                      {4, 5}, {5, 6}, {6, 4}, {4, 7}, {7, 0},
+                                      {1, 8}, {8, 9}, {9, 1}};
+  const Polygons expected = {
+      {verts[1], verts[2], verts[3]},
+      {verts[4], verts[5], verts[6]},
+      {verts[0], verts[1], verts[4], verts[7]},
+      {verts[1], verts[8], verts[9]},
+  };
+  EXPECT_EQ(OutEdgesToPolygons(verts, edges), expected);
 }
 
 TEST(CrossSectionComplex, OutEdgesToPolygonsKeepsNearDistinctVertex) {
@@ -1117,4 +1405,502 @@ TEST(CrossSectionComplex, VisibleMissedCrossingLargeEps) {
     if (kv.second.first != kv.second.second) ++imbalanced;
   EXPECT_EQ(imbalanced, 0) << "retained edges must form closed walks (dropped "
                               "crossing -> open walk)";
+}
+
+TEST(CrossSectionComplex, SweepSharedStartPreservesSubdivisions) {
+  const Polygons input = {{{0, 0}, {4, 0}, {4, 4}},
+                          {{0, 0}, {6, 0}, {6, 3}},
+                          {{0, 0}, {4, 4}, {0, 4}}};
+  using Segment = std::pair<vec2, vec2>;
+  const std::vector<Segment> expected[] = {
+      {{{0, 4}, {0, 0}},
+       {{0, 0}, {4, 0}},
+       {{4, 4}, {0, 4}},
+       {{4, 0}, {6, 0}},
+       {{4, 2}, {4, 4}},
+       {{6, 3}, {4, 2}},
+       {{6, 0}, {6, 3}}},
+      {{{0, 0}, {4, 0}}, {{4, 2}, {0, 0}}, {{4, 0}, {4, 2}}},
+      {{{0, 4}, {0, 0}},
+       {{0, 0}, {4, 2}},
+       {{4, 4}, {0, 4}},
+       {{4, 2}, {4, 0}},
+       {{4, 0}, {6, 0}},
+       {{4, 2}, {4, 4}},
+       {{6, 3}, {4, 2}},
+       {{6, 0}, {6, 3}}}};
+  const WindRule rules[] = {WindRule::Add, WindRule::Intersect,
+                            WindRule::EvenOdd};
+  for (int r = 0; r < 3; ++r) {
+    SCOPED_TRACE(r);
+    auto [verts, edges] = PolygonsToInput(input);
+    const auto result = SweepWinding(edges, verts, rules[r]);
+    ASSERT_EQ(result.size(), expected[r].size());
+    for (size_t i = 0; i < result.size(); ++i) {
+      EXPECT_EQ(verts[result[i].v0], expected[r][i].first);
+      EXPECT_EQ(verts[result[i].v1], expected[r][i].second);
+      EXPECT_EQ(result[i].mult, 1);
+    }
+  }
+}
+
+TEST(CrossSectionComplex, SweepOppositeOverlappingRemainders) {
+  // The clockwise inner triangle shares part of the outer triangle's base.
+  // The rectangle introduces events and crossings along these opposite edges.
+  const Polygons input = {{{-2, 0}, {2, 0}, {0, 2}},
+                          {{-1, 0}, {0, 1}, {2, 0}},
+                          {{-1, -1}, {1, -1}, {1, 1}, {-1, 1}}};
+  const std::vector<std::pair<vec2, vec2>> expected = {
+      {{-2, 0}, {-1, 0}},  {{-1, 1}, {-2, 0}}, {{-1, 0}, {-1, -1}},
+      {{-1, -1}, {1, -1}}, {{0, 2}, {-1, 1}},  {{1, 1}, {0, 2}},
+      {{1, -1}, {1, 0.5}}, {{1, 0.5}, {2, 0}}, {{2, 0}, {1, 1}}};
+  auto [verts, edges] = PolygonsToInput(input);
+  const auto result = SweepWinding(edges, verts, WindRule::Add);
+  ASSERT_EQ(result.size(), expected.size());
+  for (size_t i = 0; i < result.size(); ++i) {
+    EXPECT_EQ(verts[result[i].v0], expected[i].first);
+    EXPECT_EQ(verts[result[i].v1], expected[i].second);
+    EXPECT_EQ(result[i].mult, 1);
+  }
+}
+
+TEST(CrossSectionComplex, SweepPreservesExtremeScaleResults) {
+  // Exercise direct sweep inputs without public epsilon-based preprocessing.
+  for (int exponent : {-1070, -1020, -500, 0, 500, 900}) {
+    SCOPED_TRACE(exponent);
+    const double scale = std::ldexp(1.0, exponent);
+    for (WindRule rule :
+         {WindRule::Add, WindRule::Intersect, WindRule::EvenOdd}) {
+      auto verts =
+          std::vector<vec2>{{0, 0}, {4 * scale, 0}, {2 * scale, 4 * scale}};
+      const auto original = verts;
+      const std::vector<EdgeM> edges = {{0, 1, 2}, {1, 2, 2}, {2, 0, 2}};
+      const auto result = SweepWinding(edges, verts, rule);
+      if (exponent < -500 || rule == WindRule::EvenOdd) {
+        EXPECT_TRUE(result.empty());
+      } else {
+        ASSERT_EQ(result.size(), 3);
+        const int from[] = {2, 0, 1}, to[] = {0, 1, 2};
+        for (int i = 0; i < 3; ++i) {
+          EXPECT_EQ(result[i].v0, from[i]);
+          EXPECT_EQ(result[i].v1, to[i]);
+          EXPECT_EQ(result[i].mult, 1);
+        }
+      }
+      EXPECT_EQ(verts, original);
+    }
+  }
+}
+
+TEST(CrossSectionComplex, SweepHighDegreeSharedOriginExactEdges) {
+  constexpr int count = 64;
+  for (bool fanIn : {false, true}) {
+    SCOPED_TRACE(fanIn);
+    Polygons wedges;
+    for (int i = 0; i < count; ++i) {
+      if (fanIn)
+        wedges.push_back({{0, 0}, {-4, 2.0 * i + 1}, {-4, 2.0 * i}});
+      else
+        wedges.push_back({{0, 0}, {4, 2.0 * i}, {4, 2.0 * i + 1}});
+    }
+    for (WindRule rule :
+         {WindRule::Add, WindRule::Intersect, WindRule::EvenOdd}) {
+      SCOPED_TRACE(static_cast<int>(rule));
+      auto [verts, edges] = PolygonsToInput(wedges);
+      const auto result = SweepWinding(edges, verts, rule);
+      if (rule == WindRule::Intersect) {
+        EXPECT_TRUE(result.empty());
+        continue;
+      }
+      ASSERT_EQ(result.size(), 3 * count);
+      for (int i = 0; i < count; ++i) {
+        if (fanIn) {
+          EXPECT_EQ(result[3 * i].v0, 3 * i + 1);
+          EXPECT_EQ(result[3 * i].v1, 3 * i + 2);
+          EXPECT_EQ(result[3 * i + 1].v0, 3 * i + 2);
+          EXPECT_EQ(result[3 * i + 1].v1, 0);
+          EXPECT_EQ(result[3 * i + 2].v0, 0);
+          EXPECT_EQ(result[3 * i + 2].v1, 3 * i + 1);
+        } else {
+          EXPECT_EQ(result[2 * i].v0, 0);
+          EXPECT_EQ(result[2 * i].v1, 3 * i + 1);
+          EXPECT_EQ(result[2 * i + 1].v0, 3 * i + 2);
+          EXPECT_EQ(result[2 * i + 1].v1, 0);
+          EXPECT_EQ(result[2 * count + i].v0, 3 * i + 1);
+          EXPECT_EQ(result[2 * count + i].v1, 3 * i + 2);
+        }
+      }
+      for (const auto& edge : result) EXPECT_EQ(edge.mult, 1);
+    }
+  }
+}
+
+TEST(CrossSectionComplex, SweepThreeWayCrossingsExactEdges) {
+  Polygons bands;
+  for (int slope : {-1, 0, 1}) {
+    const double m = slope;
+    bands.push_back({{-1, -m}, {1, m}, {1, m + 12}, {-1, -m + 12}});
+  }
+  const std::vector<std::pair<vec2, vec2>> expected[] = {{{{-1, 0}, {-1, -1}},
+                                                          {{-1, -1}, {0, 0}},
+                                                          {{-1, 1}, {-1, 0}},
+                                                          {{-1, 11}, {-1, 1}},
+                                                          {{-1, 12}, {-1, 11}},
+                                                          {{-1, 13}, {-1, 12}},
+                                                          {{0, 12}, {-1, 13}},
+                                                          {{0, 0}, {1, -1}},
+                                                          {{1, 13}, {0, 12}},
+                                                          {{1, -1}, {1, 0}},
+                                                          {{1, 0}, {1, 1}},
+                                                          {{1, 1}, {1, 11}},
+                                                          {{1, 11}, {1, 12}},
+                                                          {{1, 12}, {1, 13}}},
+                                                         {{{-1, 1}, {-1, 0}},
+                                                          {{-1, 0}, {0, 0}},
+                                                          {{-1, 11}, {-1, 1}},
+                                                          {{-1, 12}, {-1, 11}},
+                                                          {{0, 12}, {-1, 12}},
+                                                          {{0, 0}, {1, 0}},
+                                                          {{1, 12}, {0, 12}},
+                                                          {{1, 0}, {1, 1}},
+                                                          {{1, 1}, {1, 11}},
+                                                          {{1, 11}, {1, 12}}},
+                                                         {{{-1, 0}, {-1, -1}},
+                                                          {{-1, -1}, {0, 0}},
+                                                          {{0, 0}, {-1, 0}},
+                                                          {{-1, 11}, {-1, 1}},
+                                                          {{-1, 1}, {0, 0}},
+                                                          {{0, 12}, {-1, 11}},
+                                                          {{-1, 13}, {-1, 12}},
+                                                          {{-1, 12}, {0, 12}},
+                                                          {{0, 12}, {-1, 13}},
+                                                          {{0, 0}, {1, -1}},
+                                                          {{1, 0}, {0, 0}},
+                                                          {{0, 0}, {1, 1}},
+                                                          {{1, 11}, {0, 12}},
+                                                          {{0, 12}, {1, 12}},
+                                                          {{1, 13}, {0, 12}},
+                                                          {{1, -1}, {1, 0}},
+                                                          {{1, 1}, {1, 11}},
+                                                          {{1, 12}, {1, 13}}}};
+  const WindRule rules[] = {WindRule::Add, WindRule::Intersect,
+                            WindRule::EvenOdd};
+  for (int r = 0; r < 3; ++r) {
+    SCOPED_TRACE(r);
+    auto [verts, edges] = PolygonsToInput(bands);
+    const auto result = SweepWinding(edges, verts, rules[r]);
+    ASSERT_EQ(result.size(), expected[r].size());
+    for (size_t i = 0; i < result.size(); ++i) {
+      EXPECT_EQ(verts[result[i].v0], expected[r][i].first);
+      EXPECT_EQ(verts[result[i].v1], expected[r][i].second);
+      EXPECT_EQ(result[i].mult, 1);
+    }
+  }
+}
+
+TEST(CrossSectionComplex, SweepPreservesSignedZeroRepresentative) {
+  // Preserve the first live map-key representative when +0 and -0 compare
+  // equal.
+  const Polygons input = {{{-0.0, -1}, {-0.0, 1}, {-2, -0.0}, {1, 0}},
+                          {{1, 1}, {-2, 2}, {2, -1}, {1, 2}, {-2, -2}}};
+  auto [verts, edges] = PolygonsToInput(input);
+  const auto result = OutEdgesToPolygons(
+      verts, SweepWinding(edges, verts, WindRule::Intersect));
+  const SimplePolygon expected = {
+      {-0x1.47ae147ae148p-4, 0x1.1eb851eb851ecp-1},
+      {-0.5, 0.0},
+      {0.0, 0.0},
+      {-0.0, 0.5},
+      {0x1.2492492492492p-2, 0x1.2492492492492p-2},
+      {1, 1},
+      {0x1.9999999999997p-2, 0x1.3333333333333p+0},
+      {0.0, 0x1.5555555555557p-1},
+      {-0.0, 1},
+      {-0x1.999999999999ap-2, 0x1.999999999999ap-1}};
+  ASSERT_EQ(result.size(), 1);
+  ASSERT_EQ(result[0].size(), expected.size());
+  for (size_t i = 0; i < expected.size(); ++i) {
+    EXPECT_EQ(result[0][i], expected[i]);
+    for (int axis = 0; axis < 2; ++axis)
+      EXPECT_EQ(std::signbit(result[0][i][axis]),
+                std::signbit(expected[i][axis]));
+  }
+}
+
+TEST(CrossSectionComplex, SignedZeroReducerPreservesPublicCoordinateBits) {
+  const Polygons input = {{{0, -2}, {1, -2}, {0, 2}},
+                          {{1, 2}, {-1, 1}, {-0.0, 0}},
+                          {{-1, -1}, {2, -2}, {-1, 1}}};
+  const Polygons actual = CrossSection(input).ToPolygons();
+  // Preserve raw order and double encodings, including +0 at (0, 1.5).
+  const SimplePolygon expected = {{-1, 1},
+                                  {-1, -1},
+                                  {0.0, -0x1.5555555555555p+0},
+                                  {0.0, -2},
+                                  {1, -2},
+                                  {0x1.d1745d1745d17p-1, -0x1.a2e8ba2e8ba2ep+0},
+                                  {2, -2},
+                                  {0x1.5555555555555p-1, -0x1.5555555555555p-1},
+                                  {0x1.5555555555555p-2, 0x1.5555555555555p-1},
+                                  {1, 2},
+                                  {0x1.c71c71c71c71cp-4, 0x1.8e38e38e38e39p+0},
+                                  {0.0, 2},
+                                  {0.0, 1.5}};
+  auto bits = [](double value) {
+    uint64_t result;
+    std::memcpy(&result, &value, sizeof(result));
+    return result;
+  };
+  ASSERT_EQ(actual.size(), 1);
+  ASSERT_EQ(actual[0].size(), expected.size());
+  for (size_t i = 0; i < expected.size(); ++i)
+    for (int axis = 0; axis < 2; ++axis)
+      EXPECT_EQ(bits(actual[0][i][axis]), bits(expected[i][axis]))
+          << "vertex " << i << " axis " << axis;
+}
+
+TEST(CrossSectionComplex, SweepRequeuedRemaindersExactOutput) {
+  // When the arrangement sweep splits an edge, it requeues the remainder as a
+  // pending edge. Inputs whose crossings are exact rarely reach the cases
+  // below; in these, crossings round to points about an ulp apart. The
+  // expected output keeps the resulting ulp-scale features, such as the
+  // near-duplicate vertices at (2, 8/3). The first two cases reach the merge
+  // of equal pending edges but don't depend on it: unmerged, the equal edges
+  // are emitted separately and their multiplicities sum in the output.
+  // SweepOppositeOverlappingRemainders does depend on it. The third case
+  // depends on the sweep erasing an event before processing it.
+  struct Case {
+    const char* name;
+    Polygons input;
+    Polygons expected;
+  };
+  const Case cases[] = {
+      {"two opposite remainders cancel",
+       {{{1, 3}, {4, 3}, {0, 0}},
+        {{1, 1}, {3, 0}, {4, 0}},
+        {{1, 0}, {2, 4}, {3, 3}}},
+       {{{0x1.3333333333333p0, 0x1.ccccccccccccdp-1},
+         {0x1.38e38e38e38e4p0, 0x1.c71c71c71c71cp-1},
+         {0x1.3b13b13b13b14p0, 0x1.d89d89d89d89dp-1}},
+        {{0x1.8ba2e8ba2e8bap0, 0x1.a2e8ba2e8ba2ep-1},
+         {0x1.8p0, 0x1.8p-1},
+         {3, 0},
+         {4, 0}}}},
+      {"a remainder adds to a pending edge",
+       {{{3, 3}, {0, 2}, {3, 1}, {1, 4}, {4, 0}}, {{1, 3}, {4, 3}, {4, 2}}},
+       {{{0x1.e8ba2e8ba2e8bp0, 0x1.51745d1745d18p1}, {0, 2}, {3, 1}},
+        {{2, 0x1.5555555555556p1},
+         {0x1.ffffffffffffep0, 0x1.5555555555556p1},
+         {4, 0},
+         {0x1.ap1, 0x1.2p1}}}},
+      {"a remainder starts at the current event",
+       {{{1, 1}, {0, 2}, {3, 1}},
+        {{2, 2}, {1, 4}, {4, 1}},
+        {{1, 0}, {4, 3}, {0, 0}},
+        {{3, 3}, {4, 1}, {2, 1}}},
+       {{{0, 0}, {1, 0}, {2, 1}, {0x1.5555555555555p0, 1}},
+        {{0x1.d89d89d89d89ep0, 0x1.6276276276276p0},
+         {0x1.1249249249249p1, 0x1.4924924924924p0},
+         {0x1.3333333333333p1, 0x1.ccccccccccccdp0}},
+        {{0x1.a2e8ba2e8ba2ep1, 0x1.3a2e8ba2e8ba3p1},
+         {0x1.aaaaaaaaaaaaap1, 0x1.2aaaaaaaaaaaap1},
+         {4, 3}}}},
+      {"a remainder starts an ulp before the current event",
+       {{{3, 2}, {2, 4}, {2, 3}, {3, 3}},
+        {{2, 3}, {1, 2}, {2, 2}},
+        {{4, 4}, {4, 3}, {1, 2}}},
+       {{{1, 2}, {2, 2}, {2, 0x1.2aaaaaaaaaaabp1}},
+        {{2, 3}, {0x1.4p1, 3}, {2, 4}},
+        {{1, 2}, {2, 0x1.5555555555555p1}, {2, 3}}}},
+  };
+  for (const Case& c : cases) {
+    SCOPED_TRACE(c.name);
+    const Polygons actual = CrossSection(c.input).ToPolygons();
+    ASSERT_EQ(actual.size(), c.expected.size());
+    for (size_t i = 0; i < actual.size(); ++i) {
+      ASSERT_EQ(actual[i].size(), c.expected[i].size());
+      for (size_t j = 0; j < actual[i].size(); ++j)
+        EXPECT_EQ(actual[i][j], c.expected[i][j])
+            << "polygon " << i << " vertex " << j;
+    }
+  }
+}
+
+namespace {
+
+// Fixed repetitions provide a timing signal for the weekly benchmark suite.
+void ExpectRepeatedSweep(const Polygons& input, int repetitions,
+                         size_t expectedEdges, size_t expectedContours,
+                         double expectedArea) {
+  const auto [inputVerts, edges] = PolygonsToInput(input);
+  for (int i = 0; i < repetitions; ++i) {
+    auto verts = inputVerts;
+    const auto result = SweepWinding(edges, verts, WindRule::Add);
+    ASSERT_EQ(result.size(), expectedEdges);
+    if (i == 0) {
+      const auto polys = OutEdgesToPolygons(verts, result);
+      EXPECT_EQ(polys.size(), expectedContours);
+      EXPECT_NEAR(TotalSignedArea(polys), expectedArea, 1e-9);
+    }
+  }
+}
+
+}  // namespace
+
+TEST(CrossSectionComplex, SweepManySeparatedContours) {
+  Polygons rectangles;
+  for (int i = 0; i < 512; ++i) {
+    const double y = 4 * i;
+    rectangles.push_back({{0, y}, {100, y}, {100, y + 1}, {0, y + 1}});
+  }
+  ExpectRepeatedSweep(rectangles, 32, 4 * 512, 512, 100.0 * 512);
+}
+
+TEST(CrossSectionComplex, SweepManySeparatedContoursRotated90) {
+  Polygons rectangles;
+  for (int i = 0; i < 512; ++i) {
+    const double y = 4 * i;
+    rectangles.push_back({{-y, 0}, {-y, 100}, {-y - 1, 100}, {-y - 1, 0}});
+  }
+  ExpectRepeatedSweep(rectangles, 32, 4 * 512, 512, 100.0 * 512);
+}
+
+TEST(CrossSectionComplex, SweepCrossingContours) {
+  Polygons bands;
+  for (int i = 0; i < 32; ++i) {
+    const double y = 4 * i;
+    bands.push_back({{0, y}, {128, y + 128}, {128, y + 129}, {0, y + 1}});
+    bands.push_back({{0, y + 128}, {128, y}, {128, y + 1}, {0, y + 129}});
+  }
+  // Each of the 32x32 crossings contributes four corners and area 1/2;
+  // the connected union surrounds 31x31 holes.
+  ExpectRepeatedSweep(bands, 8, 4 * 64 + 4 * 32 * 32, 1 + 31 * 31,
+                      128.0 * 64 - 0.5 * 32 * 32);
+}
+
+TEST(CrossSectionComplex, OffsetRoundMergingContours) {
+  constexpr int side = 8;
+  constexpr int segments = 32;
+  constexpr double delta = 1.25;
+  Polygons squares;
+  for (int y = 0; y < side; ++y) {
+    for (int x = 0; x < side; ++x) {
+      const double a = 3 * x;
+      const double b = 3 * y;
+      squares.push_back({{a, b}, {a + 1, b}, {a + 1, b + 1}, {a, b + 1}});
+    }
+  }
+  const CrossSection input(squares);
+  // Adjacent round offsets overlap, but diagonal pairs do not, leaving 49
+  // holes.
+  const double squareArea = 1 + 4 * delta + kPi * delta * delta;
+  const double overlapArea = 2 * delta - 2 +
+                             2 * delta * delta * std::acos(1 / delta) -
+                             2 * std::sqrt(delta * delta - 1);
+  const double roundArea =
+      side * side * squareArea - 2 * side * (side - 1) * overlapArea;
+  // Bound the inscribed arcs' area loss by one disk's faceting error per
+  // square.
+  const double facetLoss =
+      delta * delta * (kPi - segments * std::sin(2 * kPi / segments) / 2);
+  for (int i = 0; i < 16; ++i) {
+    const auto result =
+        input.Offset(delta, CrossSection::JoinType::Round, 2.0, {segments});
+    ASSERT_EQ(result.NumContour(), 1 + (side - 1) * (side - 1));
+    ASSERT_EQ(result.NumVert(), 736);
+    if (i == 0) {
+      EXPECT_GE(result.Area(), roundArea - side * side * facetLoss - 1e-6);
+      EXPECT_LE(result.Area(), roundArea + 1e-6);
+      const auto bounds = result.Bounds();
+      EXPECT_EQ(bounds.min, vec2(-delta));
+      EXPECT_EQ(bounds.max, vec2(3 * (side - 1) + 1 + delta));
+    }
+  }
+}
+
+TEST(CrossSectionComplex, OffsetMiterWavyRing) {
+  // Timed: a detailed contour whose offset edges cross one another in every
+  // wave, since the offset distance exceeds the waves' radius of curvature.
+  constexpr int n = 4096;
+  SimplePolygon ring;
+  for (int i = 0; i < n; ++i) {
+    const double a = 2 * kPi * i / n;
+    const double r = 50 + 0.5 * std::sin(256 * a);
+    ring.push_back({r * std::cos(a), r * std::sin(a)});
+  }
+  const CrossSection input(ring);
+  // The input lies between circles of radius 49.5 (less a margin for chords)
+  // and 50.5. With the default miter limit of 2, an outward offset reaches at
+  // most 2 * delta past the larger circle.
+  const double inner = 49.49;
+  const double outer = 50.5;
+  for (int i = 0; i < 2; ++i) {
+    for (double delta : {1.0, -1.0}) {
+      SCOPED_TRACE(delta);
+      const auto result = input.Offset(delta, CrossSection::JoinType::Miter);
+      ASSERT_EQ(result.NumContour(), 1);
+      const double reach = delta > 0 ? 2 * delta : delta;
+      EXPECT_GT(result.Area(), kPi * (inner + delta) * (inner + delta));
+      EXPECT_LT(result.Area(), kPi * (outer + reach) * (outer + reach));
+    }
+  }
+}
+
+TEST(CrossSectionComplex, DifferenceManyContoursFewCrossings) {
+  // Timed: 1600 small rings minus 16 large circles. Few edges cross, so this
+  // measures the cost per edge rather than per crossing.
+  constexpr int side = 40;
+  constexpr int segments = 32;
+  constexpr double ringRadius = 0.4;
+  constexpr double holeRadius = 2.5;
+  Polygons rings;
+  for (int y = 0; y < side; ++y) {
+    for (int x = 0; x < side; ++x) {
+      SimplePolygon ring;
+      for (int k = 0; k < segments; ++k) {
+        const double a = 2 * kPi * k / segments;
+        ring.push_back(
+            {x + ringRadius * std::cos(a), y + ringRadius * std::sin(a)});
+      }
+      rings.push_back(ring);
+    }
+  }
+  std::vector<CrossSection> operands = {CrossSection(rings)};
+  std::vector<vec2> holeCenters;
+  for (int j = 0; j < 4; ++j) {
+    for (int i = 0; i < 4; ++i) {
+      holeCenters.push_back({5.3 + 10 * i, 5.3 + 10 * j});
+      operands.push_back(CrossSection::Circle(holeRadius, {segments})
+                             .Translate(holeCenters.back()));
+    }
+  }
+  // A ring inside a hole's inscribed circle is removed. Any other ring that
+  // reaches inside the hole's circumscribed circle may be cut; counting those
+  // bounds the area from below.
+  const double inscribed = holeRadius * std::cos(kPi / segments);
+  int removed = 0, cut = 0;
+  for (int y = 0; y < side; ++y) {
+    for (int x = 0; x < side; ++x) {
+      for (const vec2& c : holeCenters) {
+        const double d = la::length(vec2(x, y) - c);
+        if (d + ringRadius <= inscribed) {
+          ++removed;
+        } else if (d - ringRadius < holeRadius) {
+          ++cut;
+        }
+      }
+    }
+  }
+  const double ringArea =
+      segments * ringRadius * ringRadius * std::sin(2 * kPi / segments) / 2;
+  const double maxArea = (side * side - removed) * ringArea;
+  for (int i = 0; i < 2; ++i) {
+    const auto result = CrossSection::BatchBoolean(operands, OpType::Subtract);
+    ASSERT_EQ(result.NumContour(), side * side - removed);
+    if (i == 0) {
+      EXPECT_LE(result.Area(), maxArea + 1e-9);
+      EXPECT_GE(result.Area(), maxArea - cut * ringArea);
+      EXPECT_GT(cut, 0);
+    }
+  }
 }

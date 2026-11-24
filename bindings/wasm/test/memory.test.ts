@@ -22,6 +22,8 @@ suite('Called in a loop, the bindings', () => {
       ring.revolve(3).delete();
       circle.toPolygons();
       new CrossSection(polygons).delete();
+      CrossSection.evenOdd(polygons).delete();
+      CrossSection.nonZero(polygons).delete();
       circle.add(polygons).delete();
       circle.subtract(polygons).delete();
       circle.intersect(polygons).delete();

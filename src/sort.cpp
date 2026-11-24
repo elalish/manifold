@@ -76,17 +76,29 @@ struct ReindexFace {
 };
 
 template <typename Precision, typename I>
-bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
+void MergeMeshGLP(MeshGLP<Precision, I>& mesh, Precision requestedTolerance) {
   ZoneScoped;
 
-  std::vector<int> merge(mesh.NumVert());
+  if (mesh.numProp < 3 || mesh.vertProperties.size() % mesh.numProp != 0 ||
+      mesh.mergeFromVert.size() != mesh.mergeToVert.size()) {
+    return;
+  }
+  const auto numVert = mesh.NumVert();
+  const auto numTri = mesh.NumTri();
+  const auto inRange = [numVert](I v) { return v < numVert; };
+  if (!std::all_of(mesh.mergeFromVert.begin(), mesh.mergeFromVert.end(),
+                   inRange) ||
+      !std::all_of(mesh.mergeToVert.begin(), mesh.mergeToVert.end(), inRange) ||
+      !std::all_of(mesh.triVerts.begin(), mesh.triVerts.end(), inRange)) {
+    return;
+  }
+
+  std::vector<int> merge(numVert);
   std::iota(merge.begin(), merge.end(), 0);
   for (size_t i = 0; i < mesh.mergeFromVert.size(); ++i) {
     merge[mesh.mergeFromVert[i]] = mesh.mergeToVert[i];
   }
 
-  const auto numVert = mesh.NumVert();
-  const auto numTri = mesh.NumTri();
   Vec<uint64_t> edges(3 * numTri);
   const int next[3] = {1, 2, 0};
   for_each_n(autoPolicy(numTri, 1e5), countAt(0_uz), numTri,
@@ -135,7 +147,7 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
     begin = end;
   }
   if (openVerts.empty()) {
-    return false;
+    return;
   }
   // The multiset yielded first vertices in ascending order. Preserve that
   // ordering so equal Morton codes keep the same deterministic merge roots.
@@ -143,7 +155,7 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
 
   const auto numOpenVert = openVerts.size();
 
-  Vec<Precision> vertPropD(mesh.vertProperties);
+  const VecView<const Precision> vertPropD(mesh.vertProperties);
   Box bBox;
   for (const int i : {0, 1, 2}) {
     auto iPos =
@@ -161,7 +173,7 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
     bBox.max[i] = minMax.second;
   }
 
-  const double tolerance = std::max(static_cast<double>(mesh.tolerance),
+  const double tolerance = std::max(static_cast<double>(requestedTolerance),
                                     (std::is_same<Precision, float>::value
                                          ? std::numeric_limits<float>::epsilon()
                                          : kPrecision) *
@@ -221,8 +233,6 @@ bool MergeMeshGLP(MeshGLP<Precision, I>& mesh) {
       mesh.mergeToVert.push_back(mergeTo);
     }
   }
-
-  return true;
 }
 
 }  // namespace
@@ -604,12 +614,12 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
 }
 
 /**
- * Updates the mergeFromVert and mergeToVert vectors in order to create a
- * manifold solid. If the MeshGL is already manifold, no change will occur and
- * the function will return false. Otherwise, this will merge verts along open
- * edges within tolerance (the maximum of the MeshGL tolerance and the
- * baseline bounding-box tolerance), keeping any from the existing merge
- * vectors, and return true.
+ * Returns a copy with mergeFromVert and mergeToVert vectors updated in order
+ * to create a manifold solid. If the MeshGL is already manifold, or is invalid
+ * (fewer than 3 properties, merge vectors of different lengths, or out-of-range
+ * indices), the copy is unchanged. Otherwise, verts along open edges are merged
+ * within tolerance (the maximum of the specified tolerance and the baseline
+ * bounding-box tolerance), keeping any from the existing merge vectors.
  *
  * There is no guarantee the result will be manifold - this is a best-effort
  * helper function designed primarily to aid in the case where a manifold
@@ -618,13 +628,17 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
  * will report an error status if it is not manifold.
  */
 template <>
-bool MeshGL::Merge() {
-  return MergeMeshGLP(*this);
+MeshGL MeshGL::Merge(float tolerance) const {
+  MeshGL merged = *this;
+  MergeMeshGLP(merged, tolerance);
+  return merged;
 }
 
 template <>
-bool MeshGL64::Merge() {
-  return MergeMeshGLP(*this);
+MeshGL64 MeshGL64::Merge(double tolerance) const {
+  MeshGL64 merged = *this;
+  MergeMeshGLP(merged, tolerance);
+  return merged;
 }
 
 }  // namespace manifold

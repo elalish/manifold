@@ -67,7 +67,7 @@ TEST(Hull, Tictac) {
   const double tictacHeight = 500;
   const int tictacSeg = 500;
   const double tictacMid = tictacHeight - 2 * tictacRad;
-  const auto sphere = Manifold::Sphere(tictacRad, tictacSeg);
+  const auto sphere = Manifold::Sphere(tictacRad, {tictacSeg});
   const std::vector<Manifold> spheres{sphere,
                                       sphere.Translate({0, 0, tictacMid})};
   const auto tictac = Manifold::Hull(spheres);
@@ -78,7 +78,7 @@ TEST(Hull, Tictac) {
 }
 
 TEST(Hull, Hollow) {
-  auto sphere = Manifold::Sphere(100, 360);
+  auto sphere = Manifold::Sphere(100, {360});
   auto hollow = sphere - sphere.Scale({0.8, 0.8, 0.8});
   const double sphere_vol = sphere.Volume();
   EXPECT_FLOAT_EQ(hollow.Hull().Volume(), sphere_vol);
@@ -112,7 +112,7 @@ TEST(Hull, MengerSponge) {
 }
 
 TEST(Hull, Sphere) {
-  Manifold sphere = Manifold::Sphere(1, 1500);
+  Manifold sphere = Manifold::Sphere(1, {1500});
   sphere = sphere.Translate(vec3(0.5));
   Manifold sphereHull = sphere.Hull();
   EXPECT_EQ(sphereHull.NumTri(), sphere.NumTri());
@@ -281,4 +281,27 @@ TEST(Hull, NotEnoughPoints) {
 TEST(Hull, EmptyHull) {
   Manifold hull = Manifold::Hull(std::vector<vec3>());
   EXPECT_TRUE(hull.IsEmpty());
+}
+
+TEST(Hull, CoarseDeterministic) {
+  // Coarse precision makes RemoveDegenerates collapse edges, which depends on
+  // the halfedge order QuickHull produces. The hull needs enough halfedges to
+  // run in parallel.
+  struct PrecisionGuard {
+    ~PrecisionGuard() { Quality::ResetToDefaults(); }
+  } guard;
+  for (const double precision : {1e-3, 1e-2}) {
+    Quality::SetRelativePrecision(precision);
+    const MeshGL64 s = Manifold::Sphere(0.02, 96).GetMeshGL64();
+    std::vector<vec3> pts;
+    for (const vec3 v : {vec3(0, 0, 0), vec3(1, 0, 0), vec3(0, 1, 0)})
+      for (size_t j = 0; j < s.NumVert(); ++j)
+        pts.push_back(v + s.GetVertPos(j));
+    const MeshGL64 first = Manifold::Hull(pts).GetMeshGL64();
+    for (int i = 0; i < 5; ++i) {
+      const MeshGL64 mesh = Manifold::Hull(pts).GetMeshGL64();
+      EXPECT_EQ(mesh.vertProperties, first.vertProperties) << precision;
+      EXPECT_EQ(mesh.triVerts, first.triVerts) << precision;
+    }
+  }
 }

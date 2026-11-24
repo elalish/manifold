@@ -17,6 +17,9 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
+#ifndef MANIFOLD_NO_IOSTREAM
+#include <charconv>
+#endif
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -150,17 +153,9 @@ void Manifold::Impl::EagerTransformPropNormals(
     const Halfedges& halfedge, const MeshRelationD& meshRelation,
     const mat3& normalTransform, Vec<double>& properties, int numPropVert,
     int stride, int offset) {
-  // Short-circuit when no meshID carries normals. OR semantics (any has
-  // it), unlike AllHaveNormals() - mixed inputs still need the per-meshID
-  // iteration below to rotate the with-normals subset.
-  bool anyHasNormals = false;
-  for (const auto& m : meshRelation.meshIDtransform) {
-    if (m.second.hasNormals) {
-      anyHasNormals = true;
-      break;
-    }
-  }
-  if (!anyHasNormals) return;
+  // Short-circuit when no meshID carries normals. Mixed inputs still need the
+  // per-meshID iteration below to rotate the with-normals subset.
+  if (!AnyHasNormals(meshRelation)) return;
   Vec<bool> propVisited(numPropVert, false);
   for (size_t e = 0; e < halfedge.size(); ++e) {
     if (!TriHasNormals(meshRelation, e / 3)) continue;
@@ -189,18 +184,42 @@ void Manifold::Impl::InitializeOriginal(int id) {
   const int meshID = id < 0 ? ReserveIDs(1) : id;
   meshRelation_.originalID = meshID;
   auto& triRef = meshRelation_.triRef;
-  triRef.resize_nofill(NumTri());
-  for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
-             [meshID, &triRef](const int tri) {
-               triRef[tri] = {meshID, meshID, -1, tri};
-             });
-  // Preserve the AND-across-old-Relations state so AsOriginal keeps the
-  // recording when it builds a fresh Relation. Primitives start with an
-  // empty map, which AllHaveNormals() returns false for.
-  const bool hadNormals = AllHaveNormals();
+  const int numTri = NumTri();
+  // AsOriginal of a result where only some runs record normals keeps two
+  // runs under one originalID, one for the triangles with normals and one for
+  // the rest. triID is the triangle's index in GetMeshGL's output order, which
+  // sorts an original with two relations by meshID.
+  Vec<bool> hasN;
+  if (triRef.size() == numTri && AnyHasNormals(meshRelation_)) {
+    hasN.resize_nofill(numTri);
+    for (int tri = 0; tri < numTri; ++tri)
+      hasN[tri] = TriHasNormals(meshRelation_, tri);
+  }
+  const int numN = std::count(hasN.begin(), hasN.end(), true);
+  const bool split = numN > 0 && numN < numTri;
+  int otherID = meshID;
+  // An explicit id can equal the next reserved one.
+  while (split && otherID == meshID) otherID = ReserveIDs(1);
   meshRelation_.meshIDtransform.clear();
   meshRelation_.meshIDtransform[meshID] = {meshID, la::identity, false,
-                                           hadNormals};
+                                           numN > 0};
+  if (split) {
+    meshRelation_.meshIDtransform[otherID] = {meshID, la::identity, false,
+                                              false};
+  }
+  triRef.resize_nofill(numTri);
+  // GetMeshGL sorts the runs by meshID, so the run with normals comes first
+  // unless an explicit id is above the reserved range.
+  const bool nFirst = otherID > meshID;
+  int nextN = nFirst ? 0 : numTri - numN;
+  int nextOther = nFirst ? numN : 0;
+  for (int tri = 0; tri < numTri; ++tri) {
+    if (split && !hasN[tri]) {
+      triRef[tri] = {otherID, meshID, -1, nextOther++};
+    } else {
+      triRef[tri] = {meshID, meshID, -1, split ? nextN++ : tri};
+    }
+  }
 }
 
 void Manifold::Impl::SetFaceAndVertNormals() {
@@ -536,11 +555,12 @@ void Manifold::Impl::Warp(std::function<void(vec3&)> warpFunc) {
 
 void Manifold::Impl::WarpBatch(std::function<void(VecView<vec3>)> warpFunc) {
   warpFunc(vertPos_.view());
-  CalculateBBox();
+  // CalculateBBox can discard vertices when the bounds are non-finite.
   if (!IsFinite()) {
     MakeEmpty(Error::NonFiniteVertex);
     return;
   }
+  CalculateBBox();
   SortGeometry();
   SetFaceAndVertNormals();
   meshRelation_.originalID = -1;
@@ -737,9 +757,6 @@ static std::ostream& WriteOBJWithEpsilon(std::ostream& stream,
   stream << "# ======= begin mesh ======" << std::endl;
   stream << "# float_format = " << (hexFloat ? "hexfloat" : "fixed")
          << std::endl;
-  stream << "# tolerance = ";
-  writeValue(mesh.tolerance);
-  stream << std::endl;
   if (epsilon.has_value()) {
     stream << "# epsilon = ";
     writeValue(epsilon.value());
@@ -766,18 +783,13 @@ static std::ostream& WriteOBJWithEpsilon(std::ostream& stream,
   return stream;
 }
 
-static std::pair<MeshGL64, std::optional<double>> ReadOBJWithEpsilon(
-    std::istream& stream) {
+static MeshGL64 ReadOBJMesh(std::istream& stream) {
   static const std::string FLOAT_PATTERN =
       "(-?(?:0[xX][0-9a-fA-F]+(?:\\.[0-9a-fA-F]*)?[pP][+\\-]?\\d+|\\d+(?:\\."
       "\\d*)?(?:[eE][+\\-]?\\d+)?))";
   static const std::string FACE_ELEMENT = "(\\d+)(?:\\S+)?";
   static const std::string TRAILING_SPACES = "(?:\\s*)";
   static const std::string SEPARATOR = "\\s+";
-  static const std::regex TOLERANCE_COMMENT_PATTERN(
-      "^# tolerance = " + FLOAT_PATTERN + TRAILING_SPACES);
-  static const std::regex EPSILON_COMMENT_PATTERN(
-      "^# epsilon = " + FLOAT_PATTERN + TRAILING_SPACES);
   static const std::regex VERTEX_PATTERN("^v" + SEPARATOR + FLOAT_PATTERN +
                                          SEPARATOR + FLOAT_PATTERN + SEPARATOR +
                                          FLOAT_PATTERN + TRAILING_SPACES);
@@ -786,8 +798,7 @@ static std::pair<MeshGL64, std::optional<double>> ReadOBJWithEpsilon(
                                        FACE_ELEMENT + TRAILING_SPACES);
 
   MeshGL64 mesh;
-  std::optional<double> epsilon;
-  if (!stream.good()) return std::make_pair(mesh, epsilon);
+  if (!stream.good()) return mesh;
 
   constexpr size_t BUFFER_SIZE = 1000;
   std::array<char, BUFFER_SIZE> buffer;
@@ -799,42 +810,43 @@ static std::pair<MeshGL64, std::optional<double>> ReadOBJWithEpsilon(
     // not using std::basic_istream<...>::getline because getline throws when
     // the size exceeds the limit, but we don't want exception related code
     size_t i = 0;
-    char c;
-    while (!stream.eof() && (c = stream.get()) != '\n' && c != '\r')
+    int c;
+    while ((c = stream.get()) != EOF && c != '\n' && c != '\r')
       if (i < BUFFER_SIZE) buffer[i++] = c;
     if (i == BUFFER_SIZE) continue;
     buffer[i] = '\0';
     // check pattern...
-    if (std::regex_match(buffer.data(), m, TOLERANCE_COMMENT_PATTERN)) {
-      mesh.tolerance = FromChars(m[1]);
-    } else if (std::regex_match(buffer.data(), m, EPSILON_COMMENT_PATTERN)) {
-      epsilon = {FromChars(m[1])};
-    } else if (std::regex_match(buffer.data(), m, VERTEX_PATTERN)) {
+    if (std::regex_match(buffer.data(), m, VERTEX_PATTERN)) {
       for (int j : {0, 1, 2})
         mesh.vertProperties.push_back(FromChars(m[j + 1]));
     } else if (std::regex_match(buffer.data(), m, FACE_PATTERN)) {
-      for (int j : {0, 1, 2})
-        mesh.triVerts.push_back(std::stoi(m[j + 1].str()) - 1);
+      for (int j : {0, 1, 2}) {
+        // An index that doesn't fit is out of bounds anyway, and stoi would
+        // throw on it.
+        uint64_t index = 0;
+        const auto result =
+            std::from_chars(m[j + 1].first, m[j + 1].second, index);
+        if (result.ec != std::errc()) index = 0;
+        mesh.triVerts.push_back(index - 1);
+      }
     }
   }
 
-  return std::make_pair(mesh, epsilon);
+  return mesh;
 }
 
 /**
  * Import a mesh from a Wavefront OBJ file.
  */
-MeshGL64 ReadOBJ(std::istream& stream) {
-  return ReadOBJWithEpsilon(stream).first;
-}
+MeshGL64 ReadOBJ(std::istream& stream) { return ReadOBJMesh(stream); }
 
 /**
  * Import a mesh from a Wavefront OBJ file.
- * This supports reading tolerance and epsilon values from WriteOBJ.
+ * Legacy Manifold tolerance and epsilon comments are ignored.
  */
 Manifold Manifold::ReadOBJ(std::istream& stream) {
   if (!stream.good()) return Invalid();
-  auto [mesh, epsilon] = ReadOBJWithEpsilon(stream);
+  MeshGL64 mesh = ReadOBJMesh(stream);
   auto impl = std::make_shared<Impl>(mesh);
   return Manifold(impl);
 }
@@ -853,14 +865,14 @@ bool WriteOBJ(std::ostream& stream, const MeshGL64& mesh) {
  * Debugging output using high precision OBJ files with specialized comments
  */
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
-  MeshGL64 mesh = GetMeshGLImpl<double, uint64_t>(impl, -1);
+  MeshGL64 mesh = GetMeshGLImpl<double, uint64_t>(impl);
   return WriteOBJWithEpsilon(stream, mesh, {impl.epsilon_});
 }
 
 /**
  * Export the mesh to a Wavefront OBJ file in a way that preserves the full
- * 64-bit precision of the vertex positions, as well as storing metadata such as
- * the tolerance and epsilon.
+ * 64-bit precision of the vertex positions, as well as storing epsilon
+ * metadata.
  */
 bool Manifold::WriteOBJ(std::ostream& stream) const {
   if (!stream.good()) return false;

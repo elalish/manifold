@@ -17,10 +17,13 @@
 #pragma once
 
 #include <atomic>
-#include <chrono>
 #include <cstdint>
 #include <utility>
 #include <vector>
+
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
+#include <chrono>
+#endif
 
 #ifdef MANIFOLD_DEBUG
 #include <string>
@@ -40,9 +43,7 @@ struct PhaseAcc {
   std::atomic<int64_t> filterWindingNs{0};
   std::atomic<int64_t> totalNs{0};
   std::atomic<int64_t> cases{0};
-  std::atomic<int64_t> bvhBuildNs{0};
-  std::atomic<int64_t> broadPairWorkNs{0};
-  std::atomic<int64_t> narrowPhaseNs{0};
+  std::atomic<int64_t> incidenceNs{0};
 
   void Reset() {
     mergeNs = 0;
@@ -50,9 +51,7 @@ struct PhaseAcc {
     filterWindingNs = 0;
     totalNs = 0;
     cases = 0;
-    bvhBuildNs = 0;
-    broadPairWorkNs = 0;
-    narrowPhaseNs = 0;
+    incidenceNs = 0;
   }
 };
 
@@ -74,6 +73,11 @@ inline void SetTimingEnabled(bool enabled) {
   TimingEnabledFlag().store(enabled, std::memory_order_relaxed);
 }
 
+// Phase timing reads a clock, so it is compiled only for MANIFOLD_DEBUG or
+// MANIFOLD_TIMING builds, like Boolean3's phase timing. Otherwise
+// ScopedTiming is empty and no clock is named, which also keeps builds for
+// targets without a monotonic clock (e.g. freestanding wasm32) working.
+#if defined(MANIFOLD_DEBUG) || defined(MANIFOLD_TIMING)
 namespace timing_detail {
 using Clock = std::chrono::steady_clock;
 inline int64_t Ns(Clock::time_point a, Clock::time_point b) {
@@ -102,6 +106,16 @@ class ScopedTiming {
   std::atomic<int64_t>* target_;
   timing_detail::Clock::time_point start_;
 };
+
+#else
+class ScopedTiming {
+ public:
+  explicit ScopedTiming(std::atomic<int64_t>&) {}
+
+  ScopedTiming(const ScopedTiming&) = delete;
+  ScopedTiming& operator=(const ScopedTiming&) = delete;
+};
+#endif
 
 inline void CountTimingCase() {
   if (TimingEnabled()) {

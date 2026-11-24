@@ -751,16 +751,15 @@ Vec<int> Manifold::Impl::PointWinding(VecView<const vec3> points) const {
     if (tolBox.Contains(points[i])) query2input.push_back(static_cast<int>(i));
   if (query2input.empty()) return winding;
 
-  // Build a minimal Impl for the query points. Kernel02 only reads vertPos_
-  // and vertNormal_ from inA; halfedges and faces are not accessed.
+  // Build a minimal Impl for the query points. Kernel02 reads only vertPos_
+  // from inA; Moved::Still does not need query normals.
   Impl pointImpl;
   pointImpl.epsilon_ = epsilon_;  // same tie tolerance as the booleans
   pointImpl.vertPos_.resize(query2input.size());
-  pointImpl.vertNormal_.resize(query2input.size(), vec3(0.0));
   for (size_t i = 0; i < query2input.size(); ++i)
     pointImpl.vertPos_[i] = points[query2input[i]];
 
-  // expandP=false: no symbolic perturbation from the query side (zero normals).
+  // expandP=false: Moved::Still leaves the query side unperturbed.
   // forward=true: project along +Z to count signed face crossings above each
   // point. The query box spans all Z and is widened by epsilon_ in XY,
   // so all faces with XY overlap within tolerance are returned regardless of Z.
@@ -793,26 +792,21 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
   // Kernel12 treats inA as an edge mesh. Halfedges derives endVert from the
   // next edge in a triangle, so this helper uses a padded degenerate face:
   // edge 0 is the forward ray, edge 1 is its reverse, and edge 2 only closes
-  // the local storage loop. Zero vertex normals and face normal mean the ray
-  // contributes nothing to perturbation tiebreakers; consistency at shared
-  // edges/vertices depends entirely on the mesh's own normals.
+  // the local storage loop. Moved::Still leaves the ray unperturbed, so no
+  // query normals are needed; consistency at shared edges/vertices depends
+  // entirely on the mesh's own normals.
   Impl rayImpl;
   rayImpl.epsilon_ = epsilon_;  // same tie tolerance as the booleans
   rayImpl.vertPos_.resize(2);
   rayImpl.vertPos_[0] = origin;
   rayImpl.vertPos_[1] = endpoint;
-  rayImpl.vertNormal_.resize(2);
-  rayImpl.vertNormal_[0] = vec3(0.0);
-  rayImpl.vertNormal_[1] = vec3(0.0);
   rayImpl.halfedge_.resize(3);
   rayImpl.halfedge_.Set(0, 0, 1, 0);  // forward: vert 0 → 1
   rayImpl.halfedge_.Set(1, 1, 0, 0);  // backward: vert 1 → 0
   rayImpl.halfedge_.Set(2, -1, -1, 0);
-  rayImpl.faceNormal_.resize(1);
-  rayImpl.faceNormal_[0] = vec3(0.0);
 
-  // expandP=false with zero vertNormal means the ray-side perturbation is
-  // zero. forward=true means we project along +Z for the lower-dimensional
+  // expandP=false and Moved::Still keep the ray-side perturbation zero.
+  // forward=true means we project along +Z for the lower-dimensional
   // kernel cascade (Shadow01 → Kernel02 → Kernel11 → Kernel12).
   const Moved still = Moved::Still(rayImpl);
   const Moved moved = Moved::Queried(*this, epsilon_);
@@ -826,7 +820,9 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
                     : absDir.y > absDir.z                      ? 1
                                                                : 2;
 
-  std::vector<RayHit> hits;
+  // Keep the internal triangle index alongside each hit to break distance
+  // ties, then drop it, since it isn't the triangle order of GetMeshGL.
+  std::vector<std::pair<int, RayHit>> triHits;
   // Query the BVH with the ray's AABB.
   const Box rayBox(la::min(origin, endpoint) - epsilon_,
                    la::max(origin, endpoint) + epsilon_);
@@ -838,21 +834,38 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
       const double t = (v[tAxis] - origin[tAxis]) / dir[tAxis];
       if (t >= 0.0 && t <= 1.0) {
         // Kernel12's sign is negative where the ray enters the solid.
-        hits.push_back(
-            {static_cast<uint64_t>(tri), t, v, faceNormal_[tri], -s});
+        const TriRef& ref = meshRelation_.triRef[tri];
+        triHits.push_back({tri,
+                           {static_cast<uint32_t>(ref.originalID),
+                            static_cast<uint32_t>(std::max(ref.faceID, 0)), t,
+                            v, faceNormal_[tri], -s}});
       }
     }
   };
   auto recorder = MakeSimpleRecorder(recorderf);
-  auto f = [&rayBox](int) { return rayBox; };
-  collider_.Collisions<false>(recorder, f, 1, false);
+  // For an axis-aligned segment the box already gives an exact traversal.
+  // Other finite directions use a segment test to prune the wide box of an
+  // oblique ray. Kernel12 still determines every hit and its tie-breaking.
+  const int movingAxes = (dir.x != 0.0) + (dir.y != 0.0) + (dir.z != 0.0);
+  if (movingAxes <= 1 || !la::all(la::isfinite(dir))) {
+    auto f = [&rayBox](int) { return rayBox; };
+    collider_.Collisions<false>(recorder, f, 1, false);
+  } else {
+    const collider_internal::SegmentQuery query{rayBox, origin, dir, epsilon_};
+    auto f = [&query](int) { return query; };
+    collider_.Collisions<false>(recorder, f, 1, false);
+  }
 
-  // Break distance ties by faceID so the order doesn't depend on the
+  // Break distance ties by triangle so the order doesn't depend on the
   // std::sort implementation, e.g. for canceling hits at a grazed vertex.
-  std::sort(hits.begin(), hits.end(), [](const RayHit& a, const RayHit& b) {
-    return a.distance != b.distance ? a.distance < b.distance
-                                    : a.faceID < b.faceID;
+  std::sort(triHits.begin(), triHits.end(), [](const auto& a, const auto& b) {
+    return a.second.distance != b.second.distance
+               ? a.second.distance < b.second.distance
+               : a.first < b.first;
   });
+  std::vector<RayHit> hits;
+  hits.reserve(triHits.size());
+  for (const auto& triHit : triHits) hits.push_back(triHit.second);
   return hits;
 }
 
