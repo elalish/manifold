@@ -22,6 +22,8 @@ wasm.setup();
 const { Manifold } = wasm;
 ```
 
+`manifold-3d` contains only the geometry library and has no dependencies.  The ManifoldCAD runtime, worker and command line tool, along with glTF and 3MF import and export, are in the separate [manifold-cad](https://www.npmjs.com/package/manifold-cad) package.  See [Embedding ManifoldCAD](./embedding-manifoldcad.md).
+
 Intro example
 
 ```js

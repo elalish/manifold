@@ -16,7 +16,7 @@
  * @primaryExport
  */
 
-import {Box, ErrorStatus, ExecutionContext, JoinType, Mat3, Mat4, Polygons, RayHit, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Vec2, Vec3} from './manifold-global-types';
+import {Box, CircularQuality, ErrorStatus, ExecutionContext, JoinType, Mat3, Mat4, Polygons, RayHit, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Vec2, Vec3} from './manifold-global-types';
 
 export {ExecutionContext} from './manifold-global-types';
 
@@ -41,55 +41,33 @@ export function setRelativePrecision(precision: number): void;
 export function getRelativePrecision(): number;
 
 /**
- * Sets an angle constraint the default number of circular segments for the
- * {@link CrossSection.circle}, {@link Manifold.cylinder}, {@link
- * Manifold.sphere}, and
- * {@link Manifold.revolve} constructors. The number of segments will be rounded
- * up to the nearest factor of four.
+ * Returns the number of segments a circle of this radius gets with this
+ * quality.
  *
- * @param angle The minimum angle in degrees between consecutive segments. The
- * angle will increase if the the segments hit the minimum edge length.
- * Default is 10 degrees.
+ * @param radius For a given radius of circle, determine how many segments
+ * there will be.
+ * @param quality The circular quality, see {@link CircularQuality}. Omit it
+ * for the defaults.
  */
-export function setMinCircularAngle(angle: number): void;
+export function segmentsFor(radius: number, quality?: CircularQuality): number;
 
 /**
- * Sets a length constraint the default number of circular segments for the
- * {@link CrossSection.circle}, {@link Manifold.cylinder}, {@link
- * Manifold.sphere}, and
- * {@link Manifold.revolve} constructors. The number of segments will be rounded
- * up to the nearest factor of four.
+ * Returns a quality that makes {@link Manifold.revolve} divide the given angle
+ * into exactly this many divisions. Like revolve, it uses the angle's
+ * magnitude, clamped to 360 degrees. A revolve of more than 120 degrees needs
+ * at least two divisions, and of more than 240 degrees at least three, and a
+ * tiny angle cannot get more divisions than the largest int count allows.
+ * Past those limits it returns the closest count revolve allows. A non-finite
+ * or zero angle, which revolve rejects, gives the default quality.
  *
- * @param length The minimum length of segments. The length will
- * increase if the the segments hit the minimum angle. Default is 1.0.
+ * @param divisions Number of divisions. Values below 1 are treated as 1.
+ * @param degrees Angle revolve will sweep.
  */
-export function setMinCircularEdgeLength(length: number): void;
+export function forDivisions(divisions: number, degrees: number):
+    {segments: number, minAngle: number, minEdgeLength: number};
 
 /**
- * Sets the default number of circular segments for the
- * {@link CrossSection.circle}, {@link Manifold.cylinder}, {@link
- * Manifold.sphere}, and
- * {@link Manifold.revolve} constructors. Overrides the edge length and angle
- * constraints and sets the number of segments to exactly this value.
- *
- * @param segments Number of circular segments. Default is 0, meaning no
- * constraint is applied.
- */
-export function setCircularSegments(segments: number): void;
-
-/**
- * Determine the result of the {@link setMinCircularAngle},
- * {@link setMinCircularEdgeLength}, and {@link setCircularSegments} defaults.
- *
- * @param radius For a given radius of circle, determine how many default
- * segments there will be.
- */
-export function getCircularSegments(radius: number): number;
-
-/**
- * Resets the circular construction parameters to their defaults if
- * {@link setMinCircularAngle}, {@link setMinCircularEdgeLength}, or {@link
- * setCircularSegments} have been called.
+ * Resets the relative precision to its default.
  */
 export function resetToCircularDefaults(): void;
 ///@}
@@ -132,11 +110,11 @@ export class CrossSection {
    * Constructs a circle of a given radius.
    *
    * @param radius Radius of the circle. Must be positive.
-   * @param circularSegments Number of segments along its diameter. Default is
-   * calculated by the static Quality defaults according to the radius.
+   * @param quality Number of segments in a full circle, see
+   * {@link CircularQuality}.
    * @group Constructors
    */
-  static circle(radius: number, circularSegments?: number): CrossSection;
+  static circle(radius: number, quality?: CircularQuality): CrossSection;
 
   // Extrusions (2d to 3d manifold)
 
@@ -149,9 +127,9 @@ export class CrossSection {
    * avoid interpolation artifacts. Default is none.
    * @param twistDegrees Amount to twist the top crossSection relative to the
    * bottom, interpolated linearly for the divisions in between.
-   * @param scaleTop Amount to scale the top (independently in X and Y). If the
-   * scale is {0, 0}, a pure cone is formed with only a single vertex at the
-   * top. Default {1, 1}.
+   * @param scaleTop Amount to scale the top (independently in X and Y). A
+   * single number scales X and Y equally. If the scale is {0, 0}, a pure cone
+   * is formed with only a single vertex at the top. Default {1, 1}.
    * @param center If true, the extrusion is centered on the z-axis through the
    *     origin
    * as opposed to resting on the XY plane as is default.
@@ -167,11 +145,15 @@ export class CrossSection {
    * cross the Y-axis, only the part on the positive X side is used.
    * Geometrically valid input will result in geometrically valid output.
    *
-   * @param circularSegments Number of segments along its diameter. Default is
-   * calculated by the static Defaults.
+   * @param quality Number of segments in a full circle, see
+   * {@link CircularQuality}. A partial revolve uses the matching fraction of
+   * it, rounded up, ignoring an excess of one unit in the last place. For an
+   * exact number of divisions, use {@link forDivisions}.
+   * @param revolveDegrees Number of degrees to revolve. Must be finite and
+   * nonzero. A negative value revolves the other way. Default is 360 degrees.
    * @group Transformations
    */
-  revolve(circularSegments?: number, revolveDegrees?: number): Manifold;
+  revolve(quality?: CircularQuality, revolveDegrees?: number): Manifold;
 
   // Transformations
 
@@ -251,15 +233,14 @@ export class CrossSection {
    * minimum allowed). See the [Clipper2
    * MiterLimit](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)
    * page for a visual example.
-   * @param circularSegments Number of segments per 360 degrees of
+   * @param quality Number of segments per 360 degrees of
    * <B>JoinType::Round</B> corners (roughly, the number of vertices that
-   * will be added to each contour). Default is calculated by the static Quality
-   * defaults according to the radius.
+   * will be added to each contour), see {@link CircularQuality}.
    * @group Transformations
    */
   offset(
       delta: number, joinType?: JoinType, miterLimit?: number,
-      circularSegments?: number): CrossSection;
+      quality?: CircularQuality): CrossSection;
 
   /**
    * Remove vertices from the contours in this CrossSection that are less than
@@ -395,6 +376,20 @@ export class CrossSection {
   static evenOdd(contours: Polygons): CrossSection;
 
   /**
+   * Create a 2d cross-section from a set of contours, reading them by the
+   * nonzero rule: a sub-region is filled when its signed winding number is
+   * not zero. Both clockwise and counter-clockwise contours can enclose solid
+   * regions; opposite windings cancel where their sum is zero. Unlike even-odd
+   * fill, a winding of two remains filled. The result is regularized like any
+   * other CrossSection, so every later operation behaves the same.
+   *
+   * @param contours A set of closed paths describing zero or more complex
+   * polygons.
+   * @group Input & Output
+   */
+  static nonZero(contours: Polygons): CrossSection;
+
+  /**
    * Return the contours of this CrossSection as a list of simple polygons.
    * @group Input & Output
    */
@@ -514,28 +509,28 @@ export class Manifold {
    * @param radiusLow Radius of bottom circle. Must be positive.
    * @param radiusHigh Radius of top circle. Can equal zero. Default is equal to
    * radiusLow.
-   * @param circularSegments How many line segments to use around the circle.
-   * Default is calculated by the static Defaults.
+   * @param quality How many line segments to use around the circle, see
+   * {@link CircularQuality}.
    * @param center Set to true to shift the center to the origin. Default is
    * origin at the bottom.
    * @group Constructors
    */
   static cylinder(
       height: number, radiusLow: number, radiusHigh?: number,
-      circularSegments?: number, center?: boolean): Manifold;
+      quality?: CircularQuality, center?: boolean): Manifold;
 
   /**
    * Constructs a geodesic sphere of a given radius.
    *
    * @param radius Radius of the sphere. Must be positive.
-   * @param circularSegments Number of segments along its
-   * diameter. This number will always be rounded up to the nearest factor of
-   * four, as this sphere is constructed by refining an octahedron. This means
-   * there are a circle of vertices on all three of the axis planes. Default is
-   * calculated by the static Defaults.
+   * @param quality Number of segments in a full circle, see
+   * {@link CircularQuality}. This number will always be rounded up to the
+   * nearest factor of four, as this sphere is constructed by refining an
+   * octahedron. This means there are a circle of vertices on all three of the
+   * axis planes.
    * @group Constructors
    */
-  static sphere(radius: number, circularSegments?: number): Manifold;
+  static sphere(radius: number, quality?: CircularQuality): Manifold;
 
   // Extrusions from 2d shapes
 
@@ -550,9 +545,9 @@ export class Manifold {
    * avoid interpolation artifacts. Default is none.
    * @param twistDegrees Amount to twist the top crossSection relative to the
    * bottom, interpolated linearly for the divisions in between.
-   * @param scaleTop Amount to scale the top (independently in X and Y). If the
-   * scale is {0, 0}, a pure cone is formed with only a single vertex at the
-   * top. Default {1, 1}.
+   * @param scaleTop Amount to scale the top (independently in X and Y). A
+   * single number scales X and Y equally. If the scale is {0, 0}, a pure cone
+   * is formed with only a single vertex at the top. Default {1, 1}.
    * @param center If true, the extrusion is centered on the z-axis through the
    *     origin
    * as opposed to resting on the XY plane as is default.
@@ -571,13 +566,16 @@ export class Manifold {
    * output.
    *
    * @param polygons A set of non-overlapping polygons to revolve.
-   * @param circularSegments Number of segments along its diameter. Default is
-   * calculated by the static Defaults.
-   * @param revolveDegrees Number of degrees to revolve. Default is 360 degrees.
+   * @param quality Number of segments in a full circle, see
+   * {@link CircularQuality}. A partial revolve uses the matching fraction of
+   * it, rounded up, ignoring an excess of one unit in the last place. For an
+   * exact number of divisions, use {@link forDivisions}.
+   * @param revolveDegrees Number of degrees to revolve. Must be finite and
+   * nonzero. A negative value revolves the other way. Default is 360 degrees.
    * @group Polygons
    */
   static revolve(
-      polygons: CrossSection|Polygons, circularSegments?: number,
+      polygons: CrossSection|Polygons, quality?: CircularQuality,
       revolveDegrees?: number): Manifold;
 
   // Mesh Conversion
@@ -709,17 +707,13 @@ export class Manifold {
   /**
    * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
    * geometry will remain unchanged until Refine or RefineToLength is called to
-   * interpolate the surface. This version uses the supplied vertex normal
-   * properties to define the tangent vectors.
-   *
-   * @param normalIdx The first property channel of the normals. NumProp must be
-   * at least normalIdx + 3. Any vertex where multiple normals exist and don't
-   * agree will result in a sharp edge. Default is 0, the standard slot.
-   * Non-zero values are retained for compatibility and will not be supported
-   * in a future release.
+   * interpolate the surface. This version uses standard vertex normal
+   * properties to define the tangent vectors. Fewer than three properties
+   * count as missing normals. Any vertex where multiple normals exist and don't
+   * agree will result in a sharp edge.
    * @group Smoothing
    */
-  smoothByNormals(normalIdx?: number): Manifold;
+  smoothByNormals(): Manifold;
 
   /**
    * Increase the density of the mesh by splitting every edge into n pieces. For
@@ -742,7 +736,8 @@ export class Manifold {
    * moved to the interpolated surface according to their barycentric
    * coordinates.
    *
-   * @param length The length that edges will be broken down to.
+   * @param length The length that edges will be broken down to. Its sign is
+   * ignored, and zero or NaN is an error.
    * @group Smoothing
    */
   refineToLength(length: number): Manifold;
@@ -757,7 +752,8 @@ export class Manifold {
    *
    * @param tolerance The desired maximum distance between the faceted mesh
    * produced and the exact smoothly curving surface. All vertices are exactly
-   * on the surface, within rounding error.
+   * on the surface, within rounding error. Its sign is ignored, and zero or NaN
+   * is an error.
    * @group Smoothing
    */
   refineToTolerance(tolerance: number): Manifold;
@@ -803,13 +799,11 @@ export class Manifold {
    * Fills in vertex properties for normal vectors, calculated from the mesh
    * geometry. Flat faces composed of three or more triangles will remain flat.
    *
-   * @param normalIdx The property channel in which to store the X values of the
-   * normals. The X, Y, and Z channels will be sequential. The property set will
-   * be automatically expanded to include up through normalIdx + 2. Default is
-   * 0, the standard slot; in that case the Manifold records the recording so
-   * a subsequent getMesh() without an explicit normalIdx returns solid-frame
-   * normals. Non-zero values are retained for compatibility and will not be
-   * supported in a future release.
+   * Normals are stored in the first three extra property channels. The
+   * Manifold records them so a subsequent getMesh() returns world-frame
+   * normals. Normals supplied by setProperties() are not recorded; use this
+   * instead of setProperties() on every operand when normals must follow
+   * transforms.
    *
    * @param minSharpAngle Any edges with angles greater than this value will
    * remain sharp, getting different normal vector properties on each side of
@@ -819,7 +813,7 @@ export class Manifold {
    * all.
    * @group Properties
    */
-  calculateNormals(normalIdx?: number, minSharpAngle?: number): Manifold;
+  calculateNormals(minSharpAngle?: number): Manifold;
 
   // Boolean Operations
 
@@ -980,21 +974,9 @@ export class Manifold {
   // Topological Operations
 
   /**
-   * Constructs a new manifold from a list of other manifolds. This is a purely
-   * topological operation, so care should be taken to avoid creating
-   * overlapping results. It is the inverse operation of Decompose().
-   *
-   * @param manifolds A list of Manifolds to lazy-union together.
-   * @deprecated Please use {@link add} or {@link union} instead.
-   * @group Constructors
-   */
-  static compose(manifolds: readonly Manifold[]): Manifold;
-
-  /**
    * This operation returns a vector of Manifolds that are topologically
    * disconnected. If everything is connected, the vector is length one,
-   * containing a copy of the original. It is the inverse operation of
-   * Compose().
+   * containing a copy of the original.
    *
    * @group Constructors
    */
@@ -1047,13 +1029,12 @@ export class Manifold {
   boundingBox(): Box;
 
   /**
-   * Return a copy of the manifold simplified to the given tolerance, but with
-   * its actual tolerance value unchanged. The result will contain a subset of
-   * the original verts and all surfaces will have moved by less than tolerance.
+   * Return a simplified copy of the manifold. The tolerance controls the local
+   * error when collapsing edges, measured relative to nearby face planes.
+   * Simplification tends to remove features thinner than the tolerance.
    *
-   * @param tolerance The maximum distance between the original and simplified
-   *     meshes. If not given or is less than the current tolerance, the current
-   *     tolerance is used.
+   * @param tolerance Simplification tolerance, lower-bounded by the manifold's
+   *     epsilon.
    * @group Transformations
    */
   simplify(tolerance?: number): Manifold;
@@ -1074,7 +1055,8 @@ export class Manifold {
   surfaceArea(): number;
 
   /**
-   * Returns the volume of the manifold.
+   * Returns the volume of the manifold. Negative volume is considered a class
+   * of overlapped geometry and should be avoided as much as self-intersection.
    *
    * @group Measurement
    */
@@ -1101,9 +1083,9 @@ export class Manifold {
 
   /**
    * Returns the winding number of this manifold around each of the given
-   * points. Returns 0 for points outside and a non-zero value (typically ±1)
-   * for points inside a simple closed surface. May exceed ±1 in magnitude for
-   * manifolds with overlapping regions.
+   * points. Returns 0 for points outside and 1 for points
+   * inside a non-overlapped manifold. Any other values indicate overlapping
+   * regions, e.g. -1 for inverted regions, 2 for double-enclosed regions.
    *
    * @param points The 3D query points.
    *
@@ -1144,16 +1126,15 @@ export class Manifold {
    * includes relations to all the input meshes that form a part of this result
    * and the transforms applied to each.
    *
-   * @param normalIdx If the original MeshGL inputs that formed this manifold
-   * had properties corresponding to normal vectors, you can specify the first
-   * of the three consecutive property channels forming the (x, y, z) normals,
-   * which will cause this output MeshGL to automatically update these normals
-   * according to the applied transforms and front/back side. normalIdx + 3 must
-   * be <= numProp, and all original MeshGLs must use the same channels for
-   * their normals.
+   * For each run that records normals (runFlags bit 1), the first three extra
+   * property channels contain world-frame normals. Non-original results
+   * normalize them for graphics output. Unflagged values in those channels are
+   * ordinary properties. To have normals follow transforms, call
+   * calculateNormals() on every operand or import a MeshGL with runFlags bit 1
+   * set.
    * @group Input & Output
    */
-  getMesh(normalIdx?: number): Mesh;
+  getMesh(): Mesh;
 
   // ID Management
 
@@ -1164,22 +1145,15 @@ export class Manifold {
    * reset may allow triangles of flat faces to be further collapsed with
    * Simplify().
    *
-<<<<<<< HEAD
-   * This function also condenses all coplanar faces in the relation, and
-   * collapses those edges. If you want to have inconsistent properties across
-   * these faces, meaning you want to preserve some of these edges, you should
-   * instead call GetMesh(), calculate your properties and use these to
-   * construct a new manifold.
+   * If only some of the input recorded normals, the result keeps two runs
+   * with this ID, one for the triangles with normals and one for the rest.
    *
-   * @group Mesh ID
-=======
    * @param id The ID to assign to this manifold. If negative (the default), a
    *     new ID is assigned. Use zero to match all default-constructed
    *     manifolds, thus not keeping track of the joints between input
    *     manifolds. Ensure separate IDs are used for mesh inputs containing
    *     properties, generally by calling this function without arguments just
    *     after construction.
->>>>>>> c15c7025 (switch meshID tracking to opt-in)
    */
   asOriginal(id?: number): Manifold;
 
@@ -1224,9 +1198,9 @@ export interface MeshOptions {
   runIndex?: Uint32Array;
   runOriginalID?: Uint32Array;
   runTransform?: Float32Array;
+  runFlags?: Uint8Array;
   faceID?: Uint32Array;
   halfedgeTangent?: Float32Array;
-  tolerance?: number;
 }
 
 /**
@@ -1312,9 +1286,8 @@ export class Mesh {
   /**
    * Optional: Length NumTri, contains the source face ID this triangle comes
    * from. Simplification will maintain all edges between triangles with
-   * different faceIDs. Input faceIDs will be maintained to the outputs, but if
-   * none are given, they will be filled in with Manifold's coplanar face
-   * calculation based on mesh tolerance.
+   * different faceIDs. Input faceIDs will be maintained to the outputs,
+   * otherwise this vector will be empty.
    */
   faceID: Uint32Array;
 
@@ -1325,14 +1298,6 @@ export class Mesh {
    * Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
    */
   halfedgeTangent: Float32Array;
-
-  /**
-   * Tolerance for mesh simplification. When creating a Manifold, the tolerance
-   * used will be the maximum of this and a baseline tolerance from the size of
-   * the bounding box. Any edge shorter than tolerance may be collapsed.
-   * Tolerance may be enlarged when floating point error accumulates.
-   */
-  tolerance: number;
 
   /**
    * Number of triangles
@@ -1351,20 +1316,21 @@ export class Mesh {
   get numRun(): number;
 
   /**
-   * Updates the mergeFromVert and mergeToVert vectors in order to create a
-   * manifold solid. If the MeshGL is already manifold, no change will occur and
-   * the function will return false. Otherwise, this will merge verts along open
-   * edges within tolerance (the maximum of the MeshGL tolerance and the
-   * baseline bounding-box tolerance), keeping any from the existing merge
-   * vectors.
+   * Returns a copy with mergeFromVert and mergeToVert vectors updated in order
+   * to create a manifold solid. If the MeshGL is already manifold, the merge
+   * vectors are unchanged. Otherwise, verts along open edges are merged within
+   * tolerance (the maximum of the specified tolerance and the baseline
+   * bounding-box tolerance), keeping any from the existing merge vectors.
    *
    * There is no guarantee the result will be manifold - this is a best-effort
    * helper function designed primarily to aid in the case where a manifold
    * multi-material MeshGL was produced, but its merge vectors were lost due to
    * a round-trip through a file format. Constructing a Manifold from the result
    * will report a Status if it is not manifold.
+   *
+   * @param tolerance Default 0, with a bounding-box and precision-based floor.
    */
-  merge(): boolean;
+  merge(tolerance?: number): Mesh;
 
   /**
    * Gets the three vertex indices of this triangle in CCW order.
@@ -1415,7 +1381,7 @@ export class Mesh {
 
   /**
    * Returns true if the first three extra-property channels of this run
-   * carry world-frame vertex normals (set by `calculateNormals(0)` and
+   * carry world-frame vertex normals (set by `calculateNormals()` and
    * round-tripped via `runFlags` bit 1). Consumers should treat the slot
    * as normals and skip re-applying `runTransform` to it.
    *
@@ -1423,8 +1389,8 @@ export class Mesh {
    * Behavior is undefined when a single propVert is shared by triangles
    * from runs that disagree - the slot has one interpretation, and a
    * transform rotates it for hasNormals=true and clobbers any
-   * hasNormals=false sharer. Standard `calculateNormals` / boolean /
-   * compose outputs never produce that shape.
+   * hasNormals=false sharer. Standard `calculateNormals` and boolean
+   * outputs never produce that shape.
    *
    * @param run triangle run index.
    */

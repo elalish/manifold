@@ -40,10 +40,65 @@ suite('CrossSection Bindings', () => {
     expect(evenOdd.area()).toBeCloseTo(12);
   });
 
+  test(
+      'nonZero fills both signs and even windings, and cancels opposites',
+      () => {
+        const clockwise: Polygons = [[[0, 0], [0, 2], [2, 2], [2, 0]]];
+        const reversed: Polygons = [clockwise[0].slice().reverse()];
+        const single = manifoldModule.CrossSection.nonZero(clockwise);
+        const doubled =
+            manifoldModule.CrossSection.nonZero([clockwise[0], clockwise[0]]);
+        const cancelled =
+            manifoldModule.CrossSection.nonZero([clockwise[0], reversed[0]]);
+        expect(single.area()).toBeCloseTo(4);
+        expect(doubled.area()).toBeCloseTo(4);
+        expect(cancelled.isEmpty()).toBe(true);
+        expect(
+            manifoldModule.CrossSection.ofPolygons(single.toPolygons()).area())
+            .toBeCloseTo(4);
+      });
+
   test('simplify argument is defaulted', () => {
     const cs = manifoldModule.CrossSection.circle(1).simplify();
     expect(cs.numContour()).toEqual(1);
     expect(cs.area()).to.be.greaterThan(0);
+  });
+
+  test('extrude scales X and Y by a single scaleTop (issue #1780)', () => {
+    const square = manifoldModule.CrossSection.square(10);
+    expect(square.extrude(10, 0, 0, 1).volume()).toBeCloseTo(1000);
+    expect(square.extrude(10, 0, 0, 0.5).volume())
+        .toBeCloseTo(square.extrude(10, 0, 0, [0.5, 0.5]).volume());
+    expect(manifoldModule.Manifold.extrude(square, 10, 0, 0, 1).volume())
+        .toBeCloseTo(1000);
+  });
+});
+
+suite('Circular quality', () => {
+  test('factories take a count or a quality object', () => {
+    const {CrossSection, Manifold, segmentsFor} = manifoldModule;
+    expect(CrossSection.circle(5).numVert()).toEqual(32);
+    expect(CrossSection.circle(5, 7).numVert()).toEqual(7);
+    expect(CrossSection.circle(5, {minAngle: 30}).numVert()).toEqual(12);
+    expect(CrossSection.circle(5, {minAngle: undefined}).numVert()).toEqual(32);
+    expect(Manifold.cylinder(1, 5, -1, {minAngle: 30}).numVert()).toEqual(24);
+    expect(segmentsFor(5, {minAngle: 30})).toEqual(12);
+    expect(segmentsFor(5, 7)).toEqual(7);
+    expect(segmentsFor(5)).toEqual(32);
+  });
+
+  test('forDivisions gives exact revolve divisions', () => {
+    const {CrossSection, forDivisions} = manifoldModule;
+    const ring = CrossSection.square([1, 1]).translate([4.5, 0]);
+    // A partial revolve of this ring has 4 vertices per slice.
+    // 30 per full circle over 90 degrees is 7.5, rounded up to 8.
+    expect(ring.revolve(30, 90).numVert()).toEqual(4 * (8 + 1));
+    for (const degrees of [0.7, 360 / 19, 90, 119]) {
+      for (const n of [1, 5, 21]) {
+        expect(ring.revolve(forDivisions(n, degrees), degrees).numVert())
+            .toEqual(4 * (n + 1));
+      }
+    }
   });
 });
 
@@ -51,6 +106,23 @@ suite('Manifold Bindings', () => {
   test('Simplify supports default argument', () => {
     const manifold = manifoldModule.Manifold.sphere(1).simplify();
     expect(manifold.volume()).toBeGreaterThan(0);
+  });
+
+  test('merge returns a new mesh', () => {
+    const {Manifold, Mesh} = manifoldModule;
+    // Normals split the vertices, so the mesh without its merge vectors is
+    // open and merge() builds them.
+    const cube = Manifold.cube().calculateNormals().getMesh();
+    const open = new Mesh({
+      numProp: cube.numProp,
+      vertProperties: cube.vertProperties,
+      triVerts: cube.triVerts
+    });
+    const merged = open.merge();
+    expect(merged).not.toBe(open);
+    expect(open.mergeFromVert).toBeUndefined();
+    expect(merged.mergeFromVert.length).toBeGreaterThan(0);
+    expect(new Manifold(merged).volume()).toBeCloseTo(1);
   });
 
   test('rayCast returns hits through cube', () => {
@@ -61,6 +133,15 @@ suite('Manifold Bindings', () => {
     expect(hits[1].position[2]).toEqual(0.5);
     expect(hits[0].crossing).toEqual(1);
     expect(hits[1].crossing).toEqual(-1);
+  });
+
+  test('rayCast reports originalID and faceID', () => {
+    const cube = manifoldModule.Manifold.cube([1, 1, 1], true).asOriginal(-1);
+    const hits = cube.rayCast([0, 0, -5], [0, 0, 5]);
+    expect(hits).toHaveLength(2);
+    expect(hits[0].originalID).toEqual(cube.originalID());
+    expect(hits[0].originalID).toBeGreaterThan(0);
+    expect(hits[0].faceID).toEqual(0);
   });
 
   test('rayCast returns empty on miss', () => {
@@ -145,9 +226,9 @@ suite('Manifold Bindings', () => {
     // edgeDivisions return 0 for *any* tolerance. This triggers longest == 0 in
     // the keepInterior block — the integer divide-by-zero that traps in WASM.
     const cube =
-        manifoldModule.Manifold.cube([10, 10, 10]).calculateNormals(0, 30);
+        manifoldModule.Manifold.cube([10, 10, 10]).calculateNormals(30);
     const smooth =
-        manifoldModule.Manifold.ofMesh(cube.getMesh(0)).smoothByNormals(0);
+        manifoldModule.Manifold.ofMesh(cube.getMesh()).smoothByNormals();
     // Before the fix, any tolerance value crashed: RuntimeError: divide by zero
     const refined = smooth.refineToTolerance(0.1);
     expect(refined.volume()).toBeGreaterThan(0);

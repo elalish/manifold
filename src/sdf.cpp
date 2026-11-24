@@ -457,7 +457,8 @@ namespace manifold {
  * @param bounds An axis-aligned box that defines the extent of the grid.
  * @param edgeLength Approximate maximum edge length of the triangles in the
  * final result. This affects grid spacing, and hence has a strong effect on
- * performance.
+ * performance. Every positive-length axis has at least one grid interval,
+ * including when its extent is smaller than edgeLength.
  * @param level Extract the surface at this value of your sdf; defaults to
  * zero. You can inset your mesh by using a positive value, or outset it with a
  * negative value.
@@ -486,10 +487,17 @@ void Manifold::Impl::CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
                                     double edgeLength, double level,
                                     double tolerance, bool canParallel,
                                     ExecutionContext::Impl* ctx) {
+  MANIFOLD_BEGIN_PHASE_TIMING();
   // Pre-cancel wins over the (potentially large) voxel allocation and the
   // sampling pass below.
   if (IsCancelled(ctx)) {
     MakeEmpty(Error::Cancelled);
+    return;
+  }
+
+  if (!bounds.IsFinite() || la::any(la::less(bounds.max, bounds.min)) ||
+      !std::isfinite(edgeLength) || edgeLength <= 0) {
+    MakeEmpty(Error::InvalidConstruction);
     return;
   }
 
@@ -500,10 +508,29 @@ void Manifold::Impl::CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
   auto& vertPos = vertPos_;
 
   const vec3 dim = bounds.Size();
-  const ivec3 gridSize(dim / edgeLength + 1.0);
-  const vec3 spacing = dim / (vec3(gridSize - 1));
+  // Grid positions are decoded with int shifts. The voxel array holds
+  // 2^(1 + sum of gridPow) doubles, and its size in bytes must fit in 64 bits.
+  const vec3 gridSizeD = dim / edgeLength + 1.0;
+  if (la::maxelem(gridSizeD) > (1 << 28)) {
+    MakeEmpty(Error::ResultTooLarge);
+    return;
+  }
+  ivec3 gridSize(gridSizeD);
+  // A positive span needs both endpoints even when the requested spacing is
+  // larger than that span. Otherwise gridSize is 1 and spacing becomes
+  // infinite.
+  for (const int axis : {0, 1, 2}) {
+    if (dim[axis] > 0.0) gridSize[axis] = std::max(gridSize[axis], 2);
+  }
+  // A zero-span axis keeps its single point and zero spacing, so a degenerate
+  // box remains empty without passing non-finite coordinates to the callback.
+  const vec3 spacing = dim / vec3(la::max(gridSize - 1, ivec3(1)));
 
   const ivec3 gridPow = ComputeGridPow(gridSize);
+  if (1 + gridPow.x + gridPow.y + gridPow.z + 3 > 64) {
+    MakeEmpty(Error::ResultTooLarge);
+    return;
+  }
   const uint64_t maxIndex = EncodeIndex(ivec4(gridSize + 2, 1), gridPow);
 
   // Parallel policies violate will crash language runtimes with runtime locks

@@ -45,21 +45,6 @@ bool AllFinite(const mat2x3& m) {
   return true;
 }
 
-Polygons FilterSmallContours(const Polygons& paths, double epsilon) {
-  Polygons filtered;
-  filtered.reserve(paths.size());
-  for (const auto& path : paths) {
-    const double area = SignedArea(path);
-    Rect box;
-    for (const vec2& v : path) box.Union(v);
-    const vec2 size = box.Size();
-    if (std::fabs(area) > std::max(size.x, size.y) * epsilon) {
-      filtered.push_back(path);
-    }
-  }
-  return filtered;
-}
-
 Polygons TransformPolygons(const Polygons& paths, const mat2x3& transform) {
   const bool invert = la::determinant(mat2(transform)) < 0;
   Polygons out;
@@ -78,6 +63,13 @@ Polygons TransformPolygons(const Polygons& paths, const mat2x3& transform) {
 
 std::shared_ptr<const PathImpl> shared_paths(Polygons paths) {
   return std::make_shared<const PathImpl>(std::move(paths));
+}
+
+std::shared_ptr<const PathImpl> shared_path(SimplePolygon path) {
+  Polygons paths;
+  // An initializer_list would make its element const and copy the vertices.
+  paths.push_back(std::move(path));
+  return shared_paths(std::move(paths));
 }
 
 void HullBacktrack(const vec2& point, std::vector<vec2>& stack) {
@@ -127,7 +119,7 @@ SimplePolygon HullImpl(SimplePolygon& points) {
 // min-heap over (deviation, index) with stamp-based lazy invalidation makes
 // each removal re-key only the two neighbors, so the pass is O(n log n).
 // Exactly-tied deviations remove the lowest original index first.
-SimplePolygon SimplifyRing(SimplePolygon ring, double tol) {
+SimplePolygon SimplifyRing(const SimplePolygon& ring, double tol) {
   const int n = static_cast<int>(ring.size());
   if (n <= 3) return ring;
   const double tol2 = tol * tol;
@@ -156,8 +148,13 @@ SimplePolygon SimplifyRing(SimplePolygon ring, double tol) {
   auto worse = [](const Entry& a, const Entry& b) {
     return a.d2 > b.d2 || (a.d2 == b.d2 && a.idx > b.idx);
   };
-  std::priority_queue<Entry, std::vector<Entry>, decltype(worse)> heap(worse);
-  for (int i = 0; i < n; ++i) heap.push({deviation2(i), 0, i});
+  std::vector<Entry> entries;
+  entries.reserve(n);
+  for (int i = 0; i < n; ++i) entries.push_back({deviation2(i), 0, i});
+  // Heapify the initial entries in linear time; later removals still update
+  // only the two neighboring vertices.
+  std::priority_queue<Entry, std::vector<Entry>, decltype(worse)> heap(
+      worse, std::move(entries));
 
   int numAlive = n;
   while (numAlive > 3 && !heap.empty()) {
@@ -299,12 +296,45 @@ CrossSection CrossSection::EvenOdd(const Polygons& contours) {
 }
 
 /**
+ * Create a 2d cross-section from a single contour using the nonzero winding
+ * rule. See CrossSection::NonZero(const Polygons&).
+ *
+ * @param contour A closed path outlining the desired cross-section.
+ */
+CrossSection CrossSection::NonZero(const SimplePolygon& contour) {
+  return NonZero(Polygons{contour});
+}
+
+/**
+ * Create a 2d cross-section from a set of contours using the nonzero winding
+ * rule: a sub-region is filled whenever its signed winding number is not zero.
+ * Both clockwise and counter-clockwise contours can enclose solid regions;
+ * oppositely wound overlapping contours cancel where their windings sum to
+ * zero. Unlike even-odd fill, a winding of two is still filled.
+ *
+ * The rule only controls how the input contours are read. The result has
+ * normal-oriented boundaries like any other CrossSection, so later operations
+ * retain their usual behavior. Manifold::Extrude and Manifold::Revolve take raw
+ * contours without applying a fill rule; regularize nonzero input here first
+ * and pass NonZero(contours).ToPolygons() to them.
+ *
+ * @param contours A set of closed paths describing zero or more complex
+ * polygons.
+ */
+CrossSection CrossSection::NonZero(const Polygons& contours) {
+  const double eps = InferEps(contours, {});
+  return CrossSection(
+      shared_paths(ApplyFillRule(contours, eps, WindRule::NonZero)));
+}
+
+/**
  * Create a 2d cross-section from an axis-aligned rectangle (bounding box).
+ * Empty or non-finite bounds produce an empty CrossSection.
  *
  * @param rect An axis-aligned rectangular bounding box.
  */
 CrossSection::CrossSection(const Rect& rect) {
-  if (rect.IsEmpty()) {
+  if (rect.IsEmpty() || !rect.IsFinite()) {
     paths_ = shared_paths({});
     return;
   }
@@ -325,7 +355,8 @@ std::shared_ptr<const PathImpl> CrossSection::GetPaths() const {
 /**
  * Constructs a square with the given XY dimensions. By default it is
  * positioned in the first quadrant, touching the origin. If any dimensions in
- * size are negative, or if all are zero, an empty Manifold will be returned.
+ * size are negative or non-finite, or if all are zero, an empty CrossSection
+ * will be returned.
  *
  * @param size The X, and Y dimensions of the square.
  * @param center Set to true to shift the center to the origin.
@@ -342,20 +373,18 @@ CrossSection CrossSection::Square(const vec2 size, bool center) {
 /**
  * Constructs a circle of a given radius.
  *
- * @param radius Radius of the circle. Must be positive.
- * @param circularSegments Number of segments along its diameter. Default is
- * calculated by the static Quality defaults according to the radius.
+ * @param radius Radius of the circle. Must be positive and finite; otherwise
+ * returns an empty CrossSection.
+ * @param quality Number of segments in a full circle, see CircularQuality.
  */
-CrossSection CrossSection::Circle(double radius, int circularSegments) {
-  if (radius <= 0.0) return CrossSection();
-  const int n = circularSegments > 2 ? circularSegments
-                                     : Quality::GetCircularSegments(radius);
+CrossSection CrossSection::Circle(double radius, CircularQuality quality) {
+  if (radius <= 0.0 || !std::isfinite(radius)) return CrossSection();
+  const int n = quality.SegmentsFor(radius);
   SimplePolygon circle(n);
   const double dPhi = 360.0 / n;
   for (int i = 0; i < n; ++i)
     circle[i] = {radius * cosd(dPhi * i), radius * sind(dPhi * i)};
-  const double tol = InferEps({circle}, {});
-  return CrossSection(shared_paths({std::move(circle)}));
+  return CrossSection(shared_path(std::move(circle)));
 }
 
 /**
@@ -455,7 +484,9 @@ CrossSection& CrossSection::operator^=(const CrossSection& Q) {
  * holes.
  */
 std::vector<CrossSection> CrossSection::Decompose() const {
-  if (NumContour() < 2) return {*this};
+  const size_t count = NumContour();
+  if (count == 0) return {};
+  if (count == 1) return {*this};
   const auto& paths = GetPaths()->paths_;
   std::vector<Polygons> components = DecomposeByContainment(paths);
   std::vector<CrossSection> out;
@@ -599,12 +630,17 @@ CrossSection CrossSection::Simplify(double tolerance) const {
   // decimates at the cross-section's own tolerance, matching Manifold.
   tolerance = std::max(tolerance, InferEps(GetPaths()->paths_, {}));
   const Polygons& paths = GetPaths()->paths_;
-  const Polygons filtered = FilterSmallContours(paths, tolerance);
   Polygons out;
-  out.reserve(filtered.size());
-  for (const auto& ring : filtered) {
-    SimplePolygon simplified = SimplifyRing(ring, tolerance);
-    if (simplified.size() >= 3) out.push_back(std::move(simplified));
+  out.reserve(paths.size());
+  for (const auto& ring : paths) {
+    const double area = SignedArea(ring);
+    Rect box;
+    for (const vec2& v : ring) box.Union(v);
+    const vec2 size = box.Size();
+    if (std::fabs(area) > std::max(size.x, size.y) * tolerance) {
+      SimplePolygon simplified = SimplifyRing(ring, tolerance);
+      if (simplified.size() >= 3) out.push_back(std::move(simplified));
+    }
   }
   return CrossSection(shared_paths(std::move(out)));
 }
@@ -624,18 +660,17 @@ CrossSection CrossSection::Simplify(double tolerance) const {
  * minimum allowed). See the [Clipper2
  * MiterLimit](http://www.angusj.com/clipper2/Docs/Units/Clipper.Offset/Classes/ClipperOffset/Properties/MiterLimit.htm)
  * page for a visual example.
- * @param circularSegments Number of segments per 360 degrees of
+ * @param quality Number of segments per 360 degrees of
  * <B>JoinType::Round</B> corners (roughly, the number of vertices that
- * will be added to each contour). Default is calculated by the static Quality
- * defaults according to the radius.
+ * will be added to each contour), see CircularQuality.
  */
 CrossSection CrossSection::Offset(double delta, JoinType jointype,
                                   double miterLimit,
-                                  int circularSegments) const {
+                                  CircularQuality quality) const {
   // Qualified: unqualified lookup inside the class finds this member and
   // hides the namespace-scope polygon offset.
   Polygons offset = manifold::Offset(GetPaths()->paths_, delta, jointype,
-                                     miterLimit, circularSegments);
+                                     miterLimit, quality);
   return CrossSection(shared_paths(std::move(offset)));
 }
 
@@ -662,7 +697,7 @@ CrossSection CrossSection::Hull(
 
   SimplePolygon hull = HullImpl(points);
   if (hull.size() < 3) return CrossSection();
-  return CrossSection(shared_paths({std::move(hull)}));
+  return CrossSection(shared_path(std::move(hull)));
 }
 
 /**
@@ -681,7 +716,7 @@ CrossSection CrossSection::Hull(const SimplePolygon& pts) {
   SimplePolygon points = pts;  // HullImpl sorts in place
   SimplePolygon hull = HullImpl(points);
   if (hull.size() < 3) return CrossSection();
-  return CrossSection(shared_paths({std::move(hull)}));
+  return CrossSection(shared_path(std::move(hull)));
 }
 
 /**
@@ -692,10 +727,17 @@ CrossSection CrossSection::Hull(const SimplePolygon& pts) {
  * compute a convex hull.
  */
 CrossSection CrossSection::Hull(const Polygons& polys) {
+  size_t numPoints = 0;
+  for (const auto& path : polys) numPoints += path.size();
+
   SimplePolygon points;
+  points.reserve(numPoints);
   for (const auto& path : polys)
-    for (const vec2& point : path) points.push_back(point);
-  return Hull(points);
+    points.insert(points.end(), path.begin(), path.end());
+
+  SimplePolygon hull = HullImpl(points);
+  if (hull.size() < 3) return CrossSection();
+  return CrossSection(shared_path(std::move(hull)));
 }
 
 /**
@@ -710,8 +752,11 @@ double CrossSection::Area() const {
  * Return the number of vertices in the CrossSection.
  */
 size_t CrossSection::NumVert() const {
+  // Affine transforms preserve contour sizes. Keep them deferred when only
+  // the topology is requested, without copying or rounding vertex positions.
+  std::lock_guard<std::mutex> lock(pathsMutex_);
   size_t numVert = 0;
-  for (const auto& path : GetPaths()->paths_) numVert += path.size();
+  for (const auto& path : paths_->paths_) numVert += path.size();
   return numVert;
 }
 
@@ -719,12 +764,18 @@ size_t CrossSection::NumVert() const {
  * Return the number of contours (both outer and inner paths) in the
  * CrossSection.
  */
-size_t CrossSection::NumContour() const { return GetPaths()->paths_.size(); }
+size_t CrossSection::NumContour() const {
+  std::lock_guard<std::mutex> lock(pathsMutex_);
+  return paths_->paths_.size();
+}
 
 /**
  * Does the CrossSection contain any contours?
  */
-bool CrossSection::IsEmpty() const { return GetPaths()->paths_.empty(); }
+bool CrossSection::IsEmpty() const {
+  std::lock_guard<std::mutex> lock(pathsMutex_);
+  return paths_->paths_.empty();
+}
 
 /**
  * Returns the axis-aligned bounding rectangle of all the CrossSections'

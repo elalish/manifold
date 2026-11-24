@@ -1,0 +1,12 @@
+/manifold-cad-*.tgz
+/lib/*.js
+/lib/*.js.map
+/lib/*.d.ts
+/lib/*.d.ts.map
+/test/*.js
+/test/*.js.map
+/test/*.d.ts
+/test/*.d.ts.map
+/test/results
+/coverage
+dist

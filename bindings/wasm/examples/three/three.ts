@@ -115,8 +115,7 @@ function geometry2mesh(geometry: BufferGeometry) {
   // these are automatically filled in for any mesh returned by Manifold. These
   // are necessary because GL drivers require duplicate verts when any
   // properties change, e.g. a UV boundary or sharp corner.
-  mesh.merge();
-  return mesh;
+  return mesh.merge();
 }
 
 // Convert Manifold Mesh to Three.js BufferGeometry

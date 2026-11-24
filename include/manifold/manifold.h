@@ -92,8 +92,8 @@ class Manifold {
   ///@{
   Manifold(const MeshGL&);
   Manifold(const MeshGL64&);
-  MeshGL GetMeshGL(int normalIdx = -1) const;
-  MeshGL64 GetMeshGL64(int normalIdx = -1) const;
+  MeshGL GetMeshGL() const;
+  MeshGL64 GetMeshGL64() const;
   ///@}
 
   /** @name Constructors
@@ -101,15 +101,12 @@ class Manifold {
    */
   ///@{
   std::vector<Manifold> Decompose() const;
-  [[deprecated(
-      "Compose is deprecated, use BatchBoolean with OpType::Add instead.")]]
-  static Manifold Compose(const std::vector<Manifold>&);
   static Manifold Tetrahedron();
   static Manifold Cube(vec3 size = vec3(1.0), bool center = false);
   static Manifold Cylinder(double height, double radiusLow,
-                           double radiusHigh = -1.0, int circularSegments = 0,
-                           bool center = false);
-  static Manifold Sphere(double radius, int circularSegments = 0);
+                           double radiusHigh = -1.0,
+                           CircularQuality quality = {}, bool center = false);
+  static Manifold Sphere(double radius, CircularQuality quality = {});
   static Manifold LevelSet(std::function<double(vec3)> sdf, Box bounds,
                            double edgeLength, double level = 0,
                            double tolerance = -1, bool canParallel = true);
@@ -125,7 +122,7 @@ class Manifold {
                           int nDivisions = 0, double twistDegrees = 0.0,
                           vec2 scaleTop = vec2(1.0));
   static Manifold Revolve(const Polygons& crossSection,
-                          int circularSegments = 0,
+                          CircularQuality quality = {},
                           double revolveDegrees = 360.0f);
   ///@}
 
@@ -161,10 +158,12 @@ class Manifold {
   /// that force evaluation (`Volume`, `GetMeshGL`, `BoundingBox`, etc.) do
   /// not currently observe attached ctx.
   ///
-  /// Deferred ops (Boolean operators, Translate / Rotate / Scale / Transform
-  /// / Mirror / Warp / Simplify, BatchBoolean, the
-  /// vector-of-Manifold Hull) ignore any attached ctx and produce a result
-  /// with no attached ctx. Inputs are not mutated. The idiom for observing a
+  /// Every other op that returns a Manifold ignores any attached ctx and
+  /// produces a result with no attached ctx. That includes the deferred ops
+  /// (Boolean operators, Translate / Rotate / Scale / Transform / Mirror,
+  /// BatchBoolean, the vector-of-Manifold Hull) and the ones that evaluate
+  /// their input right away (Warp, Simplify, Split, SetProperties, etc.).
+  /// Inputs are not mutated. The idiom for observing a
   /// deferred tree is therefore:
   ///
   ///   (a + b - c).WithContext(ctx).Status();
@@ -253,8 +252,7 @@ class Manifold {
       int numProp,
       std::function<void(double*, vec3, const double*)> propFunc) const;
   Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
-  Manifold CalculateNormals(int normalIdx = 0,
-                            double minSharpAngle = 52.5) const;
+  Manifold CalculateNormals(double minSharpAngle = 52.5) const;
   ///@}
 
   /** @name Smoothing
@@ -265,7 +263,7 @@ class Manifold {
   Manifold Refine(int) const;
   Manifold RefineToLength(double) const;
   Manifold RefineToTolerance(double) const;
-  Manifold SmoothByNormals(int normalIdx = 0) const;
+  Manifold SmoothByNormals() const;
   ///@}
 
   /** @name Convex Hull
@@ -347,9 +345,9 @@ class Manifold {
   // the user's ExecutionContext if a ctx-attached Manifold survives it.
   // Propagates through copy ctor / op= (raw copy preserves the attachment).
   // Manifold-returning ops do *not* propagate it: derived Manifolds get a
-  // null ctx_. Eager ops (Status, Refine family) snapshot ctx_ to observe
-  // their in-call work; the snapshot uses an atomic load, which pins the
-  // Impl across long-running evaluations even if a concurrent op= reseats
+  // null ctx_. Eager ops (Status, Refine family, Hull, Minkowski) snapshot ctx_
+  // to observe their in-call work; the snapshot uses an atomic load, which pins
+  // the Impl across long-running evaluations even if a concurrent op= reseats
   // ctx_ mid-eval.
   //
   // Accessed only atomically (AtomicLoadShared/AtomicStoreShared): no const

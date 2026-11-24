@@ -24,8 +24,10 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdlib>
+#include <functional>
+#include <limits>
 #include <map>
-#include <set>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -45,11 +47,37 @@ struct LexLess {
 };
 constexpr LexLess kLexLess{};
 
+// Enclose Interpolate's rounded y result, including its fallback to l.y.
+// For clamped x, finite lambda lies in [0, 1] from l or [-1, 0] from r.
+// Rounded multiply/add are monotonic, so values at 0 and +/-1 bound both forms.
+std::pair<double, double> InterpolatedYBounds(vec2 l, vec2 r) {
+  if (!(std::isfinite(l.x) && std::isfinite(l.y) && std::isfinite(r.x) &&
+        std::isfinite(r.y))) {
+    return {-std::numeric_limits<double>::infinity(),
+            std::numeric_limits<double>::infinity()};
+  }
+  const double dy = r.y - l.y;
+  double lo = std::min(l.y, r.y), hi = std::max(l.y, r.y);
+  if (std::isfinite(dy)) {
+    lo = std::min(lo,
+                  std::min(l.y + std::min(0.0, dy), r.y + std::min(0.0, -dy)));
+    hi = std::max(hi,
+                  std::max(l.y + std::max(0.0, dy), r.y + std::max(0.0, -dy)));
+  }
+  return {lo, hi};
+}
+
 // Table 7.1 (p.107): y-value of a non-vertical segment at abscissa xP, via the
 // shared interpolation kernel (shared.h; lambda measured from the nearer
 // endpoint, 8.5).
 double YAtX(const vec2& l, const vec2& r, double xP) {
-  return Interpolate(vec3(l, 0.0), vec3(r, 0.0), xP).x;
+  const double y = Interpolate(vec3(l, 0.0), vec3(r, 0.0), xP).x;
+#if defined(MANIFOLD_ASSERT) && defined(MANIFOLD_DEBUG)
+  const auto [ymin, ymax] = InterpolatedYBounds(l, r);
+  DEBUG_ASSERT(ymin <= y && y <= ymax, logicErr,
+               "Interpolated y is outside its conservative bounds");
+#endif
+  return y;
 }
 
 // Table 7.2 (p.108): the crossing point on the common x-range, via the shared
@@ -72,6 +100,8 @@ bool OnInterior(const vec2& v, const vec2& a, const vec2& b) {
     return v.x == lo.x && lo.y < v.y && v.y < hi.y;
   }
   if (v.x < lo.x || v.x > hi.x) return false;
+  const auto [ymin, ymax] = InterpolatedYBounds(lo, hi);
+  if (v.y < ymin || v.y > ymax) return false;
   return YAtX(lo, hi, v.x) == v.y;
 }
 
@@ -81,6 +111,7 @@ enum class Side : uint8_t { UNDER, OVER, ON, ENDS };
 // the second operand with negative multiplicity, so it uses the Add rule.
 // EvenOdd reads the same signed winding by parity, so unlike Add it fills a
 // lone clockwise contour (w == -1) as well as a counter-clockwise one.
+// NonZero fills both signs at every nonzero magnitude.
 bool IsInside(WindRule rule, int64_t w) {
   switch (rule) {
     case WindRule::Add:
@@ -89,37 +120,82 @@ bool IsInside(WindRule rule, int64_t w) {
       return w > 1;
     case WindRule::EvenOdd:
       return w % 2 != 0;
+    case WindRule::NonZero:
+      return w != 0;
   }
   return false;
 }
 
-// Lex-normalized directed-edge key with signed multiplicity: the PolySet2 of
-// Smith 7.1.2 / 6.5 (reversal negates m, exact-coincident edges sum, zero-mult
-// and zero-length annihilate). Keyed by (lo, hi) in lexicographic point order.
+using EdgeKey = std::pair<vec2, vec2>;
+
 struct PairLexLess {
-  bool operator()(const std::pair<vec2, vec2>& a,
-                  const std::pair<vec2, vec2>& b) const {
+  bool operator()(const EdgeKey& a, const EdgeKey& b) const {
     if (kLexLess(a.first, b.first)) return true;
     if (kLexLess(b.first, a.first)) return false;
     return kLexLess(a.second, b.second);
   }
 };
-using PolySet2 = std::map<std::pair<vec2, vec2>, int64_t, PairLexLess>;
 
-// Add the directed edge a->b with multiplicity m: normalize the key to lex
-// order (negating m on reversal) and erase zero-length or zero-sum entries.
-void PolySetAdd(PolySet2& ps, vec2 a, vec2 b, int64_t m) {
-  if (a == b || m == 0) return;  // zero-length / zero-mult discarded (6.5)
-  if (kLexLess(b, a)) {
-    std::swap(a, b);
-    m = -m;
+// The PolySet2 of Smith 7.1.2 / 6.5: directed edges with signed multiplicity,
+// each keyed by its endpoints in lexicographic order (lo, hi). Reversing an
+// edge negates m, exactly coincident edges sum, and edges with zero length or
+// zero multiplicity drop out. The vector holds one entry per key, in key order.
+using PolySet2 = std::vector<std::pair<EdgeKey, int64_t>>;
+
+// A function object rather than a function: in Wasm builds, the compiler
+// doesn't inline a function pointer through manifold::stable_sort, which makes
+// CrossSection booleans about 10% slower. Native builds don't show this.
+struct EntryLess {
+  bool operator()(const PolySet2::value_type& a,
+                  const PolySet2::value_type& b) const {
+    return PairLexLess()(a.first, b.first);
   }
-  auto it = ps.find({a, b});
-  if (it == ps.end())
-    ps.emplace(std::make_pair(a, b), m);
-  else if ((it->second += m) == 0)
-    ps.erase(it);
-}
+};
+constexpr EntryLess kEntryLess{};
+
+// Collects edges for a PolySet2. No stage reads a set until it is complete, so
+// Add appends each edge, and Sorted combines duplicate keys once at the end.
+class EdgeSum {
+ public:
+  void reserve(size_t n) { adds_.reserve(n); }
+
+  // Add the directed edge a->b with multiplicity m: normalize the key to lex
+  // order (negating m on reversal) and drop zero-length or zero-mult edges.
+  void Add(vec2 a, vec2 b, int64_t m) {
+    if (a == b || m == 0) return;  // drop zero-length / zero-mult edges (6.5)
+    if (kLexLess(b, a)) {
+      std::swap(a, b);
+      m = -m;
+    }
+    adds_.push_back({{a, b}, m});
+  }
+
+  // Sort the edges, sum each key's multiplicities in insertion order, and drop
+  // keys whose sum is zero. Each entry takes its coordinates from the first
+  // edge added after the key's sum was last zero, as a map that erases an
+  // entry when its sum reaches zero would. Equal keys can differ only in the
+  // sign of a zero.
+  PolySet2 Sorted() {
+    manifold::stable_sort(adds_.begin(), adds_.end(), kEntryLess);
+    PolySet2 ps;
+    ps.reserve(adds_.size());
+    for (size_t s = 0; s < adds_.size();) {
+      const EdgeKey* key = nullptr;
+      int64_t m = 0;
+      size_t e = s;
+      for (; e < adds_.size() && !kEntryLess(adds_[s], adds_[e]); ++e) {
+        if (m == 0) key = &adds_[e].first;
+        m += adds_[e].second;
+      }
+      if (m != 0) ps.push_back({*key, m});
+      s = e;
+    }
+    return ps;
+  }
+
+ private:
+  PolySet2 adds_;
+};
 
 // 7.6.1 footnote 9: resolve each x-group of coincident/overlapping vertical
 // edges into signed-coverage segments between consecutive breakpoints, summing
@@ -129,15 +205,18 @@ void PolySetAdd(PolySet2& ps, vec2 a, vec2 b, int64_t m) {
 void MergeVerticals1D(PolySet2& ps) {
   std::map<double, std::vector<std::pair<std::pair<double, double>, int64_t>>>
       groups;
-  std::vector<std::pair<vec2, vec2>> toErase;
+  auto kept = ps.begin();
   for (const auto& kv : ps) {
     if (kv.first.first.x == kv.first.second.x) {
       groups[kv.first.first.x].push_back(
           {{kv.first.first.y, kv.first.second.y}, kv.second});
-      toErase.push_back(kv.first);
+    } else {
+      *kept++ = kv;
     }
   }
-  for (const auto& k : toErase) ps.erase(k);
+  if (groups.empty()) return;
+  ps.erase(kept, ps.end());
+  const size_t numKept = ps.size();
   for (const auto& g : groups) {
     std::map<double, int64_t> delta;  // coverage change at y
     for (const auto& seg : g.second) {
@@ -151,12 +230,15 @@ void MergeVerticals1D(PolySet2& ps) {
     bool have = false;
     for (const auto& d : delta) {
       if (have && cover != 0)
-        PolySetAdd(ps, {g.first, prevY}, {g.first, d.first}, cover);
+        ps.push_back({{{g.first, prevY}, {g.first, d.first}}, cover});
       cover += d.second;
       prevY = d.first;
       have = true;
     }
   }
+  // The loop above emits the new segments in (x, y) order, and none of them
+  // equals another key, so merging the two sorted ranges sorts the vector.
+  std::inplace_merge(ps.begin(), ps.begin() + numKept, ps.end(), kEntryLess);
 }
 
 // A live sweep edge. Roles (7.6.1): l = processed end, r = pending end. `m` is
@@ -166,7 +248,13 @@ struct SweepEdge {
   vec2 l, r;
   int64_t m;
   uint64_t seq;
+  double ymin, ymax;
 };
+
+SweepEdge MakeSweepEdge(vec2 l, vec2 r, int64_t m, uint64_t seq) {
+  const auto [ymin, ymax] = InterpolatedYBounds(l, r);
+  return {l, r, m, seq, ymin, ymax};
+}
 
 // One lexicographic sweep. Arrangement mode discovers crossings (TestPair) and
 // emits every finalized piece with its signed multiplicity. Winding mode runs
@@ -181,25 +269,64 @@ class SweepPass {
 
   void Seed(vec2 a, vec2 b, int64_t m) { PendingAdd(a, b, m); }
 
-  // `mergeVerticalOutput` runs the footnote-9 vertical resolve on the result:
-  // coincident and overlapping vertical edges are summed into signed-coverage
-  // segments (input breakpoints preserved). The arrangement pass needs it to
-  // order coincident verticals the sweep status cannot; the measure pass emits
-  // the already-resolved boundary and skips it.
-  void Run(bool mergeVerticalOutput = true) {
-    while (!events_.empty()) {
-      const vec2 p = *events_.begin();
-      events_.erase(events_.begin());
-      ProcessEvent(p);
+  // PolySet2 iterates in (a, b) order, so appending keeps each list sorted.
+  void SeedFromPolySet(const PolySet2& ps) {
+    auto hint = events_.end();
+    for (const auto& kv : ps) {
+      const vec2& a = kv.first.first;
+      const vec2& b = kv.first.second;
+      const int64_t m = kv.second;
+      if (a == b || m == 0) continue;
+      if (hint == events_.end() || hint->first != a)
+        hint = events_.try_emplace(events_.end(), a);
+      hint->second.push_back({b, m});
+      events_.try_emplace(b);
     }
-    DEBUG_ASSERT(status_.empty() && pending_.empty(), logicErr,
-                 "Boolean2 sweep left live edges after draining");
-    if (mergeVerticalOutput) MergeVerticals1D(out_);
   }
 
-  PolySet2& Out() { return out_; }
+  void Run() {
+    while (!events_.empty()) {
+      // Erase the event before processing it. Processing can requeue a
+      // remainder at p, which needs a new event; if this entry were still
+      // here, the remainder would land in it and be erased unprocessed.
+      auto event = events_.begin();
+      const vec2 p = event->first;
+      auto pending = std::move(event->second);
+      events_.erase(event);
+      ProcessEvent(p, &pending);
+    }
+    DEBUG_ASSERT(status_.empty(), logicErr,
+                 "Boolean2 sweep left live edges after draining");
+  }
+
+  void RunStatic(const PolySet2& arr) {
+    std::vector<vec2> events;
+    events.reserve(2 * arr.size());
+    for (const auto& kv : arr) {
+      events.push_back(kv.first.first);
+      events.push_back(kv.first.second);
+    }
+    manifold::stable_sort(events.begin(), events.end(), kLexLess);
+    events.erase(std::unique(events.begin(), events.end(),
+                             [](const vec2& a, const vec2& b) {
+                               return !kLexLess(a, b);
+                             }),
+                 events.end());
+    static_ = &arr;
+    staticNext_ = arr.begin();
+    for (const vec2& p : events) ProcessEvent(p);
+  }
+
+  void ReserveOut(size_t n) { out_.reserve(n); }
+
+  PolySet2 SortedOut() { return out_.Sorted(); }
 
  private:
+  struct PendingEdge {
+    vec2 r;
+    int64_t m;
+  };
+
   int64_t LexMultiplicity(const SweepEdge& e) const {
     return kLexLess(e.l, e.r) ? e.m : -e.m;
   }
@@ -210,18 +337,23 @@ class SweepPass {
       std::swap(a, b);
       m = -m;
     }
-    auto& inner = pending_[a];
-    auto it = inner.find(b);
-    if (it == inner.end())
-      inner.emplace(b, m);
-    else if ((it->second += m) == 0)
-      inner.erase(it);
-    if (inner.empty()) pending_.erase(a);
-    events_.insert(a);
-    events_.insert(b);
+    auto& pending = events_[a];
+    auto it = std::lower_bound(pending.begin(), pending.end(), b,
+                               [](const PendingEdge& edge, const vec2& end) {
+                                 return kLexLess(edge.r, end);
+                               });
+    if (it == pending.end() || kLexLess(b, it->r))
+      pending.insert(it, {b, m});
+    else if ((it->m += m) == 0)
+      pending.erase(it);
+    events_.try_emplace(b);
   }
 
   Side Classify(const SweepEdge& e, const vec2& p) const {
+    if (e.l.x <= p.x && p.x <= e.r.x) {
+      if (e.ymax < p.y) return Side::UNDER;
+      if (e.ymin > p.y) return Side::OVER;
+    }
     if (e.r == p) return Side::ENDS;
     if (e.l.x == e.r.x) {
       if (p.x != e.l.x) return Side::ON;
@@ -231,8 +363,9 @@ class SweepPass {
       if (ylo >= p.y) return Side::OVER;
       return Side::ON;
     }
-    const vec2& lo = kLexLess(e.l, e.r) ? e.l : e.r;
-    const vec2& hi = kLexLess(e.l, e.r) ? e.r : e.l;
+    const bool lFirst = e.l.x < e.r.x;
+    const vec2 lo = lFirst ? e.l : e.r;
+    const vec2 hi = lFirst ? e.r : e.l;
     if (p.x < lo.x || p.x > hi.x) return p.x < lo.x ? Side::OVER : Side::ON;
     const double ys = YAtX(lo, hi, p.x);
     if (ys < p.y) return Side::UNDER;
@@ -260,16 +393,52 @@ class SweepPass {
                     int64_t above) {
     if (from == to) return;
     if (mode_ == SweepMode::Arrangement) {
-      PolySetAdd(out_, from, to, m);
+      out_.Add(from, to, m);
       return;
     }
     const bool insB = IsInside(rule_, below);
     const bool insA = IsInside(rule_, above);
     if (insB == insA) return;
     // above inside -> lex-forward; below inside -> lex-backward.
-    PolySetAdd(
-        out_, from, to,
+    out_.Add(
+        from, to,
         insA ? (kLexLess(from, to) ? 1 : -1) : (kLexLess(from, to) ? -1 : 1));
+  }
+
+  static constexpr size_t kBlockShift = 3;
+  static constexpr size_t kBlockSize = size_t{1} << kBlockShift;
+
+  struct StatusBlock {
+    double maxLx;
+    double minRx;
+    double maxY;
+    double minY;
+    int64_t wSum;
+  };
+
+  StatusBlock BuildBlock(size_t b) const {
+    const size_t start = b << kBlockShift;
+    const size_t end = std::min(start + kBlockSize, status_.size());
+    const SweepEdge& e0 = status_[start];
+    StatusBlock block{e0.l.x, e0.r.x, e0.ymax, e0.ymin,
+                      mode_ == SweepMode::Winding ? LexMultiplicity(e0) : 0};
+    for (size_t i = start + 1; i < end; ++i) {
+      const SweepEdge& e = status_[i];
+      block.maxLx = std::max(block.maxLx, e.l.x);
+      block.minRx = std::min(block.minRx, e.r.x);
+      block.maxY = std::max(block.maxY, e.ymax);
+      block.minY = std::min(block.minY, e.ymin);
+      if (mode_ == SweepMode::Winding) block.wSum += LexMultiplicity(e);
+    }
+    return block;
+  }
+
+  void RebuildBlocksFrom(size_t startIdx) {
+    const size_t numBlocks = (status_.size() + kBlockSize - 1) >> kBlockShift;
+    blocks_.resize(numBlocks);
+    for (size_t b = startIdx >> kBlockShift; b < numBlocks; ++b) {
+      blocks_[b] = BuildBlock(b);
+    }
   }
 
   // 7.4.1: split status edge idx at q; shorten in place, requeue the remainder.
@@ -278,12 +447,15 @@ class SweepPass {
     if (q == e.r) return;
     if (q == e.l) {
       status_.erase(status_.begin() + idx);
+      dirtySizeChanged_ = true;
+      if (idx < dirtyLo_) dirtyLo_ = idx;
       PendingAdd(q, e.r, e.m);
       return;
     }
-    status_[idx].r = q;
+    status_[idx] = MakeSweepEdge(e.l, q, e.m, e.seq);
+    if (idx < dirtyLo_) dirtyLo_ = idx;
+    if (idx + 1 > dirtyHi_) dirtyHi_ = idx + 1;
     PendingAdd(q, e.r, e.m);
-    events_.insert(q);
   }
 
   // 7.4.2 preliminary + 7.1.1/8.5 crossing test on a neighbour pair.
@@ -291,12 +463,15 @@ class SweepPass {
     if (j >= status_.size() || i >= j) return;
     SweepEdge a = status_[i], b = status_[j];
     if (a.l == b.l || a.l == b.r || a.r == b.l || a.r == b.r) return;
-    if (OnInterior(b.r, a.l, a.r)) return SplitAt(i, b.r);
-    if (OnInterior(a.r, b.l, b.r)) return SplitAt(j, a.r);
     const double axlo = std::min(a.l.x, a.r.x), axhi = std::max(a.l.x, a.r.x);
     const double bxlo = std::min(b.l.x, b.r.x), bxhi = std::max(b.l.x, b.r.x);
     const double xL = std::max(axlo, bxlo), xR = std::min(axhi, bxhi);
     if (xL > xR) return;
+    const double aylo = a.ymin, ayhi = a.ymax;
+    const double bylo = b.ymin, byhi = b.ymax;
+    if (ayhi < bylo || byhi < aylo) return;
+    if (OnInterior(b.r, a.l, a.r)) return SplitAt(i, b.r);
+    if (OnInterior(a.r, b.l, b.r)) return SplitAt(j, a.r);
     double yAL, yAR, yBL, yBR;
     if (axlo == axhi) {
       yAL = std::min(a.l.y, a.r.y);
@@ -323,49 +498,124 @@ class SweepPass {
     if (!aLower && !bLower) return;
     const vec2 q = aLower ? Interpolate2(xL, yAL, yBL, xR, yAR, yBR)
                           : Interpolate2(xL, yBL, yAL, xR, yBR, yAR);
-    events_.insert(q);
     SplitAt(j, q);  // j first: index safety
     SplitAt(i, q);
+  }
+
+  struct EventRange {
+    size_t lo, hi;
+    int64_t windingBelow;
+  };
+
+  EventRange FindEventRange(const vec2& p) const {
+    const size_t n = status_.size();
+    const size_t numBlocks = blocks_.size();
+    size_t lo = 0;
+    Side clsLo = Side::UNDER;
+    int64_t w = 0;
+    for (size_t b = 0; b < numBlocks; ++b) {
+      const size_t bEnd = std::min((b + 1) << kBlockShift, n);
+      const StatusBlock& blk = blocks_[b];
+      if (blk.maxLx <= p.x && p.x <= blk.minRx && blk.maxY < p.y) {
+        if (mode_ == SweepMode::Winding) w += blk.wSum;
+        lo = bEnd;
+        continue;
+      }
+      while (lo < bEnd && (clsLo = Classify(status_[lo], p)) == Side::UNDER) {
+        if (mode_ == SweepMode::Winding) w += LexMultiplicity(status_[lo]);
+        ++lo;
+      }
+      if (lo < bEnd) break;
+    }
+    size_t hi = n;
+    if (lo < n) {
+      const size_t loBlock = lo >> kBlockShift;
+      for (size_t b = numBlocks; b-- > loBlock;) {
+        const size_t bStart = b << kBlockShift;
+        if (bStart > lo) {
+          const StatusBlock& blk = blocks_[b];
+          if (blk.maxLx <= p.x && p.x <= blk.minRx && blk.minY > p.y) {
+            hi = bStart;
+            continue;
+          }
+        }
+        const size_t limit = std::max(bStart, lo + 1);
+        while (hi > limit && Classify(status_[hi - 1], p) == Side::OVER) {
+          --hi;
+        }
+        if (hi > limit) break;
+        if (hi - 1 == lo) {
+          if (clsLo == Side::OVER) --hi;
+          break;
+        }
+      }
+    }
+    return {lo, hi, w};
+  }
+
+  void ReplaceStatusRange(size_t lo, size_t hi) {
+    const size_t k = reinsert_.size();
+    const size_t removed = hi - lo;
+    dirtySizeChanged_ = false;
+    dirtyLo_ = lo;
+    dirtyHi_ = lo + k;
+    if (k == removed) {
+      if (k > 0) {
+        std::copy(reinsert_.begin(), reinsert_.end(), status_.begin() + lo);
+      }
+    } else if (k < removed) {
+      std::copy(reinsert_.begin(), reinsert_.end(), status_.begin() + lo);
+      status_.erase(status_.begin() + lo + k, status_.begin() + hi);
+      dirtySizeChanged_ = true;
+    } else {
+      std::copy(reinsert_.begin(), reinsert_.begin() + removed,
+                status_.begin() + lo);
+      status_.insert(status_.begin() + hi, reinsert_.begin() + removed,
+                     reinsert_.end());
+      dirtySizeChanged_ = true;
+    }
   }
 
   // 7.6.2 block rule: bracket the contiguous status block straddling p (from
   // the last strictly-under edge to the first strictly-over edge), split each
   // bracketed edge through p, and re-enter the remainders sorted by gradient.
   // In arrangement mode, test the newly-adjacent pairs for crossings.
-  void ProcessEvent(const vec2& p) {
-    const size_t n = status_.size();
-    std::vector<Side> cls(n);
-    for (size_t i = 0; i < n; ++i) cls[i] = Classify(status_[i], p);
-    size_t lo = 0;
-    while (lo < n && cls[lo] == Side::UNDER) lo++;
-    size_t hi = n;
-    while (hi > lo && cls[hi - 1] == Side::OVER) hi--;
-    std::vector<SweepEdge> reinsert;
-    int64_t w = 0;
-    for (size_t i = 0; i < lo; ++i) w += LexMultiplicity(status_[i]);
+  void ProcessEvent(const vec2& p,
+                    const std::vector<PendingEdge>* pending = nullptr) {
+    const auto [lo, hi, windingBelow] = FindEventRange(p);
+    int64_t w = windingBelow;
+    reinsert_.clear();
     for (size_t i = lo; i < hi; ++i) {
       SweepEdge& e = status_[i];
-      const int64_t lm = LexMultiplicity(e);
-      const int64_t below = w, above = w + lm;
-      w = above;
-      if (cls[i] == Side::ENDS) {
-        EmitBoundary(e.l, e.r, e.m, below, above);
-      } else {  // forced through p (7.6.2): commit [e.l, p], re-enter [p, e.r]
-        if (e.l != p) EmitBoundary(e.l, p, e.m, below, above);
-        reinsert.push_back({p, e.r, e.m, seqCounter_++});
+      const int64_t below = w;
+      if (mode_ == SweepMode::Winding) w += LexMultiplicity(e);
+      if (e.r == p) {
+        EmitBoundary(e.l, e.r, e.m, below, w);
+      } else {
+        if (e.l != p) EmitBoundary(e.l, p, e.m, below, w);
+        reinsert_.push_back(MakeSweepEdge(p, e.r, e.m, seqCounter_++));
       }
     }
     const bool removedAny = hi > lo;
-    status_.erase(status_.begin() + lo, status_.begin() + hi);
-    auto pit = pending_.find(p);
-    if (pit != pending_.end()) {
-      for (const auto& kv : pit->second)
-        reinsert.push_back({p, kv.first, kv.second, seqCounter_++});
-      pending_.erase(pit);
+    if (static_) {
+      for (; staticNext_ != static_->end() &&
+             !kLexLess(p, staticNext_->first.first);
+           ++staticNext_)
+        reinsert_.push_back(MakeSweepEdge(p, staticNext_->first.second,
+                                          staticNext_->second, seqCounter_++));
+    } else if (pending) {
+      for (const auto& edge : *pending)
+        reinsert_.push_back(MakeSweepEdge(p, edge.r, edge.m, seqCounter_++));
     }
-    std::stable_sort(reinsert.begin(), reinsert.end(), GradientLess);
-    status_.insert(status_.begin() + lo, reinsert.begin(), reinsert.end());
-    const size_t k = reinsert.size();
+    const size_t k = reinsert_.size();
+    if (k == 2) {
+      if (GradientLess(reinsert_[1], reinsert_[0])) {
+        std::swap(reinsert_[0], reinsert_[1]);
+      }
+    } else if (k > 2) {
+      std::stable_sort(reinsert_.begin(), reinsert_.end(), GradientLess);
+    }
+    ReplaceStatusRange(lo, hi);
     // 8.4: test the pairs that just became adjacent. The arrangement is static
     // in winding mode, so no adjacency tests and no constructed points.
     if (mode_ == SweepMode::Arrangement) {
@@ -376,39 +626,63 @@ class SweepPass {
         TestPair(lo - 1, lo);
       }
     }
+    if (dirtySizeChanged_) {
+      RebuildBlocksFrom(dirtyLo_);
+    } else if (dirtyLo_ < dirtyHi_) {
+      const size_t bFirst = dirtyLo_ >> kBlockShift;
+      const size_t bLast = (dirtyHi_ - 1) >> kBlockShift;
+      for (size_t b = bFirst; b <= bLast; ++b) blocks_[b] = BuildBlock(b);
+    }
   }
 
   WindRule rule_;
   SweepMode mode_;
-  std::set<vec2, LexLess> events_;
-  std::map<vec2, std::map<vec2, int64_t, LexLess>, LexLess> pending_;
+  // Event points, each with the pending edges that start there. Each list stays
+  // sorted by r so that a repeated edge merges with the earlier one, and so
+  // the order, which sets the seq that breaks GradientLess ties, doesn't
+  // depend on the order edges were queued.
+  std::map<vec2, std::vector<PendingEdge>, LexLess> events_;
   std::vector<SweepEdge> status_;
-  PolySet2 out_;
+  std::vector<StatusBlock> blocks_;
+  std::vector<SweepEdge> reinsert_;
+  EdgeSum out_;
+  const PolySet2* static_ = nullptr;
+  PolySet2::const_iterator staticNext_;
   uint64_t seqCounter_ = 0;
+  size_t dirtyLo_ = 0;
+  size_t dirtyHi_ = 0;
+  bool dirtySizeChanged_ = false;
 };
 
-// Arrangement pass: the collect sweep discovers crossings (testPair), resolves
-// near-concurrences with the block rule, merges coincident verticals, and emits
-// every finalized piece. The result is a true arrangement - every crossing is a
-// shared vertex, no two pieces cross.
-// The arrangement pass over the seeded PolySet2.
-PolySet2 CollectArrangement(PolySet2 arr, WindRule rule) {
+// Arrangement pass: the collect sweep discovers crossings (TestPair), resolves
+// near-concurrences with the block rule, and emits every finalized piece.
+// MergeVerticals1D then merges coincident vertical edges, which the sweep
+// status can't order. The result is a true arrangement: every crossing is a
+// shared vertex, and no two pieces cross.
+PolySet2 CollectArrangement(const PolySet2& arr, WindRule rule) {
   SweepPass collect(rule, SweepMode::Arrangement);
-  for (const auto& kv : arr)
-    collect.Seed(kv.first.first, kv.first.second, kv.second);
+  collect.ReserveOut(arr.size());
+  collect.SeedFromPolySet(arr);
   collect.Run();
-  return std::move(collect.Out());
+  PolySet2 out = collect.SortedOut();
+  MergeVerticals1D(out);
+  return out;
 }
 
 // Arrangement then winding over the resulting true arrangement.
-PolySet2 CollectThenMeasure(PolySet2 arr, WindRule rule) {
-  PolySet2 clean = CollectArrangement(std::move(arr), rule);
+PolySet2 CollectThenMeasure(const PolySet2& arr, WindRule rule) {
+  const PolySet2 clean = CollectArrangement(arr, rule);
   SweepPass measure(rule, SweepMode::Winding);
-  for (const auto& kv : clean)
-    measure.Seed(kv.first.first, kv.first.second, kv.second);
-  measure.Run(/*mergeVerticalOutput=*/false);  // preserve T-junction verts
-  return std::move(measure.Out());
+  measure.RunStatic(clean);
+  return measure.SortedOut();
 }
+
+struct PointHash {
+  size_t operator()(const vec2& p) const {
+    const std::hash<double> hash;
+    return hash64bit(hash(p.x) ^ hash64bit(hash(p.y)));
+  }
+};
 
 }  // namespace
 
@@ -417,17 +691,14 @@ PolySet2 CollectThenMeasure(PolySet2 arr, WindRule rule) {
 // vertices the returned edges reference are appended to it.
 std::vector<OutEdge> SweepWinding(const std::vector<EdgeM>& edges,
                                   std::vector<vec2>& verts, WindRule rule) {
-  std::map<std::pair<double, double>, int> vertId;
+  std::unordered_map<vec2, int, PointHash> vertId;
+  vertId.reserve(verts.size());
   for (int v = 0; v < static_cast<int>(verts.size()); ++v)
-    vertId.emplace(std::make_pair(verts[v].x, verts[v].y), v);
+    vertId.emplace(verts[v], v);
   auto getId = [&](const vec2& p) -> int {
-    const auto key = std::make_pair(p.x, p.y);
-    auto it = vertId.find(key);
-    if (it != vertId.end()) return it->second;
-    const int id = static_cast<int>(verts.size());
-    verts.push_back(p);
-    vertId.emplace(key, id);
-    return id;
+    auto [it, inserted] = vertId.try_emplace(p, static_cast<int>(verts.size()));
+    if (inserted) verts.push_back(p);
+    return it->second;
   };
 
   // Seed the sweep from the input edges as a lex-normalized signed-multiplicity
@@ -436,13 +707,18 @@ std::vector<OutEdge> SweepWinding(const std::vector<EdgeM>& edges,
   // near-concurrences to a single shared vertex; eps-scale vertex-on-edge
   // incidences are pre-split by the caller.
   PolySet2 arr;
-  for (const auto& e : edges) {
-    if (e.v0 == e.v1) continue;
-    PolySetAdd(arr, verts[e.v0], verts[e.v1], e.mult);
+  {
+    EdgeSum sum;
+    sum.reserve(edges.size());
+    for (const auto& e : edges) {
+      if (e.v0 == e.v1) continue;
+      sum.Add(verts[e.v0], verts[e.v1], e.mult);
+    }
+    arr = sum.Sorted();
   }
   MergeVerticals1D(arr);
 
-  const PolySet2 out = CollectThenMeasure(std::move(arr), rule);
+  const PolySet2 out = CollectThenMeasure(arr, rule);
 
   // Materialize the retained boundary as directed OutEdges. A key stores the
   // lex-min/lex-max endpoints with signed multiplicity: positive runs lo->hi.

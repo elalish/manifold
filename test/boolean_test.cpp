@@ -92,10 +92,9 @@ TEST(Boolean, MeshGLRoundTrip) {
 }
 
 TEST(Boolean, Normals) {
-  MeshGL cubeGL = CubeSTL();
-  cubeGL.Merge();
+  const MeshGL cubeGL = CubeSTL().Merge();
   const Manifold cube(cubeGL);
-  const Manifold sphere = Manifold::Sphere(60).CalculateNormals(0).AsOriginal();
+  const Manifold sphere = Manifold::Sphere(60).CalculateNormals().AsOriginal();
   const MeshGL sphereGL = sphere.GetMeshGL();
 
   Manifold result =
@@ -111,8 +110,7 @@ TEST(Boolean, Normals) {
 
   output.mergeFromVert.clear();
   output.mergeToVert.clear();
-  output.Merge();
-  Manifold roundTrip(output);
+  Manifold roundTrip(output.Merge());
 
   RelatedGL(roundTrip, {cubeGL, sphereGL}, true, true);
 }
@@ -120,8 +118,8 @@ TEST(Boolean, Normals) {
 TEST(Boolean, MissingNormals) {
   const Manifold noNormals = Manifold::Cube(vec3(1), true);
   const Manifold hasNormals =
-      Manifold::Cube(vec3(2), true).Translate({0, 0, -1}).CalculateNormals(0);
-  const MeshGL combo = (noNormals + hasNormals).GetMeshGL(0);
+      Manifold::Cube(vec3(2), true).Translate({0, 0, -1}).CalculateNormals();
+  const MeshGL combo = (noNormals + hasNormals).GetMeshGL();
   Manifold result(combo);
   EXPECT_FALSE(result.IsEmpty());
 }
@@ -259,7 +257,7 @@ TEST(Boolean, Simplify) {
 
 TEST(Boolean, SimplifyCracks) {
   Manifold cylinder =
-      WithPositionColors(Manifold::Cylinder(2, 50, 50, 180))
+      WithPositionColors(Manifold::Cylinder(2, 50, 50, {180}))
           .Rotate(
               -89.999999999999)  // Rotating by -90 makes the result too perfect
           .Translate(vec3(50, 0, 50));
@@ -279,7 +277,7 @@ TEST(Boolean, SimplifyCracks) {
 }
 
 TEST(Boolean, SimplifyShards) {
-  Manifold a = Manifold::Sphere(40, 10);
+  Manifold a = Manifold::Sphere(40, {10});
   Manifold b = a.Translate({0, 0, 40}) ^ a;
   Manifold result = a - b;
   Box bounds = result.BoundingBox();
@@ -344,9 +342,40 @@ TEST(Boolean, DegenerateSplitQuadSharedEdge) {
 
 #endif
 
+// Regression test (#1888): SplitQuad gave its new triangles the normal of a
+// degenerate triangle from another face, so a later colinear collapse moved a
+// vert across a crease and silently lost volume. Checking Status() after each
+// union evaluates them in order.
+TEST(Boolean, DegenerateSplitQuadNormal) {
+  const vec3 box[5][2] = {
+      {{0x1.221316fef9f3dp-39, 0x1.ef4c7fd7b0a8cp+1, -0x1.adc3adc62749fp-39},
+       {0x1.4a32ffe520f54p+0, 0x1.4a32ffe521441p+2, 0x1.4a32ffe5217c6p+0}},
+      {{0x1.ef4c7fd7b2e94p+1, 0x1.4a32ffe520be5p+0, 0x1.4a32ffe52091ap+1},
+       {0x1.4a32ffe52129fp+2, 0x1.4a32ffe522beep+1, 0x1.ef4c7fd7b1676p+1}},
+      {{0x1.ef4c7fd7b1355p+1, 0x1.d135653670f1bp-39, 0x1.ef4c7fd7b1c8fp+1},
+       {0x1.4a32ffe521557p+2, 0x1.4a32ffe51f24p+0, 0x1.4a32ffe522335p+2}},
+      {{0x1.ef4c7fd7b275p+1, -0x1.1c7eeb46978ccp-39, 0x1.4a32ffe51fc5p+1},
+       {0x1.4a32ffe520d5cp+2, 0x1.4a32ffe52316ep+0, 0x1.ef4c7fd7b2a3dp+1}},
+      {{0x1.ef4c7fd7b1cep+1, 0x1.4a32ffe52103fp+1, 0x1.4a32ffe51e564p+0},
+       {0x1.4a32ffe5218c8p+2, 0x1.ef4c7fd7b01f7p+1, 0x1.4a32ffe520692p+1}}};
+  Manifold result;
+  double volume = 0;
+  for (const auto& b : box) {
+    Manifold m = Manifold::Cube(b[1] - b[0])
+                     .Translate(b[0])
+                     .Rotate(0x1.5d0d5d1c7af0fp+7, 0x1.5f161b5de68e7p+5,
+                             0x1.db765cb1701dp+7);
+    m = Manifold(m.GetMeshGL64());
+    volume += m.Volume();
+    result = result + m;
+    EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  }
+  EXPECT_NEAR(result.Volume(), volume, 1e-6);
+}
+
 TEST(Boolean, NoRetainedVerts) {
   Manifold cube = Manifold::Cube(vec3(1), true);
-  Manifold oct = Manifold::Sphere(1, 4);
+  Manifold oct = Manifold::Sphere(1, {4});
   EXPECT_NEAR(cube.Volume(), 1, 0.001);
   EXPECT_NEAR(oct.Volume(), 1.333, 0.001);
   EXPECT_NEAR((cube ^ oct).Volume(), 0.833, 0.001);
@@ -415,17 +444,18 @@ TEST(Boolean, TreeTransforms) {
 }
 
 TEST(Boolean, CreatePropertiesSlow) {
-  Manifold a = Manifold::Sphere(10, 1024).SetProperties(
-      3, [](double* newprop, vec3 pos, const double* old) {
-        for (int i = 0; i < 3; i++) newprop[i] = 0;
-      });
-  Manifold b = Manifold::Sphere(10, 1024).Translate({5, 0, 0});
+  Manifold a =
+      Manifold::Sphere(10, {1024})
+          .SetProperties(3, [](double* newprop, vec3 pos, const double* old) {
+            for (int i = 0; i < 3; i++) newprop[i] = 0;
+          });
+  Manifold b = Manifold::Sphere(10, {1024}).Translate({5, 0, 0});
   Manifold result = a + b;
   EXPECT_EQ(result.NumProp(), 3);
 }
 
 TEST(Boolean, SimpleProperties) {
-  Manifold cube = Manifold::Cube(vec3(2), true).CalculateNormals(0, 180);
+  Manifold cube = Manifold::Cube(vec3(2), true).CalculateNormals(180);
   EXPECT_TRUE(cube.HasSimpleProps());
   Manifold flange =
       Manifold::Extrude(cube.Slice(), 2, 0, 0, vec2(2)).AsOriginal();
@@ -611,6 +641,38 @@ TEST(Boolean, Perturb3) {
   }
 }
 
+// Benchmark: intersect two solids with large faces triangulated from finely
+// sampled contours. Each extrusion's caps are single smooth polygons, and each
+// solid's caps cut through the other's walls, so the broadphase work depends
+// on how the triangulator splits the caps.
+TEST(Boolean, SmoothExtrusionCrossing) {
+  const int numVert = 5000;
+  const Polygons blob = SmoothBlob(numVert);
+  const Manifold slab = Manifold::Extrude(blob, 2).Translate({0, 0, -1});
+  const Manifold crossed = slab.Rotate(90, 0, 0);
+  const Manifold result = slab ^ crossed;
+
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(result.Genus(), 0);
+  // The intersection is close to a 2 x 2 bar spanning the blob along x.
+  const double width = blob[0][0].x - blob[0][numVert / 2].x;
+  EXPECT_NEAR(result.Volume(), 4 * width, 0.05 * width);
+}
+
+// Benchmark: the same crossing as SmoothExtrusionCrossing, with cylinders.
+// Their caps are convex, so the triangulator's convex path splits them.
+TEST(Boolean, ConvexExtrusionCrossing) {
+  const Manifold slab =
+      Manifold::Cylinder(2, 10, 10, 20000).Translate({0, 0, -1});
+  const Manifold crossed = slab.Rotate(90, 0, 0);
+  const Manifold result = slab ^ crossed;
+
+  EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(result.Genus(), 0);
+  // The intersection is close to a 2 x 2 bar across the 20-wide cylinder.
+  EXPECT_NEAR(result.Volume(), 80, 1);
+}
+
 TEST(Boolean, Coplanar) {
   Manifold cylinder =
       WithPositionColors(Manifold::Cylinder(1.0, 1.0).AsOriginal());
@@ -684,7 +746,7 @@ TEST(Boolean, CornerUnion) {
  */
 TEST(Boolean, Split) {
   Manifold cube = Manifold::Cube(vec3(2.0), true);
-  Manifold oct = Manifold::Sphere(1, 4).Translate(vec3(0.0, 0.0, 1.0));
+  Manifold oct = Manifold::Sphere(1, {4}).Translate(vec3(0.0, 0.0, 1.0));
   std::pair<Manifold, Manifold> splits = cube.Split(oct);
   EXPECT_TRUE(splits.first.MatchesTriNormals());
   EXPECT_TRUE(splits.second.MatchesTriNormals());
@@ -739,7 +801,7 @@ TEST(Boolean, SplitByPlane60) {
 TEST(Boolean, ConvexConvexMinkowski) {
   double r = 0.1;
   double w = 2.0;
-  Manifold sphere = Manifold::Sphere(r, 20);
+  Manifold sphere = Manifold::Sphere(r, {20});
   Manifold cube = Manifold::Cube({w, w, w});
   Manifold sum = cube.MinkowskiSum(sphere);
   // Analytical volume of rounded cuboid: cube + 6 slabs + 12 quarter-cylinders
@@ -763,7 +825,7 @@ TEST(Boolean, ConvexConvexMinkowskiDifference) {
 
   double r = 0.1;
   double w = 2.0;
-  Manifold sphere = Manifold::Sphere(r, 20);
+  Manifold sphere = Manifold::Sphere(r, {20});
   Manifold cube = Manifold::Cube({w, w, w});
   Manifold difference = cube.MinkowskiDifference(sphere);
   // Analytical volume of eroded cube: (w-2r)³
@@ -782,10 +844,10 @@ TEST(Boolean, NonConvexConvexMinkowskiSum) {
   ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
 
-  Manifold sphere = Manifold::Sphere(1.2, 20);
+  Manifold sphere = Manifold::Sphere(1.2, {20});
   Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
   Manifold nonConvex = cube - sphere;
-  Manifold sum = nonConvex.MinkowskiSum(Manifold::Sphere(0.1, 20));
+  Manifold sum = nonConvex.MinkowskiSum(Manifold::Sphere(0.1, {20}));
   EXPECT_NEAR(sum.Volume(), 4.841, 1e-3);
   EXPECT_NEAR(sum.SurfaceArea(), 34.06, 1e-2);
   EXPECT_EQ(sum.Genus(), 5);
@@ -798,11 +860,11 @@ TEST(Boolean, NonConvexConvexMinkowskiDifference) {
   ManifoldParamGuard guard;
   ManifoldParams().processOverlaps = true;
 
-  Manifold sphere = Manifold::Sphere(1.2, 20);
+  Manifold sphere = Manifold::Sphere(1.2, {20});
   Manifold cube = Manifold::Cube({2.0, 2.0, 2.0}, true);
   Manifold nonConvex = cube - sphere;
   Manifold difference =
-      nonConvex.MinkowskiDifference(Manifold::Sphere(0.05, 20));
+      nonConvex.MinkowskiDifference(Manifold::Sphere(0.05, {20}));
   EXPECT_NEAR(difference.Volume(), 0.778, 1e-3);
   EXPECT_NEAR(difference.SurfaceArea(), 16.70, 1e-2);
   EXPECT_EQ(difference.Genus(), 5);
@@ -836,6 +898,254 @@ TEST(Boolean, NonConvexNonConvexMinkowskiDifference) {
 
   if (options.exportModels)
     WriteTestOBJ("minkowski-nonconvex-nonconvex-diff.obj", difference);
+}
+
+TEST(Boolean, ConvexNonConvexMinkowskiDifference) {
+  const Manifold cube = Manifold::Cube(vec3(10.0), true);
+  // For an axis-aligned box, erosion by this symmetric cross has an exact
+  // box result determined by the cross's extrema in each coordinate.
+  const Manifold cross =
+      Manifold::Cube({4, 1, 1}, true) + Manifold::Cube({1, 2, 1}, true);
+  for (const double rotation : {0.0, 90.0}) {
+    const Manifold cutter = cross.Rotate(0, 0, rotation);
+    const vec3 size = rotation == 0.0 ? vec3(6, 8, 9) : vec3(8, 6, 9);
+    for (const vec3 offset : {vec3(0.0), vec3(12, -7, 3)}) {
+      SCOPED_TRACE(::testing::Message()
+                   << "rotation " << rotation << " offset " << offset.x);
+      const Manifold input = cube.Translate(offset);
+      const Manifold expected = Manifold::Cube(size, true).Translate(offset);
+      const Manifold result = input.MinkowskiDifference(cutter);
+      ASSERT_EQ(result.Status(), Manifold::Error::NoError);
+      EXPECT_NEAR(result.Volume(), expected.Volume(), 1e-8);
+      const Manifold missing = expected - result;
+      const Manifold excess = result - expected;
+      ASSERT_EQ(missing.Status(), Manifold::Error::NoError);
+      ASSERT_EQ(excess.Status(), Manifold::Error::NoError);
+      EXPECT_TRUE(missing.IsEmpty());
+      EXPECT_TRUE(excess.IsEmpty());
+      EXPECT_DOUBLE_EQ(input.Volume(), 1000.0);
+      EXPECT_DOUBLE_EQ(cutter.Volume(), 5.0);
+    }
+    // Swapping these operands is not an equivalent operation.
+    EXPECT_TRUE(cutter.MinkowskiDifference(cube).IsEmpty());
+    // A cutter whose boundary surrounds A must still remove all of A.
+    for (const vec3 offset : {vec3(0.0), vec3(-7, 4, 2)}) {
+      const Manifold smallCube =
+          Manifold::Cube(vec3(1.0), true).Translate(offset);
+      const Manifold removed =
+          smallCube.MinkowskiDifference(cutter.Scale(vec3(3.0)));
+      ASSERT_EQ(removed.Status(), Manifold::Error::NoError);
+      EXPECT_TRUE(removed.IsEmpty());
+    }
+  }
+
+  // The hull equivalence also holds for a convex base with non-axis-aligned
+  // faces.
+  const Manifold tetrahedron = Manifold::Tetrahedron()
+                                   .Scale(vec3(5.0))
+                                   .Rotate(17, 23, 11)
+                                   .Translate({-7, 3, 2});
+  const Manifold cutter = cross.Scale(vec3(0.2));
+  const Manifold expected = tetrahedron.MinkowskiDifference(cutter.Hull());
+  const Manifold result = tetrahedron.MinkowskiDifference(cutter);
+  ASSERT_EQ(expected.Status(), Manifold::Error::NoError);
+  ASSERT_EQ(result.Status(), Manifold::Error::NoError);
+  EXPECT_FALSE(expected.IsEmpty());
+  EXPECT_TRUE((expected - result).IsEmpty());
+  EXPECT_TRUE((result - expected).IsEmpty());
+}
+
+TEST(Boolean, MinkowskiSumTranslatedComponents) {
+  std::vector<std::vector<Box>> inputs = {
+      {{{0, 0, 0}, {1, 1, 1}}},
+      {{{0, 0, 0}, {2, 1, 1}}, {{0, 0, 0}, {1, 2, 1}}},
+      {{{0, 0, 0}, {1, 1, 1}}, {{20, 0, 0}, {21, 1, 1}}},
+      {{{10, 0, 0}, {15, 5, 5}}, {{40, 0, 0}, {45, 5, 5}}},
+      {{{0, 0, 0}, {3, 1, 1}},
+       {{0, 2, 0}, {3, 3, 1}},
+       {{0, 1, 0}, {1, 2, 1}},
+       {{2, 1, 0}, {3, 2, 1}}},
+      {{{0, 0, 0}, {5, 5, 1}},
+       {{0, 0, 4}, {5, 5, 5}},
+       {{0, 0, 1}, {5, 1, 4}},
+       {{0, 4, 1}, {5, 5, 4}},
+       {{0, 1, 1}, {1, 4, 4}},
+       {{4, 1, 1}, {5, 4, 4}}}};
+  // A separate solid nested inside the cavity adds a third surface component.
+  inputs.push_back(inputs.back());
+  inputs.back().push_back({{2, 2, 2}, {3, 3, 3}});
+  const auto makeSolid = [](const std::vector<Box>& boxes) {
+    std::vector<Manifold> parts;
+    for (const Box& box : boxes)
+      parts.push_back(Manifold::Cube(box.Size()).Translate(box.min));
+    return Manifold::BatchBoolean(parts, OpType::Add);
+  };
+  const auto expectSameSolid = [](const Manifold& actual,
+                                  const Manifold& expected) {
+    ASSERT_EQ(actual.Status(), Manifold::Error::NoError);
+    ASSERT_EQ(expected.Status(), Manifold::Error::NoError);
+    EXPECT_NEAR(actual.Volume(), expected.Volume(), 1e-8);
+    const Manifold excess = actual - expected;
+    const Manifold missing = expected - actual;
+    ASSERT_EQ(excess.Status(), Manifold::Error::NoError);
+    ASSERT_EQ(missing.Status(), Manifold::Error::NoError);
+    EXPECT_TRUE(excess.IsEmpty());
+    EXPECT_TRUE(missing.IsEmpty());
+  };
+  // Each pair is also checked in reverse order below.
+  for (const ivec2 pair : {ivec2(0, 0), ivec2(1, 0), ivec2(1, 1), ivec2(2, 3),
+                           ivec2(4, 1), ivec2(2, 5), ivec2(2, 6)}) {
+    SCOPED_TRACE(::testing::Message()
+                 << "operands " << pair.x << ", " << pair.y);
+    for (const vec3 offset : {vec3(0.0), vec3(10, -7, 3)}) {
+      SCOPED_TRACE(::testing::Message() << "offset " << offset.x << ", "
+                                        << offset.y << ", " << offset.z);
+      const vec3 firstOffset = vec3(2, -3, 1);
+      const Manifold first = makeSolid(inputs[pair.x]).Translate(firstOffset);
+      const Manifold second = makeSolid(inputs[pair.y]).Translate(offset);
+      const Manifold sum = first.MinkowskiSum(second);
+      std::vector<Box> sumBoxes;
+      for (const Box& a : inputs[pair.x])
+        for (const Box& b : inputs[pair.y])
+          sumBoxes.push_back({a.min + b.min, a.max + b.max});
+      const Manifold expected =
+          makeSolid(sumBoxes).Translate(firstOffset + offset);
+      expectSameSolid(sum, expected);
+      expectSameSolid(second.MinkowskiSum(first), expected);
+      expectSameSolid(first, makeSolid(inputs[pair.x]).Translate(firstOffset));
+      expectSameSolid(second, makeSolid(inputs[pair.y]).Translate(offset));
+    }
+  }
+}
+
+TEST(Boolean, MinkowskiDifferenceEnclosingNonConvexCutter) {
+  const Manifold smallBase =
+      Manifold::Cube(vec3(1.0), true) +
+      Manifold::Cube(vec3(0.5)).Translate({0.25, 0.25, 0.25});
+  const Manifold cutter =
+      (Manifold::Cube({4, 1, 1}, true) + Manifold::Cube({1, 2, 1}, true))
+          .Scale(vec3(3.0));
+  // The cutter cannot fit in either component, although the disconnected
+  // base's overall bounding box is larger than the cutter in every axis.
+  const Manifold disconnected =
+      smallBase.Translate(vec3(-10.0)) + smallBase.Translate(vec3(10.0));
+  for (const Manifold& base : {smallBase, disconnected}) {
+    for (const vec3 offset : {vec3(0.0), vec3(12, -7, 3)}) {
+      const Manifold input = base.Translate(offset);
+      const Manifold result = input.MinkowskiDifference(cutter);
+      ASSERT_EQ(result.Status(), Manifold::Error::NoError);
+      EXPECT_TRUE(result.IsEmpty());
+      EXPECT_DOUBLE_EQ(result.Volume(), 0.0);
+      EXPECT_NEAR(input.Volume(), base.Volume(), 1e-12);
+    }
+  }
+}
+
+TEST(Boolean, MinkowskiDifferenceDistributesOverCutterUnion) {
+  const Manifold first = Manifold::Cube({1, 0.25, 0.25}, true);
+  const Manifold second = Manifold::Cube({0.25, 0.5, 0.25}, true);
+  const Manifold solid = Manifold::Cube(vec3(4.0), true) +
+                         Manifold::Cube(vec3(2.0), true).Translate(vec3(2.0));
+  const Manifold hollow =
+      Manifold::Cube(vec3(6.0), true) - Manifold::Cube(vec3(2.0), true);
+  for (const Manifold& shape : {solid, hollow}) {
+    const Manifold base = shape.SetProperties(2, nullptr);
+    for (const vec3 offset : {vec3(0.0), vec3(0.125, -0.0625, 0.03125)}) {
+      const Manifold cutter =
+          (first + second).Translate(offset).SetProperties(5, nullptr);
+      // Sweeping a union of cutters is the union of their sweeps. Convex
+      // cutter calls use the separate per-face/all-vertices hull path.
+      const Manifold expected =
+          base.MinkowskiDifference(first.Translate(offset)) ^
+          base.MinkowskiDifference(second.Translate(offset));
+      const Manifold actual = base.MinkowskiDifference(cutter);
+      ASSERT_EQ(expected.Status(), Manifold::Error::NoError);
+      ASSERT_EQ(actual.Status(), Manifold::Error::NoError);
+      ASSERT_FALSE(expected.IsEmpty());
+      EXPECT_NEAR(actual.Volume(), expected.Volume(), 1e-8);
+      EXPECT_TRUE((actual - expected).IsEmpty());
+      EXPECT_TRUE((expected - actual).IsEmpty());
+      EXPECT_EQ(actual.NumProp(), expected.NumProp());
+      EXPECT_EQ(actual.NumProp(), 2);
+      EXPECT_EQ(cutter.NumProp(), 5);
+    }
+  }
+}
+
+TEST(Boolean, MinkowskiDifferenceEmptyBase) {
+  const Manifold cube = Manifold::Cube();
+  const Manifold cross =
+      Manifold::Cube({4, 1, 1}, true) + Manifold::Cube({1, 2, 1}, true);
+  const Manifold components = cube + cube.Translate({4, 0, 0});
+  const std::vector<Manifold> bases = {
+      Manifold(), cube - cube,
+      (cube - cube).Translate({3, -2, 5}).Rotate(30, 45, 60),
+      Manifold().SetProperties(2, nullptr).AsOriginal()};
+  const std::vector<Manifold> cutters = {cube, cross, components, Manifold()};
+  for (size_t i = 0; i < bases.size(); ++i) {
+    ASSERT_TRUE(bases[i].IsEmpty());
+    for (size_t j = 0; j < cutters.size(); ++j) {
+      SCOPED_TRACE(::testing::Message() << "base " << i << ", cutter " << j);
+      const Manifold result = bases[i].MinkowskiDifference(cutters[j]);
+      EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+      EXPECT_TRUE(result.IsEmpty());
+      EXPECT_EQ(result.NumVert(), 0);
+      EXPECT_EQ(result.NumTri(), 0);
+      EXPECT_EQ(result.Volume(), 0);
+      EXPECT_EQ(result.NumProp(), bases[i].NumProp());
+      EXPECT_EQ(result.OriginalID(), bases[i].OriginalID());
+    }
+  }
+}
+
+TEST(Boolean, MinkowskiEmptyOperandControls) {
+  const Manifold empty;
+  const Manifold cube = Manifold::Cube();
+  const Manifold cross =
+      Manifold::Cube({4, 1, 1}, true) + Manifold::Cube({1, 2, 1}, true);
+  const std::vector<Manifold> shapes = {
+      cube, cross, cube + cube.Translate({4, 0, 0}), empty};
+  for (size_t i = 0; i < shapes.size(); ++i) {
+    SCOPED_TRACE(::testing::Message() << "shape " << i);
+    const MeshGL expected = shapes[i].GetMeshGL();
+    for (const Manifold& result :
+         {shapes[i].MinkowskiDifference(empty), shapes[i].MinkowskiSum(empty),
+          empty.MinkowskiSum(shapes[i])}) {
+      EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+      EXPECT_EQ(result.IsEmpty(), shapes[i].IsEmpty());
+      const MeshGL actual = result.GetMeshGL();
+      EXPECT_EQ(actual.vertProperties, expected.vertProperties);
+      EXPECT_EQ(actual.triVerts, expected.triVerts);
+    }
+  }
+}
+
+TEST(Boolean, MinkowskiEmptyBaseInputErrors) {
+  MeshGL mesh = Manifold::Cube().GetMeshGL();
+  mesh.vertProperties[0] = std::numeric_limits<float>::quiet_NaN();
+  const Manifold errored(mesh);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
+  const Manifold empty;
+  EXPECT_EQ(empty.MinkowskiDifference(errored).Status(),
+            Manifold::Error::NonFiniteVertex);
+  EXPECT_EQ(errored.MinkowskiDifference(empty).Status(),
+            Manifold::Error::NonFiniteVertex);
+}
+
+TEST(Boolean, MinkowskiDifferenceEmptyBaseCancelled) {
+  ExecutionContext ctx;
+  ctx.Cancel();
+  const Manifold cube = Manifold::Cube();
+  const std::vector<Manifold> bases = {Manifold(), cube - cube};
+  const std::vector<Manifold> cutters = {cube, Manifold()};
+  for (const Manifold& base : bases) {
+    ASSERT_TRUE(base.IsEmpty());
+    for (const Manifold& cutter : cutters) {
+      const Manifold result = base.WithContext(ctx).MinkowskiDifference(cutter);
+      EXPECT_EQ(result.Status(), Manifold::Error::Cancelled);
+      EXPECT_TRUE(result.IsEmpty());
+    }
+  }
 }
 
 /**
@@ -951,6 +1261,37 @@ TEST(Boolean, SimpleCubeRegression) {
   EXPECT_TRUE(result.MatchesTriNormals());
   if (options.exportModels) WriteTestOBJ("simple_cube_regression.obj", result);
 }
+
+#if defined(MANIFOLD_DEBUG) && defined(MANIFOLD_ASSERT)
+// In a parallel BatchBoolean, the small pair below throws from the
+// triangulation check while the pair of spheres is still being computed. The
+// spheres' Boolean must finish normally and the exception must reach the
+// caller. The two pairs race, so this repeats.
+TEST(Boolean, BatchBooleanThrowingPair) {
+  const Manifold cube = Manifold::Cube(vec3(1), true);
+  const MeshGL cubeMesh = cube.GetMeshGL();
+  MeshGL overlapping;
+  overlapping.numProp = 3;
+  for (const vec3 offset : {vec3(0.0), vec3(0.5)}) {
+    const uint32_t firstVert = overlapping.NumVert();
+    for (size_t i = 0; i < cubeMesh.vertProperties.size(); ++i)
+      overlapping.vertProperties.push_back(cubeMesh.vertProperties[i] +
+                                           offset[i % 3]);
+    for (const uint32_t v : cubeMesh.triVerts)
+      overlapping.triVerts.push_back(v + firstVert);
+  }
+  const Manifold halfCube = cube.Scale(vec3(0.5)).Translate({0.6, 0, 0});
+  const Manifold sphere = Manifold::Sphere(1, {256});
+  for (int i = 0; i < 5; ++i) {
+    EXPECT_THROW(
+        Manifold::BatchBoolean({Manifold(overlapping), halfCube, sphere,
+                                sphere.Translate({0.3, 0.1, 0.05})},
+                               OpType::Add)
+            .Status(),
+        geometryErr);
+  }
+}
+#endif
 
 // Regression: Compose() in csg_tree.cpp used to read the global atomic
 // Manifold::Impl::meshIDCounter_ twice — once when shifting `triRef.meshID`
@@ -1102,6 +1443,91 @@ TEST(Boolean, BatchBoolean) {
   ExpectMeshes(subtract, {{102, 200}});
   EXPECT_FLOAT_EQ(subtract.Volume(), 7226.043);
   EXPECT_FLOAT_EQ(subtract.SurfaceArea(), 14904.597);
+}
+
+TEST(Boolean, NonFiniteTransformInUnion) {
+  const Manifold cube = Manifold::Cube();
+  const Manifold other = cube.Translate({3, 0, 0});
+  const double inf = std::numeric_limits<double>::infinity();
+  for (const double value :
+       {inf, -inf, std::numeric_limits<double>::quiet_NaN()}) {
+    for (int column = 0; column < 4; ++column) {
+      for (int row = 0; row < 3; ++row) {
+        SCOPED_TRACE(testing::Message()
+                     << value << " at " << column << ", " << row);
+        mat3x4 transform(la::identity);
+        transform[column][row] = value;
+        const Manifold evaluated = cube.Transform(transform);
+        ASSERT_EQ(evaluated.Status(), Manifold::Error::NonFiniteVertex);
+        for (const bool first : {false, true}) {
+          const Manifold pending = cube.Transform(transform);
+          const Manifold result = first ? pending + other : other + pending;
+          const Manifold reference =
+              first ? evaluated + other : other + evaluated;
+          EXPECT_NO_THROW({ EXPECT_EQ(result.Status(), reference.Status()); });
+        }
+      }
+    }
+  }
+}
+
+TEST(Boolean, NonFiniteTransformInBatchBoolean) {
+  const Manifold cube = Manifold::Cube();
+  const double inf = std::numeric_limits<double>::infinity();
+  // Include the single-leaf case and both sides of BatchUnion's chunk limit.
+  for (const int count : {1, 3, 1000, 1001}) {
+    for (const int badIndex : {0, count - 1}) {
+      SCOPED_TRACE(testing::Message() << count << " leaves, bad " << badIndex);
+      for (const OpType op :
+           {OpType::Add, OpType::Subtract, OpType::Intersect}) {
+        std::vector<Manifold> pending;
+        for (int i = 0; i < count; ++i)
+          pending.push_back(cube.Translate({3.0 * i, 0, 0}));
+        pending[badIndex] = cube.Translate({inf, 0, 0});
+        std::vector<Manifold> evaluated = pending;
+        // Keep the pending leaf independent: Status() caches its transform.
+        evaluated[badIndex] = cube.Translate({inf, 0, 0});
+        ASSERT_EQ(evaluated[badIndex].Status(),
+                  Manifold::Error::NonFiniteVertex);
+        const Manifold reference = Manifold::BatchBoolean(evaluated, op);
+        ASSERT_EQ(reference.Status(), Manifold::Error::NonFiniteVertex);
+        const Manifold result = Manifold::BatchBoolean(pending, op);
+        EXPECT_NO_THROW({ EXPECT_EQ(result.Status(), reference.Status()); });
+      }
+    }
+  }
+}
+
+TEST(Boolean, NonFiniteTransformStatusPrecedence) {
+  const Manifold cube = Manifold::Cube();
+  const Manifold other = cube.Translate({3, 0, 0});
+  const double inf = std::numeric_limits<double>::infinity();
+  // Include an empty input and a still-pending Boolean, not only mesh leaves.
+  for (int sourceIndex = 0; sourceIndex < 3; ++sourceIndex) {
+    const auto source = [&]() {
+      if (sourceIndex == 0) return Manifold();
+      if (sourceIndex == 1) return Manifold::Sphere(0);
+      return cube + cube.Translate({0.5, 0, 0});
+    };
+    const Manifold evaluated = source().Translate({inf, 0, 0});
+    const auto expected = evaluated.Status();
+    ASSERT_EQ(expected, sourceIndex == 1 ? Manifold::Error::InvalidConstruction
+                                         : Manifold::Error::NonFiniteVertex);
+    const Manifold pending = source().Translate({inf, 0, 0});
+    EXPECT_NO_THROW({
+      EXPECT_EQ(Manifold::BatchBoolean({pending, other}, OpType::Add).Status(),
+                expected);
+    });
+  }
+  ExecutionContext ctx;
+  ctx.Cancel();
+  const Manifold pending = cube.Translate({inf, 0, 0}) + other;
+  EXPECT_EQ(pending.WithContext(ctx).Status(), Manifold::Error::Cancelled);
+  // Valid empty inputs keep their existing success semantics.
+  const Manifold emptyUnion =
+      Manifold::BatchBoolean({Manifold(), other}, OpType::Add);
+  EXPECT_EQ(emptyUnion.Status(), Manifold::Error::NoError);
+  EXPECT_DOUBLE_EQ(emptyUnion.Volume(), 1.0);
 }
 
 namespace {

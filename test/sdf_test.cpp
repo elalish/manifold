@@ -35,6 +35,99 @@ struct Layers {
   }
 };
 
+TEST(SDF, InvalidGrid) {
+  auto sphere = [](vec3 p) { return 1 - la::length(p); };
+  const Box box(vec3(-1), vec3(1));
+  EXPECT_EQ(Manifold::LevelSet(sphere, box, 0).Status(),
+            Manifold::Error::InvalidConstruction);
+  EXPECT_EQ(Manifold::LevelSet(sphere, box, -1).Status(),
+            Manifold::Error::InvalidConstruction);
+  EXPECT_EQ(Manifold::LevelSet(sphere, box, NAN).Status(),
+            Manifold::Error::InvalidConstruction);
+  Box nanBox = box;
+  nanBox.max.x = NAN;
+  EXPECT_EQ(Manifold::LevelSet(sphere, nanBox, 0.5).Status(),
+            Manifold::Error::InvalidConstruction);
+  Box invertedBox = box;
+  std::swap(invertedBox.min, invertedBox.max);
+  EXPECT_EQ(Manifold::LevelSet(sphere, invertedBox, 0.5).Status(),
+            Manifold::Error::InvalidConstruction);
+  Box infBox = box;
+  infBox.max.x = INFINITY;
+  EXPECT_EQ(Manifold::LevelSet(sphere, infBox, 0.5).Status(),
+            Manifold::Error::InvalidConstruction);
+  EXPECT_EQ(
+      Manifold::LevelSet(sphere, Box(vec3(0.0), vec3(3e9, 1, 1)), 1).Status(),
+      Manifold::Error::ResultTooLarge);
+  EXPECT_EQ(Manifold::LevelSet(sphere, box, 1e-9).Status(),
+            Manifold::Error::ResultTooLarge);
+  EXPECT_EQ(Manifold::LevelSet(sphere, box, 1e-6).Status(),
+            Manifold::Error::ResultTooLarge);
+}
+
+TEST(SDF, CoarseGridSamplesFiniteCoordinates) {
+  const Box bounds(vec3(-1.0), vec3(1.0));
+  for (const double edgeLength : {2.0, 3.0, 10.0}) {
+    SCOPED_TRACE(edgeLength);
+    int calls = 0;
+    bool finite = true;
+    const Manifold box = Manifold::LevelSet(
+        [&](vec3 p) {
+          ++calls;
+          finite &= la::all(la::isfinite(p));
+          return 1.0;
+        },
+        bounds, edgeLength, 0.0, -1.0, false);
+    EXPECT_GT(calls, 0);
+    EXPECT_TRUE(finite);
+    EXPECT_EQ(box.Status(), Manifold::Error::NoError);
+    EXPECT_FALSE(box.IsEmpty());
+    EXPECT_NEAR(box.Volume(), 8.0, 1e-10);
+    EXPECT_EQ(box.BoundingBox().min, bounds.min);
+    EXPECT_EQ(box.BoundingBox().max, bounds.max);
+  }
+}
+
+TEST(SDF, ThinBoundsKeepFiniteGridSpacing) {
+  for (const int axis : {0, 1, 2}) {
+    SCOPED_TRACE(axis);
+    vec3 size(2.0);
+    size[axis] = 0.1;
+    const Box bounds(vec3(0.0), size);
+    bool finite = true;
+    const Manifold box = Manifold::LevelSet(
+        [&](vec3 p) {
+          finite &= la::all(la::isfinite(p));
+          return 1.0;
+        },
+        bounds, 0.5, 0.0, -1.0, false);
+    EXPECT_TRUE(finite);
+    EXPECT_EQ(box.Status(), Manifold::Error::NoError);
+    EXPECT_FALSE(box.IsEmpty());
+    EXPECT_NEAR(box.Volume(), 0.4, 1e-10);
+    EXPECT_EQ(box.BoundingBox().min, bounds.min);
+    EXPECT_EQ(box.BoundingBox().max, bounds.max);
+  }
+}
+
+TEST(SDF, DegenerateBoundsSampleFiniteCoordinates) {
+  for (const vec3 size :
+       {vec3(0, 2, 2), vec3(2, 0, 2), vec3(2, 2, 0), vec3(0.0)}) {
+    SCOPED_TRACE(::testing::Message() << "size=(" << size.x << "," << size.y
+                                      << "," << size.z << ")");
+    bool finite = true;
+    const Manifold empty = Manifold::LevelSet(
+        [&](vec3 p) {
+          finite &= la::all(la::isfinite(p));
+          return 1.0;
+        },
+        {vec3(0.0), size}, 0.5, 0.0, -1.0, false);
+    EXPECT_TRUE(finite);
+    EXPECT_EQ(empty.Status(), Manifold::Error::NoError);
+    EXPECT_TRUE(empty.IsEmpty());
+  }
+}
+
 TEST(SDF, SphereShell) {
   Manifold sphere = Manifold::LevelSet(
       [](vec3 pos) {

@@ -3,12 +3,13 @@
   "version": "3.5.1",
   "description": "Geometry library for topological robustness",
   "main": "manifold.js",
-  "bin": {
-    "manifold-cad": "bin/manifold-cad"
-  },
+  "workspaces": [
+    ".",
+    "manifold-cad"
+  ],
   "scripts": {
     "prebuild": "api-extractor run -c api-extractor-manifold.json",
-    "build": "tsc && node ./esbuild.mjs",
+    "build": "npm run build -w manifold-cad",
     "build:wasm": "mkdir -p ../../buildWASM && cd ../../buildWASM && emcmake cmake -DCMAKE_BUILD_TYPE=MinSizeRel .. && emmake make",
     "build:all": "npm run build:wasm && npm run build && npm run build:editor && npm run build:examples",
     "build:editor": "cd examples/editor && npm run build",
@@ -19,7 +20,6 @@
     "install:all": "npm install && npm run install:editor && npm run install:examples",
     "install:editor": "cd examples/editor && npm install",
     "install:examples": "(cd examples/three && npm install) && (cd examples/model-viewer && npm install) && (cd examples/make-manifold && npm install)",
-    "postbuild": "api-extractor run -c api-extractor-manifoldCAD.json && api-extractor run -c api-extractor-manifoldCADGlobals.json",
     "docs": "npm run docs:jsapi && npm run docs:jsuser",
     "docs:jsapi": "typedoc --options typedoc.api.json",
     "docs:jsuser": "typedoc --options typedoc.user.json",
@@ -28,11 +28,9 @@
     "public:docs": "cp -rv docs public/",
     "public:editor": "cd examples/editor && npm run public",
     "public:examples": "(cd examples/three && npm run public) && (cd examples/model-viewer && npm run public) && (cd examples/make-manifold && npm run public)",
-    "test": "vitest run",
-    "test:ui": "vitest --coverage --ui",
+    "test": "vitest run && npm test -w manifold-cad",
     "test:dev": "vitest",
-    "test:coverage": "vitest run --coverage",
-    "clean": "tsc --build --clean && rm -fr ./dist/ ./coverage ./docs",
+    "clean": "npm run clean -w manifold-cad && rm -fr ./coverage ./docs",
     "format": "cd ../.. && ./scripts/format.sh",
     "prepare": "npm run build"
   },
@@ -41,18 +39,9 @@
     "manifold.wasm",
     "manifold.d.ts",
     "manifold-encapsulated-types.d.ts",
-    "manifold-global-types.d.ts",
-    "bin/manifold-cad",
-    "lib/*.d.ts",
-    "lib/*.js",
-    "types/manifoldCAD.d.ts",
-    "types/manifoldCADGlobals.d.ts",
-    "dist/manifoldCAD.d.ts",
-    "dist/manifoldCADGlobals.d.ts",
-    "dist/worker.bundled.js"
+    "manifold-global-types.d.ts"
   ],
   "exports": {
-    "./manifoldCAD.d.ts": "./dist/manifoldCAD.d.ts",
     "./manifold.wasm": "./manifold.wasm",
     "./manifold.js": "./manifold.js",
     "./manifold.d.ts": "./manifold.d.ts",
@@ -64,37 +53,10 @@
     },
     "./manifold-encapsulated-types.d.ts": "./manifold-encapsulated-types.d.ts",
     "./manifold-global-types.d.ts": "./manifold-global-types.d.ts",
-    "./manifoldCAD.js": "./lib/manifoldCAD.js",
-    "./manifoldCAD": {
-      "import": {
-        "types": "./dist/manifoldCAD.d.ts",
-        "default": "./lib/manifoldCAD.js"
-      }
-    },
-    "./manifold-gltf": {
-      "import": {
-        "types": "./lib/manifold-gltf.d.ts",
-        "default": "./lib/manifold-gltf.js"
-      }
-    },
-    "./lib/worker.bundled.js": {
-      "import": {
-        "types": "./lib/worker.d.ts",
-        "default": "./dist/worker.bundled.js"
-      }
-    },
     ".": {
       "import": {
         "types": "./manifold.d.ts",
         "default": "./manifold.js"
-      }
-    },
-    "./lib/*.js": "./lib/*.js",
-    "./lib/*.d.ts": "./lib/*.d.ts",
-    "./lib/*": {
-      "import": {
-        "types": "./lib/*.d.ts",
-        "default": "./lib/*.js"
       }
     }
   },
@@ -124,37 +86,10 @@
     "url": "https://github.com/elalish/manifold/issues"
   },
   "homepage": "https://github.com/elalish/manifold#readme",
-  "peerDependencies": {
-    "@gltf-transform/core": "^4.2.0",
-    "@gltf-transform/extensions": "^4.2.0",
-    "@gltf-transform/functions": "^4.2.0",
-    "esbuild-wasm": "^0.27.3"
-  },
   "devDependencies": {
-    "@chialab/esbuild-plugin-meta-url": "^0.19.0",
     "@microsoft/api-extractor": "^7.57.7",
-    "@types/convert-source-map": "^2.0.3",
-    "@types/node": "^25.0.9",
-    "@vitest/coverage-v8": "^4.0.17",
-    "@vitest/ui": "^4.0.17",
-    "glob": "^13.0.0",
-    "gltf-validator": "^2.0.0-dev.3.10",
-    "stacktrace-parser": "^0.1.11",
     "typedoc": "^0.28.16",
     "typescript": "^5.9.3",
     "vitest": "^4.0.17"
-  },
-  "dependencies": {
-    "@gltf-transform/core": "^4.2.0",
-    "@gltf-transform/extensions": "^4.2.0",
-    "@gltf-transform/functions": "^4.2.0",
-    "@jridgewell/resolve-uri": "^3.1.2",
-    "@jridgewell/trace-mapping": "^0.3.31",
-    "@jscadui/3mf-export": "^0.5.0",
-    "commander": "^13.1.0",
-    "convert-source-map": "^2.0.0",
-    "fast-xml-parser": "^5.4.2",
-    "fflate": "^0.8.0",
-    "magic-string": "^0.30.21"
   }
 }

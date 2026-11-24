@@ -61,13 +61,12 @@ namespace manifold {
  *
  * You can have any number of arbitrary floating-point properties per vertex,
  * and they will all be interpolated as necessary during operations. It is up to
- * you to keep track of which channel represents what type of data. A few of
- * Manifold's methods allow you to specify the channel where normals data
- * starts, in order to update it automatically for transforms and such. This
- * will be easier if your meshes all use the same channels for properties, but
- * this is not a requirement. Operations between meshes with different numbers
- * of properties will simply use the larger numProp and pad the smaller one
- * with zeroes.
+ * you to keep track of which channel represents what type of data. Normals,
+ * when recorded, always occupy the first three extra property channels. Each
+ * triangle run records whether it carries those normals with runFlags bit 1;
+ * only recorded normals are updated automatically by transforms. Operations
+ * between meshes with different numbers of properties use the larger numProp
+ * and pad the smaller one with zeroes.
  *
  * On output, the triangles are sorted into runs (runIndex, runOriginalID,
  * runTransform) that correspond to different mesh inputs. Other 3D libraries
@@ -101,7 +100,9 @@ namespace manifold {
 template <typename Precision, typename I>
 struct MeshGLP {
   /// Number of property vertices
-  I NumVert() const { return vertProperties.size() / numProp; };
+  I NumVert() const {
+    return numProp == 0 ? 0 : vertProperties.size() / numProp;
+  };
   /// Number of triangles
   I NumTri() const { return triVerts.size() / 3; };
   /// Number of triangle runs
@@ -110,7 +111,8 @@ struct MeshGLP {
   I numProp = 3;
   /// Flat, GL-style interleaved list of all vertex properties: propVal =
   /// vertProperties[vert * numProp + propIdx]. The first three properties are
-  /// always the position x, y, z. The stride of the array is numProp.
+  /// always the position x, y, z. The stride of the array is numProp, and its
+  /// length must be a multiple of numProp.
   std::vector<Precision> vertProperties;
   /// The vertex indices of the three triangle corners in CCW (from the outside)
   /// order, for each triangle.
@@ -147,30 +149,24 @@ struct MeshGLP {
   std::vector<uint8_t> runFlags;
   /// Optional: Length NumTri, contains the source face ID this triangle comes
   /// from. Simplification will maintain all edges between triangles with
-  /// different faceIDs. Input faceIDs will be maintained to the outputs, but if
-  /// none are given, they will be filled in with Manifold's coplanar face
-  /// calculation based on mesh tolerance.
+  /// different faceIDs. Input faceIDs will be maintained to the outputs. If
+  /// no input has faceIDs, this vector will be empty.
   std::vector<I> faceID;
   /// Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
   /// non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
   /// as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
   /// Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
   std::vector<Precision> halfedgeTangent;
-  /// Tolerance for mesh simplification. When creating a Manifold, the tolerance
-  /// used will be the maximum of this and a baseline tolerance from the size of
-  /// the bounding box. Any edge shorter than tolerance may be collapsed.
-  /// Tolerance may be enlarged when floating point error accumulates.
-  Precision tolerance = 0;
-
   MeshGLP() = default;
 
   /**
-   * Updates the mergeFromVert and mergeToVert vectors in order to create a
-   * manifold solid. If the MeshGL is already manifold, no change will occur
-   * and the function will return false. Otherwise, this will merge verts
-   * along open edges within tolerance (the maximum of the MeshGL tolerance
+   * Returns a copy with mergeFromVert and mergeToVert vectors updated in order
+   * to create a manifold solid. If the MeshGL is already manifold, or is
+   * invalid (fewer than 3 properties, merge vectors of different lengths, or
+   * out-of-range indices), the copy is unchanged. Otherwise, verts along open
+   * edges are merged within tolerance (the maximum of the specified tolerance
    * and the baseline bounding-box tolerance), keeping any from the existing
-   * merge vectors, and return true.
+   * merge vectors.
    *
    * There is no guarantee the result will be manifold - this is a
    * best-effort helper function designed primarily to aid in the case where
@@ -178,8 +174,10 @@ struct MeshGLP {
    * were lost due to a round-trip through a file format. Constructing a
    * Manifold from the result will report an error status if it is not
    * manifold.
+   *
+   * @param tolerance Merge open-edge verts closer than this.
    */
-  bool Merge();
+  [[nodiscard]] MeshGLP Merge(Precision tolerance = 0) const;
 
   /**
    * Returns the x, y, z position of the ith vertex.
@@ -244,7 +242,7 @@ struct MeshGLP {
   /**
    * Returns true if the first three extra-property channels (slots 3, 4, 5)
    * of this run carry world-frame vertex normals (set by
-   * `Manifold::CalculateNormals(0)` and round-tripped via `runFlags` bit 1).
+   * `Manifold::CalculateNormals()` and round-tripped via `runFlags` bit 1).
    * Consumers should treat the slot as normals and skip re-applying
    * `runTransform` to it.
    *
@@ -252,8 +250,8 @@ struct MeshGLP {
    * Behavior is undefined when a single propVert is shared by triangles
    * from runs that disagree - the slot has one interpretation, and a
    * Transform rotates it for hasNormals=true and clobbers any
-   * hasNormals=false sharer. Standard `CalculateNormals` / Boolean /
-   * Compose outputs never produce that shape.
+   * hasNormals=false sharer. Standard `CalculateNormals` and Boolean
+   * outputs never produce that shape.
    *
    * @param run The index of the triangle run (0 <= run < runFlags.size()).
    */

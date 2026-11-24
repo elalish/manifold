@@ -12,9 +12,8 @@ API.
 
 ## Goals
 
-- Reuse manifold's geometric primitives where practical: BVH broad-phase
-  queries, `DisjointSets` for vertex equality, and the shared `Interpolate`
-  segment helper.
+- Reuse manifold's geometric primitives where practical: `DisjointSets` for
+  vertex equality and the shared `Interpolate` segment helper.
 - Make robustness testable through deterministic regression tests and FuzzTest
   targets that exercise the public `CrossSection` API and
   `CrossSection`/`Manifold` round trips.
@@ -26,12 +25,12 @@ winding:
 
 1. Merge vertices within the operation epsilon.
 2. Collapse edges whose endpoints merge together.
-3. Collect eps-padded AABB candidate edge pairs with a broad phase (an x-sorted
-   interval sweep, or a BVH above ~1024 edges).
-4. Incidence pre-split: with a narrow phase over those pairs, find the input
-   vertices lying within eps of each edge and split every edge at them into
-   two-vertex sub-edges. This is the one eps-scale quantization the pipeline
-   applies to input features; the sweep adds no more.
+3. Bin the eps-padded edge boxes into a uniform grid, or a `Collider` tree if
+   the edges are too unevenly spread for one.
+4. Incidence pre-split: each vertex queries the grid to find the edges whose
+   interior it lies within eps of, and every edge is split at those vertices
+   into two-vertex sub-edges. This is the one eps-scale quantization the
+   pipeline applies to input features; the sweep adds no more.
 5. Sweep-line arrangement. A Bentley-Ottmann sweep over the sub-edges maintains
    the edges crossing the sweep line in sorted order, so two edges are tested for
    a crossing exactly when they become adjacent, and every crossing is
@@ -68,9 +67,9 @@ regularized `Polygons`.
 | Layer | Files | Role |
 | --- | --- | --- |
 | Public core API | `boolean2.h`, `boolean2.cpp` (entry points) | Converts `Polygons` to local vertices plus directed edges, runs one arrangement build, and turns retained edges back into regularized output. |
-| Arrangement coordinator | `boolean2.cpp` (driver section) | Runs vertex merge, edge collapse, the broad phase, and the incidence pre-split, then hands the sub-edges to the sweep. |
+| Arrangement coordinator | `boolean2.cpp` (driver section) | Runs vertex merge, edge collapse, and the incidence pre-split, then hands the sub-edges to the sweep. |
 | Sweep-line engine | `boolean2_sweep.cpp` | The maintained-status Bentley-Ottmann sweep: a collect pass that discovers crossings and applies the block rule, and a measure pass that forces residual crossings through and classifies the fill by winding. |
-| Geometry leaves | `boolean2.cpp` (broad phase, vertex merge, edge-vertex list sections), `boolean2_predicates.cpp` | Local geometric operations and the epsilon predicates used before the sweep. |
+| Geometry leaves | `boolean2.cpp` (vertex merge, incidence list sections), `boolean2_predicates.cpp` | Local geometric operations and the epsilon predicates used before the sweep. |
 | Sibling helpers | `boolean2_offset.cpp` | Offset and decomposition support for the rest of the `CrossSection` API. |
 
 Debug and performance tracing live in `boolean2_diagnostics.{h,cpp}`.
@@ -106,7 +105,7 @@ The remaining implementation notes:
   then chooses the source vertex nearest each cluster centroid as the
   representative. Boolean2 treats the first arrangement pass as the robustness
   boundary rather than relying on a production fixed-point cleanup loop.
-- The broad phase feeds the incidence pre-split; the sweep discovers crossings
+- The grid serves only the incidence pre-split; the sweep discovers crossings
   itself from the sorted status, so there is no separate crossing broad phase.
 - The incidence pre-split (step 4) applies eps-scale vertex-on-edge
   quantization to input features that the sweep does not reproduce; it is kept

@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <limits>
 
 #include "atomic_compat.h"
 #include "boolean3.h"
@@ -38,6 +39,20 @@ Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
   double zDeg = degrees(math::atan2(normal.y, normal.x));
   return cutter.Rotate(0.0, yDeg, zDeg);
 }
+
+// Property arrays are indexed with int, so their size must fit in one.
+bool PropertiesTooLarge(int64_t numProp, size_t numPropVert) {
+  return numProp * static_cast<int64_t>(numPropVert) >
+         std::numeric_limits<int>::max();
+}
+
+// Converts a requested division count to int. Counts this large are rejected
+// by Subdivide, so clamping only keeps the conversion defined.
+int ToDivisions(double divisions) {
+  return divisions < std::numeric_limits<int>::max()
+             ? static_cast<int>(divisions)
+             : std::numeric_limits<int>::max();
+}
 }  // namespace
 
 namespace manifold {
@@ -48,9 +63,6 @@ std::array<int, 3> Version() {
 }
 
 static std::atomic<double> relativePrecision_ = kPrecision;
-static std::atomic<int> circularSegments_ = DEFAULT_SEGMENTS;
-static std::atomic<double> circularAngle_ = DEFAULT_ANGLE;
-static std::atomic<double> circularEdgeLength_ = DEFAULT_LENGTH;
 
 /**
  * Sets the relative precision for geometric computations, defining what counts
@@ -66,77 +78,33 @@ void Quality::SetRelativePrecision(double p) {
 double Quality::GetRelativePrecision() { return relativePrecision_; }
 
 /**
- * Sets an angle constraint the default number of circular segments for the
- * CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and
- * Manifold::Revolve() constructors. The number of segments will be rounded up
- * to the nearest factor of four.
+ * Returns the number of segments a circle of this radius gets with these
+ * settings. A minAngle or minEdgeLength that is not positive (or is NaN) uses
+ * the member default instead.
  *
- * @param angle The minimum angle in degrees between consecutive segments. The
- * angle will increase if the the segments hit the minimum edge length.
- * Default is 10 degrees.
+ * @param radius For a given radius of circle, determine how many segments
+ * there will be.
  */
-void Quality::SetMinCircularAngle(double angle) {
-  if (angle <= 0) return;
-  circularAngle_ = angle;
-}
-
-/**
- * Sets a length constraint the default number of circular segments for the
- * CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and
- * Manifold::Revolve() constructors. The number of segments will be rounded up
- * to the nearest factor of four.
- *
- * @param length The minimum length of segments. The length will
- * increase if the the segments hit the minimum angle. Default is 1.0.
- */
-void Quality::SetMinCircularEdgeLength(double length) {
-  if (length <= 0) return;
-  circularEdgeLength_ = length;
-}
-
-/**
- * Sets the default number of circular segments for the
- * CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and
- * Manifold::Revolve() constructors. Overrides the edge length and angle
- * constraints and sets the number of segments to exactly this value.
- *
- * @param number Number of circular segments. Default is 0, meaning no
- * constraint is applied.
- */
-void Quality::SetCircularSegments(int number) {
-  if (number < 3 && number != 0) return;
-  circularSegments_ = number;
-}
-
-/**
- * Determine the result of the SetMinCircularAngle(),
- * SetMinCircularEdgeLength(), and SetCircularSegments() defaults.
- *
- * @param radius For a given radius of circle, determine how many default
- * segments there will be.
- */
-int Quality::GetCircularSegments(double radius) {
-  if (circularSegments_ > 0) return circularSegments_;
-  int nSegA = 360.0 / circularAngle_;
-  // Keep nSegL a double so the truncating cast happens after fmin bounds it by
-  // nSegA; a raw int cast is undefined for non-finite or huge radius.
-  double nSegL = 2.0 * std::abs(radius) * kPi / circularEdgeLength_;
-  int nSeg = fmin(nSegA, nSegL) + 3;
+int CircularQuality::SegmentsFor(double radius) const {
+  if (segments > 2) return segments;
+  const CircularQuality kDefault;
+  const double angle = minAngle > 0 ? minAngle : kDefault.minAngle;
+  const double length =
+      minEdgeLength > 0 ? minEdgeLength : kDefault.minEdgeLength;
+  // Clamp in double before the truncating cast, which is undefined for a
+  // non-finite or huge radius, or a tiny angle.
+  const double nSegA = 360.0 / angle;
+  const double nSegL = 2.0 * std::abs(radius) * kPi / length;
+  const double kMaxSeg = std::numeric_limits<int>::max() - 3;
+  int nSeg = std::min(fmin(nSegA, nSegL), kMaxSeg) + 3;
   nSeg -= nSeg % 4;
   return std::max(nSeg, 4);
 }
 
 /**
- * Resets the circular construction parameters to their defaults if
- * SetMinCircularAngle, SetMinCircularEdgeLength, or SetCircularSegments have
- * been called.
+ * Resets the relative precision to its default.
  */
-void Quality::ResetToDefaults() {
-  relativePrecision_ = kPrecision;
-  circularSegments_ = DEFAULT_SEGMENTS;
-  circularAngle_ = DEFAULT_ANGLE;
-  circularEdgeLength_ = DEFAULT_LENGTH;
-}
+void Quality::ResetToDefaults() { relativePrecision_ = kPrecision; }
 
 /**
  * Construct an empty Manifold.
@@ -147,7 +115,10 @@ Manifold::~Manifold() = default;
 Manifold::Manifold(Manifold&&) noexcept = default;
 Manifold& Manifold::operator=(Manifold&&) noexcept = default;
 
+// The defaulted move ops leave the source without a mutex, so the copy ops
+// below must handle a moved-from Manifold on either side.
 Manifold::Manifold(const Manifold& other) {
+  if (!other.pNodeMutex_) return;
   std::lock_guard<std::mutex> lock(*other.pNodeMutex_);
   pNode_ = other.pNode_;
   AtomicStoreShared(&ctx_, AtomicLoadShared(&other.ctx_));
@@ -176,6 +147,8 @@ Manifold Manifold::FromImpl(std::shared_ptr<Impl> pImpl) {
 
 Manifold& Manifold::operator=(const Manifold& other) {
   if (this != &other) {
+    if (!other.pNodeMutex_) return *this = Manifold(other);
+    if (!pNodeMutex_) pNodeMutex_ = std::make_shared<std::mutex>();
     std::scoped_lock lock(*pNodeMutex_, *other.pNodeMutex_);
     pNode_ = other.pNode_;
     AtomicStoreShared(&ctx_, AtomicLoadShared(&other.ctx_));
@@ -185,10 +158,11 @@ Manifold& Manifold::operator=(const Manifold& other) {
 
 /**
  * Returns a copy of this Manifold with the given ExecutionContext attached.
- * The attachment is consumed by the next eager op on the result (Status,
- * Refine family). Deferred ops produce a result with no attached ctx; raw
- * copy preserves the attachment. See ExecutionContext in common.h for the
- * full model.
+ * The attachment is consumed by the eager ops on the result (Status, the
+ * Refine family, Hull, MinkowskiSum / MinkowskiDifference). Every other op
+ * that returns a Manifold produces a result with no attached ctx. A raw copy
+ * preserves the attachment. See ExecutionContext in common.h for the full
+ * model.
  */
 Manifold Manifold::WithContext(const ExecutionContext& ctx) const {
   Manifold result = *this;
@@ -265,25 +239,18 @@ Manifold::Manifold(const MeshGL64& meshGL64)
  * that may have been input. It also includes relations to all the input meshes
  * that form a part of this result and the transforms applied to each.
  *
- * @param normalIdx If this manifold has properties corresponding to normal
- * vectors, you can specify the first of the three consecutive property channels
- * forming the (x, y, z) normals, which will cause this output MeshGL to
- * automatically update these normals according to the applied transforms and
- * front/back side. normalIdx + 3 must be <= numProp, and all original meshes
- * must use the same channels for their normals. Default is -1: if
- * `CalculateNormals()` recorded normals at the standard slot, that slot is
- * used automatically; otherwise no normals are applied. If normals are
- * selected, the runTransform matrices will be removed from the output, to
- * avoid them being double-applied when round-tripped.
- * Passing a non-negative `normalIdx` is the legacy interface from before
- * `CalculateNormals` recorded the slot on the Manifold itself; prefer the
- * no-arg form after `CalculateNormals(0)`. The explicit-idx path will be
- * removed in a future release.
+ * For each run that records normals (runFlags bit 1), the first three extra
+ * property channels contain world-frame normals. Non-original results
+ * normalize them for graphics output. Their run transforms are retained as
+ * metadata and must not be applied again to the normal channels.
+ *
+ * Unflagged values in those channels are ordinary properties. To have normals
+ * follow transforms, calculate them on every operand or import a MeshGL with
+ * runFlags bit 1 set.
  */
-MeshGL Manifold::GetMeshGL(int normalIdx) const {
+MeshGL Manifold::GetMeshGL() const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
-  if (normalIdx < 0 && impl.AllHaveNormals()) normalIdx = 0;
-  return GetMeshGLImpl<float, uint32_t>(impl, normalIdx);
+  return GetMeshGLImpl<float, uint32_t>(impl);
 }
 
 /**
@@ -292,23 +259,18 @@ MeshGL Manifold::GetMeshGL(int normalIdx) const {
  * that may have been input. It also includes relations to all the input meshes
  * that form a part of this result and the transforms applied to each.
  *
- * @param normalIdx If this manifold has properties corresponding to normal
- * vectors, you can specify the first of the three consecutive property channels
- * forming the (x, y, z) normals, which will cause this output MeshGL to
- * automatically update these normals according to the applied transforms and
- * front/back side. normalIdx + 3 must be <= numProp, and all original meshes
- * must use the same channels for their normals. Default is -1: if
- * `CalculateNormals()` recorded normals at the standard slot, that slot is
- * used automatically; otherwise no normals are applied. If normals are
- * selected, the runTransform matrices will be removed from the output, to
- * avoid them being double-applied when round-tripped.
- * Same deprecation note as `GetMeshGL`: prefer the no-arg form after
- * `CalculateNormals(0)`.
+ * For each run that records normals (runFlags bit 1), the first three extra
+ * property channels contain world-frame normals. Non-original results
+ * normalize them for graphics output. Their run transforms are retained as
+ * metadata and must not be applied again to the normal channels.
+ *
+ * Unflagged values in those channels are ordinary properties. To have normals
+ * follow transforms, calculate them on every operand or import a MeshGL with
+ * runFlags bit 1 set.
  */
-MeshGL64 Manifold::GetMeshGL64(int normalIdx) const {
+MeshGL64 Manifold::GetMeshGL64() const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
-  if (normalIdx < 0 && impl.AllHaveNormals()) normalIdx = 0;
-  return GetMeshGLImpl<double, uint64_t>(impl, normalIdx);
+  return GetMeshGLImpl<double, uint64_t>(impl);
 }
 
 /**
@@ -317,7 +279,7 @@ MeshGL64 Manifold::GetMeshGL64(int normalIdx) const {
 bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
 /**
  * Returns the reason for an input Mesh producing an empty Manifold. This Status
- * will carry on through operations like NaN propogation, ensuring an errored
+ * will carry on through operations like NaN propagation, ensuring an errored
  * mesh doesn't get mysteriously lost. Empty meshes may still show
  * NoError, for instance the intersection of non-overlapping meshes.
  */
@@ -376,11 +338,11 @@ double Manifold::GetEpsilon() const {
 }
 
 /**
- * Return a copy of the manifold simplified to the given tolerance, but with its
- * actual tolerance value unchanged. If the tolerance is not given or is less
- * than the current tolerance, the current tolerance is used for simplification.
- * The result will contain a subset of the original verts and all surfaces will
- * have moved by less than tolerance.
+ * Return a simplified copy of the manifold. The tolerance controls the local
+ * error when collapsing edges, measured relative to nearby face planes.
+ * Simplification tends to remove features thinner than the tolerance.
+ * @param tolerance Simplification tolerance, lower-bounded by the manifold's
+ * epsilon.
  */
 Manifold Manifold::Simplify(double tolerance) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
@@ -425,7 +387,8 @@ double Manifold::SurfaceArea() const {
 }
 
 /**
- * Returns the volume of the manifold.
+ * Returns the volume of the manifold. Negative volume is considered a class of
+ * overlapped geometry and should be avoided as much as self-intersection.
  */
 double Manifold::Volume() const {
   return GetCsgLeafNode().GetImpl()->GetProperty(Impl::Property::Volume);
@@ -448,6 +411,9 @@ int Manifold::OriginalID() const {
  * - these don't get joined at boundaries where originalID changes, so the
  * reset may allow triangles of flat faces to be further collapsed with
  * RemoveDegenerates().
+ *
+ * If only some of the input recorded normals, the result keeps two runs with
+ * this ID, one for the triangles with normals and one for the rest.
  *
  * @param id The ID to assign to this manifold. If negative (the default), a new
  * ID is assigned. Use zero to match all default-constructed manifolds, thus not
@@ -584,10 +550,12 @@ Manifold Manifold::Transform(const mat3x4& m) const {
  * @param normal The normal vector of the plane to be mirrored over
  */
 Manifold Manifold::Mirror(vec3 normal) const {
-  auto leafImpl = GetCsgLeafNode().GetImpl();
-  if (leafImpl->status_ != Error::NoError)
-    return PropagateStatus(leafImpl->status_);
   if (la::length(normal) == 0.) {
+    // A degenerate mirror must not hide an existing error behind its empty
+    // result. Other mirrors stay deferred; Impl::Transform propagates errors.
+    auto leafImpl = GetCsgLeafNode().GetImpl();
+    if (leafImpl->status_ != Error::NoError)
+      return PropagateStatus(leafImpl->status_);
     return Manifold();
   }
   auto n = la::normalize(normal);
@@ -647,9 +615,10 @@ Manifold Manifold::WarpBatch(
  *
  * If propFunc is a nullptr, this function will just set the channel to zeroes.
  *
- * Any normals recording set by `CalculateNormals()` is preserved. If the new
- * properties overwrite slot 0..2 with non-normal data, the recording becomes
- * stale; re-call `CalculateNormals()` (or use a numProp < 3 call followed by
+ * Any normals recording set by `CalculateNormals()` is preserved if numProp is
+ * at least 3, and dropped otherwise. If the new properties overwrite slot 0..2
+ * with non-normal data, the recording becomes stale; re-call
+ * `CalculateNormals()` (or use a numProp < 3 call followed by
  * CalculateNormals) to reset.
  *
  * @param numProp The new number of properties per vertex.
@@ -662,35 +631,38 @@ Manifold Manifold::SetProperties(
   auto leafImpl = GetCsgLeafNode().GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
+  if (numProp < 0) return Invalid();
+  if (PropertiesTooLarge(numProp, leafImpl->NumPropVert()))
+    return PropagateStatus(Error::ResultTooLarge);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   const int oldNumProp = NumProp();
-  const Vec<double> oldProperties = pImpl->properties_;
+  const Vec<double> oldProperties = std::move(pImpl->properties_);
 
   if (numProp == 0) {
     pImpl->properties_.clear();
   } else {
     pImpl->properties_ = Vec<double>(numProp * NumPropVert(), 0);
-    for_each_n(
-        propFunc == nullptr ? ExecutionPolicy::Par : ExecutionPolicy::Seq,
-        countAt(0), NumTri(), [&](int tri) {
-          for (int i : {0, 1, 2}) {
-            const int edge = 3 * tri + i;
-            const int vert = pImpl->halfedge_.Start(edge);
-            const int propVert = pImpl->halfedge_.Prop(edge);
-            if (propFunc == nullptr) {
-              for (int p = 0; p < numProp; ++p) {
-                pImpl->properties_[numProp * propVert + p] = 0;
-              }
-            } else {
-              propFunc(&pImpl->properties_[numProp * propVert],
-                       pImpl->vertPos_[vert],
-                       oldProperties.data() + oldNumProp * propVert);
-            }
-          }
-        });
+    if (propFunc != nullptr) {
+      for_each_n(ExecutionPolicy::Seq, countAt(0), NumTri(), [&](int tri) {
+        for (int i : {0, 1, 2}) {
+          const int edge = 3 * tri + i;
+          const int vert = pImpl->halfedge_.Start(edge);
+          const int propVert = pImpl->halfedge_.Prop(edge);
+          propFunc(&pImpl->properties_[numProp * propVert],
+                   pImpl->vertPos_[vert],
+                   oldProperties.data() + oldNumProp * propVert);
+        }
+      });
+    }
   }
 
   pImpl->numProp_ = numProp;
+  // Normals need slots 0..2, so with fewer channels the recording is dropped.
+  if (numProp < 3) {
+    for (auto& m : pImpl->meshRelation_.meshIDtransform) {
+      m.second.hasNormals = false;
+    }
+  }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
 
@@ -714,6 +686,9 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
+  if (PropertiesTooLarge(std::max(gaussianIdx, meanIdx) + int64_t(1),
+                         leafImpl->NumPropVert()))
+    return PropagateStatus(Error::ResultTooLarge);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   pImpl->CalculateCurvature(gaussianIdx, meanIdx);
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
@@ -723,14 +698,13 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
  * Fills in vertex properties for normal vectors, calculated from the mesh
  * geometry.
  *
- * @param normalIdx The property channel in which to store the X values of the
- * normals. The X, Y, and Z channels will be sequential. The property set will
- * be automatically expanded such that NumProp will be at least normalIdx + 3.
- * Default is 0, the standard slot (MeshGL channels 3, 4, 5); the Manifold
- * records the recording per-meshID in that case so subsequent `GetMeshGL()` /
- * `GetMeshGL64()` without an explicit normalIdx will return world-frame
- * normals and mark each output run via runFlags bit 1. Non-zero values are
- * retained for compatibility and will not be supported in a future release.
+ * Normals are stored in the first three extra property channels (MeshGL
+ * channels 3, 4, 5). The Manifold records them per mesh ID so subsequent
+ * `GetMeshGL()` and `GetMeshGL64()` return world-frame normals and mark each
+ * output run via runFlags bit 1.
+ *
+ * Normals written with `SetProperties()` are not recorded. Call this method on
+ * every operand before a transform when those values must follow the geometry.
  *
  * @param minSharpAngle Any edges with angles greater than this value will
  * remain sharp, getting different normal vector properties on each side of the
@@ -738,19 +712,16 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
  * of zero, the model is faceted and all normals match their triangle normals,
  * but in this case it would be better not to calculate normals at all.
  */
-Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
+Manifold Manifold::CalculateNormals(double minSharpAngle) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
+  if (PropertiesTooLarge(3, leafImpl->NumPropVert()))
+    return PropagateStatus(Error::ResultTooLarge);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
-  pImpl->SetNormals(normalIdx, minSharpAngle);
-  // Mark per-meshID hasNormals so GetMeshGL(-1) can auto-substitute slot 0 on
-  // export. Restricted to the standard slot since a non-zero slot would be
-  // ambiguous when round-tripping through MeshGL.
-  if (normalIdx == 0) {
-    for (auto& m : pImpl->meshRelation_.meshIDtransform) {
-      m.second.hasNormals = true;
-    }
+  pImpl->SetNormals(minSharpAngle);
+  for (auto& m : pImpl->meshRelation_.meshIDtransform) {
+    m.second.hasNormals = true;
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -759,23 +730,20 @@ Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
  * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
  * geometry will remain unchanged until Refine, RefineToLength, or
  * RefineToTolerance is called to interpolate the surface. This version uses the
- * supplied vertex normal properties to define the tangent vectors. Zero-length
+ * standard vertex normal properties to define the tangent vectors. Zero-length
  * normals are considered missing and will defer to their neighboring normals
  * instead. If all normals are missing, the vertex pseudonormal will be used.
  *
- * @param normalIdx The first property channel of the normals. NumProp must be
- * at least normalIdx + 3. Any vertex where multiple normals exist and don't
- * agree will result in a sharp edge. Default is 0, the standard slot.
- * Non-zero values are retained for compatibility and will not be supported in
- * a future release.
+ * Fewer than three properties count as missing normals. Any vertex where
+ * multiple normals exist and don't agree will result in a sharp edge.
  */
-Manifold Manifold::SmoothByNormals(int normalIdx) const {
+Manifold Manifold::SmoothByNormals() const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (!IsEmpty()) {
-    pImpl->CreateTangents(normalIdx);
+    pImpl->CreateTangents();
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -815,7 +783,8 @@ Manifold Manifold::Refine(int n) const {
  * `CalculateNormals()` is preserved; the new verts get linearly-interpolated
  * normals, which are less precise than recomputed ones but still meaningful.
  *
- * @param length The length that edges will be broken down to.
+ * @param length The length that edges will be broken down to. Its sign is
+ * ignored, and zero or NaN is an error.
  */
 Manifold Manifold::RefineToLength(double length) const {
   length = std::abs(length);
@@ -823,10 +792,11 @@ Manifold Manifold::RefineToLength(double length) const {
   auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
+  if (!(length > 0)) return Invalid();
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   pImpl->Refine(
       [length](vec3 edge, vec4, vec4) {
-        return static_cast<int>(la::length(edge) / length);
+        return ToDivisions(la::length(edge) / length);
       },
       false, ctx.get());
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
@@ -844,7 +814,8 @@ Manifold Manifold::RefineToLength(double length) const {
  *
  * @param tolerance The desired maximum distance between the faceted mesh
  * produced and the exact smoothly curving surface. All vertices are exactly on
- * the surface, within rounding error.
+ * the surface, within rounding error. Its sign is ignored, and zero or NaN is
+ * an error.
  */
 Manifold Manifold::RefineToTolerance(double tolerance) const {
   tolerance = std::abs(tolerance);
@@ -852,6 +823,7 @@ Manifold Manifold::RefineToTolerance(double tolerance) const {
   auto leafImpl = GetCsgLeafNode(ctx.get()).GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
+  if (!(tolerance > 0)) return Invalid();
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (!pImpl->halfedgeTangent_.empty()) {
     pImpl->Refine(
@@ -866,7 +838,7 @@ Manifold Manifold::RefineToTolerance(double tolerance) const {
           // Circular arc result plus heuristic term for non-circular curves
           const double d = 0.5 * (la::length(start) + la::length(end)) +
                            la::length(start - end);
-          return static_cast<int>(std::sqrt(3 * d / (4 * tolerance)));
+          return ToDivisions(std::sqrt(3 * d / (4 * tolerance)));
         },
         true, ctx.get());
   }
@@ -895,15 +867,15 @@ Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
  * Perform the given boolean operation on a list of Manifolds. In case of
  * Subtract, all Manifolds in the tail are differenced from the head. The
  * empty-input case returns a default-constructed Manifold; the
- * single-input case returns the input unchanged (a no-op identity, including
- * any attached ExecutionContext on that single input).
+ * single-input case returns the input unchanged, without any attached
+ * ExecutionContext.
  */
 Manifold Manifold::BatchBoolean(const std::vector<Manifold>& manifolds,
                                 OpType op) {
   if (manifolds.size() == 0)
     return Manifold();
   else if (manifolds.size() == 1)
-    return manifolds[0];
+    return Manifold(manifolds[0].LoadPNode());
   std::vector<std::shared_ptr<CsgNode>> children;
   children.reserve(manifolds.size());
   for (const auto& m : manifolds) children.push_back(m.LoadPNode());
@@ -1101,7 +1073,8 @@ Manifold Manifold::Hull() const {
  */
 Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
   for (const auto& man : manifolds) {
-    auto status = man.Status();
+    // Static factories ignore contexts attached to their inputs.
+    auto status = man.GetCsgLeafNode().GetImpl()->status_;
     if (status != Error::NoError) return PropagateStatus(status);
   }
   std::vector<vec3> vertPos;
@@ -1126,11 +1099,27 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
  * @param searchLength The maximum distance to search for a minimum gap.
  */
 double Manifold::MinGap(const Manifold& other, double searchLength) const {
+  const auto impl = GetCsgLeafNode().GetImpl();
+  const auto otherImpl = other.GetCsgLeafNode().GetImpl();
+  // The mesh bounds give a lower bound on the gap. If they are already beyond
+  // a positive search limit, even the solid intersection check is unnecessary.
+  const vec3 gap =
+      la::max(vec3(0.0), la::max(impl->bBox_.min - otherImpl->bBox_.max,
+                                 otherImpl->bBox_.min - impl->bBox_.max));
+  const double gapSquared = la::length2(gap);
+  if (searchLength > 0 && gapSquared > 0 &&
+      gapSquared >= searchLength * searchLength) {
+    return searchLength;
+  }
+
   auto intersect = *this ^ other;
   if (!intersect.IsEmpty()) return 0.0;
 
-  return GetCsgLeafNode().GetImpl()->MinGap(*other.GetCsgLeafNode().GetImpl(),
-                                            searchLength);
+  // Build query bounds for the smaller mesh and traverse the larger mesh's BVH.
+  if (impl->NumTri() < otherImpl->NumTri()) {
+    return otherImpl->MinGap(*impl, searchLength);
+  }
+  return impl->MinGap(*otherImpl, searchLength);
 }
 
 /**
@@ -1147,9 +1136,9 @@ std::vector<RayHit> Manifold::RayCast(vec3 origin, vec3 endpoint) const {
 
 /**
  * Returns the winding number of this manifold around each of the given points.
- * Returns 0 for points outside, and a non-zero value (typically ±1) for points
- * inside a simple closed surface. For manifolds with overlapping regions the
- * magnitude may exceed 1.
+ * Returns 0 for points outside, and 1 for points
+ * inside a non-overlapped manifold. Any other values indicate overlapping
+ * regions, e.g. -1 for inverted regions, 2 for double-enclosed regions.
  *
  * @param points The 3D query points.
  */

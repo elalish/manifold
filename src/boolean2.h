@@ -20,7 +20,6 @@
 #include <utility>
 #include <vector>
 
-#include "collider.h"
 #include "manifold/common.h"
 #include "manifold/optional_assert.h"
 #include "parallel.h"
@@ -28,9 +27,7 @@
 namespace manifold {
 
 // Shared grain size for boolean2 parallel loops whose per-item work is small
-// but non-trivial: BVH traversal, pair narrow tests, and merge broad-phase
-// sweeps. Radix-tree construction uses a coarser build-specific grain because
-// its per-index work is much smaller.
+// but non-trivial: incidence queries and merge broad-phase sweeps.
 inline constexpr int kFineParallelGrainSize = 512;
 
 constexpr double kU = 1.110223024625156540423631668e-16;
@@ -47,11 +44,6 @@ double TotalSignedArea(const Polygons& polys);
 double EpsilonFromScale(double L, int k_budget = 1000);
 double Coord(vec2 p, int axis);
 
-inline constexpr int kEdgePairBvhThreshold = 1024;
-// The radix-tree BVH is binary and has at most 32 Morton-code bits plus
-// 32 index tie-breaker bits, so a depth-first traversal stack of 64 is enough.
-inline constexpr int kBvhTraversalStackCapacity = 64;
-
 struct Box2 {
   vec2 min = vec2(std::numeric_limits<double>::infinity());
   vec2 max = vec2(-std::numeric_limits<double>::infinity());
@@ -66,80 +58,11 @@ struct Box2 {
             vec2(std::max(max.x, b.max.x), std::max(max.y, b.max.y))};
   }
 
-  vec2 Center() const { return (min + max) * 0.5; }
-
   bool DoesOverlap(const Box2& b) const {
     return min.x <= b.max.x && max.x >= b.min.x && min.y <= b.max.y &&
            max.y >= b.min.y;
   }
 };
-
-Box2 BoxOf2DEdge(vec2 p0, vec2 p1, double eps);
-uint32_t MortonCode2(vec2 position, Box2 bBox);
-
-struct BVH {
-  std::vector<Box2> nodeBBox;
-  std::vector<std::pair<int, int>> internalChildren;
-  std::vector<int> leafToOrig;
-
-  bool Empty() const { return internalChildren.empty(); }
-};
-
-BVH BVHBuildFromBoxes(const std::vector<Box2>& boxes);
-
-template <typename Recorder, typename F>
-inline void BVHCollisions(const BVH& bvh, Recorder& recorder, F&& queryBox,
-                          int n, bool parallel) {
-  using namespace collider_internal;
-  if (bvh.Empty()) return;
-  auto collideOne = [&](int queryIdx) {
-    const Box2 query = queryBox(queryIdx);
-    int stack[kBvhTraversalStackCapacity];
-    int top = -1;
-    int node = kRoot;
-    auto& local = recorder.local();
-    while (true) {
-      const int internal = Node2Internal(node);
-      const int child1 = bvh.internalChildren[internal].first;
-      const int child2 = bvh.internalChildren[internal].second;
-      auto recordOrTraverse = [&](int child) {
-        const bool overlaps = bvh.nodeBBox[child].DoesOverlap(query);
-        if (overlaps && IsLeaf(child)) {
-          const int leafIdx = Node2Leaf(child);
-          recorder.record(queryIdx, leafIdx, local);
-        }
-        return overlaps && IsInternal(child);
-      };
-      const bool traverse1 = recordOrTraverse(child1);
-      const bool traverse2 = recordOrTraverse(child2);
-      if (!traverse1 && !traverse2) {
-        if (top < 0) break;
-        node = stack[top--];
-      } else {
-        node = traverse1 ? child1 : child2;
-        if (traverse1 && traverse2) {
-          DEBUG_ASSERT(top + 1 < kBvhTraversalStackCapacity, logicErr,
-                       "Boolean2 BVH traversal stack overflow");
-          stack[++top] = child2;
-        }
-      }
-    }
-  };
-  manifold::for_each_n(
-      parallel ? autoPolicy(n, kFineParallelGrainSize) : ExecutionPolicy::Seq,
-      countAt(0), n, collideOne);
-}
-
-template <typename F>
-inline void CollidePairs(const BVH& bvh, const std::vector<Box2>& queries,
-                         F&& f) {
-  if (bvh.Empty() || queries.empty()) return;
-  auto adapter = [&](int qi, int leafIdx) { f(qi, bvh.leafToOrig[leafIdx]); };
-  auto recorder = MakeSimpleRecorder(adapter);
-  auto qf = [&](int i) { return queries[i]; };
-  BVHCollisions(bvh, recorder, qf, static_cast<int>(queries.size()),
-                /*parallel=*/false);
-}
 
 struct VertexMerge {
   std::vector<int> inputVert2Merged;
@@ -150,18 +73,12 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps);
 std::vector<EdgeM> RemapAndCollapse(const std::vector<EdgeM>& edges,
                                     const std::vector<int>& inputVert2Merged);
 
-// Incidence narrow phase over broad-phase edge pairs: for each edge, the sorted
-// list of other-edge endpoints lying within eps of its interior. Splitting each
-// edge at these vertices yields the two-vertex sub-edges the sweep operates on.
+// For each edge, the sorted list of other edges' endpoints lying within eps of
+// its interior. Splitting each edge at these vertices yields the two-vertex
+// sub-edges the sweep operates on.
 std::vector<std::vector<int>> BuildIncidenceLists(
-    const std::vector<EdgeM>& edges, const std::vector<vec2>& verts, double eps,
-    const std::vector<std::pair<int, int>>& pairs);
-
-void CollectIntersectionPairs(const std::vector<EdgeM>& edges,
-                              const std::vector<vec2>& verts, double eps,
-                              const std::vector<Box2>& edgeBoxes,
-                              const BVH& bvh,
-                              std::vector<std::pair<int, int>>& pairs);
+    const std::vector<EdgeM>& edges, const std::vector<vec2>& verts,
+    double eps);
 
 struct Trace;
 
@@ -169,6 +86,7 @@ enum class WindRule {
   Add,
   Intersect,
   EvenOdd,
+  NonZero,
 };
 
 // Smith sweep-line arrangement + winding over the collapsed input edges: a
@@ -204,8 +122,8 @@ Polygons OutEdgesToPolygons(const std::vector<vec2>& verts,
                             const std::vector<OutEdge>& edges);
 
 // Regularize one polygon set at machine-scale eps under `rule`, which decides
-// how the input's own winding is read: Positive (Add) or EvenOdd. Either way
-// the output is normal-oriented and positive, so this is the only place the
+// how the input's own winding is read: Positive (Add), EvenOdd, or NonZero.
+// The output is normal-oriented and positive, so this is the only place the
 // rule is visible. No default: every caller states which rule it wants, since
 // only CrossSection construction has a reason to pick anything but Add.
 // Fill-rule application, not tolerance decimation.
@@ -215,7 +133,7 @@ Polygons Boolean2D(const Polygons& a, const Polygons& b, OpType op,
 
 // Polygon offset backing CrossSection::Offset.
 Polygons Offset(const Polygons& in, double delta, JoinType jt,
-                double miterLimit = 2.0, int circularSegments = 0);
+                double miterLimit = 2.0, const CircularQuality& quality = {});
 
 // Group regularized simple loops into outer-ring components with their
 // directly contained holes, backing CrossSection::Decompose.
