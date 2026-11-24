@@ -193,6 +193,33 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
   const double deltaSign = (delta >= 0) ? 1.0 : -1.0;
   miterLimit = ValidMiterLimit(miterLimit);
 
+  // Edge k runs from contour[k] to contour[k + 1]. Rounding error sets the
+  // direction of an edge shorter than eps, so give such an edge the bisector
+  // of the normals of its nearest edges that are not short.
+  Rect box;
+  for (const vec2& v : contour) box.Union(v);
+  const double shortEps = EpsilonFromScale(box.Scale());
+  std::vector<vec2> normals(n);
+  std::vector<bool> isShort(n);
+  int longEdges = 0;
+  for (int k = 0; k < n; ++k) {
+    const vec2 e = contour[(k + 1) % n] - contour[k];
+    isShort[k] = la::length2(e) <= shortEps * shortEps;
+    normals[k] = OutwardNormal(e);
+    if (!isShort[k]) ++longEdges;
+  }
+  if (longEdges > 0 && longEdges < n) {
+    for (int k = 0; k < n; ++k) {
+      if (!isShort[k]) continue;
+      int before = (k + n - 1) % n, after = (k + 1) % n;
+      while (isShort[before]) before = (before + n - 1) % n;
+      while (isShort[after]) after = (after + 1) % n;
+      const ScaledDirection bisector =
+          UnitFromScaled(normals[before] + normals[after]);
+      normals[k] = bisector.scale != 0 ? bisector.unit : normals[before];
+    }
+  }
+
   SimplePolygon out;
   out.reserve(static_cast<size_t>(n) * 2);
   for (int i = 0; i < n; ++i) {
@@ -201,8 +228,9 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
     const vec2 N = contour[(i + 1) % n];
     const vec2 ePrev = V - P;
     const vec2 eNext = N - V;
-    const vec2 nPrev = OutwardNormal(ePrev);
-    const vec2 nNext = OutwardNormal(eNext);
+    const int prevEdge = (i + n - 1) % n;
+    const vec2 nPrev = normals[prevEdge];
+    const vec2 nNext = normals[i];
     if (nPrev == vec2(0, 0) || nNext == vec2(0, 0)) continue;
     const vec2 endPrev = V + delta * nPrev;
     const vec2 startNext = V + delta * nNext;
@@ -212,19 +240,26 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
     // concave indent = solid's convex bulge into the hole). Negative
     // delta flips the offset role (a solid-convex corner becomes a
     // shrinking-corner that needs a miter), hence the `* deltaSign`.
-    const double cross = la::cross(ePrev, eNext);
+    // Next to a short edge, the vertex positions are too close together to
+    // give the direction of the turn, so take it from the normals. Consecutive
+    // normals turn by the same angle as their edges.
+    const bool besideShort = isShort[prevEdge] || isShort[i];
+    const double cross =
+        besideShort ? la::cross(nPrev, nNext) : la::cross(ePrev, eNext);
     // Collinearity reuses the canonical CCW predicate, with a scale-derived
     // tolerance from the larger adjacent edge.
     const double eps = EpsilonFromScale(
         std::sqrt(std::max(la::length2(ePrev), la::length2(eNext))));
-    if (CCW(P, V, N, eps) == 0) {
+    const bool straight = besideShort ? nPrev == nNext || nPrev == -nNext
+                                      : CCW(P, V, N, eps) == 0;
+    if (straight) {
       // Zero cross is either a straight continuation (dot >= 0: nPrev == nNext,
       // so endPrev == startNext - one point suffices) or an antiparallel
       // reversal (dot < 0: nPrev == -nNext, so the offset endpoints are
       // distinct and on opposite sides). Emit both for the reversal to bevel
       // across the spike instead of collapsing it to a single point.
       out.push_back(endPrev);
-      if (dot(ePrev, eNext) < 0) out.push_back(startNext);
+      if (dot(nPrev, nNext) < 0) out.push_back(startNext);
       continue;
     }
     const bool convex = cross * deltaSign > 0;

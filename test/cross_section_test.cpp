@@ -534,13 +534,9 @@ TEST(CrossSection, OffsetMiterKeepsCollinearInputVerts) {
 }
 
 // Found by fuzzing. Regularizing this self-crossing ring leaves two vertices
-// 2e-16 apart where the ring touches itself, and the normal of the edge
-// between them comes from rounding error. Offset points next to that edge lie
-// off the neighboring offset edges, so the result depends on exactly which
-// points the joins emit. This test pins the current result. With the two
-// vertices merged into one, the area is 30.696439315, matching Clipper2, so
-// the current result is short some area; the test only guards against
-// further change.
+// 2e-16 apart where the ring touches itself. Offset gives the edge between
+// them the bisector of its neighbors' normals, so the result matches
+// Clipper2's and the result with the two vertices merged into one.
 TEST(CrossSection, OffsetMiterNextToSubEpsEdge) {
   const SimplePolygon ring = {{4, 3},  {10, 1}, {8, 3},
                               {9, -2}, {8, 1},  {9.999999998, 4.999999996}};
@@ -549,7 +545,7 @@ TEST(CrossSection, OffsetMiterNextToSubEpsEdge) {
   const CrossSection out =
       cs.Offset(1.0083379023984145, CrossSection::JoinType::Miter);
   EXPECT_EQ(out.NumContour(), 1);
-  EXPECT_NEAR(out.Area(), 30.073494595086, 1e-9);
+  EXPECT_NEAR(out.Area(), 30.696439315160, 1e-9);
 }
 
 TEST(CrossSection, OffsetWithHole) {
