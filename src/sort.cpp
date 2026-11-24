@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <atomic>
+#include <cmath>
 #include <cstdint>
 
 #include "disjoint_sets.h"
@@ -173,6 +174,7 @@ void MergeMeshGLP(MeshGLP<Precision, I>& mesh, Precision requestedTolerance) {
     bBox.max[i] = minMax.second;
   }
 
+  if (std::isnan(requestedTolerance)) requestedTolerance = 0;
   const double tolerance = std::max(
       static_cast<double>(requestedTolerance),
       (std::is_same<Precision, float>::value ? kDefaultRelativePrecision

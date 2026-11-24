@@ -368,7 +368,7 @@ double Manifold::GetPrecision() const {
  * error when collapsing edges, measured relative to nearby face planes.
  * Simplification tends to remove features thinner than the tolerance.
  * @param tolerance Simplification tolerance, lower-bounded by the manifold's
- * epsilon.
+ * epsilon. NaN is treated as 0.
  */
 Manifold Manifold::Simplify(double tolerance) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();

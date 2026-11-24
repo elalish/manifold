@@ -177,7 +177,8 @@ struct MeshGLP {
    * Manifold from the result will report an error status if it is not
    * manifold.
    *
-   * @param tolerance Merge open-edge verts closer than this.
+   * @param tolerance Merge open-edge verts closer than this. NaN is treated
+   * as 0.
    */
   [[nodiscard]] MeshGLP Merge(Precision tolerance = 0) const;
 
