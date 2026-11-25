@@ -13,8 +13,8 @@
 // limitations under the License.
 
 /* This file is used in two ways.
- * Run it through typedoc (`npm run docs:jsuser`), and it generates
- * the ManifoldCAD User Guide.
+ * Run through typedoc (`npm run docs:jsuser`, via
+ * `manifoldCADUserGuide.d.ts`), it generates the ManifoldCAD User Guide.
  * On the other hand API Extractor (`npm run postbuild`) rolls up
  * all of the imported references to generate `dist/manifoldCAD.d.ts`.
  *

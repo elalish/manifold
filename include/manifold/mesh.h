@@ -90,7 +90,7 @@ namespace manifold {
  * The halfedgeTangent vector is used to specify the weighted tangent vectors of
  * each halfedge for the purpose of using the Refine methods to create a
  * smoothly-interpolated surface. They can also be output when calculated
- * automatically by the Smooth functions.
+ * automatically by SmoothByNormals().
  *
  * MeshGL is an alias for the standard single-precision version. Use MeshGL64 to
  * output the full double precision that Manifold uses internally.
@@ -141,7 +141,8 @@ struct MeshGLP {
   /// Optional: For each run, a 3x4 transform is stored representing how the
   /// corresponding original mesh was transformed to create this triangle run.
   /// This matrix is stored in column-major order and the length of the overall
-  /// vector is 12 * runOriginalID.size().
+  /// vector is 12 * runOriginalID.size(). It is empty in the output of a
+  /// Manifold that is an original (see OriginalID()).
   std::vector<Precision> runTransform;
   /// Optional: For each run, defines a set of flags giving extra information
   /// about the run. See the corresponding getter functions for details on the

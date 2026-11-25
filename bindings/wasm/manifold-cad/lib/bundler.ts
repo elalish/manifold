@@ -109,16 +109,13 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       // Scene builder exports.
       'show', 'only', 'setMaterial',
       // GLTFNode and utilities.
-      'GLTFMaterial', 'GLTFNode', 'getGLTFNodes', 'VisualizationGLTFNode',
+      'GLTFNode', 'getGLTFNodes', 'resetGLTFNodes', 'VisualizationGLTFNode',
       'CrossSectionGLTFNode',
       // Import
       'importModel', 'importManifold',
-      // Getters for global properties
+      // Animation.
       'getAnimationDuration', 'getAnimationFPS', 'getAnimationMode',
-      // Setters for global properties.
-      // These will only be defined for top level scripts
-      'setMorphStart', 'setMorphEnd', 'setAnimationDuration', 'setAnimationFPS',
-      'setAnimationMode', 'resetGLTFNodes',
+      'setMorphStart', 'setMorphEnd',
 
       // ManifoldCAD specific exports.
       'isManifoldCAD'

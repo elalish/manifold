@@ -116,6 +116,14 @@ export type Box = {
  * primitive that never went through asOriginal().
  * @property faceID The faceID the hit triangle got from its input mesh, as in
  * Mesh.faceID. It is 0 if that mesh had no faceID.
+ * @property distance The parametric distance along the ray segment, in [0, 1],
+ * where 0 is the origin and 1 is the endpoint.
+ * @property position The hit point.
+ * @property normal The geometric face normal at the hit.
+ * @property crossing +1 if the ray enters the solid here, -1 if it exits.
+ * Summing these along the ray gives the change in winding number from origin
+ * to endpoint. Prefer this over the sign of the normal along the ray, which
+ * can disagree in degenerate cases.
  */
 export type RayHit = {
   originalID: number,

@@ -233,11 +233,11 @@ struct RayHit {
  * short-circuit to Error::Cancelled. Construct a fresh context to make a
  * new evaluation cancellable independently.
  *
- * Cancellation granularity varies by op: Boolean trees check per
- * sub-boolean (so a single very large boolean may run to completion
- * before the next check); Hull checks at the boundaries of its main
- * phases (post-buildMesh and post-SortGeometry); Minkowski checks per
- * face of the first input and per internal BatchBoolean batch.
+ * Cancellation granularity varies by op: Boolean trees check between
+ * sub-booleans and between the phases inside each one; Hull checks at the
+ * boundaries of its main phases (post-buildMesh and post-SortGeometry);
+ * Minkowski checks per face of the first input and per internal BatchBoolean
+ * batch.
  *
  * Example: cancel a long-running BatchBoolean from an observer thread.
  * @code
@@ -282,7 +282,7 @@ class ExecutionContext {
   /// Normalized progress in [0, 1]. Monotonically increases during
   /// evaluation. Returns 1.0 when no work has been scheduled (interpreted
   /// as trivially complete -- e.g. a single-leaf manifold has nothing to
-  /// evaluate, and `Progress()` called before any `Status(ctx)` reflects
+  /// evaluate, and `Progress()` called before any evaluation reflects
   /// the same "no pending work" state).
   double Progress() const;
 

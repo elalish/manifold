@@ -294,10 +294,9 @@ class Manifold {
    *   Manifold obj_m = Manifold::ReadOBJ(ifile);
    *   ifile.close();
    *   if (obj_m.Status() != Manifold::Error::NoError) {
-   *      std::cerr << "Failed reading " << filename << ":\n";
-   *      std::cerr << Manifold::ToString(obj_m.Status()) << "\n";
+   *      std::cerr << "Failed reading " << filename << ": error "
+   *                << static_cast<int>(obj_m.Status()) << "\n";
    *   }
-   *   ifile.close();
    * }
    * @endcode
    *

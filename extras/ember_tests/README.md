@@ -27,12 +27,12 @@ decompress and put the `raw_meshes` directory inside `testfiles`.
   transform arguments. It converts those to MeshGL, then to Manifold,
   then runs a boolean difference, and converts the result back to MeshGL.
   It times the total time take to do this (not including loading the
-  stl files into MeshGL format), and appends a line to a benchmarks.csv
+  stl files into MeshGL format), and appends a line to a benchmark.csv
   file with the argument and timing information.
-- `testfiles/test_file/ember-benchmark-cases.json`: JSON file describing each
+- `testfiles/ember-benchmark-cases.json`: JSON file describing each
   test case.
 - `analyze_ember_tests.py` reads the benchmark.csv file and calculates
   statistics and does a plot.
 - `bug-case.json` is a single test case that takes abnormally long.
-- `m3max_benchmarks.csv` is the benchmarks file gotten by running on a
+- `m3max_benchmark.csv` is the benchmark file gotten by running on a
   Macbook Pro M3 Max (12 performance cores, 4 efficiency cores).

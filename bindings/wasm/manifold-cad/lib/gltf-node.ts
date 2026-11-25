@@ -24,8 +24,8 @@
  * representing objects that are *already* part of a gltf-transform document.
  * That class can mostly be seen in import and export related code.
  *
- * This leads to the confusing case where, `NonManifoldGLTFNode` is both.  It is
- * a manifoldCAD node that contains an imported gltf-transform `Node`.  It
+ * This leads to the confusing case where, `VisualizationGLTFNode` is both.  It
+ * is a manifoldCAD node that contains an imported gltf-transform `Node`.  It
  * specifies how that gltf-transform node will be scaled, rotated and translated
  * when it is eventually copied into a new gltf-transform document at export
  * time.
@@ -74,7 +74,7 @@ export interface GLTFMaterial {
    * and uses 10-12 for color.
    *
    * Normals follow transforms only when they come from `calculateNormals()` or
-   * a MeshGL input whose corresponding runFlags bit 1 is set. Values supplied
+   * a Mesh input whose corresponding runFlags bit 1 is set. Values supplied
    * by `setProperties()` remain ordinary properties.
    *
    * Some properties such as `TEXCOORD_0` or `COLOR_0` may be set when importing

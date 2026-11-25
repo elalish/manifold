@@ -25,14 +25,18 @@
 
 export type * from './manifold-global-types';
 export type {MeshOptions, Mesh64Options, MIN_RELATIVE_PRECISION, triangulate, segmentsFor, forDivisions} from './manifold-encapsulated-types';
-export {CrossSection, Manifold, Mesh, Mesh64} from './manifold-encapsulated-types';
+export {CrossSection, Manifold, ManifoldError, Mesh, Mesh64} from './manifold-encapsulated-types';
 
 import type {MIN_RELATIVE_PRECISION, triangulate, segmentsFor, forDivisions} from './manifold-encapsulated-types';
-import {CrossSection, Manifold, Mesh, Mesh64} from './manifold-encapsulated-types';
+import {CrossSection, Manifold, ManifoldError, Mesh, Mesh64} from './manifold-encapsulated-types';
+
+import type {ExecutionContext} from './manifold-global-types';
 
 export interface ManifoldToplevel {
   CrossSection: typeof CrossSection;
   Manifold: typeof Manifold;
+  ManifoldError: typeof ManifoldError;
+  ExecutionContext: new() => ExecutionContext;
   Mesh: typeof Mesh;
   Mesh64: typeof Mesh64;
   MIN_RELATIVE_PRECISION: typeof MIN_RELATIVE_PRECISION;

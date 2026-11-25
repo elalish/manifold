@@ -22,7 +22,7 @@
  * Each format must have a defined extension and mime type.  In the case of
  * duplicates, order is not guaranteed. While an implementation may support both
  * import and export of a format, this is not required.  At the time of writing,
- * manifoldCAD supports both import and export of glTF, but only exports 3mf.
+ * manifoldCAD supports both import and export of glTF and 3mf.
  *
  * @packageDocumentation
  * @group ManifoldCAD
@@ -110,7 +110,7 @@ function getExporter(identifier: ExportFormat|string) {
  * Returns true if a given extension or mimetype can be exported.
  *
  * @param filetype
- * @param throwOnFailure If true, throw an `UnsupportedFormatException` rather
+ * @param throwOnFailure If true, throw an `UnsupportedFormatError` rather
  *     than return false.
  * @group Management
  */

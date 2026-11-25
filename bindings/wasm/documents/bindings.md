@@ -38,7 +38,7 @@ const result = box.subtract(ball);
 > [!WARNING]
 > Since Manifold is a WASM module, it does not automatically garbage-collect like regular JavaScript.
 
-You must manually `delete()` each object constructed by your scripts (both `Manifold` and `CrossSection`).
+You must manually `delete()` each object constructed by your scripts (`Manifold`, `CrossSection` and `ExecutionContext`).
 See [discussion](https://github.com/elalish/manifold/discussions/256#discussioncomment-3944287).
 
 ## Examples
