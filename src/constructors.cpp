@@ -168,13 +168,15 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
       !std::isfinite(radiusHigh) || height <= 0.0 || radiusLow < 0.0) {
     return Invalid();
   }
-  const bool flip = radiusLow == 0.0;
-  if (flip) {
-    if (radiusHigh <= 0.0) {
-      return Invalid();
-    }
-    std::swap(radiusLow, radiusHigh);
+  if (radiusLow == 0.0 && radiusHigh <= 0.0) {
+    return Invalid();
   }
+  // Preserve the usual construction's floating-point coordinates. Reverse only
+  // when scaling from the requested bottom radius would overflow.
+  const bool flip =
+      radiusLow == 0.0 ||
+      (radiusHigh > radiusLow && !std::isfinite(radiusHigh / radiusLow));
+  if (flip) std::swap(radiusLow, radiusHigh);
   const double scale = radiusHigh >= 0.0 ? radiusHigh / radiusLow : 1.0;
   const double radius = fmax(radiusLow, radiusHigh);
   const int n = quality.SegmentsFor(radius);
