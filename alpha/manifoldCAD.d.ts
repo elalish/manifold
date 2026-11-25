@@ -514,7 +514,7 @@ export declare interface ExecutionContext {
     // have no source Manifold to attach via Manifold.withContext).
 
     /** Like {@link Manifold.ofMesh}, observed/cancellable via this context. */
-    fromMesh(mesh: Mesh): Manifold;
+    fromMesh(mesh: Mesh|Mesh64): Manifold;
     /** Like {@link Manifold.levelSet}, observed/cancellable via this context. */
     levelSet(
     sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
@@ -777,9 +777,13 @@ export declare class Manifold {
      * reserveIDs() to set a unique originalID for each material, and sort the
      * materials into triangle runs.
      *
+     * A Mesh64 is read in double precision, so the input positions are not
+     * rounded to float. A plain object is read as a Mesh. To read a plain object
+     * in double precision, wrap it with new Mesh64(obj).
+     *
      * @group Basics
      */
-    constructor(mesh: Mesh);
+    constructor(mesh: Mesh|Mesh64);
 
     // Shapes
 
@@ -889,9 +893,13 @@ export declare class Manifold {
      * round-trip of data from getMesh(). For multi-material input, use
      * reserveIDs() to set a unique originalID for each material, and sort the
      * materials into triangle runs.
+     *
+     * A Mesh64 is read in double precision, so the input positions are not
+     * rounded to float. A plain object is read as a Mesh. To read a plain object
+     * in double precision, wrap it with new Mesh64(obj).
      * @group Input & Output
      */
-    static ofMesh(mesh: Mesh): Manifold;
+    static ofMesh(mesh: Mesh|Mesh64): Manifold;
 
     // Signed Distance Functions
 
@@ -1435,6 +1443,14 @@ export declare class Manifold {
      */
     getMesh(): Mesh;
 
+    /**
+     * Like getMesh(), but returns the full double precision used internally
+     * (MeshGL64): vertProperties, runTransform and halfedgeTangent are
+     * Float64Array.
+     * @group Input & Output
+     */
+    getMesh64(): Mesh64;
+
     // ID Management
 
     /**
@@ -1716,6 +1732,75 @@ export declare class Mesh {
 }
 
 /**
+ * The double-precision version of Mesh, matching MeshGL64 in C++: the vertex
+ * properties, run transforms and tangents are Float64Array. Indices are
+ * Uint32Array, as in Mesh. See Mesh for the meaning of each field and method.
+ *
+ * @see {@link https://manifoldcad.org/docs/html/structmanifold_1_1_mesh_g_l_p.html | C++ API: MeshGLP< Precision, I > Struct Template Reference}
+ * @group Input & Output
+ * @internal
+ */
+export declare class Mesh64 {
+    constructor(options: Mesh64Options);
+
+    numProp: number;
+    vertProperties: Float64Array;
+    triVerts: Uint32Array;
+    mergeFromVert: Uint32Array;
+    mergeToVert: Uint32Array;
+    runIndex: Uint32Array;
+    runOriginalID: Uint32Array;
+    runTransform: Float64Array;
+    runFlags: Uint8Array;
+    faceID: Uint32Array;
+    halfedgeTangent: Float64Array;
+
+    get numTri(): number;
+    get numVert(): number;
+    get numRun(): number;
+
+    /**
+     * Like Mesh.merge(), in double precision.
+     *
+     * @param tolerance Default 0, with a bounding-box and precision-based floor.
+     */
+    merge(tolerance?: number): Mesh64;
+
+    verts(tri: number): SealedUint32Array<3>;
+
+    /** Gets the x, y, z position of this vertex in double precision. */
+    position(vert: number): SealedFloat64Array<3>;
+
+    /** Gets any other properties of this vertex in double precision. */
+    extras(vert: number): Float64Array;
+
+    /** Like Mesh.tangent(), in double precision. */
+    tangent(halfedge: number): SealedFloat64Array<4>;
+
+    transform(run: number): Mat4;
+    backside(run: number): boolean;
+    hasNormals(run: number): boolean;
+}
+
+/**
+ * @group Input & Output
+ * @internal
+ */
+export declare interface Mesh64Options {
+    numProp: number;
+    vertProperties: Float64Array;
+    triVerts: Uint32Array;
+    mergeFromVert?: Uint32Array;
+    mergeToVert?: Uint32Array;
+    runIndex?: Uint32Array;
+    runOriginalID?: Uint32Array;
+    runTransform?: Float64Array;
+    runFlags?: Uint8Array;
+    faceID?: Uint32Array;
+    halfedgeTangent?: Float64Array;
+}
+
+/**
  * @group Input & Output
  * @internal
  */
@@ -1786,6 +1871,14 @@ export declare function resetGLTFNodes(): void;
  * @hidden
  */
 export declare interface SealedFloat32Array<N extends number> extends Float32Array {
+    length: N;
+}
+
+/**
+ * @inline
+ * @hidden
+ */
+export declare interface SealedFloat64Array<N extends number> extends Float64Array {
     length: N;
 }
 
