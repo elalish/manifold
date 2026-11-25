@@ -161,9 +161,17 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       }
 
       // Is this a virtual file?
-      // FIXME Resolve paths!
-      if (options.files && Object.keys(options.files).includes(args.path)) {
-        return {namespace: 'virtual-file', path: args.path};
+      const files = options.files;
+      if (files) {
+        const resolved = /^\.\.?\//.test(args.path) ?
+            resolve(args.path, args.importer || '<stdin>') :
+            args.path;
+        const path = [resolved, resolved.replace(/^\.\//, ''), args.path].find(
+            path => Object.hasOwn(files, path));
+        if (path !== undefined) {
+          if (args.kind === 'entry-point') entrypoint = path;
+          return {namespace: 'virtual-file', path};
+        }
       }
 
       // Try esbuilds' resolver first.
