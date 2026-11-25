@@ -525,10 +525,10 @@ CrossSection CrossSection::Rotate(double degrees) const {
  * Scale this CrossSection in space. This operation can be chained. Transforms
  * are combined and applied lazily.
  *
- * @param scale The vector to multiply every vertex by per component.
+ * @param v The vector to multiply every vertex by per component.
  */
-CrossSection CrossSection::Scale(const vec2 scale) const {
-  mat2x3 m({scale.x, 0.0}, {0.0, scale.y}, {0.0, 0.0});
+CrossSection CrossSection::Scale(const vec2 v) const {
+  mat2x3 m({v.x, 0.0}, {0.0, v.y}, {0.0, 0.0});
   return Transform(m);
 }
 
@@ -538,11 +538,11 @@ CrossSection CrossSection::Scale(const vec2 scale) const {
  * empty CrossSection is returned. This operation can be chained. Transforms are
  * combined and applied lazily.
  *
- * @param ax the axis to be mirrored over
+ * @param normal The normal vector of the axis to be mirrored over
  */
-CrossSection CrossSection::Mirror(const vec2 ax) const {
-  if (la::length(ax) == 0.0) return CrossSection();
-  const vec2 n = la::normalize(ax);
+CrossSection CrossSection::Mirror(const vec2 normal) const {
+  if (la::length(normal) == 0.0) return CrossSection();
+  const vec2 n = la::normalize(normal);
   return Transform(
       mat2x3(mat2(la::identity) - 2.0 * la::outerprod(n, n), vec2(0.0)));
 }
@@ -652,7 +652,7 @@ CrossSection CrossSection::Simplify(double tolerance) const {
  * @param delta Positive deltas will cause the expansion of outlining contours
  * to expand, and retraction of inner (hole) contours. Negative deltas will
  * have the opposite effect.
- * @param jointype The join type specifying the treatment of contour joins
+ * @param join_type The join type specifying the treatment of contour joins
  * (corners). Defaults to Round.
  * @param miter_limit The maximum distance in multiples of delta that vertices
  * can be offset from their original positions with before squaring is
@@ -664,12 +664,12 @@ CrossSection CrossSection::Simplify(double tolerance) const {
  * <B>JoinType::Round</B> corners (roughly, the number of vertices that
  * will be added to each contour), see CircularQuality.
  */
-CrossSection CrossSection::Offset(double delta, JoinType jointype,
+CrossSection CrossSection::Offset(double delta, JoinType joinType,
                                   double miterLimit,
                                   CircularQuality quality) const {
   // Qualified: unqualified lookup inside the class finds this member and
   // hides the namespace-scope polygon offset.
-  Polygons offset = manifold::Offset(GetPaths()->paths_, delta, jointype,
+  Polygons offset = manifold::Offset(GetPaths()->paths_, delta, joinType,
                                      miterLimit, quality);
   return CrossSection(shared_paths(std::move(offset)));
 }
@@ -709,12 +709,12 @@ CrossSection CrossSection::Hull() const { return Hull({*this}); }
  * Compute the convex hull of a set of points. If the given points are fewer
  * than 3, an empty CrossSection will be returned.
  *
- * @param pts A vector of 2-dimensional points over which to compute a convex
- * hull.
+ * @param points A vector of 2-dimensional points over which to compute a
+ * convex hull.
  */
-CrossSection CrossSection::Hull(const SimplePolygon& pts) {
-  SimplePolygon points = pts;  // HullImpl sorts in place
-  SimplePolygon hull = HullImpl(points);
+CrossSection CrossSection::Hull(const SimplePolygon& points) {
+  SimplePolygon sorted = points;  // HullImpl sorts in place
+  SimplePolygon hull = HullImpl(sorted);
   if (hull.size() < 3) return CrossSection();
   return CrossSection(shared_path(std::move(hull)));
 }

@@ -220,9 +220,9 @@ CircularQuality ToQuality(const QualityArg& quality) {
 // strip original :params: and replace with ours
 const std::string manifold__rotate_xyz =
     manifold__rotate__x_degrees__y_degrees__z_degrees;
-const std::string manifold__rotate__v =
+const std::string manifold__rotate__degrees =
     manifold__rotate_xyz.substr(0, manifold__rotate_xyz.find(":param")) +
-    ":param v: [X, Y, Z] rotation in degrees.";
+    ":param degrees: [X, Y, Z] rotation in degrees.";
 
 NB_MODULE(manifold3d, m) {
   m.doc() = "Python binding for the Manifold library.";
@@ -274,10 +274,10 @@ NB_MODULE(manifold3d, m) {
       .def_static(
           "hull_points",
           [](std::vector<vec3> pts) { return Manifold::Hull(pts); },
-          nb::arg("pts"), manifold__hull__pts)
+          nb::arg("points"), manifold__hull__points)
       .def("transform", &Manifold::Transform, nb::arg("m"),
            manifold__transform__m)
-      .def("translate", &Manifold::Translate, nb::arg("t"),
+      .def("translate", &Manifold::Translate, nb::arg("v"),
            manifold__translate__v)
       .def("scale", &Manifold::Scale, nb::arg("v"), manifold__scale__v)
       .def(
@@ -287,13 +287,14 @@ NB_MODULE(manifold3d, m) {
           "Scale this Manifold in space. This operation can be chained. "
           "Transforms are combined and applied lazily.\n\n"
           ":param s: The scalar to multiply every vertex by component.")
-      .def("mirror", &Manifold::Mirror, nb::arg("v"), manifold__mirror__normal)
+      .def("mirror", &Manifold::Mirror, nb::arg("normal"),
+           manifold__mirror__normal)
       .def(
           "rotate",
-          [](const Manifold& self, vec3 v) {
-            return self.Rotate(v.x, v.y, v.z);
+          [](const Manifold& self, vec3 degrees) {
+            return self.Rotate(degrees.x, degrees.y, degrees.z);
           },
-          nb::arg("v"), manifold__rotate__v.c_str())
+          nb::arg("degrees"), manifold__rotate__degrees.c_str())
       .def(
           "warp",
           [](const Manifold& self, std::function<vec3(vec3)> warp_func) {
@@ -352,7 +353,7 @@ NB_MODULE(manifold3d, m) {
               }
             });
           },
-          nb::arg("new_num_prop"), nb::arg("f"),
+          nb::arg("num_prop"), nb::arg("prop_func"),
           manifold__set_properties__num_prop__prop_func)
       .def("calculate_curvature", &Manifold::CalculateCurvature,
            nb::arg("gaussian_idx"), nb::arg("mean_idx"),
@@ -360,7 +361,7 @@ NB_MODULE(manifold3d, m) {
       .def("min_gap", &Manifold::MinGap, nb::arg("other"),
            nb::arg("search_length"),
            "Returns the minimum gap between two manifolds."
-           "Returns a double between 0 and searchLength.")
+           "Returns a double between 0 and search_length.")
       .def("ray_cast", &Manifold::RayCast, nb::arg("origin"),
            nb::arg("endpoint"),
            "Cast a ray segment, returning all hits sorted by distance.")
@@ -454,7 +455,7 @@ NB_MODULE(manifold3d, m) {
             return Manifold::Extrude(crossSection.ToPolygons(), height,
                                      nDivisions, twistDegrees, scaleTop);
           },
-          nb::arg("crossSection"), nb::arg("height"),
+          nb::arg("cross_section"), nb::arg("height"),
           nb::arg("n_divisions") = 0, nb::arg("twist_degrees") = 0.0f,
           nb::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
           manifold__extrude__cross_section__height__n_divisions__twist_degrees__scale_top)
@@ -465,7 +466,7 @@ NB_MODULE(manifold3d, m) {
             return Manifold::Revolve(crossSection.ToPolygons(),
                                      ToQuality(quality), revolveDegrees);
           },
-          nb::arg("crossSection"), nb::arg("quality") = nb::none(),
+          nb::arg("cross_section"), nb::arg("quality") = nb::none(),
           nb::arg("revolve_degrees") = 360.0,
           manifold__revolve__cross_section__quality__revolve_degrees)
       .def_static(
@@ -485,7 +486,7 @@ NB_MODULE(manifold3d, m) {
             return Manifold::LevelSet(cppToPython, bound, edgeLength, level,
                                       tolerance, false);
           },
-          nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
+          nb::arg("sdf"), nb::arg("bounds"), nb::arg("edge_length"),
           nb::arg("level") = 0.0, nb::arg("tolerance") = -1,
           manifold__level_set__sdf__bounds__edge_length__level__tolerance__can_parallel)
       .def_static(
@@ -799,7 +800,7 @@ NB_MODULE(manifold3d, m) {
             return ctx.LevelSet(cppToPython, bound, edgeLength, level,
                                 tolerance, false);
           },
-          nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
+          nb::arg("sdf"), nb::arg("bounds"), nb::arg("edge_length"),
           nb::arg("level") = 0.0, nb::arg("tolerance") = -1,
           "Like Manifold.level_set, run under this context so the level-set "
           "evaluation reports progress and observes cancellation.");
@@ -887,8 +888,7 @@ NB_MODULE(manifold3d, m) {
            cross_section__translate__v)
       .def("rotate", &CrossSection::Rotate, nb::arg("degrees"),
            cross_section__rotate__degrees)
-      .def("scale", &CrossSection::Scale, nb::arg("scale"),
-           cross_section__scale__scale)
+      .def("scale", &CrossSection::Scale, nb::arg("v"), cross_section__scale__v)
       .def(
           "scale",
           [](const CrossSection& self, double s) { return self.Scale({s, s}); },
@@ -897,8 +897,8 @@ NB_MODULE(manifold3d, m) {
           "Transforms are combined and applied lazily."
           "\n\n"
           ":param s: The scalar to multiply every vertex by per component.")
-      .def("mirror", &CrossSection::Mirror, nb::arg("ax"),
-           cross_section__mirror__ax)
+      .def("mirror", &CrossSection::Mirror, nb::arg("normal"),
+           cross_section__mirror__normal)
       .def("transform", &CrossSection::Transform, nb::arg("m"),
            cross_section__transform__m)
       .def(
@@ -938,7 +938,7 @@ NB_MODULE(manifold3d, m) {
           nb::arg("delta"),
           nb::arg("join_type") = CrossSection::JoinType::Round,
           nb::arg("miter_limit") = 2.0, nb::arg("quality") = nb::none(),
-          cross_section__offset__delta__jointype__miter_limit__quality)
+          cross_section__offset__delta__join_type__miter_limit__quality)
       .def(nb::self + nb::self, cross_section__operator_plus__q)
       .def(nb::self - nb::self, cross_section__operator_minus__q)
       .def(nb::self ^ nb::self, cross_section__operator_xor__q)
@@ -952,7 +952,7 @@ NB_MODULE(manifold3d, m) {
       .def_static(
           "hull_points",
           [](std::vector<vec2> pts) { return CrossSection::Hull(pts); },
-          nb::arg("pts"), cross_section__hull__pts)
+          nb::arg("points"), cross_section__hull__points)
       .def("decompose", &CrossSection::Decompose, cross_section__decompose)
       .def_static("batch_boolean", &CrossSection::BatchBoolean,
                   nb::arg("cross_sections"), nb::arg("op"),

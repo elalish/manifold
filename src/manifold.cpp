@@ -1041,12 +1041,12 @@ ExecutionParams& ManifoldParams() { return manifoldParams; }
  * Compute the convex hull of a set of points. If the given points are fewer
  * than 4, or they are all coplanar, an empty Manifold will be returned.
  *
- * @param pts A vector of 3-dimensional points over which to compute a convex
- * hull.
+ * @param points A vector of 3-dimensional points over which to compute a
+ * convex hull.
  */
-Manifold Manifold::Hull(const std::vector<vec3>& pts) {
+Manifold Manifold::Hull(const std::vector<vec3>& points) {
   std::shared_ptr<Impl> impl = std::make_shared<Impl>();
-  impl->Hull(Vec<vec3>(pts));
+  impl->Hull(Vec<vec3>(points));
   return Manifold(std::make_shared<CsgLeafNode>(impl));
 }
 

@@ -11,7 +11,8 @@ def snake_case(name):
 def python_param_modifier(comment):
     # p = f":{snake_case(m[0][1:])}:"
     comment = re.sub(r"@(param \w+)", lambda m: f":{snake_case(m[1])}:", comment)
-    # python API renames `MeshGL` to `Mesh`
+    # python API renames `MeshGL` to `Mesh`, and both constructors take `mesh`
+    comment = re.sub(":param mesh_gl64:", ":param mesh:", comment)
     comment = re.sub("mesh_gl", "mesh", comment)
     comment = re.sub("MeshGL", "Mesh", comment)
     return comment
