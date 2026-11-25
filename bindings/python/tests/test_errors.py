@@ -105,6 +105,7 @@ CATEGORIES = {
         A,
         [
             (IC, lambda: Manifold.level_set(sphere_sdf, BOUNDS, 0)),
+            (IC, lambda: Manifold.level_set(sphere_sdf, BOUNDS[3:] + BOUNDS[:3], 0.5)),
         ],
     ),
     "Manifold.hull_points": (A, []),
@@ -268,6 +269,12 @@ CATEGORIES = {
         D,
         [
             (IC, lambda: ExecutionContext().level_set(sphere_sdf, BOUNDS, 0)),
+            (
+                IC,
+                lambda: ExecutionContext().level_set(
+                    sphere_sdf, BOUNDS[3:] + BOUNDS[:3], 0.5
+                ),
+            ),
         ],
     ),
     "CircularQuality.segments_for": (C, []),
@@ -395,3 +402,6 @@ def test_empty_input_does_not_raise():
     assert Manifold.batch_hull([]).is_empty()
     assert Manifold().trim_by_plane((0, 0, 1), 0).is_empty()
     assert (CUBE ^ CUBE.translate((5, 0, 0))).is_empty()
+    empty = list(Manifold().bounding_box())
+    assert Manifold.level_set(sphere_sdf, empty, 0.5).is_empty()
+    assert ExecutionContext().level_set(sphere_sdf, empty, 0.5).is_empty()

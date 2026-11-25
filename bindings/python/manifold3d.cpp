@@ -663,8 +663,10 @@ NB_MODULE(manifold3d, m) {
             // Same format as Manifold.bounding_box
             if (bounds.size() != 6)
               throw std::runtime_error("bounds must have 6 elements");
-            Box bound = {vec3(bounds[0], bounds[1], bounds[2]),
-                         vec3(bounds[3], bounds[4], bounds[5])};
+            // Box's two-point constructor would sort the corners.
+            Box bound;
+            bound.min = vec3(bounds[0], bounds[1], bounds[2]);
+            bound.max = vec3(bounds[3], bounds[4], bounds[5]);
 
             std::function<double(vec3)> cppToPython = [&f](vec3 v) {
               return f(v.x, v.y, v.z);
@@ -983,8 +985,10 @@ NB_MODULE(manifold3d, m) {
              double tolerance) {
             if (bounds.size() != 6)
               throw std::runtime_error("bounds must have 6 elements");
-            Box bound = {vec3(bounds[0], bounds[1], bounds[2]),
-                         vec3(bounds[3], bounds[4], bounds[5])};
+            // Box's two-point constructor would sort the corners.
+            Box bound;
+            bound.min = vec3(bounds[0], bounds[1], bounds[2]);
+            bound.max = vec3(bounds[3], bounds[4], bounds[5]);
             std::function<double(vec3)> cppToPython = [&f](vec3 v) {
               return f(v.x, v.y, v.z);
             };

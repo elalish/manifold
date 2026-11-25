@@ -51,7 +51,9 @@ manifold__level_set__sdf__bounds__edge_length__level__tolerance__can_parallel:
   negative outside. There is no requirement that the function be a true
   distance, or even continuous.
   :param bounds: The extent of the grid as (xmin, ymin, zmin, xmax, ymax,
-  zmax), the same format as bounding_box().
+  zmax), the same format as bounding_box(). It must be finite with each min
+  at most its max, or be the bounding_box() of an empty Manifold, which gives
+  an empty result with no error.
   :param edge_length: Approximate maximum edge length of the triangles in the
   final result. Must be positive and finite. This affects grid spacing, and
   hence has a strong effect on performance. Every positive-length axis has at
