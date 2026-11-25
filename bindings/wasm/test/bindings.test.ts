@@ -492,6 +492,36 @@ suite('Mesh64', () => {
     ctx.delete();
   });
 
+  test('a Manifold from a Mesh64 has the finest precision', () => {
+    const {Manifold, Mesh, ExecutionContext, MIN_RELATIVE_PRECISION} =
+        manifoldModule;
+    const input = doubleCube();
+    const fromFloat = new Manifold(new Mesh({
+      numProp: input.numProp,
+      triVerts: input.triVerts,
+      vertProperties: Float32Array.from(input.vertProperties)
+    }));
+    expect(fromFloat.getPrecision()).toEqual(2 ** -23);
+    const ctx = new ExecutionContext();
+    const fromDouble =
+        [new Manifold(input), Manifold.ofMesh(input), ctx.fromMesh(input)];
+    for (const manifold of fromDouble) {
+      expect(manifold.getPrecision()).toEqual(MIN_RELATIVE_PRECISION);
+    }
+    const coarse = fromDouble[0].withPrecision(1e-3);
+    expect(coarse.getPrecision()).toEqual(1e-3);
+    // 0 gives float epsilon, even for a Manifold made from a Mesh64.
+    const unset = fromDouble[0].withPrecision(0);
+    expect(unset.getPrecision()).toEqual(2 ** -23);
+    // The mesh does not store the precision.
+    const again = new Manifold(coarse.getMesh64());
+    expect(again.getPrecision()).toEqual(MIN_RELATIVE_PRECISION);
+    for (const m of [fromFloat, ...fromDouble, coarse, unset, again]) {
+      m.delete();
+    }
+    ctx.delete();
+  });
+
   test('a Mesh64 from another module instance reads as double', async () => {
     const other = await Module();
     other.setup();
