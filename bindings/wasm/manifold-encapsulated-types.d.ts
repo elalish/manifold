@@ -590,10 +590,11 @@ export class Manifold {
 
   /**
    * Convert a Mesh into a Manifold, retaining its properties and merging only
-   * the positions according to the merge vectors. Will throw an error if the
-   * result is not an oriented 2-manifold. Triangles with a repeated vertex
-   * after merging are dropped. Other degenerate triangles are kept. Use
-   * simplify() to collapse them.
+   * the positions according to the merge vectors. Throws a ManifoldError, with
+   * the error status as its code, if the mesh is invalid or the result is not
+   * an oriented 2-manifold. Triangles with a repeated vertex after merging are
+   * dropped. Other degenerate triangles are kept. Use simplify() to collapse
+   * them.
    *
    * All fields are read, making this structure suitable for a lossless
    * round-trip of data from getMesh(). For multi-material input, use
