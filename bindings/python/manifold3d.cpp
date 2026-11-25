@@ -358,9 +358,7 @@ NB_MODULE(manifold3d, m) {
            nb::arg("gaussian_idx"), nb::arg("mean_idx"),
            manifold__calculate_curvature__gaussian_idx__mean_idx)
       .def("min_gap", &Manifold::MinGap, nb::arg("other"),
-           nb::arg("search_length"),
-           "Returns the minimum gap between two manifolds."
-           "Returns a double between 0 and search_length.")
+           nb::arg("search_length"), manifold__min_gap__other__search_length)
       .def("ray_cast", &Manifold::RayCast, nb::arg("origin"),
            nb::arg("endpoint"),
            "Cast a ray segment, returning all hits sorted by distance.")
@@ -389,13 +387,11 @@ NB_MODULE(manifold3d, m) {
       .def("genus", &Manifold::Genus, manifold__genus)
       .def(
           "volume", [](const Manifold& self) { return self.Volume(); },
-          "Get the volume of the manifold\n This is clamped to zero for a "
-          "given face if they are within the Epsilon().")
+          manifold__volume)
       .def(
           "surface_area",
           [](const Manifold& self) { return self.SurfaceArea(); },
-          "Get the surface area of the manifold\n This is clamped to zero for "
-          "a given face if they are within the Epsilon().")
+          manifold__surface_area)
       .def("original_id", &Manifold::OriginalID, manifold__original_id)
       .def("simplify", &Manifold::Simplify, nb::arg("tolerance") = 0,
            manifold__simplify__tolerance)
@@ -427,7 +423,9 @@ NB_MODULE(manifold3d, m) {
           [](const Manifold& self) {
             return CrossSection(self.Project()).Simplify(self.GetEpsilon());
           },
-          manifold__project)
+          "Returns a CrossSection of the projected outline of this object onto "
+          "the X-Y plane. The outline polygons are combined with the positive "
+          "fill rule and simplified at this Manifold's epsilon.")
       .def("status", &Manifold::Status, manifold__status, release_gil())
       .def("with_context", &Manifold::WithContext, nb::arg("ctx"),
            manifold__with_context__ctx)
@@ -767,7 +765,7 @@ NB_MODULE(manifold3d, m) {
       .def("cancel", &ExecutionContext::Cancel)
       .def("cancelled", &ExecutionContext::Cancelled)
       .def("progress", &ExecutionContext::Progress)
-      // ctx-aware static factories: like Manifold.from_mesh / level_set, but
+      // ctx-aware static factories: like Manifold(mesh) / level_set, but
       // run under this context so progress / cancellation are observed (these
       // ops have no source Manifold to attach via with_context).
       .def(
@@ -777,7 +775,7 @@ NB_MODULE(manifold3d, m) {
             return ctx.FromMeshGL(mesh);
           },
           nb::arg("mesh"),
-          "Ingest a MeshGL into a Manifold under this context, so the ingest "
+          "Ingest a Mesh into a Manifold under this context, so the ingest "
           "reports progress and observes cancellation. The result has float "
           "relative precision.")
       .def(
@@ -787,7 +785,7 @@ NB_MODULE(manifold3d, m) {
             return ctx.FromMeshGL(mesh);
           },
           nb::arg("mesh"),
-          "Ingest a MeshGL64 into a Manifold under this context, so the ingest "
+          "Ingest a Mesh64 into a Manifold under this context, so the ingest "
           "reports progress and observes cancellation. The result has "
           "relative precision 1e-12.")
       .def(
