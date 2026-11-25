@@ -1294,8 +1294,9 @@ export class Mesh {
    * Optional: For each run, a 3x4 transform is stored representing how the
    * corresponding original mesh was transformed to create this triangle run.
    * This matrix is stored in column-major order and the length of the overall
-   * vector is 12 * runOriginalID.size(). It is empty in the output of a
-   * Manifold that is an original (see originalID()).
+   * vector is either 12 * runOriginalID.size() or 0. It is empty in the output
+   * of a Manifold that is an original (see originalID()), and every run then
+   * has the identity transform.
    */
   runTransform: Float32Array;
 
@@ -1389,7 +1390,7 @@ export class Mesh {
 
   /**
    * Gets the column-major 4x4 matrix transform from the original mesh to these
-   * related triangles.
+   * related triangles, or the identity if runTransform does not hold one.
    *
    * @param run triangle run index.
    */
