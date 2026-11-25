@@ -104,7 +104,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       // Manifold classes.
       'Mesh', 'Manifold', 'CrossSection',
       // Manifold methods.
-      'triangulate',
+      'triangulate', 'segmentsFor', 'forDivisions',
 
       // Scene builder exports.
       'show', 'only', 'setMaterial',
@@ -114,15 +114,13 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       // Import
       'importModel', 'importManifold',
       // Getters for global properties
-      'getCircularSegments', 'getMinCircularAngle', 'getMinCircularEdgeLength',
       'getRelativePrecision', 'getAnimationDuration', 'getAnimationFPS',
       'getAnimationMode',
       // Setters for global properties.
       // These will only be defined for top level scripts
-      'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-      'setRelativePrecision', 'resetToCircularDefaults', 'setMorphStart',
-      'setMorphEnd', 'setAnimationDuration', 'setAnimationFPS',
-      'setAnimationMode', 'resetGLTFNodes',
+      'setRelativePrecision', 'setMorphStart', 'setMorphEnd',
+      'setAnimationDuration', 'setAnimationFPS', 'setAnimationMode',
+      'resetGLTFNodes',
 
       // ManifoldCAD specific exports.
       'isManifoldCAD'

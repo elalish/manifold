@@ -88,8 +88,8 @@ MeshGL MeshJS2GL(const val& mesh) {
   return out;
 }
 
-val GetMeshJS(const Manifold& manifold, int normalIdx) {
-  MeshGL mesh = manifold.GetMeshGL(normalIdx);
+val GetMeshJS(const Manifold& manifold) {
+  MeshGL mesh = manifold.GetMeshGL();
   return MeshGL2JS(mesh);
 }
 
@@ -97,6 +97,11 @@ val Merge(const val& mesh, float tolerance) {
   return MeshGL2JS(MeshJS2GL(mesh).Merge(tolerance));
 }
 
+CircularQuality DefaultCircularQuality() { return {}; }
+
+int SegmentsFor(CircularQuality quality, double radius) {
+  return quality.SegmentsFor(radius);
+}
 }  // namespace js
 
 namespace cross_js {
@@ -150,12 +155,12 @@ CrossSection Warp(CrossSection& cross_section, uintptr_t funcPtr) {
 }
 
 CrossSection Offset(CrossSection& cross_section, double delta, int join_type,
-                    double miter_limit, double arc_tolerance) {
+                    double miter_limit, CircularQuality quality) {
   auto jt = join_type == 0   ? CrossSection::JoinType::Square
             : join_type == 1 ? CrossSection::JoinType::Round
             : join_type == 2 ? CrossSection::JoinType::Miter
                              : CrossSection::JoinType::Bevel;
-  return cross_section.Offset(delta, jt, miter_limit, arc_tolerance);
+  return cross_section.Offset(delta, jt, miter_limit, quality);
 }
 
 void CollectVertices(std::vector<vec2>& verts, const CrossSection& cs) {

@@ -26,7 +26,7 @@ namespace {
 constexpr int kNumSizes = 8;
 
 void RunSizeIndex(int i) {
-  Manifold sphere = Manifold::Sphere(1, (8 << i) * 4);
+  Manifold sphere = Manifold::Sphere(1, {(8 << i) * 4});
   Manifold sphere2 = sphere.Translate(vec3(0.5));
   auto start = std::chrono::high_resolution_clock::now();
   Manifold diff = sphere - sphere2;

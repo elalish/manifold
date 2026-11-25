@@ -144,15 +144,15 @@ test(
       const bundle = await bundleFile('./project/main.ts', {
         files: {
           'project/main.ts': `import {value} from './part.ts';
-        import {setCircularSegments} from 'manifold-cad/manifoldCAD';
-        setCircularSegments(value);
+        import {setMorphStart} from 'manifold-cad/manifoldCAD';
+        setMorphStart(value);
         export default value;`,
           'project/part.ts': 'export const value = 42;'
         },
         fetchRemotePackages: false
       });
       expect(execute(bundle, {
-               setCircularSegments: (value: number) => settings.push(value)
+               setMorphStart: (value: number) => settings.push(value)
              }).default)
           .toBe(42);
       expect(settings).toEqual([42]);

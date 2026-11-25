@@ -227,11 +227,7 @@ export async function evaluate(
   const globals = {
     // These accessors are only available to top level scripts.
     // See ../lib/manifoldCADGlobals.d.ts
-    setCircularSegments: levelOfDetail.setCircularSegments,
-    setMinCircularAngle: levelOfDetail.setMinCircularAngle,
-    setMinCircularEdgeLength: levelOfDetail.setMinCircularEdgeLength,
     setRelativePrecision: levelOfDetail.setRelativePrecision,
-    resetToCircularDefaults: levelOfDetail.resetToCircularDefaults,
     setAnimationDuration: animation.setAnimationDuration,
     setAnimationFPS: animation.setAnimationFPS,
     setAnimationMode: animation.setAnimationMode,

@@ -820,7 +820,9 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
                     : absDir.y > absDir.z                      ? 1
                                                                : 2;
 
-  std::vector<RayHit> hits;
+  // Keep the internal triangle index alongside each hit to break distance
+  // ties, then drop it, since it isn't the triangle order of GetMeshGL.
+  std::vector<std::pair<int, RayHit>> triHits;
   // Query the BVH with the ray's AABB.
   const Box rayBox(la::min(origin, endpoint) - epsilon_,
                    la::max(origin, endpoint) + epsilon_);
@@ -832,8 +834,11 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
       const double t = (v[tAxis] - origin[tAxis]) / dir[tAxis];
       if (t >= 0.0 && t <= 1.0) {
         // Kernel12's sign is negative where the ray enters the solid.
-        hits.push_back(
-            {static_cast<uint64_t>(tri), t, v, faceNormal_[tri], -s});
+        const TriRef& ref = meshRelation_.triRef[tri];
+        triHits.push_back({tri,
+                           {static_cast<uint32_t>(ref.originalID),
+                            static_cast<uint32_t>(std::max(ref.faceID, 0)), t,
+                            v, faceNormal_[tri], -s}});
       }
     }
   };
@@ -851,12 +856,16 @@ std::vector<RayHit> Manifold::Impl::RayCast(vec3 origin, vec3 endpoint) const {
     collider_.Collisions<false>(recorder, f, 1, false);
   }
 
-  // Break distance ties by faceID so the order doesn't depend on the
+  // Break distance ties by triangle so the order doesn't depend on the
   // std::sort implementation, e.g. for canceling hits at a grazed vertex.
-  std::sort(hits.begin(), hits.end(), [](const RayHit& a, const RayHit& b) {
-    return a.distance != b.distance ? a.distance < b.distance
-                                    : a.faceID < b.faceID;
+  std::sort(triHits.begin(), triHits.end(), [](const auto& a, const auto& b) {
+    return a.second.distance != b.second.distance
+               ? a.second.distance < b.second.distance
+               : a.first < b.first;
   });
+  std::vector<RayHit> hits;
+  hits.reserve(triHits.size());
+  for (const auto& triHit : triHits) hits.push_back(triHit.second);
   return hits;
 }
 

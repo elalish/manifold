@@ -73,8 +73,31 @@ export const attributeDefs = {
 export type Attribute = keyof(typeof attributeDefs);
 
 export interface Properties {
-  material: GLTFTransform.Material;
+  material: GLTFTransform.Material|null;
   attributes: Attribute[];
+}
+
+/**
+ * Normal properties occupy the fixed channels immediately after POSITION in a
+ * Manifold mesh. Keep every glTF property layout in that order as well.
+ */
+export function normalFirstAttributes(attributes: Attribute[]): Attribute[] {
+  if (attributes.length === 0 || attributes[0] !== 'POSITION') {
+    return attributes;
+  }
+  const ordered: Attribute[] = ['POSITION'];
+  if (attributes.includes('NORMAL')) ordered.push('NORMAL');
+  ordered.push(...attributes.filter(
+      (attribute) => attribute !== 'POSITION' && attribute !== 'NORMAL'));
+  return ordered;
+}
+
+function runAttributes(
+    attributes: Attribute[], attributesIn: Attribute[]): Attribute[] {
+  return attributes.map((attribute) => {
+    if (attributesIn.includes(attribute)) return attribute;
+    return `SKIP_${attributeDefs[attribute].components}` as Attribute;
+  });
 }
 
 /**
@@ -93,17 +116,20 @@ export function setupIO(io: GLTFTransform.WebIO) {
  * @param attributes An array of attributes representing the order of desired
  *     properties returned in the vertProperties array of the output mesh. If
  *     omitted, this will be populated with the union of all attributes defined
- *     in the primitives of the input mesh. If present, the first entry must be
- *     'POSITION', and any attributes in the primitives that are not included in
- *     this list will be ignored, while those in the list but not defined in a
- *     primitive will be populated with zeros.
+ *     in the primitives of the input mesh. This function never modifies the
+ *     supplied array. In the effective returned layout, the first entry must
+ *     be 'POSITION', and 'NORMAL', when present on any primitive, is directly
+ *     after it. Attributes in the primitives but not in this list are ignored;
+ *     attributes in the list but absent from a primitive are populated with
+ *     zeros.
  * @returns The returned mesh is suitable for initializing a Manifold or Mesh of
  *     the Manifold library if desired. See Manifold documentation if you prefer
  *     to use these GL arrays in a different library. The runProperties array
  *     gives the Material and attributes list associated with each triangle run,
  *     which in turn corresponds to a primitive of the input mesh. These
- *     attributes are the intersection of the attributes present on the
- *     primitive and those requested in the attributes input.
+ *     attributes use the returned property layout, with `SKIP_*` entries for
+ *     requested properties absent from that primitive. `NORMAL`, when present
+ *     on any primitive, is placed directly after `POSITION` in every layout.
  */
 export function readMesh(
     mesh: GLTFTransform.Mesh, attributes: Attribute[] = []):
@@ -112,7 +138,10 @@ export function readMesh(
   if (primitives.length === 0) {
     return null;
   }
+  attributes = [...attributes];
 
+  const hasNormals = primitives.some(
+      (primitive) => primitive.listSemantics().includes('NORMAL'));
   if (attributes.length === 0) {
     const attributeSet = new Set<Attribute>();
     for (const primitive of primitives) {
@@ -135,6 +164,8 @@ export function readMesh(
 
   if (attributes.length < 1 || attributes[0] !== 'POSITION')
     throw new Error('First attribute must be "POSITION".');
+  if (hasNormals && !attributes.includes('NORMAL')) attributes.push('NORMAL');
+  attributes = normalFirstAttributes(attributes);
 
   let numProp = 0;
   const attributeOffsets = attributes.map((numProp = 0, def => {
@@ -151,11 +182,12 @@ export function readMesh(
   const runIndexArray = [0];
   const mergeFromVertArray = Array<number>();
   const mergeToVertArray = Array<number>();
+  const runFlagsArray = Array<number>();
   const runProperties = Array<Properties>();
   if (manifoldPrimitive != null) {
     const numVert = primitives[0].getAttribute('POSITION')!.getCount();
     const foundAttribute = attributes.map((a) => attributeDefs[a].type == null);
-    vertPropArray = new Array<number>(numProp * numVert);
+    vertPropArray = new Array<number>(numProp * numVert).fill(0);
 
     for (const primitive of primitives) {
       const indices = primitive.getIndices();
@@ -182,9 +214,10 @@ export function readMesh(
 
       triVertArray = [...triVertArray, ...indices.getArray()!];
       runIndexArray.push(triVertArray.length);
+      runFlagsArray.push(attributesIn.includes('NORMAL') ? 0x02 : 0x00);
       runProperties.push({
-        material: primitive.getMaterial()!,
-        attributes: attributesIn.filter(b => attributes.some(a => a == b))
+        material: primitive.getMaterial(),
+        attributes: runAttributes(attributes, attributesIn)
       });
     }
     const mergeTriVert = manifoldPrimitive.getMergeIndices()?.getArray() ?? [];
@@ -207,14 +240,16 @@ export function readMesh(
       const numVert = vertPropArray.length / numProp;
       vertPropArray =
           [...vertPropArray, ...readPrimitive(primitive, numProp, attributes)];
-      triVertArray =
-          [...triVertArray, ...indices.getArray()!.map((i) => i + numVert)];
+      // Offset in number space, not in the source Uint8/Uint16Array: the
+      // combined mesh may need wider indices than any individual primitive.
+      for (const i of indices.getArray()!) triVertArray.push(i + numVert);
       runIndexArray.push(triVertArray.length);
 
       const attributesIn = primitive.listSemantics() as Attribute[];
+      runFlagsArray.push(attributesIn.includes('NORMAL') ? 0x02 : 0x00);
       runProperties.push({
-        material: primitive.getMaterial()!,
-        attributes: attributesIn.filter(b => attributes.some(a => a == b))
+        material: primitive.getMaterial(),
+        attributes: runAttributes(attributes, attributesIn)
       });
     }
   }
@@ -224,8 +259,16 @@ export function readMesh(
   const mergeFromVert = new Uint32Array(mergeFromVertArray);
   const mergeToVert = new Uint32Array(mergeToVertArray);
 
-  const meshOut =
-      {numProp, triVerts, vertProperties, runIndex, mergeFromVert, mergeToVert};
+  const runFlags = new Uint8Array(runFlagsArray);
+  const meshOut = {
+    numProp,
+    triVerts,
+    vertProperties,
+    runIndex,
+    mergeFromVert,
+    mergeToVert,
+    runFlags
+  };
 
   return {mesh: meshOut, runProperties};
 }
@@ -244,7 +287,9 @@ export function readMesh(
  *     no attributes beyond 'POSITION'. Each attributes array must correspond to
  *     the manifoldMesh vertProperties, thus the first attribute must always be
  *     'POSITION'. Any properties that should not be output for a given
- *     primitive must use the 'SKIP_*' attributes.
+ *     primitive must use the 'SKIP_*' attributes. This function normalizes
+ *     each nonzero emitted NORMAL vector and canonicalizes NORMAL directly
+ *     after POSITION.
  * @param EXT_mesh_manifold If false, emit a plain glTF mesh.  In this case,
  *     the mesh is not required to be fully manifold when written.  Use this
  *     to write explicitly non-manifold meshes, e.g.: CrossSections.
@@ -291,14 +336,15 @@ function writePrimitiveAttributes(
 
     const properties = id2properties.get(id);
     if (properties) {
-      const {material, attributes} = properties;
+      const {material} = properties;
+      let attributes = normalFirstAttributes(properties.attributes);
       if (attributes.length < 1 || attributes[0] !== 'POSITION')
         throw new Error('First attribute must be "POSITION".');
 
       primitive.setMaterial(material);
       primitive2attributes.set(primitive, attributes);
 
-      properties.attributes.forEach((attribute, i) => {
+      attributes.forEach((attribute, i) => {
         if (i >= attributeUnion.length) {
           attributeUnion.push(attribute);
         } else {
@@ -332,7 +378,7 @@ function writePrimitiveAttributes(
       throw new Error(attribute + ' is not a recognized attribute.');
 
     if (def.type == null) {
-      ++offset;
+      offset += def.components;
       return;
     }
 
@@ -341,8 +387,15 @@ function writePrimitiveAttributes(
 
     const array = new Float32Array(n * numVert);
     for (let v = 0; v < numVert; ++v) {
+      const normalLength = attribute === 'NORMAL' ?
+          Math.hypot(...manifoldMesh.vertProperties.slice(
+              numProp * v + offset, numProp * v + offset + n)) :
+          1;
       for (let i = 0; i < n; ++i) {
         let x = manifoldMesh.vertProperties[numProp * v + offset + i];
+        if (attribute === 'NORMAL' && normalLength > 0) {
+          x /= normalLength;
+        }
         if (attribute == 'COLOR_0') {
           x = Math.max(0, Math.min(1, x));
         }
@@ -493,7 +546,8 @@ function writeProperties(
 function readPrimitive(
     primitive: GLTFTransform.Primitive, numProp: number,
     attributes: Attribute[]) {
-  const vertProperties: number[] = [];
+  const numVert = primitive.getAttribute('POSITION')!.getCount();
+  const vertProperties = new Array<number>(numProp * numVert).fill(0);
   let offset = 0;
   for (const attribute of attributes) {
     const size = attributeDefs[attribute].components;
