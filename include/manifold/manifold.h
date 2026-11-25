@@ -369,69 +369,19 @@ class Manifold {
 };
 /** @} */
 
-namespace detail {
-struct ErrorStrings {
-  const char* name;
-  const char* message;
-};
-inline ErrorStrings GetErrorStrings(Manifold::Error error) {
-  using Error = Manifold::Error;
-  switch (error) {
-    case Error::NoError:
-      return {"NoError", "No error"};
-    case Error::NonFiniteVertex:
-      return {"NonFiniteVertex", "Non-finite vertex"};
-    case Error::NotManifold:
-      return {"NotManifold", "Not manifold"};
-    case Error::VertexOutOfBounds:
-      return {"VertexOutOfBounds", "Vertex index out of bounds"};
-    case Error::PropertiesWrongLength:
-      return {"PropertiesWrongLength", "Properties have wrong length"};
-    case Error::MissingPositionProperties:
-      return {"MissingPositionProperties",
-              "Fewer than three properties per vertex"};
-    case Error::MergeVectorsDifferentLengths:
-      return {"MergeVectorsDifferentLengths",
-              "Merge vectors have different lengths"};
-    case Error::MergeIndexOutOfBounds:
-      return {"MergeIndexOutOfBounds", "Merge index out of bounds"};
-    case Error::TransformWrongLength:
-      return {"TransformWrongLength", "Transform vector has wrong length"};
-    case Error::RunIndexWrongLength:
-      return {"RunIndexWrongLength", "Invalid run index vector"};
-    case Error::FaceIDWrongLength:
-      return {"FaceIDWrongLength", "Face ID vector has wrong length"};
-    case Error::InvalidConstruction:
-      return {"InvalidConstruction",
-              "Manifold constructed with invalid parameters"};
-    case Error::ResultTooLarge:
-      return {"ResultTooLarge", "Result exceeds maximum size"};
-    case Error::InvalidTangents:
-      return {"InvalidTangents", "Invalid halfedge tangents"};
-    case Error::Cancelled:
-      return {"Cancelled", "Operation cancelled"};
-  }
-  return {"UnknownError", "Unknown error"};
-}
-}  // namespace detail
-
 /**
  * Returns the enumerator name of an error status, such as "NotManifold". The
  * bindings use it to name their enum values and as the JS error code. Values
  * outside the enum give "UnknownError".
  */
-inline const char* ErrorName(Manifold::Error error) {
-  return detail::GetErrorStrings(error).name;
-}
+const char* ErrorName(Manifold::Error error);
 
 /**
  * Returns a short English description of an error status, such as "Not
  * manifold". Every binding uses these messages. Values outside the enum give
  * "Unknown error".
  */
-inline const char* ToString(Manifold::Error error) {
-  return detail::GetErrorStrings(error).message;
-}
+const char* ToString(Manifold::Error error);
 
 /** @addtogroup Debug
  *  @ingroup Optional
