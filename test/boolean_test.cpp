@@ -768,6 +768,21 @@ TEST(Boolean, SplitByPlaneEmpty) {
   EXPECT_TRUE(split.second.IsEmpty());
 }
 
+TEST(Boolean, TrimByPlaneEmpty) {
+  for (const Manifold& empty :
+       {Manifold(), Manifold().WithPrecision(1e-3),
+        Manifold::Cube().Translate({5, 0, 0}) ^ Manifold::Cube()}) {
+    for (vec3 normal : {vec3(1, 0, 0), vec3(0, 0, -1), vec3(1, 2, 3)}) {
+      for (double offset : {0.0, -10.0, 10.0}) {
+        const Manifold trimmed = empty.TrimByPlane(normal, offset);
+        EXPECT_EQ(trimmed.Status(), Manifold::Error::NoError);
+        EXPECT_TRUE(trimmed.IsEmpty());
+        EXPECT_EQ(trimmed.GetPrecision(), empty.GetPrecision());
+      }
+    }
+  }
+}
+
 TEST(Boolean, SplitByPlane) {
   Manifold cube = Manifold::Cube(vec3(2.0), true);
   cube = cube.Translate({0.0, 1.0, 0.0});
