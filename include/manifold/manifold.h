@@ -374,26 +374,45 @@ struct ErrorStrings {
   const char* name;
   const char* message;
 };
-// One entry per Manifold::Error, indexed by its value.
-inline constexpr ErrorStrings kErrorStrings[] = {
-    {"NoError", "No error"},
-    {"NonFiniteVertex", "Non-finite vertex"},
-    {"NotManifold", "Not manifold"},
-    {"VertexOutOfBounds", "Vertex index out of bounds"},
-    {"PropertiesWrongLength", "Properties have wrong length"},
-    {"MissingPositionProperties", "Fewer than three properties per vertex"},
-    {"MergeVectorsDifferentLengths", "Merge vectors have different lengths"},
-    {"MergeIndexOutOfBounds", "Merge index out of bounds"},
-    {"TransformWrongLength", "Transform vector has wrong length"},
-    {"RunIndexWrongLength", "Invalid run index vector"},
-    {"FaceIDWrongLength", "Face ID vector has wrong length"},
-    {"InvalidConstruction", "Manifold constructed with invalid parameters"},
-    {"ResultTooLarge", "Result exceeds maximum size"},
-    {"InvalidTangents", "Invalid halfedge tangents"},
-    {"Cancelled", "Operation cancelled"},
-};
-static_assert(std::size(kErrorStrings) ==
-              static_cast<size_t>(Manifold::Error::Cancelled) + 1);
+inline ErrorStrings GetErrorStrings(Manifold::Error error) {
+  using Error = Manifold::Error;
+  switch (error) {
+    case Error::NoError:
+      return {"NoError", "No error"};
+    case Error::NonFiniteVertex:
+      return {"NonFiniteVertex", "Non-finite vertex"};
+    case Error::NotManifold:
+      return {"NotManifold", "Not manifold"};
+    case Error::VertexOutOfBounds:
+      return {"VertexOutOfBounds", "Vertex index out of bounds"};
+    case Error::PropertiesWrongLength:
+      return {"PropertiesWrongLength", "Properties have wrong length"};
+    case Error::MissingPositionProperties:
+      return {"MissingPositionProperties",
+              "Fewer than three properties per vertex"};
+    case Error::MergeVectorsDifferentLengths:
+      return {"MergeVectorsDifferentLengths",
+              "Merge vectors have different lengths"};
+    case Error::MergeIndexOutOfBounds:
+      return {"MergeIndexOutOfBounds", "Merge index out of bounds"};
+    case Error::TransformWrongLength:
+      return {"TransformWrongLength", "Transform vector has wrong length"};
+    case Error::RunIndexWrongLength:
+      return {"RunIndexWrongLength", "Invalid run index vector"};
+    case Error::FaceIDWrongLength:
+      return {"FaceIDWrongLength", "Face ID vector has wrong length"};
+    case Error::InvalidConstruction:
+      return {"InvalidConstruction",
+              "Manifold constructed with invalid parameters"};
+    case Error::ResultTooLarge:
+      return {"ResultTooLarge", "Result exceeds maximum size"};
+    case Error::InvalidTangents:
+      return {"InvalidTangents", "Invalid halfedge tangents"};
+    case Error::Cancelled:
+      return {"Cancelled", "Operation cancelled"};
+  }
+  return {"UnknownError", "Unknown error"};
+}
 }  // namespace detail
 
 /**
@@ -402,9 +421,7 @@ static_assert(std::size(kErrorStrings) ==
  * outside the enum give "UnknownError".
  */
 inline const char* ErrorName(Manifold::Error error) {
-  const size_t i = static_cast<size_t>(error);
-  return i < std::size(detail::kErrorStrings) ? detail::kErrorStrings[i].name
-                                              : "UnknownError";
+  return detail::GetErrorStrings(error).name;
 }
 
 /**
@@ -413,9 +430,7 @@ inline const char* ErrorName(Manifold::Error error) {
  * "Unknown error".
  */
 inline const char* ToString(Manifold::Error error) {
-  const size_t i = static_cast<size_t>(error);
-  return i < std::size(detail::kErrorStrings) ? detail::kErrorStrings[i].message
-                                              : "Unknown error";
+  return detail::GetErrorStrings(error).message;
 }
 
 /** @addtogroup Debug
