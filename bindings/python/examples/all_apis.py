@@ -131,7 +131,7 @@ def all_manifold():
     cancel_factory_ctx.cancel()
     try:
         cancel_factory_ctx.from_mesh(Manifold.cube().to_mesh())
-        assert False, "from_mesh on a cancelled context should raise"
+        raise AssertionError("from_mesh on a cancelled context should raise")
     except ManifoldCancelled as e:
         assert e.code == Error.Cancelled
     m = Manifold.tetrahedron()

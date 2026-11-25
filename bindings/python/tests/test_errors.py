@@ -291,20 +291,25 @@ def cancelled_tree(ctx):
 
 
 CANCEL = {
-    "Manifold.refine": lambda ctx: cancelled_tree(ctx).refine(2),
-    "Manifold.refine_to_length": lambda ctx: cancelled_tree(ctx).refine_to_length(0.5),
-    "Manifold.refine_to_tolerance": lambda ctx: cancelled_tree(ctx).refine_to_tolerance(
-        0.1
-    ),
-    "Manifold.hull": lambda ctx: cancelled_tree(ctx).hull(),
-    "Manifold.minkowski_sum": lambda ctx: cancelled_tree(ctx).minkowski_sum(CUBE),
-    "Manifold.minkowski_difference": lambda ctx: cancelled_tree(
-        ctx
-    ).minkowski_difference(CUBE),
-    "Manifold.with_precision": lambda ctx: cancelled_tree(ctx).with_precision(1e-3),
-    "Manifold.get_precision": lambda ctx: cancelled_tree(ctx).get_precision(),
-    "ExecutionContext.from_mesh": lambda ctx: ctx.from_mesh(CUBE.to_mesh64()),
-    "ExecutionContext.level_set": lambda ctx: ctx.level_set(sphere_sdf, BOUNDS, 0.5),
+    "Manifold.refine": [lambda ctx: cancelled_tree(ctx).refine(2)],
+    "Manifold.refine_to_length": [
+        lambda ctx: cancelled_tree(ctx).refine_to_length(0.5)
+    ],
+    "Manifold.refine_to_tolerance": [
+        lambda ctx: cancelled_tree(ctx).refine_to_tolerance(0.1)
+    ],
+    "Manifold.hull": [lambda ctx: cancelled_tree(ctx).hull()],
+    "Manifold.minkowski_sum": [lambda ctx: cancelled_tree(ctx).minkowski_sum(CUBE)],
+    "Manifold.minkowski_difference": [
+        lambda ctx: cancelled_tree(ctx).minkowski_difference(CUBE)
+    ],
+    "Manifold.with_precision": [lambda ctx: cancelled_tree(ctx).with_precision(1e-3)],
+    "Manifold.get_precision": [lambda ctx: cancelled_tree(ctx).get_precision()],
+    "ExecutionContext.from_mesh": [
+        lambda ctx: ctx.from_mesh(CUBE.to_mesh()),
+        lambda ctx: ctx.from_mesh(CUBE.to_mesh64()),
+    ],
+    "ExecutionContext.level_set": [lambda ctx: ctx.level_set(sphere_sdf, BOUNDS, 0.5)],
 }
 
 CLASSES = [Manifold, CrossSection, ExecutionContext, CircularQuality]
@@ -319,18 +324,23 @@ EXEMPT_CLASSES = {
     "ManifoldError",
     "ManifoldCancelled",
 }
-DUNDERS = {"__init__", "__add__", "__sub__", "__xor__"}
+# Class bookkeeping that every class has.
+NOT_METHODS = {"__doc__", "__module__", "__new__"}
 # CircularQuality's constructor and fields never touch a Manifold.
-NOT_LISTED = {"CircularQuality.__init__"}
+NOT_LISTED = {
+    "CircularQuality.__init__",
+    "CircularQuality.segments",
+    "CircularQuality.min_angle",
+    "CircularQuality.min_edge_length",
+}
 
 
 def public_names():
     names = set()
     for cls in CLASSES:
-        for n, v in vars(cls).items():
-            if isinstance(v, property):
-                continue
-            if not n.startswith("_") or n in DUNDERS:
+        for n in vars(cls):
+            dunder = n.startswith("__") and n.endswith("__")
+            if (dunder or not n.startswith("_")) and n not in NOT_METHODS:
                 names.add(f"{cls.__name__}.{n}")
     for n, v in vars(m3d).items():
         if n.startswith("_"):
@@ -379,11 +389,12 @@ def test_lazy_methods_keep_the_error(name):
 
 @pytest.mark.parametrize("name", sorted(CANCEL))
 def test_cancel_raises(name):
-    ctx = ExecutionContext()
-    ctx.cancel()
-    with pytest.raises(ManifoldCancelled) as e:
-        CANCEL[name](ctx)
-    assert e.value.code == Error.Cancelled
+    for call in CANCEL[name]:
+        ctx = ExecutionContext()
+        ctx.cancel()
+        with pytest.raises(ManifoldCancelled) as e:
+            call(ctx)
+        assert e.value.code == Error.Cancelled
 
 
 def test_cancelled_status_does_not_raise():

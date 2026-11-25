@@ -308,8 +308,8 @@ NB_MODULE(manifold3d, m) {
       "ManifoldError, with the status as `code`, once a call evaluates it. "
       "Calls that return a Manifold check their result, and queries such as "
       "to_mesh(), volume() and is_empty() check their inputs. Booleans, "
-      "transforms, trim_by_plane() and with_context() are lazy and never "
-      "raise, and status() reads the error without raising. A cancelled "
+      "transforms, trim_by_plane() and with_context() never raise, and "
+      "status() reads the error without raising. A cancelled "
       "ExecutionContext raises ManifoldCancelled from the calls that observe "
       "it. Empty input gives an empty result with no error.")
       .def(nb::init<>(), manifold__manifold)
@@ -945,8 +945,8 @@ NB_MODULE(manifold3d, m) {
       "Reports progress and allows cancellation. Another thread can call "
       "cancel() while Manifold.status(), with_precision(), get_precision(), "
       "refine*(), minkowski_*() or hull(), or this class's from_mesh() or "
-      "level_set(), runs. After a cancel, those calls raise "
-      "ManifoldCancelled, except status(), which returns Error.Cancelled. "
+      "level_set(), runs. Those calls raise ManifoldCancelled when they "
+      "observe the cancel, except status(), which returns Error.Cancelled. "
       "On Python before "
       "3.13.8, join any thread running these calls before the interpreter "
       "exits.")

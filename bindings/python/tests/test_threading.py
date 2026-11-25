@@ -71,12 +71,24 @@ def assert_same_mesh(a, b):
 # Each case takes an ExecutionContext, builds its inputs, and returns a call
 # that takes a few hundred ms unless cancelled. status() returns
 # Error.Cancelled, and the other calls raise ManifoldCancelled.
-def status_case(ctx):
+def tree(ctx):
     m = sponge(0.01)
     for k in range(1, 3):
         m = m + sponge(0.02 * k).translate((2.5 * k, 0, 0))
-    m = m.with_context(ctx)
-    return m.status
+    return m.with_context(ctx)
+
+
+def status_case(ctx):
+    return tree(ctx).status
+
+
+def with_precision_case(ctx):
+    m = tree(ctx)
+    return lambda: m.with_precision(1e-3)
+
+
+def get_precision_case(ctx):
+    return tree(ctx).get_precision
 
 
 def refine_case(ctx):
@@ -135,6 +147,8 @@ def level_set_case(ctx):
     "case",
     [
         status_case,
+        with_precision_case,
+        get_precision_case,
         refine_case,
         refine_to_length_case,
         refine_to_tolerance_case,
