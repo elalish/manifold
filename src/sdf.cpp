@@ -505,8 +505,11 @@ void Manifold::Impl::CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
     MakeEmpty(Error::InvalidConstruction);
     return;
   }
-  // The default Box is the bounding box of empty geometry.
-  if (bounds == Box()) return;
+  // The default Box is the bounding box of empty geometry, so there is no work.
+  if (bounds == Box()) {
+    if (ctx) ctx->donePhases.store(ctx->totalPhases.load());
+    return;
+  }
   if (!bounds.IsFinite() || la::any(la::less(bounds.max, bounds.min))) {
     MakeEmpty(Error::InvalidConstruction);
     return;
