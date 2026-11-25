@@ -233,7 +233,8 @@ Manifold Manifold::Sphere(double radius, CircularQuality quality) {
  *
  * Contours with fewer than three vertices are ignored. If none remain, the
  * result is an empty Manifold with no error. An invalid parameter or a
- * non-finite vertex gives an empty Manifold with InvalidConstruction status.
+ * non-finite vertex in a remaining contour gives an empty Manifold with
+ * InvalidConstruction status.
  *
  * @param crossSection A set of non-overlapping polygons to extrude.
  * @param height Z-extent of extrusion. Must be positive and finite.
@@ -284,8 +285,9 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
  *
  * Contours with fewer than three vertices, and contours entirely on the
  * negative X side, are ignored. If none remain, the result is an empty Manifold
- * with no error. An invalid angle or a non-finite vertex gives an empty
- * Manifold with InvalidConstruction status.
+ * with no error. An invalid angle, or a non-finite vertex in a contour of at
+ * least three vertices, gives an empty Manifold with InvalidConstruction
+ * status.
  *
  * @param crossSection A set of non-overlapping polygons to revolve.
  * @param quality Number of segments in a full circle, see CircularQuality.
