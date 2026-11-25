@@ -92,10 +92,16 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .value("Miter", CrossSection::JoinType::Miter)
       .value("Bevel", CrossSection::JoinType::Bevel);
 
+  value_object<CircularQuality>("circularQuality")
+      .field("segments", &CircularQuality::segments)
+      .field("minAngle", &CircularQuality::minAngle)
+      .field("minEdgeLength", &CircularQuality::minEdgeLength);
+
   value_object<Rect>("rect").field("min", &Rect::min).field("max", &Rect::max);
   value_object<Box>("box").field("min", &Box::min).field("max", &Box::max);
 
   value_object<RayHit>("rayHit")
+      .field("originalID", &RayHit::originalID)
       .field("faceID", &RayHit::faceID)
       .field("distance", &RayHit::distance)
       .field("position", &RayHit::position)
@@ -228,13 +234,11 @@ EMSCRIPTEN_BINDINGS(whatever) {
   // Quality Globals
   function("setRelativePrecision", &Quality::SetRelativePrecision);
   function("getRelativePrecision", &Quality::GetRelativePrecision);
-  function("setMinCircularAngle", &Quality::SetMinCircularAngle);
-  function("setMinCircularEdgeLength", &Quality::SetMinCircularEdgeLength);
-  function("getMinCircularAngle", &Quality::GetMinCircularAngle);
-  function("getMinCircularEdgeLength", &Quality::GetMinCircularEdgeLength);
-  function("setCircularSegments", &Quality::SetCircularSegments);
-  function("getCircularSegments", &Quality::GetCircularSegments);
   function("resetToCircularDefaults", &Quality::ResetToDefaults);
+
+  function("_DefaultCircularQuality", &js::DefaultCircularQuality);
+  function("_SegmentsFor", &js::SegmentsFor);
+  function("_ForDivisions", &CircularQuality::ForDivisions);
 
   function("initTBB", &initTBB);
 }

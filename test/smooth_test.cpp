@@ -25,7 +25,7 @@ using namespace manifold;
 
 TEST(Smooth, Tetrahedron) {
   Manifold tet = Manifold::Tetrahedron();
-  Manifold smooth = tet.CalculateNormals(0, 180).SmoothByNormals();
+  Manifold smooth = tet.CalculateNormals(180).SmoothByNormals();
   int n = 100;
   smooth = smooth.Refine(n);
   ExpectMeshes(smooth, {{2 * n * n + 2, 4 * n * n, 3}});
@@ -44,16 +44,27 @@ TEST(Smooth, Tetrahedron) {
 }
 
 TEST(Smooth, RefineQuads) {
-  Manifold cylinder = WithPositionColors(Manifold::Cylinder(2, 1, -1, 12))
-                          .CalculateNormals(3)
-                          .SmoothByNormals(3)
-                          .RefineToLength(0.05)
-                          .SetProperties(3, [](double* newProp, vec3 pos,
-                                               const double* oldProp) {
-                            for (const int i : {0, 1, 2})
-                              newProp[i] = oldProp[i];
-                          });
-  EXPECT_EQ(cylinder.NumTri(), 16644);
+  Manifold source = Manifold::Cylinder(2, 1, -1, {12}).CalculateNormals();
+  const Box bbox = source.BoundingBox();
+  const vec3 size = bbox.Size();
+  Manifold cylinder =
+      source
+          .SetProperties(
+              6,
+              [bbox, size](double* newProp, vec3 pos, const double* oldProp) {
+                for (const int i : {0, 1, 2}) {
+                  newProp[i] = oldProp[i];
+                  newProp[i + 3] = (pos[i] - bbox.min[i]) / size[i];
+                }
+              })
+          .SmoothByNormals()
+          .RefineToLength(0.05)
+          .SetProperties(3,
+                         [](double* newProp, vec3 pos, const double* oldProp) {
+                           for (const int i : {0, 1, 2})
+                             newProp[i] = oldProp[i + 3];
+                         });
+  EXPECT_EQ(cylinder.NumTri(), 16504);
   EXPECT_NEAR(cylinder.Volume(), 2 * kPi, 0.003);
   EXPECT_NEAR(cylinder.SurfaceArea(), 6 * kPi, 0.004);
   const MeshGL out = cylinder.GetMeshGL();
@@ -74,13 +85,13 @@ TEST(Smooth, RefineQuads) {
 }
 
 TEST(Smooth, TruncatedCone) {
-  Manifold cone = Manifold::Cylinder(5, 10, 5, 12);
+  Manifold cone = Manifold::Cylinder(5, 10, 5, {12});
   Manifold smooth = cone.CalculateNormals()
                         .SmoothByNormals()
                         .RefineToLength(0.5)
                         .CalculateNormals();
-  EXPECT_NEAR(smooth.Volume(), 1021.05, 0.01);
-  EXPECT_NEAR(smooth.SurfaceArea(), 737.67, 0.01);
+  EXPECT_NEAR(smooth.Volume(), 1020.90, 0.01);
+  EXPECT_NEAR(smooth.SurfaceArea(), 737.64, 0.01);
   CheckGL(smooth, false);
 
   if (options.exportModels) WriteTestOBJ("smoothTruncatedCone.obj", smooth);
@@ -88,12 +99,12 @@ TEST(Smooth, TruncatedCone) {
 
 TEST(Smooth, ToLength) {
   Manifold cone = Manifold::Extrude(
-      CrossSection::Circle(10, 10).Translate({10, 0}).ToPolygons(), 2, 0, 0,
+      CrossSection::Circle(10, {10}).Translate({10, 0}).ToPolygons(), 2, 0, 0,
       {0, 0});
   cone += cone.Scale({1, 1, -5});
   EXPECT_EQ(cone.NumVert(), 11);
   Manifold smooth =
-      cone.CalculateNormals(0, 180).SmoothByNormals().RefineToLength(0.1);
+      cone.CalculateNormals(180).SmoothByNormals().RefineToLength(0.1);
   ExpectMeshes(smooth, {{85250, 170496, 3}});
   EXPECT_NEAR(smooth.Volume(), 4570, 1);
   EXPECT_NEAR(smooth.SurfaceArea(), 1348, 1);
@@ -114,10 +125,10 @@ TEST(Smooth, Sphere) {
   // Tests vertex precision of interpolation
   double precision[5] = {0.04, 0.015, 0.003, 0.0005, 0.00006};
   for (int i = 0; i < 5; ++i) {
-    Manifold sphere = Manifold::Sphere(1, n[i]);
+    Manifold sphere = Manifold::Sphere(1, {n[i]});
     // Refine(3*x) makes a center point, which is the worst case.
     Manifold smoothed =
-        sphere.CalculateNormals(0, 180).SmoothByNormals().Refine(6);
+        sphere.CalculateNormals(180).SmoothByNormals().Refine(6);
     // Refine(3*x) puts a center point in the triangle, which is the worst
     // case.
     MeshGL64 out = smoothed.GetMeshGL64();
@@ -140,7 +151,7 @@ TEST(Smooth, Precision) {
   const double tolerance = 0.001;
   const double radius = 10;
   const double height = 10;
-  Manifold cylinder = Manifold::Cylinder(height, radius, radius, 8);
+  Manifold cylinder = Manifold::Cylinder(height, radius, radius, {8});
   Manifold smoothed =
       cylinder.CalculateNormals().SmoothByNormals().RefineToTolerance(
           tolerance);
@@ -161,20 +172,8 @@ TEST(Smooth, Precision) {
   }
   EXPECT_NEAR(std::sqrt(minR2), radius - tolerance, 1e-4);
   EXPECT_NEAR(std::sqrt(maxR2), radius, 1e-8);
-  EXPECT_EQ(smoothed.NumTri(), 7984);
+  EXPECT_EQ(smoothed.NumTri(), 8152);
   if (options.exportModels) WriteTestOBJ("refineCylinder.obj", smoothed);
-}
-
-TEST(Smooth, Normals) {
-  Manifold cylinder = Manifold::Cylinder(10, 5, 5, 8);
-  Manifold out =
-      cylinder.CalculateNormals().SmoothByNormals().RefineToLength(0.1);
-  Manifold byNormals =
-      cylinder.CalculateNormals(0).SmoothByNormals(0).RefineToLength(0.1);
-  EXPECT_FLOAT_EQ(out.Volume(), byNormals.Volume());
-  EXPECT_FLOAT_EQ(out.SurfaceArea(), byNormals.SurfaceArea());
-
-  if (options.exportModels) WriteTestOBJ("smoothNormals.obj", byNormals);
 }
 
 TEST(Smooth, FacetedNormals) {
@@ -183,7 +182,7 @@ TEST(Smooth, FacetedNormals) {
   // Regression test for https://github.com/elalish/manifold/issues/1577
   Manifold cylinder = Manifold::Cylinder(10, 10);
   Manifold faceted =
-      cylinder.CalculateNormals(0, 0).SmoothByNormals(0).RefineToLength(0.1);
+      cylinder.CalculateNormals(0).SmoothByNormals().RefineToLength(0.1);
   EXPECT_EQ(faceted.Status(), Manifold::Error::NoError);
   EXPECT_FLOAT_EQ(cylinder.Volume(), faceted.Volume());
   EXPECT_FLOAT_EQ(cylinder.SurfaceArea(), faceted.SurfaceArea());
@@ -192,39 +191,70 @@ TEST(Smooth, FacetedNormals) {
   // normals and shift the dot products into different float neighborhoods.
   Manifold rotated = cylinder.Rotate(30, 45, 60).Translate({5, 10, 15});
   Manifold facetedRot =
-      rotated.CalculateNormals(0, 0).SmoothByNormals(0).RefineToLength(0.1);
+      rotated.CalculateNormals(0).SmoothByNormals().RefineToLength(0.1);
   EXPECT_EQ(facetedRot.Status(), Manifold::Error::NoError);
   EXPECT_FLOAT_EQ(rotated.Volume(), facetedRot.Volume());
   EXPECT_FLOAT_EQ(rotated.SurfaceArea(), facetedRot.SurfaceArea());
 }
 
 TEST(Smooth, NormalTransform) {
-  Manifold cube1 = Manifold::Cube().Rotate(30).CalculateNormals(0);
+  Manifold cube1 = Manifold::Cube().Rotate(30).CalculateNormals();
   Manifold cube2 =
-      Manifold::Cube().CalculateNormals(0).Rotate(30).Translate({3, 0, 0});
+      Manifold::Cube().CalculateNormals().Rotate(30).Translate({3, 0, 0});
   Manifold combo = cube1 + cube2;
-  Manifold out1 = combo.SmoothByNormals(0).Refine(10);
+  Manifold out1 = combo.SmoothByNormals().Refine(10);
   EXPECT_FLOAT_EQ(out1.Volume(), 2);
   EXPECT_FLOAT_EQ(out1.SurfaceArea(), 12);
-  Manifold out2 = Manifold(combo.GetMeshGL(0)).SmoothByNormals(0).Refine(10);
+  Manifold out2 = Manifold(combo.GetMeshGL()).SmoothByNormals().Refine(10);
   EXPECT_FLOAT_EQ(out2.Volume(), 2);
   EXPECT_FLOAT_EQ(out2.SurfaceArea(), 12);
 }
 
 TEST(Smooth, MissingNormals) {
-  Manifold tetNorm = Manifold::Tetrahedron().CalculateNormals(0);
+  Manifold tetNorm = Manifold::Tetrahedron().CalculateNormals();
   Manifold diff = tetNorm - Manifold::Tetrahedron().Translate(vec3(0.5));
-  Manifold out = diff.SmoothByNormals(0).Refine(10);
+  Manifold out = diff.SmoothByNormals().Refine(10);
   EXPECT_NEAR(out.Volume(), 2.46, 0.01);
   EXPECT_NEAR(out.SurfaceArea(), 12.45, 0.01);
   if (options.exportModels) WriteTestOBJ("missingNormals.obj", out);
 }
 
+TEST(Smooth, MissingNormalChannels) {
+  const Manifold cube = Manifold::Cube();
+  // Fewer than three properties means no normal slot, equivalent to an
+  // explicitly-zero normal slot. This guards GetNormal's short-circuit before
+  // it reads properties 0..2.
+  const double zeroNormals =
+      cube.SetProperties(3, nullptr).SmoothByNormals().Refine(4).Volume();
+  EXPECT_DOUBLE_EQ(cube.SmoothByNormals().Refine(4).Volume(), zeroNormals);
+}
+
+TEST(Smooth, GetMeshGLNormalizesNormals) {
+  // Interpolation and a non-uniform transform both leave recorded normals
+  // non-unit before GetMeshGL converts them into graphics output.
+  const Manifold ellipsoid =
+      Manifold::Sphere(1, {8}).CalculateNormals().Scale({2, 3, 4});
+  const Manifold source = ellipsoid + ellipsoid.Translate({1, 0, 0});
+  auto check = [](const auto& mesh, double tolerance) {
+    ASSERT_GE(mesh.numProp, 6);
+    ASSERT_GT(mesh.NumVert(), 0u);
+    ASSERT_TRUE(mesh.HasNormals(0));
+    for (size_t vert = 0; vert < mesh.NumVert(); ++vert) {
+      const vec3 normal(mesh.vertProperties[vert * mesh.numProp + 3],
+                        mesh.vertProperties[vert * mesh.numProp + 4],
+                        mesh.vertProperties[vert * mesh.numProp + 5]);
+      EXPECT_NEAR(la::length(normal), 1.0, tolerance);
+    }
+  };
+  check(source.GetMeshGL(), 1e-5);
+  check(source.GetMeshGL64(), 1e-12);
+}
+
 TEST(Smooth, MissingNormalsCone) {
-  Manifold cone = Manifold::Cylinder(5, 10, 7, 6).CalculateNormals(0, 60);
-  Manifold peak = Manifold::Cylinder(4, 7, 0, 6);
+  Manifold cone = Manifold::Cylinder(5, 10, 7, {6}).CalculateNormals(60);
+  Manifold peak = Manifold::Cylinder(4, 7, 0, {6});
   Manifold biCone = cone + peak.Translate({0, 0, 5});
-  Manifold out = biCone.SmoothByNormals(0).RefineToTolerance(0.01);
+  Manifold out = biCone.SmoothByNormals().RefineToTolerance(0.01);
   EXPECT_NEAR(out.Volume(), 1480, 1);
   EXPECT_NEAR(out.SurfaceArea(), 828, 1);
   if (options.exportModels) WriteTestOBJ("missingNormalsCone.obj", out);
@@ -232,18 +262,18 @@ TEST(Smooth, MissingNormalsCone) {
 
 TEST(Smooth, OperandOrder) {
   auto mk = [](bool unique) {
-    Manifold a = Manifold::Sphere(10, 16).Scale({3, 1, 1});
-    Manifold b = Manifold::Sphere(6, 16);
+    Manifold a = Manifold::Sphere(10, {16}).Scale({3, 1, 1});
+    Manifold b = Manifold::Sphere(6, {16});
     if (unique) {
       a = a.AsOriginal();
       b = b.AsOriginal();
     }
-    a = a.CalculateNormals(0, 180).Rotate(0, 0, 45);
+    a = a.CalculateNormals(180).Rotate(0, 0, 45);
     b = b.Rotate(60, 0, 0).Translate({0, 0, 9});
     return std::make_pair(a, b);
   };
   auto smooth = [](const Manifold& m) {
-    return m.SmoothByNormals(0).RefineToTolerance(0.01);
+    return m.SmoothByNormals().RefineToTolerance(0.01);
   };
 
   auto [a, b] = mk(false);
@@ -268,9 +298,9 @@ TEST(Smooth, Fillet) {
   float depth = 3;
   float radius = 10;
   float filletScale = 1 + depth / radius;
-  Manifold cylinder = Manifold::Cylinder(20, radius, radius, 6, true)
+  Manifold cylinder = Manifold::Cylinder(20, radius, radius, {6}, true)
                           .AsOriginal()
-                          .CalculateNormals(0, 80)
+                          .CalculateNormals(80)
                           .Rotate(20);
   CrossSection section = cylinder.Slice(0);
   Manifold chamfer =
@@ -278,13 +308,13 @@ TEST(Smooth, Fillet) {
                         vec2(filletScale, 1.1 * filletScale))
           .Mirror({0, 0, 1});
   EXPECT_EQ(chamfer.NumTri(), 20);
-  Manifold base = Manifold::Cylinder(10, 15, 15, 6)
+  Manifold base = Manifold::Cylinder(10, 15, 15, {6})
                       .Translate({0, 0, -10 - depth})
                       .Scale({1, 1.2, 1})
-                      .CalculateNormals(0, 80);
+                      .CalculateNormals(80);
   Manifold chamfered = cylinder + chamfer + base;
   EXPECT_EQ(chamfered.NumTri(), 56);
-  Manifold fillet = chamfered.SmoothByNormals(0).RefineToTolerance(0.01);
+  Manifold fillet = chamfered.SmoothByNormals().RefineToTolerance(0.01);
   EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);
   EXPECT_NEAR(fillet.Volume(), 12805, 1);
   EXPECT_NEAR(fillet.SurfaceArea(), 3452, 1);
@@ -295,10 +325,10 @@ TEST(Smooth, Fillet2) {
   float depth = 3;
   float radius = 10;
   float filletScale = 1 + depth / radius;
-  Manifold cylinder = Manifold::Cylinder(40, radius, radius, 6, true)
+  Manifold cylinder = Manifold::Cylinder(40, radius, radius, {6}, true)
                           .AsOriginal()
                           .Rotate(0, 30)
-                          .CalculateNormals(0, 80);
+                          .CalculateNormals(80);
   CrossSection section = cylinder.Slice(0);
 
   Manifold chamfer = Manifold::Extrude(section.Simplify().ToPolygons(), depth,
@@ -310,7 +340,7 @@ TEST(Smooth, Fillet2) {
                       .CalculateNormals();
   Manifold chamfered = cylinder + chamfer + base;
   EXPECT_EQ(chamfered.NumTri(), 48);
-  Manifold fillet = chamfered.SmoothByNormals(0).RefineToTolerance(0.01);
+  Manifold fillet = chamfered.SmoothByNormals().RefineToTolerance(0.01);
   EXPECT_EQ(fillet.Status(), Manifold::Error::NoError);
   EXPECT_NEAR(fillet.Volume(), 71507, 1);
   EXPECT_NEAR(fillet.SurfaceArea(), 10936, 1);
@@ -319,8 +349,8 @@ TEST(Smooth, Fillet2) {
 
 TEST(Smooth, Manual) {
   // Unit Octahedron
-  const auto oct = Manifold::Sphere(1, 4);
-  MeshGL smooth = oct.CalculateNormals(0, 180).SmoothByNormals().GetMeshGL();
+  const auto oct = Manifold::Sphere(1, {4});
+  MeshGL smooth = oct.CalculateNormals(180).SmoothByNormals().GetMeshGL();
   // Sharpen the edge from vert 4 to 5
   smooth.halfedgeTangent[4 * 6 + 3] = 0;
   smooth.halfedgeTangent[4 * 22 + 3] = 0;
@@ -347,12 +377,11 @@ TEST(Smooth, Manual) {
 
 TEST(Smooth, ExportTangentsFollowTriangleRuns) {
   const Manifold sphere =
-      Manifold::Sphere(1, 12).CalculateNormals(0, 180).SmoothByNormals();
+      Manifold::Sphere(1, {12}).CalculateNormals(180).SmoothByNormals();
   const Manifold ellipsoid = sphere.Scale({1, 2, 3}).Translate({6, 0, 0});
-  const Manifold tetrahedron = Manifold::Tetrahedron()
-                                   .CalculateNormals(0, 180)
-                                   .SmoothByNormals()
-                                   .Translate({-6, 0, 0});
+  const Manifold tetrahedron =
+      Manifold::Tetrahedron().CalculateNormals(180).SmoothByNormals().Translate(
+          {-6, 0, 0});
   const std::vector<Manifold> cases = {
       sphere,
       ellipsoid,
@@ -388,7 +417,7 @@ TEST(Smooth, ExportTangentsFollowTriangleRuns) {
 }
 
 TEST(Smooth, InvalidTangents) {
-  Manifold cube = Manifold::Cube().CalculateNormals(0, 180).SmoothByNormals();
+  Manifold cube = Manifold::Cube().CalculateNormals(180).SmoothByNormals();
   MeshGL withTangents = cube.GetMeshGL();
   size_t sizeHalfedges = withTangents.halfedgeTangent.size();
   for (size_t i = (sizeHalfedges / 8) * 4 + 3; i < sizeHalfedges; i += 4) {
@@ -398,19 +427,6 @@ TEST(Smooth, InvalidTangents) {
   Manifold cube2(withTangents);
   Manifold smooth = cube2.Refine(10);
   EXPECT_EQ(smooth.Status(), Manifold::Error::InvalidTangents);
-}
-
-TEST(Smooth, NormalIdxOutOfRange) {
-  const Manifold cube = Manifold::Cube();
-  EXPECT_EQ(cube.SmoothByNormals(-1).Status(),
-            Manifold::Error::InvalidConstruction);
-  // Channels past NumProp count as missing normals, same as zero normals.
-  const double missing =
-      cube.SetProperties(3, nullptr).SmoothByNormals(0).Refine(4).Volume();
-  EXPECT_DOUBLE_EQ(cube.SmoothByNormals(0).Refine(4).Volume(), missing);
-  EXPECT_DOUBLE_EQ(
-      cube.SetProperties(3, nullptr).SmoothByNormals(5).Refine(4).Volume(),
-      missing);
 }
 
 TEST(Smooth, Mirrored) {
@@ -427,7 +443,7 @@ TEST(Smooth, Mirrored) {
 
 TEST(Smooth, Csaszar) {
   Manifold csaszar(Csaszar());
-  csaszar = csaszar.CalculateNormals(0, 180).SmoothByNormals().Refine(100);
+  csaszar = csaszar.CalculateNormals(180).SmoothByNormals().Refine(100);
   ExpectMeshes(csaszar, {{70000, 140000, 3}});
   EXPECT_NEAR(csaszar.Volume(), 74757, 10);
   EXPECT_NEAR(csaszar.SurfaceArea(), 11313, 10);
@@ -453,7 +469,7 @@ vec4 CircularTangent(const vec3& tangent, const vec3& edgeVec) {
 TEST(Smooth, Torus) {
   MeshGL64 torusMesh =
       Manifold::Revolve(
-          CrossSection::Circle(1, 8).Translate({2, 0}).ToPolygons(), 6)
+          CrossSection::Circle(1, {8}).Translate({2, 0}).ToPolygons(), {6})
           .GetMeshGL64();
   const int numTri = torusMesh.NumTri();
 
@@ -490,8 +506,8 @@ TEST(Smooth, Torus) {
 
   Manifold smooth = Manifold(torusMesh)
                         .RefineToLength(0.1)
-                        .CalculateCurvature(-1, 0)
-                        .CalculateNormals(1);
+                        .CalculateNormals()
+                        .CalculateCurvature(-1, 3);
   MeshGL out = smooth.GetMeshGL();
   float maxMeanCurvature = 0;
   for (size_t i = 0; i < out.vertProperties.size(); i += 7) {
@@ -502,7 +518,7 @@ TEST(Smooth, Torus) {
     double r = la::length(v - p);
     ASSERT_NEAR(r, 1, 0.006);
     maxMeanCurvature =
-        std::max(maxMeanCurvature, std::abs(out.vertProperties[i + 3]));
+        std::max(maxMeanCurvature, std::abs(out.vertProperties[i + 6]));
   }
   EXPECT_NEAR(maxMeanCurvature, 1.63, 0.01);
 
@@ -550,7 +566,7 @@ TEST(Smooth, SDF) {
                 const vec3 normal = -la::normalize(gradient(pos));
                 for (const int i : {0, 1, 2}) newProp[i] = normal[i];
               })
-          .SmoothByNormals(0)
+          .SmoothByNormals()
           .RefineToLength(0.1)
           .SetProperties(1, error);
 
@@ -571,7 +587,7 @@ TEST(Smooth, RefineInvalid) {
       cube.RefineToLength(std::numeric_limits<double>::infinity()).NumTri(),
       cube.NumTri());
 
-  const Manifold smooth = cube.CalculateNormals(0, 30).SmoothByNormals(0);
+  const Manifold smooth = cube.CalculateNormals(30).SmoothByNormals();
   for (const double tolerance : {0.0, -0.0, std::nan("")}) {
     EXPECT_EQ(smooth.RefineToTolerance(tolerance).Status(),
               Manifold::Error::InvalidConstruction);
@@ -589,7 +605,7 @@ TEST(Smooth, RefineTooLarge) {
             Manifold::Error::ResultTooLarge);
   EXPECT_EQ(cube.Refine(1 << 20).Status(), Manifold::Error::ResultTooLarge);
   const Manifold smooth =
-      Manifold::Cylinder(1, 1, 1, 8).CalculateNormals().SmoothByNormals();
+      Manifold::Cylinder(1, 1, 1, {8}).CalculateNormals().SmoothByNormals();
   ASSERT_GT(smooth.RefineToTolerance(0.01).NumTri(), smooth.NumTri());
   EXPECT_EQ(smooth.RefineToTolerance(1e-30).Status(),
             Manifold::Error::ResultTooLarge);
@@ -602,7 +618,7 @@ TEST(Smooth, RefinePropertiesTooLarge) {
 }
 
 TEST(Smooth, SphereTooLarge) {
-  EXPECT_EQ(Manifold::Sphere(1, 1 << 20).Status(),
+  EXPECT_EQ(Manifold::Sphere(1, {1 << 20}).Status(),
             Manifold::Error::ResultTooLarge);
 }
 

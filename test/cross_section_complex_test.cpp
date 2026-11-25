@@ -818,7 +818,7 @@ TEST(CrossSectionComplex, OffsetRoundUsesRequestedSegments) {
   const int segments = 20;
   const double delta = 5.0;
 
-  Polygons rounded = Offset({square}, delta, JoinType::Round, 2.0, segments);
+  Polygons rounded = Offset({square}, delta, JoinType::Round, 2.0, {segments});
 
   ASSERT_EQ(rounded.size(), 1);
   EXPECT_EQ(rounded[0].size(), segments + 4);
@@ -828,7 +828,7 @@ TEST(CrossSectionComplex, OffsetRoundClampsHugeSegmentCount) {
   // An absurd requested count is clamped so the vertex count cannot blow up;
   // the clamp is kMaxRoundJoinSegments == 1 << 15 (file-local in offset.cpp).
   SimplePolygon square = {{0, 0}, {20, 0}, {20, 20}, {0, 20}};
-  Polygons rounded = Offset({square}, 5.0, JoinType::Round, 2.0, 1 << 20);
+  Polygons rounded = Offset({square}, 5.0, JoinType::Round, 2.0, {1 << 20});
   ASSERT_EQ(rounded.size(), 1);
   EXPECT_EQ(rounded[0].size(), (1 << 15) + 4);
 }
@@ -1805,7 +1805,7 @@ TEST(CrossSectionComplex, OffsetRoundMergingContours) {
       delta * delta * (kPi - segments * std::sin(2 * kPi / segments) / 2);
   for (int i = 0; i < 16; ++i) {
     const auto result =
-        input.Offset(delta, CrossSection::JoinType::Round, 2.0, segments);
+        input.Offset(delta, CrossSection::JoinType::Round, 2.0, {segments});
     ASSERT_EQ(result.NumContour(), 1 + (side - 1) * (side - 1));
     ASSERT_EQ(result.NumVert(), 736);
     if (i == 0) {
@@ -1870,7 +1870,7 @@ TEST(CrossSectionComplex, DifferenceManyContoursFewCrossings) {
   for (int j = 0; j < 4; ++j) {
     for (int i = 0; i < 4; ++i) {
       holeCenters.push_back({5.3 + 10 * i, 5.3 + 10 * j});
-      operands.push_back(CrossSection::Circle(holeRadius, segments)
+      operands.push_back(CrossSection::Circle(holeRadius, {segments})
                              .Translate(holeCenters.back()));
     }
   }

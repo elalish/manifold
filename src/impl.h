@@ -39,10 +39,6 @@ struct Manifold::Impl {
     mat3 GetNormalTransform() const {
       return NormalTransform(transform) * (backSide ? -1.0 : 1.0);
     }
-
-    mat3 GetInverseNormalTransform() const {
-      return InverseNormalTransform(transform) * (backSide ? -1.0 : 1.0);
-    }
   };
   struct MeshRelationD {
     /// The originalID of this Manifold if it is an original; -1 otherwise.
@@ -94,17 +90,12 @@ struct Manifold::Impl {
       int halfedge, std::function<T(int halfedge)> transform,
       std::function<void(int halfedge, const T& here, T& next)> binaryOp) const;
 
-  // True only when every meshID carries normals at slot 0..2 - the
-  // condition under which GetMeshGL(-1) can safely auto-substitute that
-  // slot. A mixed Boolean output (some meshIDs with normals, some
-  // without) returns false; the output MeshGL's per-run bit 1 still
-  // marks the with-normals runs individually.
-  bool AllHaveNormals() const {
-    if (meshRelation_.meshIDtransform.empty()) return false;
-    for (const auto& m : meshRelation_.meshIDtransform) {
-      if (!m.second.hasNormals) return false;
+  // True when any meshID carries normals in slots 0..2.
+  static bool AnyHasNormals(const MeshRelationD& meshRelation) {
+    for (const auto& m : meshRelation.meshIDtransform) {
+      if (m.second.hasNormals) return true;
     }
-    return true;
+    return false;
   }
 
   // True iff the meshID owning `tri` has hasNormals set. Returns false when
@@ -162,6 +153,7 @@ struct Manifold::Impl {
   bool Is2Manifold() const;
   bool IsSelfIntersecting() const;
   bool MatchesTriNormals() const;
+  bool IsFlat(int tri, vec3 normal) const;
   int NumDegenerateTris() const;
   bool HasSimpleProps() const;
   bool IsConvex() const;
@@ -230,7 +222,7 @@ struct Manifold::Impl {
   void DedupeEdge(int edge);
   void CollapseDegenerate(int edge, Vec<int>& scratch);
   bool CollapseEdge(int edge, Vec<int>& scratch, const Merger& merger);
-  int SwapDegenerateEdges(Vec<int>& scratch);
+  int SwapDegenerateEdges(Vec<int>& scratch, bool nearFlatOnly);
   bool SplitQuad(int edge, bool nextDiag);
   void RemoveIfFolded(int edge);
   void PairUp(int edge0, int edge1);
@@ -250,14 +242,14 @@ struct Manifold::Impl {
 
   // smoothing.cpp
   bool IsMarkedInsideQuad(int halfedge) const;
-  vec3 GetNormal(int halfedge, int normalIdx) const;
+  vec3 GetNormal(int halfedge) const;
   vec4 TangentFromNormal(const vec3& normal, int halfedge) const;
   Vec<int> VertHalfedge() const;
   bool ValidTangents() const;
   void MarkQuads(const Vec<bool>& fixedHalfedge);
-  void SetNormals(int normalIdx, double minSharpAngle);
+  void SetNormals(double minSharpAngle);
   void DistributeTangents(Vec<bool>& fixedHalfedges);
-  void CreateTangents(int normalIdx);
+  void CreateTangents();
 
   void Refine(std::function<int(vec3, vec4, vec4)>, bool = false,
               ExecutionContext::Impl* ctx = nullptr);
@@ -313,6 +305,11 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
 
   if (meshGL.numProp < 3) {
     MakeEmpty(Error::MissingPositionProperties);
+    return;
+  }
+
+  if (meshGL.vertProperties.size() % meshGL.numProp != 0) {
+    MakeEmpty(Error::PropertiesWrongLength);
     return;
   }
 
@@ -553,15 +550,14 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
 }
 
 template <typename Precision, typename I>
-inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
-                                           int normalIdx) {
+inline MeshGLP<Precision, I> GetMeshGLImpl(
+    const manifold::Manifold::Impl& impl) {
   ZoneScoped;
   const int numProp = impl.NumProp();
   const int numVert = impl.NumPropVert();
   const int numTri = impl.NumTri();
 
   const bool isOriginal = impl.meshRelation_.originalID >= 0;
-  const bool updateNormals = !isOriginal && normalIdx >= 0;
 
   MeshGLP<Precision, I> out;
   out.numProp = 3 + numProp;
@@ -573,8 +569,8 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
   std::vector<int> triNew2Old(numTri);
   std::iota(triNew2Old.begin(), triNew2Old.end(), 0);
   VecView<const TriRef> triRef = impl.meshRelation_.triRef;
-  // Don't sort originals - keep them in order
-  if (!isOriginal) {
+  // Keep originals in order, unless AsOriginal split them into two runs
+  if (!isOriginal || impl.meshRelation_.meshIDtransform.size() > 1) {
     std::stable_sort(triNew2Old.begin(), triNew2Old.end(),
                      [triRef](int a, int b) {
                        return triRef[a].originalID == triRef[b].originalID
@@ -694,30 +690,18 @@ inline MeshGLP<Precision, I> GetMeshGLImpl(const manifold::Manifold::Impl& impl,
           out.vertProperties.push_back(impl.properties_[prop * numProp + p]);
         }
 
-        // Normalize the requested normal slot. For runs that already carry
-        // world-frame normals (hasNormals bit), just normalize; for legacy
-        // callers asking to interpret a slot as normals on a run without
-        // hasNormals, apply the per-run inverse-frame transform first.
-        // TODO: collapse the !runHasN branch into a no-op once the explicit-
-        // normalIdx parameter on GetMeshGL is removed and `updateNormals`
-        // becomes implied by the hasNormals bit.
-        if (updateNormals) {
+        // Runs flagged with runFlags bit 1 record world-frame normals in the
+        // standard property slot. Normalize them for graphics output without
+        // applying run transforms.
+        if (!isOriginal && (out.runFlags[run] & 2)) {
           vec3 normal;
           const int start = out.vertProperties.size() - out.numProp;
           for (int i : {0, 1, 2}) {
-            normal[i] = out.vertProperties[start + 3 + normalIdx + i];
-          }
-          const bool runHasN = !isOriginal && (out.runFlags[run] & 2) != 0;
-          if (!isOriginal && !runHasN) {
-            const Precision* m = out.runTransform.data() + 12 * run;
-            const mat3x4 t({m[0], m[1], m[2]}, {m[3], m[4], m[5]},
-                           {m[6], m[7], m[8]}, {m[9], m[10], m[11]});
-            normal = NormalTransform(t) *
-                     ((out.runFlags[run] & 1) ? -1.0 : 1.0) * normal;
+            normal[i] = out.vertProperties[start + 3 + i];
           }
           normal = SafeNormalize(normal);
           for (int i : {0, 1, 2}) {
-            out.vertProperties[start + 3 + normalIdx + i] = normal[i];
+            out.vertProperties[start + 3 + i] = normal[i];
           }
         }
 

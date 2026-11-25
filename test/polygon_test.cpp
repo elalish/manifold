@@ -112,6 +112,34 @@ class PolygonTestFixture : public testing::Test {
   void TestBody() { TestPoly(polys, expectedNumTri, epsilon); }
 };
 
+struct EdgeStats {
+  // The most triangles that share one vertex.
+  int maxDegree;
+  // Total length of the edges inside the polygon, divided by its perimeter.
+  double interiorPerPerimeter;
+};
+
+EdgeStats MeasureEdges(const SimplePolygon& poly,
+                       const std::vector<ivec3>& triangles) {
+  const int numVert = poly.size();
+  std::vector<int> degree(numVert, 0);
+  double edgeLength = 0;
+  for (const ivec3& tri : triangles) {
+    for (int i : {0, 1, 2}) {
+      ++degree[tri[i]];
+      edgeLength += la::length(poly[tri[i]] - poly[tri[(i + 1) % 3]]);
+    }
+  }
+  double perimeter = 0;
+  for (int i = 0; i < numVert; ++i) {
+    perimeter += la::length(poly[i] - poly[(i + 1) % numVert]);
+  }
+  // Boundary edges appear in one triangle, interior edges in two.
+  const double interiorLength = (edgeLength - perimeter) / 2;
+  return {*std::max_element(degree.begin(), degree.end()),
+          interiorLength / perimeter};
+}
+
 #ifndef MANIFOLD_NO_IOSTREAM
 void RegisterPolygonTestsFile(const std::string& filename) {
   const std::vector<PolygonCorpusEntry> corpus = ReadPolygonCorpus(filename);
@@ -208,6 +236,20 @@ TEST(Triangulation, LargeSmoothContour) {
   EXPECT_EQ(triangles.size(), numVert - 2);
 }
 
+// Benchmark: triangulate one large regular polygon. It is convex, so the
+// triangulator takes its convex path, which should run in linear time.
+TEST(Triangulation, LargeConvexContour) {
+  const int numVert = 100000;
+  Polygons polys(1);
+  for (int i = 0; i < numVert; ++i) {
+    const double angle = kTwoPi * i / numVert;
+    polys[0].push_back({10 * std::cos(angle), 10 * std::sin(angle)});
+  }
+  std::vector<ivec3> triangles;
+  EXPECT_NO_THROW(triangles = Triangulate(polys));
+  EXPECT_EQ(triangles.size(), numVert - 2);
+}
+
 // The triangulator must not build fans on smooth contours. Each clipped ear
 // adds a triangle at the fan's center vertex, the fan's edges reach across the
 // polygon, and its long sliver triangles slow both the ear search and later
@@ -221,24 +263,28 @@ TEST(Triangulation, NoFansOnSmoothContour) {
     const Polygons polys = SmoothBlob(numVert);
     const std::vector<ivec3> triangles = Triangulate(polys);
     ASSERT_EQ(triangles.size(), numVert - 2);
-    const SimplePolygon& poly = polys[0];
-    std::vector<int> degree(numVert, 0);
-    double edgeLength = 0;
-    for (const ivec3& tri : triangles) {
-      for (int i : {0, 1, 2}) {
-        ++degree[tri[i]];
-        edgeLength += la::length(poly[tri[i]] - poly[tri[(i + 1) % 3]]);
-      }
-    }
-    double perimeter = 0;
-    for (int i = 0; i < numVert; ++i) {
-      perimeter += la::length(poly[i] - poly[(i + 1) % numVert]);
-    }
-    // Boundary edges appear in one triangle, interior edges in two.
-    const double interiorLength = (edgeLength - perimeter) / 2;
-    EXPECT_LE(*std::max_element(degree.begin(), degree.end()), numVert / 25)
+    const EdgeStats stats = MeasureEdges(polys[0], triangles);
+    EXPECT_LE(stats.maxDegree, numVert / 25) << numVert << " verts";
+    EXPECT_LE(stats.interiorPerPerimeter, numVert / 40.0)
         << numVert << " verts";
-    EXPECT_LE(interiorLength / perimeter, numVert / 40.0)
+  }
+}
+
+// The convex path must not split a finely sampled convex contour into long
+// slivers either. A zigzag strip, its earlier layout, has about numVert / 5
+// perimeters of interior edge length. Halving the ring stays far below that.
+TEST(Triangulation, ShortEdgesOnConvexContour) {
+  for (const int numVert : {1000, 20000}) {
+    Polygons polys(1);
+    for (int i = 0; i < numVert; ++i) {
+      const double angle = kTwoPi * i / numVert;
+      polys[0].push_back({10 * std::cos(angle), 10 * std::sin(angle)});
+    }
+    const std::vector<ivec3> triangles = Triangulate(polys);
+    ASSERT_EQ(triangles.size(), numVert - 2);
+    const EdgeStats stats = MeasureEdges(polys[0], triangles);
+    EXPECT_LE(stats.maxDegree, numVert / 25) << numVert << " verts";
+    EXPECT_LE(stats.interiorPerPerimeter, numVert / 40.0)
         << numVert << " verts";
   }
 }
