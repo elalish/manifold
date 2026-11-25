@@ -102,7 +102,8 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
     const ManifoldCADExportMatch = /^manifold-(3d|cad)\/manifoldCAD(.ts|.js)?$/
     const manifoldCADExportNames = [
       // Manifold classes.
-      'Mesh', 'Mesh64', 'Manifold', 'CrossSection', 'MIN_RELATIVE_PRECISION',
+      'Mesh', 'Mesh64', 'Manifold', 'ManifoldError', 'CrossSection',
+      'MIN_RELATIVE_PRECISION',
       // Manifold methods.
       'triangulate', 'segmentsFor', 'forDivisions', 'version',
 

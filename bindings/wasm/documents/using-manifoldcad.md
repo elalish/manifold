@@ -17,6 +17,13 @@ Usage: manifold-cad [options] <infile.[js|ts]> <outfile>
 
 The output file can be in either `.glb` or `.3mf` format, determined by extension.
 
+## Errors
+
+When a call such as `Manifold.cube()` gets an invalid parameter, or evaluates a Manifold with an error, it throws a `ManifoldError`, which stops the model at that line.
+Booleans and transforms are lazy, so an error from one, such as a `NaN` translation, throws when the model is exported instead.
+The command line tool exits with an error in both cases.
+To handle an error in a model, import `ManifoldError` from `manifold-cad/manifoldCAD` and check its `code`.
+
 ## Coordinate Systems
 
 ManifoldCAD uses a right-handed coordinate system where '+Z' is up.  Length units are assumed to be millimetres.  This is slightly at odds with glTF, which also uses a right handed coordinate system, but specifies '+Y' as up, and length units are in metres.
