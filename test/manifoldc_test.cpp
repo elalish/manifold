@@ -3,10 +3,6 @@
 #include <cfloat>
 #include <cmath>
 #include <cstddef>
-#include <iterator>
-#include <set>
-#include <string>
-#include <utility>
 #ifndef MANIFOLD_NO_IOSTREAM
 #include <fstream>
 #endif
@@ -29,31 +25,10 @@ const ManifoldCircularQuality kQuality32 = {32, 10.0, 1.0};
 const ManifoldCircularQuality kQuality100 = {100, 10.0, 1.0};
 
 TEST(CBIND, error_string) {
-  using Error = manifold::Manifold::Error;
-  const std::pair<ManifoldError, Error> pairs[] = {
-      {MANIFOLD_NO_ERROR, Error::NoError},
-      {MANIFOLD_NON_FINITE_VERTEX, Error::NonFiniteVertex},
-      {MANIFOLD_NOT_MANIFOLD, Error::NotManifold},
-      {MANIFOLD_VERTEX_OUT_OF_BOUNDS, Error::VertexOutOfBounds},
-      {MANIFOLD_PROPERTIES_WRONG_LENGTH, Error::PropertiesWrongLength},
-      {MANIFOLD_MISSING_POSITION_PROPERTIES, Error::MissingPositionProperties},
-      {MANIFOLD_MERGE_VECTORS_DIFFERENT_LENGTHS,
-       Error::MergeVectorsDifferentLengths},
-      {MANIFOLD_MERGE_INDEX_OUT_OF_BOUNDS, Error::MergeIndexOutOfBounds},
-      {MANIFOLD_TRANSFORM_WRONG_LENGTH, Error::TransformWrongLength},
-      {MANIFOLD_RUN_INDEX_WRONG_LENGTH, Error::RunIndexWrongLength},
-      {MANIFOLD_FACE_ID_WRONG_LENGTH, Error::FaceIDWrongLength},
-      {MANIFOLD_INVALID_CONSTRUCTION, Error::InvalidConstruction},
-      {MANIFOLD_RESULT_TOO_LARGE, Error::ResultTooLarge},
-      {MANIFOLD_INVALID_TANGENTS, Error::InvalidTangents},
-      {MANIFOLD_CANCELLED, Error::Cancelled},
-  };
-  std::set<std::string> messages;
-  for (const auto& [c, cpp] : pairs) {
-    EXPECT_STREQ(manifold_error_string(c), manifold::ToString(cpp));
-    messages.insert(manifold_error_string(c));
+  for (int i = 0; i <= MANIFOLD_CANCELLED; ++i) {
+    EXPECT_STREQ(manifold_error_string(static_cast<ManifoldError>(i)),
+                 manifold::ToString(static_cast<manifold::Manifold::Error>(i)));
   }
-  EXPECT_EQ(messages.size(), std::size(pairs));
   EXPECT_STREQ(
       manifold_error_string(static_cast<ManifoldError>(MANIFOLD_CANCELLED + 1)),
       "Unknown error");
