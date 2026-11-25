@@ -1,9 +1,20 @@
 var searchData=
 [
-  ['warp_0',['Warp',['../classmanifold_1_1_manifold.html#a5366f7082adcbb2be63fcf2b4c57eb51',1,'manifold::Manifold::Warp()'],['../classmanifold_1_1_cross_section.html#ac50618697f91880859f4d536f2569b5e',1,'manifold::CrossSection::Warp()']]],
-  ['warpbatch_1',['WarpBatch',['../classmanifold_1_1_manifold.html#a7825d52e3102cc6e7d48a19f9ea0b468',1,'manifold::Manifold::WarpBatch()'],['../classmanifold_1_1_cross_section.html#a2d4ae264fded90c78cf750ad0dbea33a',1,'manifold::CrossSection::WarpBatch()']]],
-  ['wasm_2',['WASM',['../index.html#autotoc_md11',1,'']]],
-  ['windingnumber_3',['WindingNumber',['../classmanifold_1_1_manifold.html#ac1aa0d3ad229052aa208348fd8cbc7c7',1,'manifold::Manifold']]],
-  ['windows_20shenanigans_4',['Windows Shenanigans',['../index.html#autotoc_md13',1,'']]],
-  ['withcontext_5',['WithContext',['../classmanifold_1_1_manifold.html#a0402e64f60e398de9be29e0a75d29bf0',1,'manifold::Manifold']]]
+  ['vec_0',['Vec',['../group__vec.html',1,'']]],
+  ['vec_1',['vec',['../structlinalg_1_1vec.html',1,'linalg']]],
+  ['vec_3c_20double_2c_202_20_3e_2',['vec&lt; double, 2 &gt;',['../structlinalg_1_1vec.html',1,'linalg']]],
+  ['vec_3c_20double_2c_203_20_3e_3',['vec&lt; double, 3 &gt;',['../structlinalg_1_1vec.html',1,'linalg']]],
+  ['vec_3c_20ret_5ft_3c_20f_2c_20a_20_3e_2c_20m_20_3e_4',['vec&lt; ret_t&lt; F, A &gt;, M &gt;',['../structlinalg_1_1vec.html',1,'linalg']]],
+  ['vec_3c_20ret_5ft_3c_20f_2c_20a_2c_20b_20_3e_2c_20m_20_3e_5',['vec&lt; ret_t&lt; F, A, B &gt;, M &gt;',['../structlinalg_1_1vec.html',1,'linalg']]],
+  ['vec_3c_20ret_5ft_3c_20f_2c_20a_2c_20b_2c_20c_20_3e_2c_20m_20_3e_6',['vec&lt; ret_t&lt; F, A, B, C &gt;, M &gt;',['../structlinalg_1_1vec.html',1,'linalg']]],
+  ['vec_3c_20t_2c_201_20_3e_7',['vec&lt; T, 1 &gt;',['../structlinalg_1_1vec_3_01_t_00_011_01_4.html',1,'linalg']]],
+  ['vec_3c_20t_2c_202_20_3e_8',['vec&lt; T, 2 &gt;',['../structlinalg_1_1vec_3_01_t_00_012_01_4.html',1,'linalg']]],
+  ['vec_3c_20t_2c_203_20_3e_9',['vec&lt; T, 3 &gt;',['../structlinalg_1_1vec_3_01_t_00_013_01_4.html',1,'linalg']]],
+  ['vec_3c_20t_2c_204_20_3e_10',['vec&lt; T, 4 &gt;',['../structlinalg_1_1vec_3_01_t_00_014_01_4.html',1,'linalg']]],
+  ['vector_20algebra_11',['Vector Algebra',['../group__vec__algebra.html',1,'']]],
+  ['vecview_12',['VecView',['../classmanifold_1_1_vec_view.html',1,'manifold']]],
+  ['verbose_13',['verbose',['../group___debug.html#a0b2caeb4b6f130be43e5a2f0267dd453',1,'manifold::ExecutionParams']]],
+  ['verifynodegenerates_14',['verifyNoDegenerates',['../group___debug.html#acb0dd3ed3ab0d2b6adac1c53ea811f99',1,'manifold::ExecutionParams']]],
+  ['vertproperties_15',['vertProperties',['../structmanifold_1_1_mesh_g_l_p.html#a46f72e2c73b83104e4a089142cb033d7',1,'manifold::MeshGLP']]],
+  ['volume_16',['Volume',['../classmanifold_1_1_manifold.html#a678f606b1ff10c8959240d2985e022ad',1,'manifold::Manifold']]]
 ];

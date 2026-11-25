@@ -1,9 +1,5 @@
 var searchData=
 [
-  ['length_0',['length',['../group__vec__algebra.html#gaf95c4ba484d6efe575e8fe8225f7203f',1,'linalg']]],
-  ['length2_1',['length2',['../group__vec__algebra.html#ga62fc2092370a3257fb759ee17ec7c23f',1,'linalg']]],
-  ['lerp_2',['lerp',['../structlinalg_1_1detail_1_1lerp.html',1,'lerp'],['../group__selection.html#gaba946a8870ece8a8a64e96564f7eae31',1,'linalg::lerp()']]],
-  ['levelset_3',['LevelSet',['../classmanifold_1_1_manifold.html#a098fe7bfec8a178d3d2113ba33b09d26',1,'manifold::Manifold::LevelSet()'],['../classmanifold_1_1_execution_context.html#a098fe7bfec8a178d3d2113ba33b09d26',1,'manifold::ExecutionContext::LevelSet()']]],
-  ['library_4',['Manifold Library',['../index.html#autotoc_md6',1,'']]],
-  ['linalg_5',['LinAlg',['../group___lin_alg.html',1,'']]]
+  ['kdefaultrelativeprecision_0',['kDefaultRelativePrecision',['../group___scalar.html#gad81e1d0979514f4ba6caad6525293d0e',1,'manifold']]],
+  ['kminrelativeprecision_1',['kMinRelativePrecision',['../group___scalar.html#ga2bec17119b7dbbf2286f94e5adc744df',1,'manifold']]]
 ];

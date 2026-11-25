@@ -173,6 +173,8 @@ Information</h2></td></tr>
 </td></tr>
 <tr class="memitem:a423e2f2a67ccc0662a97e018b2c3886d" id="r_a423e2f2a67ccc0662a97e018b2c3886d"><td class="memItemLeft">Error&#160;</td><td class="memItemRight"><a class="el" href="#a423e2f2a67ccc0662a97e018b2c3886d">Status</a> () const</td></tr>
 <tr class="memitem:a0402e64f60e398de9be29e0a75d29bf0" id="r_a0402e64f60e398de9be29e0a75d29bf0"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a0402e64f60e398de9be29e0a75d29bf0">WithContext</a> (const <a class="el" href="classmanifold_1_1_execution_context.html">ExecutionContext</a> &amp;ctx) const</td></tr>
+<tr class="memitem:ad33066348fa63e1e84e21e78472d9599" id="r_ad33066348fa63e1e84e21e78472d9599"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#ad33066348fa63e1e84e21e78472d9599">WithPrecision</a> (double relPrecision) const</td></tr>
+<tr class="memitem:a243b359d61ee67f5c5b333bfb31c3f7c" id="r_a243b359d61ee67f5c5b333bfb31c3f7c"><td class="memItemLeft">double&#160;</td><td class="memItemRight"><a class="el" href="#a243b359d61ee67f5c5b333bfb31c3f7c">GetPrecision</a> () const</td></tr>
 <tr class="memitem:a8e12342fc420701fbffd97025421575a" id="r_a8e12342fc420701fbffd97025421575a"><td class="memItemLeft">bool&#160;</td><td class="memItemRight"><a class="el" href="#a8e12342fc420701fbffd97025421575a">IsEmpty</a> () const</td></tr>
 <tr class="memitem:ac8fdbd9a43d0168f1d6e6767aa89bb8d" id="r_ac8fdbd9a43d0168f1d6e6767aa89bb8d"><td class="memItemLeft">size_t&#160;</td><td class="memItemRight"><a class="el" href="#ac8fdbd9a43d0168f1d6e6767aa89bb8d">NumVert</a> () const</td></tr>
 <tr class="memitem:a6358437d05a317c6bd0860f37ea20abf" id="r_a6358437d05a317c6bd0860f37ea20abf"><td class="memItemLeft">size_t&#160;</td><td class="memItemRight"><a class="el" href="#a6358437d05a317c6bd0860f37ea20abf">NumEdge</a> () const</td></tr>
@@ -266,8 +268,8 @@ I/O</h2></td></tr>
 <div class="line">  }</div>
 <div class="line">  ifile.close();</div>
 <div class="line">}</div>
-<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:286</div></div>
-<div class="ttc" id="aclassmanifold_1_1_manifold_html_ad5f60691d05e3402630122740cdf3a0b"><div class="ttname"><a href="#ad5f60691d05e3402630122740cdf3a0b">manifold::Manifold::Manifold</a></div><div class="ttdeci">Manifold()</div><div class="ttdef"><b>Definition</b> manifold.cpp:113</div></div>
+<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:277</div></div>
+<div class="ttc" id="aclassmanifold_1_1_manifold_html_ad5f60691d05e3402630122740cdf3a0b"><div class="ttname"><a href="#ad5f60691d05e3402630122740cdf3a0b">manifold::Manifold::Manifold</a></div><div class="ttdeci">Manifold()</div><div class="ttdef"><b>Definition</b> manifold.cpp:97</div></div>
 </div><!-- fragment --><p>Writing: </p><div class="fragment"><div class="line">std::ofstream ofile;</div>
 <div class="line">ofile.open(filename);</div>
 <div class="line"><span class="keywordflow">if</span> (ofile.is_open()) {</div>
@@ -276,7 +278,8 @@ I/O</h2></td></tr>
 <div class="line">   }</div>
 <div class="line">}</div>
 <div class="line">ofile.close();</div>
-</div><!-- fragment --> </td></tr>
+</div><!-- fragment --><p>ReadOBJ reads double-precision positions, so the result has kMinRelativePrecision, like Manifold(MeshGL64). </p>
+</td></tr>
 <tr class="memitem:a4be2289015cd5e72e0d4d2ecee1936cc" id="r_a4be2289015cd5e72e0d4d2ecee1936cc"><td class="memItemLeft"><a id="a4be2289015cd5e72e0d4d2ecee1936cc" name="a4be2289015cd5e72e0d4d2ecee1936cc"></a>
 bool&#160;</td><td class="memItemRight"><b>WriteOBJ</b> (std::ostream &amp;stream) const</td></tr>
 <tr class="memitem:a4bc1b1a7ee59ca1a553e6c9f6943f087" id="r_a4bc1b1a7ee59ca1a553e6c9f6943f087"><td class="memItemLeft"><a id="a4bc1b1a7ee59ca1a553e6c9f6943f087" name="a4bc1b1a7ee59ca1a553e6c9f6943f087"></a>
@@ -332,6 +335,7 @@ Testing Hooks</h2></td></tr>
 </div><div class="memdoc">
 <p>Convert a MeshGL into a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>, retaining its properties and merging only the positions according to the merge vectors. Will return an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> and set an Error Status if the result is not an oriented 2-manifold. Will collapse degenerate triangles and unnecessary vertices.</p>
 <p>All fields are read, making this structure suitable for a lossless round-trip of data from GetMeshGL. For multi-material input, use ReserveIDs to set a unique originalID for each material, and sort the materials into triangle runs.</p>
+<p>The result has relative precision kDefaultRelativePrecision. Precision is not stored in the mesh, so use <a class="el" href="#ad33066348fa63e1e84e21e78472d9599">WithPrecision()</a> to change it after ingest.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">meshGL</td><td>The input MeshGL. </td></tr>
@@ -357,6 +361,7 @@ Testing Hooks</h2></td></tr>
 </div><div class="memdoc">
 <p>Convert a MeshGL into a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>, retaining its properties and merging only the positions according to the merge vectors. Will return an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> and set an Error Status if the result is not an oriented 2-manifold. Will collapse degenerate triangles and unnecessary vertices.</p>
 <p>All fields are read, making this structure suitable for a lossless round-trip of data from GetMeshGL. For multi-material input, use ReserveIDs to set a unique originalID for each material, and sort the materials into triangle runs.</p>
+<p>The result has relative precision kMinRelativePrecision. Precision is not stored in the mesh, so use <a class="el" href="#ad33066348fa63e1e84e21e78472d9599">WithPrecision()</a> to change it after ingest.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">meshGL64</td><td>The input MeshGL64. </td></tr>
@@ -808,13 +813,55 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Returns a copy of this <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with the given <a class="el" href="classmanifold_1_1_execution_context.html" title="Observe and control a long-running Manifold evaluation.">ExecutionContext</a> attached. The attachment is consumed only by <span class="tt"><a class="el" href="#a423e2f2a67ccc0662a97e018b2c3886d">Status()</a></span> (for deferred CSG trees) and the eager ops (<span class="tt"><a class="el" href="#a5d9227a2d10d8ad7b005555213ecd1ac">Refine</a></span> / <span class="tt"><a class="el" href="#a1381728e52975862d954032f717106d5">RefineToLength</a></span> / <span class="tt"><a class="el" href="#a723efa99b25f74d4099f004a47313be1">RefineToTolerance</a></span>, <span class="tt"><a class="el" href="#a9dc9e00112e2b063cfa6fe8482b1afe8">Hull</a></span>, <span class="tt"><a class="el" href="#ae174a8240802779eca5a0416af7ea78b">MinkowskiSum</a></span> / <span class="tt"><a class="el" href="#a47715067c292eeaafdc48aab3a604829">MinkowskiDifference</a></span>); those snapshot the ctx and report progress / observe cancellation through it. Other queries that force evaluation (<span class="tt"><a class="el" href="#a678f606b1ff10c8959240d2985e022ad">Volume</a></span>, <span class="tt"><a class="el" href="#a1417d4f6b8e85cb40cabf15e0ce4f7d5">GetMeshGL</a></span>, <span class="tt"><a class="el" href="#a3d711d458596b520edd4cd7948a53e67">BoundingBox</a></span>, etc.) do not currently observe attached ctx.</p>
+<p>Returns a copy of this <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with the given <a class="el" href="classmanifold_1_1_execution_context.html" title="Observe and control a long-running Manifold evaluation.">ExecutionContext</a> attached. The attachment is consumed only by <span class="tt"><a class="el" href="#a423e2f2a67ccc0662a97e018b2c3886d">Status()</a></span>, <span class="tt"><a class="el" href="#ad33066348fa63e1e84e21e78472d9599">WithPrecision()</a></span> and <span class="tt"><a class="el" href="#a243b359d61ee67f5c5b333bfb31c3f7c">GetPrecision()</a></span> (for deferred CSG trees) and the eager ops (<span class="tt"><a class="el" href="#a5d9227a2d10d8ad7b005555213ecd1ac">Refine</a></span> / <span class="tt"><a class="el" href="#a1381728e52975862d954032f717106d5">RefineToLength</a></span> / <span class="tt"><a class="el" href="#a723efa99b25f74d4099f004a47313be1">RefineToTolerance</a></span>, <span class="tt"><a class="el" href="#a9dc9e00112e2b063cfa6fe8482b1afe8">Hull</a></span>, <span class="tt"><a class="el" href="#ae174a8240802779eca5a0416af7ea78b">MinkowskiSum</a></span> / <span class="tt"><a class="el" href="#a47715067c292eeaafdc48aab3a604829">MinkowskiDifference</a></span>); those snapshot the ctx and report progress / observe cancellation through it. Other queries that force evaluation (<span class="tt"><a class="el" href="#a678f606b1ff10c8959240d2985e022ad">Volume</a></span>, <span class="tt"><a class="el" href="#a1417d4f6b8e85cb40cabf15e0ce4f7d5">GetMeshGL</a></span>, <span class="tt"><a class="el" href="#a3d711d458596b520edd4cd7948a53e67">BoundingBox</a></span>, etc.) do not currently observe attached ctx.</p>
 <p>Every other op that returns a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> ignores any attached ctx and produces a result with no attached ctx. That includes the deferred ops (Boolean operators, Translate / Rotate / Scale / Transform / Mirror, BatchBoolean, the vector-of-Manifold Hull) and the ones that evaluate their input right away (Warp, Simplify, Split, SetProperties, etc.). Inputs are not mutated. The idiom for observing a deferred tree is therefore:</p>
 <p>(a + b - c).WithContext(ctx).<a class="el" href="#a423e2f2a67ccc0662a97e018b2c3886d">Status()</a>;</p>
 <p>while the idiom for observing an eager op is:</p>
 <p>m.WithContext(ctx).Refine(n); m.WithContext(ctx).MinkowskiSum(other);</p>
 <p>Raw copy / assignment preserves the attachment (it's the same logical <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>). Only ops that derive a <em>new</em> <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> drop the attachment.</p>
-<p>Returns a copy of this <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with the given <a class="el" href="classmanifold_1_1_execution_context.html" title="Observe and control a long-running Manifold evaluation.">ExecutionContext</a> attached. The attachment is consumed by the eager ops on the result (Status, the Refine family, Hull, MinkowskiSum / MinkowskiDifference). Every other op that returns a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> produces a result with no attached ctx. A raw copy preserves the attachment. See <a class="el" href="classmanifold_1_1_execution_context.html" title="Observe and control a long-running Manifold evaluation.">ExecutionContext</a> in <a class="el" href="common_8h_source.html">common.h</a> for the full model. </p>
+<p>Returns a copy of this <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with the given <a class="el" href="classmanifold_1_1_execution_context.html" title="Observe and control a long-running Manifold evaluation.">ExecutionContext</a> attached. The attachment is consumed by the eager ops on the result (Status, WithPrecision, GetPrecision, the Refine family, Hull, MinkowskiSum / MinkowskiDifference). Every other op that returns a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> produces a result with no attached ctx. A raw copy preserves the attachment. See <a class="el" href="classmanifold_1_1_execution_context.html" title="Observe and control a long-running Manifold evaluation.">ExecutionContext</a> in <a class="el" href="common_8h_source.html">common.h</a> for the full model. </p>
+
+</div>
+</div>
+<a id="ad33066348fa63e1e84e21e78472d9599" name="ad33066348fa63e1e84e21e78472d9599"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad33066348fa63e1e84e21e78472d9599">&#9670;&#160;</a></span>WithPrecision()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> WithPrecision </td>
+          <td>(</td>
+          <td class="paramtype">double</td>          <td class="paramname"><span class="paramname"><em>relPrecision</em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Evaluates this <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> and returns it with the given relative precision, which defines what counts as coplanar or degenerate. The geometry is not recomputed: the precision applies only to later operations. Booleans and other operations on several Manifolds use the smallest precision among their non-empty inputs.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">relPrecision</td><td>The relative precision. 0, negative values, NaN and infinity give kDefaultRelativePrecision, even for a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> made from MeshGL64. Positive values below kMinRelativePrecision are raised to it, so pass kMinRelativePrecision for the finest. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="a243b359d61ee67f5c5b333bfb31c3f7c" name="a243b359d61ee67f5c5b333bfb31c3f7c"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a243b359d61ee67f5c5b333bfb31c3f7c">&#9670;&#160;</a></span>GetPrecision()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">double GetPrecision </td>
+          <td>(</td>
+          <td class="paramname"><span class="paramname"><em></em></span></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Returns the relative precision of this <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>. A <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> made from MeshGL or built by a factory such as <a class="el" href="#ad5486e9d0cff020565c3c20c1f496ab9">Cube()</a>, <a class="el" href="#a37da082109050d748421069e22eff876">Extrude()</a>, <a class="el" href="#a098fe7bfec8a178d3d2113ba33b09d26">LevelSet()</a> or <a class="el" href="#a9dc9e00112e2b063cfa6fe8482b1afe8">Hull()</a> of points has kDefaultRelativePrecision. One made from MeshGL64 or by ReadOBJ() has kMinRelativePrecision. <a class="el" href="#ad33066348fa63e1e84e21e78472d9599">WithPrecision()</a> sets it, other operations on one <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> keep it, and operations on several take the smallest among their non-empty inputs. An empty Boolean or Minkowski result takes the smallest among all its inputs. </p>
 
 </div>
 </div>
@@ -1351,7 +1398,7 @@ Testing Hooks</h2></td></tr>
 </div><div class="memdoc">
 <p>Return a simplified copy of the manifold. The tolerance controls the local error when collapsing edges, measured relative to nearby face planes. Simplification tends to remove features thinner than the tolerance. </p><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">tolerance</td><td>Simplification tolerance, lower-bounded by the manifold's epsilon. </td></tr>
+    <tr><td class="paramname">tolerance</td><td>Simplification tolerance, lower-bounded by the manifold's epsilon. NaN is treated as 0. </td></tr>
   </table>
   </dd>
 </dl>
@@ -1396,6 +1443,7 @@ Testing Hooks</h2></td></tr>
 </div><div class="memdoc">
 <p>The central operation of this library: the Boolean combines two manifolds into another by calculating their intersections and removing the unused portions. <a href="https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid">&epsilon;-valid</a> inputs will produce &epsilon;-valid output. &epsilon;-invalid input may fail triangulation.</p>
 <p>These operations are optimized to produce nearly-instant results if either input is empty or their bounding boxes do not overlap.</p>
+<p>The result uses the smaller relative precision of the two inputs, ignoring an empty input unless the result is also empty. See <a class="el" href="#ad33066348fa63e1e84e21e78472d9599">WithPrecision()</a>.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">second</td><td>The other <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>. </td></tr>
@@ -1432,7 +1480,7 @@ Testing Hooks</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
-<p>Perform the given boolean operation on a list of Manifolds. In case of Subtract, all Manifolds in the tail are differenced from the head. The empty-input case returns a default-constructed <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>; the single-input case returns the input unchanged, without any attached <a class="el" href="classmanifold_1_1_execution_context.html" title="Observe and control a long-running Manifold evaluation.">ExecutionContext</a>. </p>
+<p>Perform the given boolean operation on a list of Manifolds. In case of Subtract, all Manifolds in the tail are differenced from the head. The empty-input case returns a default-constructed <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>; the single-input case returns the input unchanged, without any attached <a class="el" href="classmanifold_1_1_execution_context.html" title="Observe and control a long-running Manifold evaluation.">ExecutionContext</a>. The result's relative precision follows the same rule as <a class="el" href="#a9aad9d9b9a58ff2b7622de673742d1df">Boolean()</a>. </p>
 
 </div>
 </div>
@@ -1894,6 +1942,7 @@ Testing Hooks</h2></td></tr>
 </table>
 </div><div class="memdoc">
 <p>Compute the convex hull enveloping a set of manifolds. If the input list is empty (or all input manifolds are empty), returns a default-constructed <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with no attached <a class="el" href="classmanifold_1_1_execution_context.html" title="Observe and control a long-running Manifold evaluation.">ExecutionContext</a> (no source operand to inherit from).</p>
+<p>The result uses the smallest relative precision among the non-empty inputs.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">manifolds</td><td>A vector of manifolds over which to compute a convex hull. </td></tr>
@@ -1949,7 +1998,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>The triangle normal vectors are saved over the course of operations rather than recalculated to avoid rounding error. This checks that triangles still match their normal vectors within Precision(). </p>
+<p>The triangle normal vectors are saved over the course of operations rather than recalculated to avoid rounding error. This checks that triangles still match their normal vectors within <a class="el" href="#ad4952fe30496434f3e128a33f5e350ef">GetEpsilon()</a>. </p>
 
 </div>
 </div>
@@ -1985,7 +2034,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>The number of triangles that are colinear within Precision(). This library attempts to remove all of these, but it cannot always remove all of them without changing the mesh by too much. </p>
+<p>The number of triangles that are colinear within <a class="el" href="#ad4952fe30496434f3e128a33f5e350ef">GetEpsilon()</a>. This library attempts to remove all of these, but it cannot always remove all of them without changing the mesh by too much. </p>
 
 </div>
 </div>
@@ -2003,7 +2052,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Returns the epsilon value of this <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>'s vertices, which tracks the approximate rounding error over all the transforms and operations that have led to this state. This is the value of &epsilon; defining <a href="https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid">&epsilon;-valid</a>. </p>
+<p>Returns the epsilon value of this <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>'s vertices: its relative precision times its bounding box scale, or -1 if it is empty. This is the value of &epsilon; defining <a href="https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid">&epsilon;-valid</a>. </p>
 
 </div>
 </div>

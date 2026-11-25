@@ -9,8 +9,6 @@
  */
 export declare type AnimationMode = 'loop' | 'ping-pong';
 
-export declare function getRelativePrecision(): number;
-
 /**
  * Set the duration of the animation, in seconds.
  *
@@ -31,7 +29,5 @@ export declare function setAnimationFPS(fps: number): void;
  * @param mode 'loop' or 'ping-pong'
  */
 export declare function setAnimationMode(mode: AnimationMode): void;
-
-export declare function setRelativePrecision(precision: number): void;
 
 export { }

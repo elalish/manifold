@@ -21,6 +21,8 @@ var group___core =
       [ "Revolve", "classmanifold_1_1_manifold.html#a8d93a51d679579e50af9b5a6d6f3a58f", null ],
       [ "Status", "classmanifold_1_1_manifold.html#a423e2f2a67ccc0662a97e018b2c3886d", null ],
       [ "WithContext", "classmanifold_1_1_manifold.html#a0402e64f60e398de9be29e0a75d29bf0", null ],
+      [ "WithPrecision", "classmanifold_1_1_manifold.html#ad33066348fa63e1e84e21e78472d9599", null ],
+      [ "GetPrecision", "classmanifold_1_1_manifold.html#a243b359d61ee67f5c5b333bfb31c3f7c", null ],
       [ "IsEmpty", "classmanifold_1_1_manifold.html#a8e12342fc420701fbffd97025421575a", null ],
       [ "NumVert", "classmanifold_1_1_manifold.html#ac8fdbd9a43d0168f1d6e6767aa89bb8d", null ],
       [ "NumEdge", "classmanifold_1_1_manifold.html#a6358437d05a317c6bd0860f37ea20abf", null ],

@@ -1,5 +1,6 @@
 var NAVTREEINDEX1 =
 {
+"index.html#autotoc_md13":[0,3,2],
 "index.html#autotoc_md14":[0,4],
 "index.html#autotoc_md15":[0,4,0],
 "index.html#autotoc_md16":[0,4,1],
@@ -173,7 +174,7 @@ var NAVTREEINDEX1 =
 "structmanifold_1_1_rect.html#abfcbffbf2135ec515b0c8f2a0a43bb68":[1,0,2,4,12],
 "structmanifold_1_1_rect.html#ac2bf0d9c3c91b07fd81499a3cbee4c75":[1,0,2,4,8],
 "structmanifold_1_1_rect.html#ae56ad379896fd93dc3e41ab719a52c87":[1,0,2,4,14],
-"structmanifold_1_1_timer.html":[2,0,1,13],
+"structmanifold_1_1_timer.html":[2,0,1,12],
 "structstd_1_1hash_3_01linalg_1_1mat_3_01_t_00_01_m_00_011_01_4_01_4.html":[1,0,1,1,21,4],
 "structstd_1_1hash_3_01linalg_1_1mat_3_01_t_00_01_m_00_012_01_4_01_4.html":[1,0,1,1,21,5],
 "structstd_1_1hash_3_01linalg_1_1mat_3_01_t_00_01_m_00_013_01_4_01_4.html":[1,0,1,1,21,6],

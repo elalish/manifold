@@ -109,6 +109,8 @@ constexpr double&#160;</td><td class="memItemRight"><b>kPi</b> = 3.1415926535897
 constexpr double&#160;</td><td class="memItemRight"><b>kTwoPi</b> = 6.28318530717958647692528676655900576</td></tr>
 <tr class="memitem:gacdd6811825618eb2444b1d7b0989695f" id="r_gacdd6811825618eb2444b1d7b0989695f"><td class="memItemLeft"><a id="gacdd6811825618eb2444b1d7b0989695f" name="gacdd6811825618eb2444b1d7b0989695f"></a>
 constexpr double&#160;</td><td class="memItemRight"><b>kHalfPi</b> = 1.57079632679489661923132169163975144</td></tr>
+<tr class="memitem:gad81e1d0979514f4ba6caad6525293d0e" id="r_gad81e1d0979514f4ba6caad6525293d0e"><td class="memItemLeft">constexpr double&#160;</td><td class="memItemRight"><a class="el" href="#gad81e1d0979514f4ba6caad6525293d0e">kDefaultRelativePrecision</a></td></tr>
+<tr class="memitem:ga2bec17119b7dbbf2286f94e5adc744df" id="r_ga2bec17119b7dbbf2286f94e5adc744df"><td class="memItemLeft">constexpr double&#160;</td><td class="memItemRight"><a class="el" href="#ga2bec17119b7dbbf2286f94e5adc744df">kMinRelativePrecision</a> = 1e-12</td></tr>
 </table>
 <a name="details" id="details"></a><h2 id="header-details" class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Simple scalar operations. </p>
@@ -281,6 +283,56 @@ constexpr double&#160;</td><td class="memItemRight"><b>kHalfPi</b> = 1.570796326
   </table>
   </dd>
 </dl>
+
+</div>
+</div>
+<a name="doc-var-members" id="doc-var-members"></a><h2 id="header-doc-var-members" class="groupheader">Variable Documentation</h2>
+<a id="gad81e1d0979514f4ba6caad6525293d0e" name="gad81e1d0979514f4ba6caad6525293d0e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#gad81e1d0979514f4ba6caad6525293d0e">&#9670;&#160;</a></span>kDefaultRelativePrecision</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">double kDefaultRelativePrecision</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel constexpr">constexpr</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<b>Initial value:</b><div class="fragment"><div class="line">                                       =</div>
+<div class="line">std::numeric_limits&lt;float&gt;::epsilon()</div>
+</div><!-- fragment --><p>The default relative precision of a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> made from MeshGL or built by a factory such as Cube() or LevelSet(): float epsilon. A <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>'s epsilon is its relative precision times its bounding box scale.</p>
+<p><a class="el" href="classmanifold_1_1_manifold.html#ad33066348fa63e1e84e21e78472d9599">Manifold::WithPrecision()</a> with 0, a negative value, NaN or infinity gives this default, even for a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> made from MeshGL64. </p>
+
+</div>
+</div>
+<a id="ga2bec17119b7dbbf2286f94e5adc744df" name="ga2bec17119b7dbbf2286f94e5adc744df"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ga2bec17119b7dbbf2286f94e5adc744df">&#9670;&#160;</a></span>kMinRelativePrecision</h2>
+
+<div class="memitem">
+<div class="memproto">
+<table class="mlabels">
+  <tr>
+  <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">double kMinRelativePrecision = 1e-12</td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel constexpr">constexpr</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+<p>The smallest relative precision allowed, and the default for a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> made from MeshGL64. Pass it to request the finest precision. </p>
 
 </div>
 </div>

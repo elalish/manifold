@@ -104,7 +104,6 @@ var hierarchy =
     [ "ord&lt; T &gt;", "structlinalg_1_1detail_1_1ord.html", null ],
     [ "PathImpl", "structmanifold_1_1_path_impl.html", null ],
     [ "PolyVert", "group___structs.html#structmanifold_1_1_poly_vert", null ],
-    [ "Quality", "classmanifold_1_1_quality.html", null ],
     [ "RayHit", "group___structs.html#structmanifold_1_1_ray_hit", null ],
     [ "Rect", "structmanifold_1_1_rect.html", null ],
     [ "runtime_error", null, [

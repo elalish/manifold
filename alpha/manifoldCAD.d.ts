@@ -489,10 +489,11 @@ export declare type ErrorStatus = 'NoError'|'NonFiniteVertex'|'NotManifold'|
 /**
  * Observe and control a long-running Manifold evaluation. Attach to a
  * Manifold via Manifold.withContext(); the next eager op invoked on the
- * result (status(), one of the refine* family, hull(), or minkowskiSum() /
- * minkowskiDifference()) snapshots the ctx and reports progress / observes
- * cancellation through it. Deferred ops (Boolean, transforms, batch ops)
- * ignore any attached ctx. Safe to read/write from any thread/worker.
+ * result (status(), withPrecision(), getPrecision(), one of the refine*
+ * family, hull(), or minkowskiSum() / minkowskiDifference()) snapshots the ctx
+ * and reports progress / observes cancellation through it. Deferred ops
+ * (Boolean, transforms, batch ops) ignore any attached ctx. Safe to read/write
+ * from any thread/worker.
  *
  * Cancellation is permanent for a Manifold: once cancelled and detected,
  * the Manifold's status becomes 'Cancelled' and stays 'Cancelled'.
@@ -702,6 +703,9 @@ export declare class GLTFNode extends BaseGLTFNode {
  * and then union the results together.  If a child node has no mesh, the mesh
  * has no geometry, or the mesh is not manifold, that child node will be
  * silently excluded.
+ *
+ * The result has float relative precision, since the file does not store a
+ * precision. Use `withPrecision()` to change it.
  */
 export declare function importManifold(source: string | Blob | URL | ArrayBuffer, options?: ImportOptions): Promise<Manifold>;
 
@@ -723,7 +727,7 @@ export declare interface ImportOptions {
     mimetype?: string;
     /**
      * When an imported model is not manifold, try closing gaps smaller than
-     * tolerance in an effort to make it manifold.
+     * tolerance, in millimeters, in an effort to make it manifold.
      */
     tolerance?: number;
 }
@@ -780,6 +784,10 @@ export declare class Manifold {
      * A Mesh64 is read in double precision, so the input positions are not
      * rounded to float. A plain object is read as a Mesh. To read a plain object
      * in double precision, wrap it with new Mesh64(obj).
+     *
+     * The result has relative precision float epsilon, about 1.2e-7, for a Mesh
+     * and {@link MIN_RELATIVE_PRECISION} (1e-12) for a Mesh64. Precision is not
+     * stored in the mesh, so use {@link withPrecision} to change it.
      *
      * @group Basics
      */
@@ -897,6 +905,11 @@ export declare class Manifold {
      * A Mesh64 is read in double precision, so the input positions are not
      * rounded to float. A plain object is read as a Mesh. To read a plain object
      * in double precision, wrap it with new Mesh64(obj).
+     *
+     * The result has relative precision float epsilon, about 1.2e-7, for a Mesh
+     * and {@link MIN_RELATIVE_PRECISION} (1e-12) for a Mesh64. Precision is not
+     * stored in the mesh, so use {@link withPrecision} to change it.
+     *
      * @group Input & Output
      */
     static ofMesh(mesh: Mesh|Mesh64): Manifold;
@@ -1272,7 +1285,8 @@ export declare class Manifold {
 
     /**
      * Compute the convex hull of all points contained within a set of Manifolds
-     * and point vectors.
+     * and point vectors. The hull uses the smallest precision among the
+     * non-empty input Manifolds.
      *
      * @group Convex Hull
      */
@@ -1415,8 +1429,9 @@ export declare class Manifold {
     /**
      * Returns a copy of this Manifold with the given ExecutionContext attached.
      * The attachment is consumed by the next eager op invoked on the result:
-     * status() for a deferred CSG tree, refine() / refineToLength() /
-     * refineToTolerance(), hull(), or minkowskiSum() / minkowskiDifference().
+     * status(), withPrecision() or getPrecision() for a deferred CSG tree,
+     * refine() / refineToLength() / refineToTolerance(), hull(), or
+     * minkowskiSum() / minkowskiDifference().
      * Deferred ops (Boolean operators, transforms, batch ops) ignore any
      * attached ctx and produce a result with no attached ctx. See
      * ExecutionContext for the full model.
@@ -1424,6 +1439,34 @@ export declare class Manifold {
      * @group Information
      */
     withContext(ctx: ExecutionContext): Manifold;
+
+    /**
+     * Evaluates this Manifold and returns it with the given relative precision,
+     * which defines what counts as coplanar or degenerate. The geometry is not
+     * recomputed: the precision applies only to later operations. Booleans and
+     * other operations on several Manifolds use the smallest precision among
+     * their non-empty inputs.
+     *
+     * @param relPrecision The relative precision. 0, negative values, NaN and
+     * infinity give float epsilon. Positive values below
+     * {@link MIN_RELATIVE_PRECISION} (1e-12) are raised to it, so pass it for the
+     * finest.
+     * @group Information
+     */
+    withPrecision(relPrecision: number): Manifold;
+
+    /**
+     * Returns the relative precision of this Manifold. A Manifold made from a
+     * Mesh or built by a factory such as cube(), extrude(), levelSet() or hull()
+     * of points has float epsilon, about 1.2e-7. One made from a Mesh64 has
+     * {@link MIN_RELATIVE_PRECISION} (1e-12). withPrecision() sets it, other
+     * operations on one Manifold keep it, and operations on several take the
+     * smallest among their non-empty inputs. An empty Boolean or Minkowski result
+     * takes the smallest among all its inputs.
+     *
+     * @group Information
+     */
+    getPrecision(): number;
 
     // Export
 
@@ -1654,7 +1697,9 @@ export declare class Mesh {
      * to create a manifold solid. If the MeshGL is already manifold, the merge
      * vectors are unchanged. Otherwise, verts along open edges are merged within
      * tolerance (the maximum of the specified tolerance and the baseline
-     * bounding-box tolerance), keeping any from the existing merge vectors.
+     * bounding-box tolerance), keeping any from the existing merge vectors. The
+     * baseline is the bounding box scale times float epsilon, the precision a
+     * Manifold made from this mesh gets.
      *
      * There is no guarantee the result will be manifold - this is a best-effort
      * helper function designed primarily to aid in the case where a manifold
@@ -1760,7 +1805,8 @@ export declare class Mesh64 {
     get numRun(): number;
 
     /**
-     * Like Mesh.merge(), in double precision.
+     * Like Mesh.merge(), in double precision. The baseline is the bounding box
+     * scale times 1e-12, the precision a Manifold made from a Mesh64 gets.
      *
      * @param tolerance Default 0, with a bounding-box and precision-based floor.
      */
@@ -1817,6 +1863,12 @@ export declare interface MeshOptions {
     faceID?: Uint32Array;
     halfedgeTangent?: Float32Array;
 }
+
+/**
+ * The finest relative precision a Manifold can have, 1e-12. Pass it to
+ * {@link Manifold.withPrecision} to request the finest.
+ */
+export declare const MIN_RELATIVE_PRECISION: number;
 
 /**
  * Wrap any shape object with this method to display it and any copies as the

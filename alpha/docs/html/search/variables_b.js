@@ -1,4 +1,6 @@
 var searchData=
 [
-  ['triverts_0',['triVerts',['../structmanifold_1_1_mesh_g_l_p.html#ab0aa7d9b8f8adbb059ff0c6b70d38e6e',1,'manifold::MeshGLP']]]
+  ['segments_0',['segments',['../structmanifold_1_1_circular_quality.html#a32e4172d8952ac9f1db668982da57128',1,'manifold::CircularQuality']]],
+  ['selfintersectionchecks_1',['selfIntersectionChecks',['../group___debug.html#aca3506c8f5774ba33cd774fd54b20d4a',1,'manifold::ExecutionParams']]],
+  ['suppresserrors_2',['suppressErrors',['../group___debug.html#a48b673772893c29c426e98f8c84f0206',1,'manifold::ExecutionParams']]]
 ];

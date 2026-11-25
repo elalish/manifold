@@ -127,7 +127,6 @@ var annotated_dup =
       [ "MeshGLP", "structmanifold_1_1_mesh_g_l_p.html", "structmanifold_1_1_mesh_g_l_p" ],
       [ "PathImpl", "structmanifold_1_1_path_impl.html", null ],
       [ "PolyVert", "group___structs.html#structmanifold_1_1_poly_vert", "group___structs_structmanifold_1_1_poly_vert" ],
-      [ "Quality", "classmanifold_1_1_quality.html", "classmanifold_1_1_quality" ],
       [ "RayHit", "group___structs.html#structmanifold_1_1_ray_hit", "group___structs_structmanifold_1_1_ray_hit" ],
       [ "Rect", "structmanifold_1_1_rect.html", "structmanifold_1_1_rect" ],
       [ "Timer", "structmanifold_1_1_timer.html", null ],

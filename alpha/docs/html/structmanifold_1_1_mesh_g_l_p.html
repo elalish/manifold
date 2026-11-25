@@ -168,11 +168,11 @@ template&lt;typename Precision, typename I&gt; </div>
   </tr>
 </table>
 </div><div class="memdoc">
-<p>Returns a copy with mergeFromVert and mergeToVert vectors updated in order to create a manifold solid. If the MeshGL is already manifold, or is invalid (fewer than 3 properties, merge vectors of different lengths, or out-of-range indices), the copy is unchanged. Otherwise, verts along open edges are merged within tolerance (the maximum of the specified tolerance and the baseline bounding-box tolerance), keeping any from the existing merge vectors.</p>
+<p>Returns a copy with mergeFromVert and mergeToVert vectors updated in order to create a manifold solid. If the MeshGL is already manifold, or is invalid (fewer than 3 properties, merge vectors of different lengths, or out-of-range indices), the copy is unchanged. Otherwise, verts along open edges are merged within tolerance (the maximum of the specified tolerance and the baseline bounding-box tolerance), keeping any from the existing merge vectors. The baseline is the bounding box scale times the relative precision a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> made from this mesh gets: kDefaultRelativePrecision for MeshGL and kMinRelativePrecision for MeshGL64.</p>
 <p>There is no guarantee the result will be manifold - this is a best-effort helper function designed primarily to aid in the case where a manifold multi-material MeshGL was produced, but its merge vectors were lost due to a round-trip through a file format. Constructing a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> from the result will report an error status if it is not manifold.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">tolerance</td><td>Merge open-edge verts closer than this. </td></tr>
+    <tr><td class="paramname">tolerance</td><td>Merge open-edge verts closer than this. NaN is treated as 0. </td></tr>
   </table>
   </dd>
 </dl>

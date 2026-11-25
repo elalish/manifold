@@ -67,10 +67,6 @@ var group___structs =
       [ "minAngle", "structmanifold_1_1_circular_quality.html#a289eb8988776f812f50ee3e8d9cbbad2", null ],
       [ "minEdgeLength", "structmanifold_1_1_circular_quality.html#aa03b4243ac640556600e2357551db20f", null ]
     ] ],
-    [ "Quality", "classmanifold_1_1_quality.html", [
-      [ "SetRelativePrecision", "classmanifold_1_1_quality.html#a0b788f3338b1e3a4728dc61e3b00c583", null ],
-      [ "ResetToDefaults", "classmanifold_1_1_quality.html#a44e4d5610bee38664e43a437892aa0c0", null ]
-    ] ],
     [ "manifold::SimplePolygonIdx", "group___structs.html#gae59111461370c22408ad3690c1844555", null ],
     [ "manifold::PolygonsIdx", "group___structs.html#ga92d9998d052288cbed5f13396261e3ee", null ],
     [ "manifold::SimplePolygon", "group___structs.html#gac63dd7235f7caf5698ab44acb83ba362", null ],

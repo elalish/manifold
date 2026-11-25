@@ -1,9 +1,18 @@
 var searchData=
 [
-  ['uangle_0',['uangle',['../group__vec__algebra.html#gab0d86accbda99f38bf3c60f03b03504a',1,'linalg']]],
-  ['unary_5fops_1',['Unary_ops',['../group__unary__ops.html',1,'']]],
-  ['unary_5fstl_2',['Unary_STL',['../group__unary___s_t_l.html',1,'']]],
-  ['union_3',['Union',['../structmanifold_1_1_box.html#a9605138c461b1e437e59a71e1aa34653',1,'manifold::Box::Union(const vec3 p)'],['../structmanifold_1_1_box.html#a93b41da273604cdc41d92498d1dbfd1f',1,'manifold::Box::Union(const Box &amp;box) const'],['../structmanifold_1_1_rect.html#aab08573b89e6715df6a1b0e1c4222e8d',1,'manifold::Rect::Union(const vec2 p)'],['../structmanifold_1_1_rect.html#abfcbffbf2135ec515b0c8f2a0a43bb68',1,'manifold::Rect::Union(const Rect &amp;rect) const']]],
-  ['usererr_4',['userErr',['../structuser_err.html',1,'']]],
-  ['users_5',['Users',['../index.html#autotoc_md1',1,'']]]
+  ['tetpuzzle_0',['TetPuzzle',['../group___samples.html#gaa69f000001c833bf1534f35c19a7e8b0',1,'manifold']]],
+  ['tetrahedron_1',['Tetrahedron',['../classmanifold_1_1_manifold.html#afbd42733f05fb87dec1b3dae9ff9f582',1,'manifold::Manifold']]],
+  ['the_20author_2',['About the author',['../index.html#autotoc_md18',1,'']]],
+  ['timer_3',['Timer',['../structmanifold_1_1_timer.html',1,'manifold']]],
+  ['topologyerr_4',['topologyErr',['../structtopology_err.html',1,'']]],
+  ['topolygons_5',['ToPolygons',['../classmanifold_1_1_cross_section.html#a209a83b1c39a84e094da9e854a7b8bc2',1,'manifold::CrossSection']]],
+  ['torusknot_6',['TorusKnot',['../group___samples.html#ga0ccde255ceda709d8e4a54ec95f3ca3e',1,'manifold']]],
+  ['transform_7',['Transform',['../classmanifold_1_1_manifold.html#a69976677a7a332a1ad69c3fcf216e2bf',1,'manifold::Manifold::Transform()'],['../classmanifold_1_1_cross_section.html#a4c84b6c8b521f867f7fa7416d36909de',1,'manifold::CrossSection::Transform()'],['../structmanifold_1_1_box.html#a268eaff1405d22443331cd697a46ad54',1,'manifold::Box::Transform()'],['../structmanifold_1_1_rect.html#a9e0b6af248c25d0154dbf0d0b1cddb1c',1,'manifold::Rect::Transform()']]],
+  ['transforms_8',['Transforms',['../group__transforms.html',1,'']]],
+  ['translate_9',['Translate',['../classmanifold_1_1_manifold.html#a78fbea69555ea755f8731255060f7c9d',1,'manifold::Manifold::Translate()'],['../classmanifold_1_1_cross_section.html#a38bcb89b28140acbceca56f0bbda67b9',1,'manifold::CrossSection::Translate()']]],
+  ['triangulate_10',['Triangulate',['../group___triangulation.html#gad94a4b0c8fcbba40756f72d741adf160',1,'manifold']]],
+  ['triangulation_11',['Triangulation',['../group___triangulation.html',1,'']]],
+  ['triid2faceid_12',['TriID2FaceID',['../classmanifold_1_1_manifold.html#ac80b43d11acc218fcdaa4919091edee7',1,'manifold::Manifold']]],
+  ['trimbyplane_13',['TrimByPlane',['../classmanifold_1_1_manifold.html#aa8d62161da6e94da7651418c33c3e294',1,'manifold::Manifold']]],
+  ['triverts_14',['triVerts',['../structmanifold_1_1_mesh_g_l_p.html#ab0aa7d9b8f8adbb059ff0c6b70d38e6e',1,'manifold::MeshGLP']]]
 ];
