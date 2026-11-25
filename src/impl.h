@@ -155,7 +155,7 @@ struct Manifold::Impl {
   bool IsManifold() const;
   bool Is2Manifold() const;
   bool IsSelfIntersecting() const;
-  bool MatchesTriNormals() const;
+  bool MatchesTriNormals(double epsilon, bool checkFlat) const;
   bool IsFlat(int tri, vec3 normal) const;
   int NumDegenerateTris() const;
   bool HasSimpleProps() const;
