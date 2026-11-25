@@ -348,18 +348,6 @@ export class CrossSection {
   // Polygon Conversion
 
   /**
-   * Create a 2d cross-section from a set of contours (complex polygons). A
-   * boolean union operation (with the Positive filling rule) is performed to
-   * combine overlapping polygons and ensure the resulting CrossSection is free
-   * of intersections.
-   *
-   * @param contours A set of closed paths describing zero or more complex
-   * polygons.
-   * @group Input & Output
-   */
-  static ofPolygons(contours: Polygons): CrossSection;
-
-  /**
    * Create a 2d cross-section from a set of contours, reading them by the
    * even-odd rule: a sub-region is filled when its winding number is odd, so
    * overlapping an odd number of contours fills and overlapping an even number
@@ -585,33 +573,6 @@ export class Manifold {
   static revolve(
       polygons: CrossSection|Polygons, quality?: CircularQuality,
       revolveDegrees?: number): Manifold;
-
-  // Mesh Conversion
-
-  /**
-   * Convert a Mesh into a Manifold, retaining its properties and merging only
-   * the positions according to the merge vectors. Throws a ManifoldError, with
-   * the error status as its code, if the mesh is invalid or the result is not
-   * an oriented 2-manifold. Triangles with a repeated vertex after merging are
-   * dropped. Other degenerate triangles are kept. Use simplify() to collapse
-   * them.
-   *
-   * All fields are read, making this structure suitable for a lossless
-   * round-trip of data from getMesh(). For multi-material input, use
-   * reserveIDs() to set a unique originalID for each material, and sort the
-   * materials into triangle runs.
-   *
-   * A Mesh64 is read in double precision, so the input positions are not
-   * rounded to float. A plain object is read as a Mesh. To read a plain object
-   * in double precision, wrap it with new Mesh64(obj).
-   *
-   * The result has relative precision float epsilon, about 1.2e-7, for a Mesh
-   * and {@link MIN_RELATIVE_PRECISION} (1e-12) for a Mesh64. Precision is not
-   * stored in the mesh, so use {@link withPrecision} to change it.
-   *
-   * @group Input & Output
-   */
-  static ofMesh(mesh: Mesh|Mesh64): Manifold;
 
   // Signed Distance Functions
 

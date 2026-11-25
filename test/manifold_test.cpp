@@ -593,8 +593,8 @@ TEST(Manifold, NormalsAutoSubstitute) {
 }
 
 TEST(Manifold, NormalsRoundTrip) {
-  // getMesh -> ofMesh -> getMesh preserves the per-run flag, so the second
-  // getMesh still emits world-frame normals.
+  // GetMeshGL -> Manifold(mesh) -> GetMeshGL preserves the per-run flag, so
+  // the second GetMeshGL still emits world-frame normals.
   Manifold round = (Manifold::Sphere(10.0, {32}) - Manifold::Sphere(3.0, {32}))
                        .CalculateNormals();
   MeshGL out1 = round.GetMeshGL();

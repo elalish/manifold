@@ -33,8 +33,7 @@ suite('CrossSection Bindings', () => {
     ];
     // Positive fill leaves the nested pair solid; even-odd cuts the inner
     // square out.
-    expect(manifoldModule.CrossSection.ofPolygons(nested).area())
-        .toBeCloseTo(16);
+    expect(new manifoldModule.CrossSection(nested).area()).toBeCloseTo(16);
     const evenOdd = manifoldModule.CrossSection.evenOdd(nested);
     expect(evenOdd.numContour()).toEqual(2);
     expect(evenOdd.area()).toBeCloseTo(12);
@@ -53,8 +52,7 @@ suite('CrossSection Bindings', () => {
         expect(single.area()).toBeCloseTo(4);
         expect(doubled.area()).toBeCloseTo(4);
         expect(cancelled.isEmpty()).toBe(true);
-        expect(
-            manifoldModule.CrossSection.ofPolygons(single.toPolygons()).area())
+        expect(new manifoldModule.CrossSection(single.toPolygons()).area())
             .toBeCloseTo(4);
       });
 
@@ -128,7 +126,6 @@ suite('Manifold Bindings', () => {
   test('precision is the mesh default and set by withPrecision', () => {
     const {Manifold, MIN_RELATIVE_PRECISION} = manifoldModule;
     const mesh = Manifold.sphere(1, 64).getMesh();
-    expect(Manifold.ofMesh(mesh).getPrecision()).toEqual(2 ** -23);
     expect(new Manifold(mesh).getPrecision()).toEqual(2 ** -23);
     expect(new manifoldModule.ExecutionContext().fromMesh(mesh).getPrecision())
         .toEqual(2 ** -23);
@@ -294,7 +291,7 @@ suite('Manifold Bindings', () => {
     const cube =
         manifoldModule.Manifold.cube([10, 10, 10]).calculateNormals(30);
     const smooth =
-        manifoldModule.Manifold.ofMesh(cube.getMesh()).smoothByNormals();
+        new manifoldModule.Manifold(cube.getMesh()).smoothByNormals();
     // Before the fix, any tolerance value crashed: RuntimeError: divide by zero
     const refined = smooth.refineToTolerance(0.1);
     expect(refined.volume()).toBeGreaterThan(0);
@@ -481,14 +478,13 @@ suite('Mesh64', () => {
     for (const m of [cube, withNormals, manifold]) m.delete();
   });
 
-  test('ofMesh and fromMesh also read a Mesh64 as double', () => {
-    const {Manifold, ExecutionContext} = manifoldModule;
+  test('fromMesh also reads a Mesh64 as double', () => {
+    const {ExecutionContext} = manifoldModule;
     const input = doubleCube();
     const ctx = new ExecutionContext();
-    for (const manifold of [Manifold.ofMesh(input), ctx.fromMesh(input)]) {
-      expect(sortedVerts(manifold.getMesh64())).toEqual(sortedVerts(input));
-      manifold.delete();
-    }
+    const manifold = ctx.fromMesh(input);
+    expect(sortedVerts(manifold.getMesh64())).toEqual(sortedVerts(input));
+    manifold.delete();
     ctx.delete();
   });
 
@@ -503,8 +499,7 @@ suite('Mesh64', () => {
     }));
     expect(fromFloat.getPrecision()).toEqual(2 ** -23);
     const ctx = new ExecutionContext();
-    const fromDouble =
-        [new Manifold(input), Manifold.ofMesh(input), ctx.fromMesh(input)];
+    const fromDouble = [new Manifold(input), ctx.fromMesh(input)];
     for (const manifold of fromDouble) {
       expect(manifold.getPrecision()).toEqual(MIN_RELATIVE_PRECISION);
     }
@@ -527,9 +522,7 @@ suite('Mesh64', () => {
     other.setup();
     const input = doubleCube();
     const ctx = new other.ExecutionContext();
-    for (const manifold
-             of [new other.Manifold(input), other.Manifold.ofMesh(input),
-                 ctx.fromMesh(input)]) {
+    for (const manifold of [new other.Manifold(input), ctx.fromMesh(input)]) {
       expect(sortedVerts(manifold.getMesh64())).toEqual(sortedVerts(input));
       manifold.delete();
     }
@@ -547,7 +540,6 @@ suite('Mesh64', () => {
     const ctx = new ExecutionContext();
     for (const manifold
              of [new Manifold(new Mesh64(plain)),
-                 Manifold.ofMesh(new Mesh64(plain)),
                  ctx.fromMesh(new Mesh64(plain))]) {
       expect(sortedVerts(manifold.getMesh64())).toEqual(sortedVerts(input));
       manifold.delete();
@@ -560,7 +552,6 @@ suite('Mesh64', () => {
     const input = doubleCube();
     input.triVerts = Uint32Array.from(input.triVerts, v => v == 0 ? 8 : v);
     expect(() => new Manifold(input)).toThrow('Vertex index out of bounds');
-    expect(() => Manifold.ofMesh(input)).toThrow('Vertex index out of bounds');
   });
 
   test('a Mesh reads as float, whatever its array type', () => {
@@ -576,10 +567,9 @@ suite('Mesh64', () => {
         triVerts: input.triVerts,
         vertProperties: vertProperties as Float32Array
       });
-      for (const manifold of [new Manifold(mesh), Manifold.ofMesh(mesh)]) {
-        expect(sortedVerts(manifold.getMesh64())).toEqual(expected);
-        manifold.delete();
-      }
+      const manifold = new Manifold(mesh);
+      expect(sortedVerts(manifold.getMesh64())).toEqual(expected);
+      manifold.delete();
     }
   });
 
