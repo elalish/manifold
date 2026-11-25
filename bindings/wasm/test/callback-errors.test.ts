@@ -126,6 +126,56 @@ test.each(mutations)(
       expect(reused.volume ? reused.volume() : reused.area()).toBeCloseTo(1);
     });
 
+const bounds = {
+  min: [-1, -1, -1],
+  max: [1, 1, 1]
+};
+const ball = (p: number[]) => 0.5 - Math.hypot(...p);
+
+const levelSets = [
+  {
+    name: 'Manifold.levelSet',
+    owner: () => module as any,
+    call: (sdf: (p: number[]) => number) =>
+        module.Manifold.levelSet(sdf, bounds, 0.5)
+  },
+  {
+    name: 'ExecutionContext.levelSet',
+    owner: () => keep(new module.ExecutionContext()),
+    call: (sdf: (p: number[]) => number, ctx: any) =>
+        ctx.levelSet(sdf, bounds, 0.5)
+  }
+];
+
+test.each(levelSets)(
+    '$name releases native results and callback slots after a throw',
+    ({owner, call}) => {
+      const target = owner();
+      const results = observeNativeResults(target, '_LevelSet');
+      const failure = new Error('sdf failed');
+      let calls = 0;
+      const sdf = (p: number[]) => {
+        if (++calls === 10) throw failure;
+        return ball(p);
+      };
+      // Warm the free-list before measuring table growth.
+      expectThrownValue(() => call(sdf, target), failure);
+      const grow = vi.spyOn(WebAssembly.Table.prototype, 'grow');
+      for (let i = 0; i < 3; i++) {
+        calls = 0;
+        expectThrownValue(() => call(sdf, target), failure);
+        // The SDF is not called again after it throws.
+        expect(calls).toBe(10);
+      }
+      expect(grow).not.toHaveBeenCalled();
+      // The native operation must return normally so its C++ locals are
+      // destroyed before the original value is rethrown.
+      expect(results).toHaveLength(4);
+      for (const {handle} of results) expect(handle.isDeleted()).toBe(true);
+      const reused = keep(call(ball, target));
+      expect(reused.volume()).toBeGreaterThan(0);
+    });
+
 test.each([undefined, null, 0, 'callback failed'])(
     'preserves the thrown value %j after rolling back a batch mutation',
     failure => {

@@ -773,23 +773,34 @@ Module.setup = function() {
   Module.Manifold.difference = manifoldBatchbool('Difference');
   Module.Manifold.intersection = manifoldBatchbool('Intersection');
 
+  function withLevelSetCallback(sdf, level, operation) {
+    return withCallback(state => function(vec3Ptr) {
+      // Outside the surface, so later evaluations add no geometry.
+      if (state.failed) return level - 1;
+      try {
+        const x = getValue(vec3Ptr, 'double');
+        const y = getValue(vec3Ptr + 8, 'double');
+        const z = getValue(vec3Ptr + 16, 'double');
+        return sdf([x, y, z]);
+      } catch (error) {
+        // Return normally so C++ can destroy its local allocations.
+        state.failed = true;
+        state.failure = error;
+        return level - 1;
+      }
+    }, 'di', operation);
+  }
+
   Module.Manifold.levelSet = function(
       sdf, bounds, edgeLength, level = 0, tolerance = -1) {
     const bounds2 = {
       min: {x: bounds.min[0], y: bounds.min[1], z: bounds.min[2]},
       max: {x: bounds.max[0], y: bounds.max[1], z: bounds.max[2]},
     };
-    const wasmFuncPtr = addFunction(function(vec3Ptr) {
-      const x = getValue(vec3Ptr, 'double');
-      const y = getValue(vec3Ptr + 8, 'double');
-      const z = getValue(vec3Ptr + 16, 'double');
-      const vert = [x, y, z];
-      return sdf(vert);
-    }, 'di');
-    const out =
-        Module._LevelSet(wasmFuncPtr, bounds2, edgeLength, level, tolerance);
-    removeFunction(wasmFuncPtr);
-    return out;
+    return withLevelSetCallback(
+        sdf, level,
+        pointer =>
+            Module._LevelSet(pointer, bounds2, edgeLength, level, tolerance));
   };
 
   // ctx-aware static factories: mirror new Manifold / levelSet but
@@ -804,17 +815,10 @@ Module.setup = function() {
       min: {x: bounds.min[0], y: bounds.min[1], z: bounds.min[2]},
       max: {x: bounds.max[0], y: bounds.max[1], z: bounds.max[2]},
     };
-    const wasmFuncPtr = addFunction(function(vec3Ptr) {
-      const x = getValue(vec3Ptr, 'double');
-      const y = getValue(vec3Ptr + 8, 'double');
-      const z = getValue(vec3Ptr + 16, 'double');
-      const vert = [x, y, z];
-      return sdf(vert);
-    }, 'di');
-    const out =
-        this._LevelSet(wasmFuncPtr, bounds2, edgeLength, level, tolerance);
-    removeFunction(wasmFuncPtr);
-    return out;
+    return withLevelSetCallback(
+        sdf, level,
+        pointer =>
+            this._LevelSet(pointer, bounds2, edgeLength, level, tolerance));
   };
 
   function pushVec3(vec, ps) {
