@@ -141,7 +141,7 @@ struct manifold::MeshGLP&lt; Precision, I &gt;</div><p>Mesh input/output suitabl
 <p>On output, the triangles are sorted into runs (runIndex, runOriginalID, runTransform) that correspond to different mesh inputs. Other 3D libraries may refer to these runs as primitives of a mesh (as in glTF) or draw calls, as they often represent different materials on different parts of the mesh. It is generally a good idea to maintain a map of OriginalIDs to materials to make it easy to reapply them after a set of Boolean operations. These runs can also be used as input, and thus also ensure a lossless roundtrip of data through MeshGL.</p>
 <p>As an example, with runIndex = [0, 6, 18, 21] and runOriginalID = [1, 3, 3], there are 7 triangles, where the first two are from the input mesh with ID 1, the next 4 are from an input mesh with ID 3, and the last triangle is from a different copy (instance) of the input mesh with ID 3. These two instances can be distinguished by their different runTransform matrices.</p>
 <p>You can reconstruct polygonal faces by assembling all the triangles that are from the same run and share the same faceID. These faces will be planar within the output tolerance.</p>
-<p>The halfedgeTangent vector is used to specify the weighted tangent vectors of each halfedge for the purpose of using the Refine methods to create a smoothly-interpolated surface. They can also be output when calculated automatically by the Smooth functions.</p>
+<p>The halfedgeTangent vector is used to specify the weighted tangent vectors of each halfedge for the purpose of using the Refine methods to create a smoothly-interpolated surface. They can also be output when calculated automatically by SmoothByNormals().</p>
 <p>MeshGL is an alias for the standard single-precision version. Use MeshGL64 to output the full double precision that <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> uses internally. </p>
 </div><a name="doc-func-members" id="doc-func-members"></a><h2 id="header-doc-func-members" class="groupheader">Member Function Documentation</h2>
 <a id="a654c44a0abfbfaafca3ee5e25c118227" name="a654c44a0abfbfaafca3ee5e25c118227"></a>
@@ -500,7 +500,7 @@ template&lt;typename Precision, typename I&gt; </div>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Optional: For each run, a 3x4 transform is stored representing how the corresponding original mesh was transformed to create this triangle run. This matrix is stored in column-major order and the length of the overall vector is 12 * runOriginalID.size(). </p>
+<p>Optional: For each run, a 3x4 transform is stored representing how the corresponding original mesh was transformed to create this triangle run. This matrix is stored in column-major order and the length of the overall vector is 12 * runOriginalID.size(). It is empty in the output of a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> that is an original (see OriginalID()). </p>
 
 </div>
 </div>

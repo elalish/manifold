@@ -172,7 +172,7 @@ Manifold Library</h1>
 <p>The most significant contribution here is a guaranteed-manifold <a href="https://github.com/elalish/manifold/wiki/Manifold-Library#mesh-boolean">mesh Boolean</a> algorithm, which I believe is the first of its kind. If you know of another, please open a discussion - a mesh Boolean algorithm robust to edge cases has been an open problem for many years. Likewise, if the Boolean here ever fails you, please submit an issue! This Boolean forms the basis of a CAD kernel, as it allows simple shapes to be combined into more complex ones.</p>
 <p>Manifold has full support for arbitrary vertex properties, and also has IDs that make it easy to keep track of materials and what surfaces belong to what input objects or faces. See our <a href="https://manifoldcad.org/model-viewer.html">web example</a> for a simple demonstration of combining objects with unique textures.</p>
 <p>Also included are a novel and powerful suite of refining functions for smooth mesh interpolation. They handle smoothing both triangles and quads, as well as keeping polygonal faces flat. You can easily create sharp or small-radius edges where desired, or even drive the curvature by normal vectors.</p>
-<p>To aid in speed, this library makes extensive use of parallelization through TBB, if enabled. Not everything is so parallelizable, for instance a <a href="https://github.com/elalish/manifold/wiki/Manifold-Library#polygon-triangulation">polygon triangulation</a> algorithm is included which is serial. Even if compiled with parallel backend, the code will still fall back to the serial version of the algorithms if the problem size is small. The WASM build is serial-only for now, but still fast.</p>
+<p>To aid in speed, this library makes extensive use of parallelization through TBB, if enabled. Not everything is so parallelizable, for instance a <a href="https://github.com/elalish/manifold/wiki/Manifold-Library#polygon-triangulation">polygon triangulation</a> algorithm is included which is serial. Even if compiled with parallel backend, the code will still fall back to the serial version of the algorithms if the problem size is small. The published WASM package is serial, but still fast. The WASM build also supports <span class="tt">MANIFOLD_PAR=ON</span>, but that is not recommended (see WASM).</p>
 <p>Look in the <a href="https://github.com/elalish/manifold/tree/master/samples">samples</a> directory for examples of how to use this library to make interesting 3D models. You may notice that some of these examples bear a certain resemblance to my OpenSCAD designs on <a href="https://www.thingiverse.com/emmett">Thingiverse</a>, which is no accident. Much as I love OpenSCAD, my library is dramatically faster and the code is more flexible.</p>
 <h2 class="doxsection"><a class="anchor" id="autotoc_md7"></a>
 Dependencies</h2>
@@ -199,7 +199,7 @@ Dependencies</h2>
 <p>Manifold provides high precision OBJ file IO, but it is limited in functionality and is primarily to aid in testing. If you are using our npm module, we have a much more capable <a href="https://github.com/elalish/manifold/blob/master/bindings/wasm/manifold-cad/lib/gltf-io.ts">gltf-io.ts</a> you can use instead. For other languages we strongly recommend using existing packages that focus on 3D file I/O, e.g. <a href="https://trimesh.org/">trimesh</a> for Python, particularly when using vertex properties or materials. Example for integrating with <a href="https://github.com/assimp/assimp">Assimp</a> is in <span class="tt">extras/meshIO.cpp</span>, which is used by files such as <span class="tt">extras/convert_file.cpp</span>.</p>
 <h1 class="doxsection"><a class="anchor" id="autotoc_md9"></a>
 Building</h1>
-<p>Only CMake, a C++ compiler, and Python are required to be installed and set up to build this library (it has been tested with GCC, LLVM, MSVC). However, a variety of optional dependencies can bring in more functionality, see below.</p>
+<p>Only CMake and a C++ compiler are required to be installed and set up to build this library (it has been tested with GCC, LLVM, MSVC). However, a variety of optional dependencies can bring in more functionality, see below.</p>
 <p>Build and test (Ubuntu or similar): </p><div class="fragment"><div class="line">git clone --recurse-submodules https://github.com/elalish/manifold.git</div>
 <div class="line">cd manifold</div>
 <div class="line">mkdir build</div>
@@ -208,8 +208,8 @@ Building</h1>
 <div class="line">make test</div>
 </div><!-- fragment --><p>CMake flags (usage e.g. <span class="tt">-DMANIFOLD_DEBUG=ON</span>):</p><ul>
 <li><span class="tt">MANIFOLD_JSBIND=[OFF, &lt;ON&gt;]</span>: Build js binding (when using the emscripten toolchain).</li>
-<li><span class="tt">MANIFOLD_CBIND=[&lt;OFF&gt;, ON]</span>: Build C FFI binding.</li>
-<li><span class="tt">MANIFOLD_PYBIND=[OFF, &lt;ON&gt;]</span>: Build python binding, requires <span class="tt">nanobind</span>.</li>
+<li><span class="tt">MANIFOLD_CBIND=[OFF, &lt;ON&gt;]</span>: Build C FFI binding.</li>
+<li><span class="tt">MANIFOLD_PYBIND=[&lt;OFF&gt;, ON]</span>: Build python binding, requires Python and <span class="tt">nanobind</span>.</li>
 <li><span class="tt">MANIFOLD_PAR=[&lt;OFF&gt;, ON]</span>: Enables multi-thread parallelization, requires <span class="tt">tbb</span>.</li>
 <li><span class="tt">MANIFOLD_DEBUG=[&lt;OFF&gt;, ON]</span>: Enables exceptions, timing, verbosity, OBJ test dumps. Has almost no effect on its own, but enables further runtime parameters to dump various outputs.</li>
 <li><span class="tt">MANIFOLD_ASSERT=[&lt;OFF&gt;, ON]</span>: Enables internal assertions. This incurs around 20% runtime overhead. Requires MANIFOLD_DEBUG to work.</li>
@@ -269,25 +269,26 @@ WASM</h2>
 <div class="line">node ./manifold_test.js</div>
 </div><!-- fragment --><h2 class="doxsection"><a class="anchor" id="autotoc_md12"></a>
 Python</h2>
-<p>The CMake script will build the python binding <span class="tt">manifold3d</span> automatically. To use the extension, please add <span class="tt">$BUILD_DIR/bindings/python</span> to your <span class="tt">PYTHONPATH</span>, where <span class="tt">$BUILD_DIR</span> is the build directory for CMake. Examples using the python binding can be found in <span class="tt">bindings/python/examples</span>. To see exported samples, run: </p><div class="fragment"><div class="line">sudo apt install pkg-config libpython3-dev python3 python3-distutils python3-pip</div>
+<p>Configure with <span class="tt">-DMANIFOLD_PYBIND=ON</span> to build the python binding <span class="tt">manifold3d</span>. To use the extension, please add <span class="tt">$BUILD_DIR/bindings/python</span> to your <span class="tt">PYTHONPATH</span>, where <span class="tt">$BUILD_DIR</span> is the build directory for CMake. Examples using the python binding can be found in <span class="tt">bindings/python/examples</span>. To see exported samples, run: </p><div class="fragment"><div class="line">sudo apt install pkg-config libpython3-dev python3 python3-distutils python3-pip</div>
 <div class="line">pip install trimesh pytest</div>
 <div class="line">python3 run_all.py -e</div>
 </div><!-- fragment --><p>Run the following code in the interpreter for python binding documentation:</p>
 <div class="fragment"><div class="line">&gt;&gt;&gt; import manifold3d</div>
 <div class="line">&gt;&gt;&gt; help(manifold3d)</div>
 </div><!-- fragment --><p>For more detailed documentation, please refer to the C++ API.</p>
-<p><span class="tt">manifold3d</span> supports free-threaded Python (3.14t and later) and keeps the GIL disabled, so threads can build and evaluate Manifolds in parallel. Manifold and CrossSection objects are immutable and can be shared between threads. On regular Python, the calls that report progress to an <span class="tt">ExecutionContext</span> release the GIL, so another thread can watch progress or cancel them.</p>
+<p><span class="tt">manifold3d</span> supports free-threaded Python (3.14t and later) and keeps the GIL disabled, so threads can build and evaluate Manifolds in parallel. Manifold and CrossSection objects are immutable and can be shared between threads. On regular Python, the calls that report progress to an <span class="tt">ExecutionContext</span> release the GIL, so another thread can watch progress or cancel them. <span class="tt">ExecutionContext.level_set</span> is the exception: it keeps the GIL because it calls back into Python.</p>
 <h2 class="doxsection"><a class="anchor" id="autotoc_md13"></a>
 Windows Shenanigans</h2>
 <p>Windows users should build with <span class="tt">-DBUILD_SHARED_LIBS=OFF</span>, as enabling shared libraries in general makes things very complicated.</p>
-<p>The DLL file for manifoldc (C FFI bindings) when built with msvc is in <span class="tt">${CMAKE_BINARY_DIR}/bin/${BUILD_TYPE}/manifoldc.dll</span>. For example, for the following command, the path relative to the project root directory is <span class="tt">build/bin/Release/manifoldc.dll</span>. </p><div class="fragment"><div class="line">cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DMANIFOLD_DEBUG=ON -DMANIFOLD_PAR=${{matrix.parallel_backend}} -A x64 -B build</div>
+<p>The DLL file for manifoldc (C FFI bindings) when built with msvc is in <span class="tt">${CMAKE_BINARY_DIR}/lib/${BUILD_TYPE}/manifoldc.dll</span>. For example, for the following command, the path relative to the project root directory is <span class="tt">build/lib/Release/manifoldc.dll</span>. </p><div class="fragment"><div class="line">cmake . -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=ON -DMANIFOLD_DEBUG=ON -A x64 -B build</div>
+<div class="line">cmake --build build --config Release</div>
 </div><!-- fragment --><h1 class="doxsection"><a class="anchor" id="autotoc_md14"></a>
 Contributing</h1>
 <p>Contributions are welcome! A lower barrier contribution is to simply make a PR that adds a test, especially if it repros an issue you've found. Simply name it prepended with DISABLED_, so that it passes the CI. That will be a very strong signal to me to fix your issue. However, if you know how to fix it yourself, then including the fix in your PR would be much appreciated!</p>
 <h2 class="doxsection"><a class="anchor" id="autotoc_md15"></a>
 Formatting</h2>
 <p>There is a formatting script <span class="tt">format.sh</span> that automatically formats everything. It requires clang-format, black formatter for python and <a href="https://github.com/BlankSpruce/gersemi">gersemi</a> for formatting cmake files.</p>
-<p>Note that our script can run with clang-format older than 18, but the GitHub action check may fail due to slight differences between different versions of clang-format. In that case, either update your clang-format version or apply the patch from the GitHub action log.</p>
+<p>Note that our script can run with clang-format older than 20, but the GitHub action check may fail due to slight differences between different versions of clang-format. In that case, either update your clang-format version or apply the patch from the GitHub action log.</p>
 <h2 class="doxsection"><a class="anchor" id="autotoc_md16"></a>
 Profiling</h2>
 <p>There is now basic support for the <a href="https://github.com/wolfpld/tracy">Tracy profiler</a> for our tests. To enable tracing, compile with <span class="tt">-DTRACY_ENABLE=on</span> cmake option, and run the test with Tracy server running. To enable memory profiling in addition to tracing, compile with <span class="tt">-DTRACY_MEMORY_USAGE=ON</span> in addition to <span class="tt">-DTRACY_ENABLE=ON</span>.</p>

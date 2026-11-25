@@ -125,6 +125,8 @@ Boolean2 predicates are:
 - `EvenOdd`: `w` odd, reachable from `CrossSection::EvenOdd` for input authored
   against an even-odd tool. It reads the same signed winding by parity rather
   than sign, so unlike `Add` it fills a lone clockwise contour (`w == -1`).
+- `NonZero`: `w != 0`, reachable from `CrossSection::NonZero`. It fills both
+  signs at every nonzero magnitude.
 
 The rule is not selectable for boolean operations - `Boolean2D` picks `Add` or
 `Intersect` from the `OpType`. It is selectable only where the input's own
@@ -148,8 +150,8 @@ other; a subsequent pass fuses them as input features on re-ingest.
 
 Callers may pass an explicit epsilon. A non-positive epsilon asks the core to
 infer an operation scale and apply the local floating-point budget used by the
-Boolean2 predicates. Inputs are translated into a local frame before the
-arrangement is built, then translated back on output.
+Boolean2 predicates. The inferred scale includes the inputs' distance from the
+origin, so inputs are not translated into a local frame.
 
 The core runs one arrangement pass and returns that regularized output. Repeated
 `Simplify()` calls are not part of the public contract: tiny perturbations from

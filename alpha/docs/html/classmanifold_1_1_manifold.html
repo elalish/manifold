@@ -263,12 +263,11 @@ I/O</h2></td></tr>
 <div class="line">  <a class="code hl_function" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> obj_m = Manifold::ReadOBJ(ifile);</div>
 <div class="line">  ifile.close();</div>
 <div class="line">  <span class="keywordflow">if</span> (obj_m.<a class="code hl_function" href="#a423e2f2a67ccc0662a97e018b2c3886d">Status</a>() != Manifold::Error::NoError) {</div>
-<div class="line">     std::cerr &lt;&lt; <span class="stringliteral">&quot;Failed reading &quot;</span> &lt;&lt; filename &lt;&lt; <span class="stringliteral">&quot;:\n&quot;</span>;</div>
-<div class="line">     std::cerr &lt;&lt; Manifold::ToString(obj_m.<a class="code hl_function" href="#a423e2f2a67ccc0662a97e018b2c3886d">Status</a>()) &lt;&lt; <span class="stringliteral">&quot;\n&quot;</span>;</div>
+<div class="line">     std::cerr &lt;&lt; <span class="stringliteral">&quot;Failed reading &quot;</span> &lt;&lt; filename &lt;&lt; <span class="stringliteral">&quot;: error &quot;</span></div>
+<div class="line">               &lt;&lt; <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(obj_m.<a class="code hl_function" href="#a423e2f2a67ccc0662a97e018b2c3886d">Status</a>()) &lt;&lt; <span class="stringliteral">&quot;\n&quot;</span>;</div>
 <div class="line">  }</div>
-<div class="line">  ifile.close();</div>
 <div class="line">}</div>
-<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:277</div></div>
+<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:285</div></div>
 <div class="ttc" id="aclassmanifold_1_1_manifold_html_ad5f60691d05e3402630122740cdf3a0b"><div class="ttname"><a href="#ad5f60691d05e3402630122740cdf3a0b">manifold::Manifold::Manifold</a></div><div class="ttdeci">Manifold()</div><div class="ttdef"><b>Definition</b> manifold.cpp:97</div></div>
 </div><!-- fragment --><p>Writing: </p><div class="fragment"><div class="line">std::ofstream ofile;</div>
 <div class="line">ofile.open(filename);</div>
@@ -333,9 +332,10 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Convert a MeshGL into a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>, retaining its properties and merging only the positions according to the merge vectors. Will return an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> and set an Error Status if the result is not an oriented 2-manifold. Will collapse degenerate triangles and unnecessary vertices.</p>
+<p>Convert a MeshGL into a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>, retaining its properties and merging only the positions according to the merge vectors. Will return an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> and set an Error Status if the result is not an oriented 2-manifold. Triangles with a repeated vertex after merging are dropped. Other degenerate triangles are kept. Use <a class="el" href="#a10c9279f88f8ef7a396a04baad480076">RemoveDegenerates()</a> to collapse them.</p>
 <p>All fields are read, making this structure suitable for a lossless round-trip of data from GetMeshGL. For multi-material input, use ReserveIDs to set a unique originalID for each material, and sort the materials into triangle runs.</p>
 <p>The result has relative precision kDefaultRelativePrecision. Precision is not stored in the mesh, so use <a class="el" href="#ad33066348fa63e1e84e21e78472d9599">WithPrecision()</a> to change it after ingest.</p>
+<p>The conversion runs in this constructor, so it cannot be cancelled or report progress. Use <a class="el" href="classmanifold_1_1_execution_context.html#a64b616f0231c55d69a904e8173c3b6b0">ExecutionContext::FromMeshGL</a> for that.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">meshGL</td><td>The input MeshGL. </td></tr>
@@ -359,9 +359,10 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Convert a MeshGL into a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>, retaining its properties and merging only the positions according to the merge vectors. Will return an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> and set an Error Status if the result is not an oriented 2-manifold. Will collapse degenerate triangles and unnecessary vertices.</p>
-<p>All fields are read, making this structure suitable for a lossless round-trip of data from GetMeshGL. For multi-material input, use ReserveIDs to set a unique originalID for each material, and sort the materials into triangle runs.</p>
+<p>Convert a MeshGL64 into a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>, retaining its properties and merging only the positions according to the merge vectors. Will return an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> and set an Error Status if the result is not an oriented 2-manifold. Triangles with a repeated vertex after merging are dropped. Other degenerate triangles are kept. Use <a class="el" href="#a10c9279f88f8ef7a396a04baad480076">RemoveDegenerates()</a> to collapse them.</p>
+<p>All fields are read, making this structure suitable for a lossless round-trip of data from GetMeshGL64. For multi-material input, use ReserveIDs to set a unique originalID for each material, and sort the materials into triangle runs.</p>
 <p>The result has relative precision kMinRelativePrecision. Precision is not stored in the mesh, so use <a class="el" href="#ad33066348fa63e1e84e21e78472d9599">WithPrecision()</a> to change it after ingest.</p>
+<p>The conversion runs in this constructor, so it cannot be cancelled or report progress. Use <a class="el" href="classmanifold_1_1_execution_context.html#a64b616f0231c55d69a904e8173c3b6b0">ExecutionContext::FromMeshGL</a> for that.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">meshGL64</td><td>The input MeshGL64. </td></tr>
@@ -1803,7 +1804,7 @@ Testing Hooks</h2></td></tr>
 <p>Normals written with <span class="tt"><a class="el" href="#ab2942ad196fd238a45667fda1f33ec0e">SetProperties()</a></span> are not recorded. Call this method on every operand before a transform when those values must follow the geometry.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">minSharpAngle</td><td>Any edges with angles greater than this value will remain sharp, getting different normal vector properties on each side of the edge. By default, no edges are sharp and all normals are shared. With a value of zero, the model is faceted and all normals match their triangle normals, but in this case it would be better not to calculate normals at all. </td></tr>
+    <tr><td class="paramname">minSharpAngle</td><td>Any edges with angles greater than this value will remain sharp, getting different normal vector properties on each side of the edge. Default is 52.5 degrees. With a value of zero, the model is faceted and all normals match their triangle normals, but in this case it would be better not to calculate normals at all. </td></tr>
   </table>
   </dd>
 </dl>
@@ -1824,7 +1825,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Increase the density of the mesh by splitting every edge into n pieces. For instance, with n = 2, each triangle will be split into 4 triangles. Quads will ignore their interior triangle bisector. These will all be coplanar (and will not be immediately collapsed) unless the Mesh/Manifold has halfedgeTangents specified (e.g. from the Smooth() constructor), in which case the new vertices will be moved to the interpolated surface according to their barycentric coordinates. Any normals recording set by <span class="tt"><a class="el" href="#a7f6e8c31bd3602fcbfa93bfb349c1457">CalculateNormals()</a></span> is preserved; the new verts get linearly-interpolated normals, which are less precise than recomputed ones but still meaningful.</p>
+<p>Increase the density of the mesh by splitting every edge into n pieces. For instance, with n = 2, each triangle will be split into 4 triangles. Quads will ignore their interior triangle bisector. These will all be coplanar (and will not be immediately collapsed) unless the Mesh/Manifold has halfedgeTangents specified (e.g. from <a class="el" href="#af97abee92407e3c97e721c80eb10d057">SmoothByNormals()</a>), in which case the new vertices will be moved to the interpolated surface according to their barycentric coordinates. Any normals recording set by <span class="tt"><a class="el" href="#a7f6e8c31bd3602fcbfa93bfb349c1457">CalculateNormals()</a></span> is preserved; the new verts get linearly-interpolated normals, which are less precise than recomputed ones but still meaningful.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">n</td><td>The number of pieces to split every edge into. Must be &gt; 1. </td></tr>
@@ -1848,7 +1849,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Increase the density of the mesh by splitting each edge into pieces of roughly the input length. Interior verts are added to keep the rest of the triangulation edges also of roughly the same length. If halfedgeTangents are present (e.g. from the Smooth() constructor), the new vertices will be moved to the interpolated surface according to their barycentric coordinates. Quads will ignore their interior triangle bisector. Any normals recording set by <span class="tt"><a class="el" href="#a7f6e8c31bd3602fcbfa93bfb349c1457">CalculateNormals()</a></span> is preserved; the new verts get linearly-interpolated normals, which are less precise than recomputed ones but still meaningful.</p>
+<p>Increase the density of the mesh by splitting each edge into pieces of roughly the input length. Interior verts are added to keep the rest of the triangulation edges also of roughly the same length. If halfedgeTangents are present (e.g. from <a class="el" href="#af97abee92407e3c97e721c80eb10d057">SmoothByNormals()</a>), the new vertices will be moved to the interpolated surface according to their barycentric coordinates. Quads will ignore their interior triangle bisector. Any normals recording set by <span class="tt"><a class="el" href="#a7f6e8c31bd3602fcbfa93bfb349c1457">CalculateNormals()</a></span> is preserved; the new verts get linearly-interpolated normals, which are less precise than recomputed ones but still meaningful.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">length</td><td>The length that edges will be broken down to. Its sign is ignored, and zero or NaN is an error. </td></tr>

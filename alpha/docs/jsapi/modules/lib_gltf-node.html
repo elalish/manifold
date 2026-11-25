@@ -6,8 +6,8 @@ into a gltf-transform document.</p>
 <p>It's important to note that gltf-transform <em>also</em> has a <code>Node</code> class,
 representing objects that are <em>already</em> part of a gltf-transform document.
 That class can mostly be seen in import and export related code.</p>
-<p>This leads to the confusing case where, <code>NonManifoldGLTFNode</code> is both.  It is
-a manifoldCAD node that contains an imported gltf-transform <code>Node</code>.  It
+<p>This leads to the confusing case where, <code>VisualizationGLTFNode</code> is both.  It
+is a manifoldCAD node that contains an imported gltf-transform <code>Node</code>.  It
 specifies how that gltf-transform node will be scaled, rotated and translated
 when it is eventually copied into a new gltf-transform document at export
 time.</p>
