@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <atomic>
+#include <cmath>
 #include <cstdint>
 
 #include "disjoint_sets.h"
@@ -173,11 +174,11 @@ void MergeMeshGLP(MeshGLP<Precision, I>& mesh, Precision requestedTolerance) {
     bBox.max[i] = minMax.second;
   }
 
-  const double tolerance = std::max(static_cast<double>(requestedTolerance),
-                                    (std::is_same<Precision, float>::value
-                                         ? std::numeric_limits<float>::epsilon()
-                                         : kPrecision) *
-                                        bBox.Scale());
+  const double tolerance = std::max(
+      (std::is_same<Precision, float>::value ? kDefaultRelativePrecision
+                                             : kMinRelativePrecision) *
+          bBox.Scale(),
+      static_cast<double>(requestedTolerance));
 
   auto policy = autoPolicy(numOpenVert, 1e5);
   Vec<Box> vertBox(numOpenVert);
@@ -247,6 +248,7 @@ namespace manifold {
 void Manifold::Impl::SortGeometry(ExecutionContext::Impl* ctx) {
   if (halfedge_.size() == 0) {
     collider_ = {};
+    bBox_ = Box();
     return;
   }
 
@@ -264,6 +266,7 @@ void Manifold::Impl::SortGeometry(ExecutionContext::Impl* ctx) {
   if (IsCancelled(ctx)) return;
   if (halfedge_.size() == 0) {
     collider_ = {};
+    bBox_ = Box();
     return;
   }
   collider_ = Collider(faceBox, faceMorton);
@@ -619,7 +622,10 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
  * (fewer than 3 properties, merge vectors of different lengths, or out-of-range
  * indices), the copy is unchanged. Otherwise, verts along open edges are merged
  * within tolerance (the maximum of the specified tolerance and the baseline
- * bounding-box tolerance), keeping any from the existing merge vectors.
+ * bounding-box tolerance), keeping any from the existing merge vectors. The
+ * baseline is the bounding box scale times the relative precision a Manifold
+ * made from this mesh gets: kDefaultRelativePrecision for MeshGL and
+ * kMinRelativePrecision for MeshGL64.
  *
  * There is no guarantee the result will be manifold - this is a best-effort
  * helper function designed primarily to aid in the case where a manifold

@@ -102,7 +102,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
     const ManifoldCADExportMatch = /^manifold-(3d|cad)\/manifoldCAD(.ts|.js)?$/
     const manifoldCADExportNames = [
       // Manifold classes.
-      'Mesh', 'Mesh64', 'Manifold', 'CrossSection',
+      'Mesh', 'Mesh64', 'Manifold', 'CrossSection', 'MIN_RELATIVE_PRECISION',
       // Manifold methods.
       'triangulate', 'segmentsFor', 'forDivisions',
 
@@ -114,13 +114,11 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       // Import
       'importModel', 'importManifold',
       // Getters for global properties
-      'getRelativePrecision', 'getAnimationDuration', 'getAnimationFPS',
-      'getAnimationMode',
+      'getAnimationDuration', 'getAnimationFPS', 'getAnimationMode',
       // Setters for global properties.
       // These will only be defined for top level scripts
-      'setRelativePrecision', 'setMorphStart', 'setMorphEnd',
-      'setAnimationDuration', 'setAnimationFPS', 'setAnimationMode',
-      'resetGLTFNodes',
+      'setMorphStart', 'setMorphEnd', 'setAnimationDuration', 'setAnimationFPS',
+      'setAnimationMode', 'resetGLTFNodes',
 
       // ManifoldCAD specific exports.
       'isManifoldCAD'

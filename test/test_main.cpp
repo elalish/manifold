@@ -402,7 +402,7 @@ void RelatedGL(const Manifold& out, const std::vector<MeshGL>& originals,
     };
     const float tolerance =
         3 *
-        std::max(Quality::GetRelativePrecision(),
+        std::max(out.GetPrecision(),
                  static_cast<double>(std::numeric_limits<float>::epsilon())) *
         std::max(meshScale(output), meshScale(inMesh));
 

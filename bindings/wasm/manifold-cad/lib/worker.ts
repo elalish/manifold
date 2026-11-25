@@ -35,7 +35,6 @@ import {RuntimeError} from './error.ts';
 import * as exportModel from './export-model.ts';
 import * as garbageCollector from './garbage-collector.ts';
 import * as gltfNode from './gltf-node.ts'
-import * as levelOfDetail from './level-of-detail.ts';
 import * as scenebuilder from './scene-builder.ts';
 import {getSourceMappedStackTrace, isWebWorker} from './util.ts';
 import {getManifoldModule, setWasmUrl as setManifoldWasmUrl} from './wasm.ts';
@@ -167,7 +166,6 @@ function log(...args: any[]) {
 export function cleanup(): void {
   garbageCollector.cleanup();
   scenebuilder.cleanup();
-  levelOfDetail.cleanup();
   gltfNode.cleanup();
 }
 
@@ -227,7 +225,6 @@ export async function evaluate(
   const globals = {
     // These accessors are only available to top level scripts.
     // See ../lib/manifoldCADGlobals.d.ts
-    setRelativePrecision: levelOfDetail.setRelativePrecision,
     setAnimationDuration: animation.setAnimationDuration,
     setAnimationFPS: animation.setAnimationFPS,
     setAnimationMode: animation.setAnimationMode,

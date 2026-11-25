@@ -39,6 +39,7 @@ TEST(Properties, BooleanBarycentricWeightsRemainFinite) {
   const double height = std::sqrt(3.0);
   const Manifold prism =
       Manifold::Extrude(Polygons{{{0, 0}, {2, 0}, {1, height}}}, 2)
+          .WithPrecision(1e-12)
           .SetProperties(3, [height](double* color, vec3 p, const double*) {
             color[2] = p.y / height;
             color[1] = (p.x - color[2]) / 2;
@@ -67,17 +68,17 @@ TEST(Properties, BooleanBarycentricWeightsRemainFinite) {
 
 TEST(Properties, Epsilon) {
   Manifold cube = Manifold::Cube();
-  EXPECT_FLOAT_EQ(cube.GetEpsilon(), Quality::GetRelativePrecision());
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), cube.GetPrecision());
   cube = cube.Scale({0.1, 1, 10});
-  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 10 * Quality::GetRelativePrecision());
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 10 * cube.GetPrecision());
   cube = cube.Translate({-100, -10, -1});
-  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 100 * Quality::GetRelativePrecision());
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), 100 * cube.GetPrecision());
 }
 
 TEST(Properties, Epsilon2) {
   Manifold cube = Manifold::Cube();
   cube = cube.Translate({-0.5, 0, 0}).Scale({2, 1, 1});
-  EXPECT_FLOAT_EQ(cube.GetEpsilon(), Quality::GetRelativePrecision());
+  EXPECT_FLOAT_EQ(cube.GetEpsilon(), cube.GetPrecision());
 }
 
 TEST(Properties, Tolerance) {

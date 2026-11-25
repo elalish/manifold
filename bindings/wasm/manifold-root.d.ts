@@ -24,10 +24,10 @@
  */
 
 export type * from './manifold-global-types';
-export type {MeshOptions, Mesh64Options, triangulate, setRelativePrecision, getRelativePrecision, segmentsFor, forDivisions, resetToCircularDefaults} from './manifold-encapsulated-types';
+export type {MeshOptions, Mesh64Options, MIN_RELATIVE_PRECISION, triangulate, segmentsFor, forDivisions} from './manifold-encapsulated-types';
 export {CrossSection, Manifold, Mesh, Mesh64} from './manifold-encapsulated-types';
 
-import type {triangulate, setRelativePrecision, getRelativePrecision, segmentsFor, forDivisions, resetToCircularDefaults} from './manifold-encapsulated-types';
+import type {MIN_RELATIVE_PRECISION, triangulate, segmentsFor, forDivisions} from './manifold-encapsulated-types';
 import {CrossSection, Manifold, Mesh, Mesh64} from './manifold-encapsulated-types';
 
 export interface ManifoldToplevel {
@@ -35,12 +35,10 @@ export interface ManifoldToplevel {
   Manifold: typeof Manifold;
   Mesh: typeof Mesh;
   Mesh64: typeof Mesh64;
+  MIN_RELATIVE_PRECISION: typeof MIN_RELATIVE_PRECISION;
   triangulate: typeof triangulate;
-  setRelativePrecision: typeof setRelativePrecision;
-  getRelativePrecision: typeof getRelativePrecision;
   segmentsFor: typeof segmentsFor;
   forDivisions: typeof forDivisions;
-  resetToCircularDefaults: typeof resetToCircularDefaults;
   setup: () => void;
 }
 

@@ -125,6 +125,72 @@ suite('Manifold Bindings', () => {
     expect(new Manifold(merged).volume()).toBeCloseTo(1);
   });
 
+  test('precision is the mesh default and set by withPrecision', () => {
+    const {Manifold, MIN_RELATIVE_PRECISION} = manifoldModule;
+    const mesh = Manifold.sphere(1, 64).getMesh();
+    expect(Manifold.ofMesh(mesh).getPrecision()).toEqual(2 ** -23);
+    expect(new Manifold(mesh).getPrecision()).toEqual(2 ** -23);
+    expect(new manifoldModule.ExecutionContext().fromMesh(mesh).getPrecision())
+        .toEqual(2 ** -23);
+    expect(Manifold.cube().getPrecision()).toEqual(2 ** -23);
+    const square = manifoldModule.CrossSection.square();
+    for (const shape
+             of [Manifold.extrude(square, 1),
+                 Manifold.revolve(square.translate([1, 0])),
+                 Manifold.levelSet(
+                     p => 1 - Math.hypot(...p),
+   {min: [-2, -2, -2], max: [2, 2, 2]}, 0.5),
+                 Manifold.hull([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]])]) {
+      expect(shape.getPrecision()).toEqual(2 ** -23);
+    }
+    // 0, negative values, NaN and infinity give the default.
+    for (const unset of [0, -1, NaN, Infinity]) {
+      expect(Manifold.cube()
+                 .withPrecision(1e-3)
+                 .withPrecision(unset)
+                 .getPrecision())
+          .toEqual(2 ** -23);
+    }
+    expect(MIN_RELATIVE_PRECISION).toEqual(1e-12);
+    expect(Manifold.cube().withPrecision(MIN_RELATIVE_PRECISION).getPrecision())
+        .toEqual(1e-12);
+    expect(Manifold.cube().withPrecision(1e-15).getPrecision()).toEqual(1e-12);
+    const coarse = new Manifold(mesh).withPrecision(1e-3);
+    expect(coarse.getPrecision()).toEqual(1e-3);
+    // The mesh does not store the precision.
+    expect(new Manifold(coarse.getMesh()).getPrecision()).toEqual(2 ** -23);
+    const stamped = Manifold.cube().withPrecision(1e-2);
+    expect(stamped.getPrecision()).toEqual(1e-2);
+    expect(coarse.add(stamped).getPrecision()).toEqual(1e-3);
+    expect(Manifold.hull([coarse, stamped]).getPrecision()).toEqual(1e-3);
+  });
+
+  test('merge closes gaps up to its tolerance', () => {
+    const {Manifold, Mesh} = manifoldModule;
+    const cube = Manifold.cube().calculateNormals(0).getMesh();
+    const vertProperties = cube.vertProperties.slice();
+    vertProperties[0] += 1e-4;
+    const open = new Mesh(
+        {numProp: cube.numProp, vertProperties, triVerts: cube.triVerts});
+    expect(() => new Manifold(open.merge())).toThrow();
+    expect(new Manifold(open.merge(1e-3)).status()).toEqual('NoError');
+  });
+
+  test('hull of Manifolds is computed at their smallest precision', () => {
+    const {Manifold} = manifoldModule;
+    const coarse = Manifold.sphere(1, 256).withPrecision(1e-2);
+    const hull = Manifold.hull([coarse]);
+    expect(hull.getPrecision()).toEqual(1e-2);
+    expect(hull.numTri()).toEqual(coarse.hull().numTri());
+    const withPoint = Manifold.hull([coarse, [2, 0, 0]]);
+    expect(withPoint.getPrecision()).toEqual(1e-2);
+    expect(withPoint.boundingBox().max[0]).toBeCloseTo(2);
+    const cube = Manifold.cube();
+    expect(Manifold.hull(cube, [2, 0, 0]).boundingBox().max[0]).toEqual(2);
+    expect(Manifold.hull(cube, [[3, 0, 0], [0, 3, 0], [0, 0, 3]]).volume())
+        .toBeCloseTo(4.5);
+  });
+
   test('rayCast returns hits through cube', () => {
     const cube = manifoldModule.Manifold.cube([1, 1, 1], true);
     const hits = cube.rayCast([0, 0, -5], [0, 0, 5]);
@@ -422,6 +488,36 @@ suite('Mesh64', () => {
     for (const manifold of [Manifold.ofMesh(input), ctx.fromMesh(input)]) {
       expect(sortedVerts(manifold.getMesh64())).toEqual(sortedVerts(input));
       manifold.delete();
+    }
+    ctx.delete();
+  });
+
+  test('a Manifold from a Mesh64 has the finest precision', () => {
+    const {Manifold, Mesh, ExecutionContext, MIN_RELATIVE_PRECISION} =
+        manifoldModule;
+    const input = doubleCube();
+    const fromFloat = new Manifold(new Mesh({
+      numProp: input.numProp,
+      triVerts: input.triVerts,
+      vertProperties: Float32Array.from(input.vertProperties)
+    }));
+    expect(fromFloat.getPrecision()).toEqual(2 ** -23);
+    const ctx = new ExecutionContext();
+    const fromDouble =
+        [new Manifold(input), Manifold.ofMesh(input), ctx.fromMesh(input)];
+    for (const manifold of fromDouble) {
+      expect(manifold.getPrecision()).toEqual(MIN_RELATIVE_PRECISION);
+    }
+    const coarse = fromDouble[0].withPrecision(1e-3);
+    expect(coarse.getPrecision()).toEqual(1e-3);
+    // 0 gives float epsilon, even for a Manifold made from a Mesh64.
+    const unset = fromDouble[0].withPrecision(0);
+    expect(unset.getPrecision()).toEqual(2 ** -23);
+    // The mesh does not store the precision.
+    const again = new Manifold(coarse.getMesh64());
+    expect(again.getPrecision()).toEqual(MIN_RELATIVE_PRECISION);
+    for (const m of [fromFloat, ...fromDouble, coarse, unset, again]) {
+      m.delete();
     }
     ctx.delete();
   });

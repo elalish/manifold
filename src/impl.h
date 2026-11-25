@@ -51,6 +51,9 @@ struct Manifold::Impl {
   };
 
   Box bBox_;
+  // The requested relative precision. CalculateBBox sets epsilon_ to this
+  // times the bounding box scale.
+  double relPrecision_ = kDefaultRelativePrecision;
   double epsilon_ = -1;
   int numProp_ = 0;
   Error status_ = Error::NoError;
@@ -294,7 +297,10 @@ void Manifold::Impl::ForVert(
 
 template <typename Precision, typename I>
 Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
-                     ExecutionContext::Impl* ctx) {
+                     ExecutionContext::Impl* ctx)
+    : relPrecision_(std::is_same<Precision, float>::value
+                        ? kDefaultRelativePrecision
+                        : kMinRelativePrecision) {
   MANIFOLD_BEGIN_PHASE_TIMING();
   // Entry-time cancel wins over empty/malformed input; past this gate,
   // validation errors win over races.
@@ -520,8 +526,6 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   }
   ADVANCE_PHASE_OR_RETURN(ctx);
 
-  CalculateBBox();
-
   // we need to split pinched verts before calculating vertex normals, because
   // the algorithm doesn't work with pinched verts
   CleanupTopology();
@@ -536,6 +540,7 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
   RemoveUnreferencedVerts();
   ADVANCE_PHASE_OR_RETURN(ctx);
 
+  CalculateBBox();
   SortGeometry(ctx);
   ADVANCE_PHASE_OR_RETURN(ctx);
 

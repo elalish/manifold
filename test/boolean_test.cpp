@@ -249,7 +249,7 @@ TEST(Boolean, Simplify) {
 
   MeshGL resultGL = result.GetMeshGL();
   resultGL.faceID.clear();
-  Manifold result2(resultGL);
+  Manifold result2 = Manifold(resultGL).WithPrecision(1e-12);
   EXPECT_EQ(result2.NumTri(), nStarting);
   EXPECT_EQ(result2.RemoveDegenerates().NumTri(), 34);
   EXPECT_EQ(result2.Simplify().NumTri(), 12);
@@ -1204,7 +1204,7 @@ TEST(Boolean, Precision) {
   Manifold cube2 = cube;
   Manifold cube3 = cube;
   double distance = 100;
-  double scale = distance * Quality::GetRelativePrecision();
+  double scale = distance * cube.GetPrecision();
   cube2 = cube2.Scale(vec3(scale)).Translate({distance, 0, 0});
 
   cube += cube2;
@@ -1220,7 +1220,7 @@ TEST(Boolean, Precision) {
 TEST(Boolean, Precision2) {
   double scale = 1000;
   Manifold cube = Manifold::Cube(vec3(scale));
-  const double epsilon = scale * Quality::GetRelativePrecision();
+  const double epsilon = scale * cube.GetPrecision();
   // An overlap within epsilon is a tie, resolved as no intersection.
   double distance = scale - epsilon / 2;
   EXPECT_TRUE((cube ^ cube.Translate(vec3(-distance))).IsEmpty());
@@ -1240,14 +1240,14 @@ TEST(Boolean, Precision3) {
   Manifold result2 =
       Manifold(cube1.GetMeshGL64()) + Manifold(cube2.GetMeshGL64());
   EXPECT_EQ(result2.NumTri(), result.NumTri());
-  // MeshGL rounds to single precision, so the results are no longer coplanar.
-  Manifold result3 = Manifold(cube1.GetMeshGL()) + Manifold(cube2.GetMeshGL());
+  // MeshGL rounds to single precision, so at double precision the results are
+  // no longer coplanar.
+  Manifold result3 = Manifold(cube1.GetMeshGL()).WithPrecision(1e-12) +
+                     Manifold(cube2.GetMeshGL()).WithPrecision(1e-12);
   EXPECT_GT(result3.NumTri(), result.NumTri());
-  // Setting the precision to reflect this makes the faces coplanar again.
-  Quality::SetRelativePrecision(1e-7);
+  // The default precision of MeshGL reflects this, so the faces are coplanar.
   Manifold result4 = Manifold(cube1.GetMeshGL()) + Manifold(cube2.GetMeshGL());
   EXPECT_EQ(result4.NumTri(), result.NumTri());
-  Quality::ResetToDefaults();
 }
 
 TEST(Boolean, SimpleCubeRegression) {
@@ -1815,7 +1815,7 @@ TEST(Boolean, PointWithinToleranceOfCoincidentEdge) {
   const Manifold b1 = block - clipper;
   const Manifold b2 = block.Translate(vec3(0, 0, -30)) ^ clipper;
   const Manifold result = b1 + b2;
-  const double tol = 100 * Quality::GetRelativePrecision();
+  const double tol = 100 * result.GetPrecision();
   const vec3 edge(50 * std::tan(kPi / 6), 50, 70);
   const vec3 out(-std::cos(kPi / 6), std::sin(kPi / 6), 1);
   const vec3 within = edge + out * (tol / 4);

@@ -37,8 +37,6 @@
 
 namespace manifold {
 
-constexpr double kPrecision = 1e-12;
-
 inline int Next3(int i) {
   constexpr ivec3 next3(1, 2, 0);
   return next3[i];

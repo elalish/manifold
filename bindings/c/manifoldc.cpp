@@ -30,6 +30,8 @@
 
 using namespace manifold;
 
+static_assert(MANIFOLD_MIN_RELATIVE_PRECISION == kMinRelativePrecision);
+
 namespace {
 ManifoldManifold* level_set(double (*sdf_context)(double, double, double,
                                                   void*),
@@ -761,6 +763,15 @@ double manifold_epsilon(const ManifoldManifold* m) {
   return from_c(m)->GetEpsilon();
 }
 
+ManifoldManifold* manifold_with_precision(const ManifoldManifold* m,
+                                          double rel_precision) {
+  return to_c(new Manifold(from_c(m)->WithPrecision(rel_precision)));
+}
+
+double manifold_get_precision(const ManifoldManifold* m) {
+  return from_c(m)->GetPrecision();
+}
+
 size_t manifold_num_prop_vert(const ManifoldManifold* m) {
   return from_c(m)->NumPropVert();
 }
@@ -884,16 +895,6 @@ void manifold_version(int version[3]) {
   version[0] = v[0];
   version[1] = v[1];
   version[2] = v[2];
-}
-
-// Static Quality Globals
-
-void manifold_set_relative_precision(double precision) {
-  Quality::SetRelativePrecision(precision);
-}
-
-double manifold_get_relative_precision() {
-  return Quality::GetRelativePrecision();
 }
 
 int manifold_circular_quality_segments_for(

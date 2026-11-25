@@ -27,6 +27,17 @@ extern "C" {
 // If the function return type is `const T*`,
 // the result is borrowed from input arguments.
 
+// Relative precision defines what counts as coplanar or degenerate. A
+// manifold's epsilon is its relative precision times its bounding box scale.
+// Manifolds made from a MeshGL and built shapes have float epsilon
+// (FLT_EPSILON in <float.h>). Manifolds made from a MeshGL64 or read from OBJ
+// have MANIFOLD_MIN_RELATIVE_PRECISION, the finest allowed. Booleans,
+// Minkowski and hulls of several manifolds use the smallest precision among
+// their non-empty inputs. An empty Boolean or Minkowski result uses the
+// smallest among all its inputs. Other operations keep the precision of their
+// input. Use manifold_with_precision to change it.
+#define MANIFOLD_MIN_RELATIVE_PRECISION 1e-12
+
 // Polygons
 
 ManifoldSimplePolygon* manifold_simple_polygon(const ManifoldVec2* ps,
@@ -204,22 +215,33 @@ ManifoldManifold* manifold_as_original(const ManifoldManifold* m, int id);
 int manifold_is_empty(const ManifoldManifold* m);
 ManifoldError manifold_status(const ManifoldManifold* m);
 // Returns a copy of the manifold with the given ExecutionContext attached.
-// Only manifold_status and the eager ops (the manifold_refine* family,
-// manifold_hull, manifold_minkowski_sum and manifold_minkowski_difference)
-// observe it, reporting progress and cancellation through it. Other queries
-// that force evaluation, such as manifold_volume or manifold_get_meshgl, do
-// not. Every other op that returns a manifold ignores the attached ctx and
-// returns a result with no attached ctx. Copies (manifold_copy and the
+// Only manifold_status, manifold_with_precision, manifold_get_precision and
+// the eager ops (the manifold_refine* family, manifold_hull,
+// manifold_minkowski_sum and manifold_minkowski_difference) observe it,
+// reporting progress and cancellation through it. Other queries that force
+// evaluation, such as manifold_volume or manifold_get_meshgl, do not. Every
+// other op that returns a manifold ignores the attached ctx and returns a
+// result with no attached ctx. Copies (manifold_copy and the
 // manifold_manifold_vec get/set/push_back calls) keep the attachment. See
 // Manifold::WithContext in manifold.h and ExecutionContext in common.h for
 // the full model.
 ManifoldManifold* manifold_with_context(const ManifoldManifold* m,
                                         const ManifoldExecutionContext* ctx);
+// Evaluates m and returns it with the given relative precision for later
+// operations, without recomputing it. 0, negative values, NaN and infinity
+// give FLT_EPSILON, even for a manifold made from a MeshGL64. Positive values
+// below MANIFOLD_MIN_RELATIVE_PRECISION are raised to it.
+ManifoldManifold* manifold_with_precision(const ManifoldManifold* m,
+                                          double rel_precision);
+// Returns the relative precision of m. See MANIFOLD_MIN_RELATIVE_PRECISION.
+double manifold_get_precision(const ManifoldManifold* m);
 size_t manifold_num_vert(const ManifoldManifold* m);
 size_t manifold_num_edge(const ManifoldManifold* m);
 size_t manifold_num_tri(const ManifoldManifold* m);
 size_t manifold_num_prop(const ManifoldManifold* m);
 ManifoldBox* manifold_bounding_box(const ManifoldManifold* m);
+// Returns the relative precision of m times its bounding box scale, or -1 if
+// m is empty.
 double manifold_epsilon(const ManifoldManifold* m);
 size_t manifold_num_prop_vert(const ManifoldManifold* m);
 int manifold_genus(const ManifoldManifold* m);
@@ -426,11 +448,6 @@ int manifold_box_is_finite(const ManifoldBox* b);
 
 void manifold_version(int version[3]);
 
-// Static Quality Globals
-
-void manifold_set_relative_precision(double precision);
-double manifold_get_relative_precision(void);
-
 // Circular Quality
 // quality may be NULL for the default CircularQuality.
 int manifold_circular_quality_segments_for(
@@ -523,7 +540,8 @@ void manifold_delete_execution_context(ManifoldExecutionContext* ctx);
 
 // Import a manifold from a Wavefront obj file.
 // The obj_file parameter is the content of the obj file, not the filename,
-// and should be null-terminated.
+// and should be null-terminated. The result has relative precision
+// MANIFOLD_MIN_RELATIVE_PRECISION.
 ManifoldManifold* manifold_read_obj(const char* obj_file);
 // Import a meshgl from a Wavefront obj file.
 // The obj_file parameter is the content of the obj file, not the filename,

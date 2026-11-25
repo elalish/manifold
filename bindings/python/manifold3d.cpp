@@ -227,10 +227,9 @@ const std::string manifold__rotate__degrees =
 NB_MODULE(manifold3d, m) {
   m.doc() = "Python binding for the Manifold library.";
 
-  m.def("set_relative_precision", Quality::SetRelativePrecision,
-        nb::arg("precision"));
-
-  m.def("get_relative_precision", Quality::GetRelativePrecision);
+  // The finest relative precision, and the precision of a Manifold made from a
+  // Mesh64.
+  m.attr("MIN_RELATIVE_PRECISION") = kMinRelativePrecision;
 
   nb::class_<CircularQuality>(m, "CircularQuality")
       .def(
@@ -432,6 +431,10 @@ NB_MODULE(manifold3d, m) {
       .def("status", &Manifold::Status, manifold__status, release_gil())
       .def("with_context", &Manifold::WithContext, nb::arg("ctx"),
            manifold__with_context__ctx)
+      .def("with_precision", &Manifold::WithPrecision, nb::arg("rel_precision"),
+           manifold__with_precision__rel_precision, release_gil())
+      .def("get_precision", &Manifold::GetPrecision, manifold__get_precision,
+           release_gil())
       .def(
           "bounding_box",
           [](const Manifold& self) {
@@ -755,8 +758,9 @@ NB_MODULE(manifold3d, m) {
   nb::class_<ExecutionContext>(
       m, "ExecutionContext",
       "Reports progress and allows cancellation. Another thread can call "
-      "cancel() while Manifold.status(), refine*(), minkowski_*() or hull(), "
-      "or this class's from_mesh() or level_set(), runs. On Python before "
+      "cancel() while Manifold.status(), with_precision(), get_precision(), "
+      "refine*(), minkowski_*() or hull(), or this class's from_mesh() or "
+      "level_set(), runs. On Python before "
       "3.13.8, join any thread running these calls before the interpreter "
       "exits.")
       .def(nb::init<>())
@@ -774,7 +778,8 @@ NB_MODULE(manifold3d, m) {
           },
           nb::arg("mesh"),
           "Ingest a MeshGL into a Manifold under this context, so the ingest "
-          "reports progress and observes cancellation.")
+          "reports progress and observes cancellation. The result has float "
+          "relative precision.")
       .def(
           "from_mesh",
           [](ExecutionContext& ctx, const MeshGL64& mesh) {
@@ -783,7 +788,8 @@ NB_MODULE(manifold3d, m) {
           },
           nb::arg("mesh"),
           "Ingest a MeshGL64 into a Manifold under this context, so the ingest "
-          "reports progress and observes cancellation.")
+          "reports progress and observes cancellation. The result has "
+          "relative precision 1e-12.")
       .def(
           "level_set",
           [](ExecutionContext& ctx,

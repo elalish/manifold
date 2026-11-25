@@ -166,7 +166,9 @@ struct MeshGLP {
    * out-of-range indices), the copy is unchanged. Otherwise, verts along open
    * edges are merged within tolerance (the maximum of the specified tolerance
    * and the baseline bounding-box tolerance), keeping any from the existing
-   * merge vectors.
+   * merge vectors. The baseline is the bounding box scale times the relative
+   * precision a Manifold made from this mesh gets: kDefaultRelativePrecision
+   * for MeshGL and kMinRelativePrecision for MeshGL64.
    *
    * There is no guarantee the result will be manifold - this is a
    * best-effort helper function designed primarily to aid in the case where
@@ -175,7 +177,8 @@ struct MeshGLP {
    * Manifold from the result will report an error status if it is not
    * manifold.
    *
-   * @param tolerance Merge open-edge verts closer than this.
+   * @param tolerance Merge open-edge verts closer than this. NaN is treated
+   * as 0.
    */
   [[nodiscard]] MeshGLP Merge(Precision tolerance = 0) const;
 

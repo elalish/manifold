@@ -2827,6 +2827,13 @@ TEST(CrossSection, SimplifyRemovesCollinearVertices) {
   EXPECT_NEAR(simplified.Area(), 4.0, 1e-9);
 }
 
+TEST(CrossSection, SimplifyNaNTolerance) {
+  // NaN simplifies like 0, at the cross-section's own tolerance.
+  const CrossSection simplified = CrossSection::Square({2, 2}).Simplify(NAN);
+  EXPECT_EQ(simplified.NumVert(), 4);
+  EXPECT_NEAR(simplified.Area(), 4.0, 1e-9);
+}
+
 TEST(CrossSection, SimplifyReducesCurveWithoutCollapsing) {
   // A moderate epsilon reduces a dense curve but must never delete it
   // (regression: feeding epsilon as the boolean merge tolerance collapsed
