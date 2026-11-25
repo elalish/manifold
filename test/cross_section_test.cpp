@@ -472,11 +472,77 @@ TEST(CrossSection, MiterOffset) {
 
   EXPECT_EQ(result.Genus(), 0);
   EXPECT_NEAR(result.Volume(), 30. * 30., 0.01);
-  // Offset keeps collinear verts on the miter edges; stripping them is
-  // Simplify's job, so the raw offset has more than 4 verts and Simplify
-  // reduces it to the 4 corners (checked backend-agnostically).
-  EXPECT_GT(offset.NumVert(), 4);
+  // Each corner is one miter point.
+  EXPECT_EQ(offset.NumVert(), 4);
   EXPECT_EQ(offset.Simplify().NumVert(), 4);
+}
+
+// A regular hexagon's 120-degree corners are within the default miter limit.
+// An outward offset gives each corner a miter join. An inward offset makes
+// every corner concave on the offset side, where the fill rule trims the
+// crossing offset edges to one vertex.
+TEST(CrossSection, OffsetMiterHexagonVertexCount) {
+  const CrossSection hexagon = CrossSection::Circle(10, {6});
+  const double inradius = 10 * std::cos(kPi / 6);
+  for (double delta : {1.0, -1.0}) {
+    SCOPED_TRACE(delta);
+    const CrossSection out =
+        hexagon.Offset(delta, CrossSection::JoinType::Miter);
+    const double r = inradius + delta;
+    EXPECT_NEAR(out.Area(), 6 * r * r * std::tan(kPi / 6), 1e-9);
+    EXPECT_EQ(out.NumVert(), 6);
+    EXPECT_EQ(out.Simplify().NumVert(), 6);
+  }
+}
+
+// A Square join cuts each corner of a square off with a flat edge
+// perpendicular to the corner's bisector.
+TEST(CrossSection, OffsetSquareJoinSquareVertexCount) {
+  const CrossSection square = CrossSection::Square({20., 20.}, true);
+  const CrossSection out = square.Offset(5., CrossSection::JoinType::Square);
+  // Each flat edge removes a right isosceles triangle with legs
+  // 5 * (2 - sqrt(2)) from the 30 x 30 square that Miter joins would give.
+  const double leg = 5 * (2 - std::sqrt(2.0));
+  EXPECT_NEAR(out.Area(), 30. * 30. - 4 * leg * leg / 2, 1e-9);
+  // Each corner is the flat edge's two ends.
+  EXPECT_EQ(out.NumVert(), 8);
+  EXPECT_EQ(out.Simplify().NumVert(), 8);
+}
+
+// Offset keeps collinear input vertices: a square with a vertex at the middle
+// of each edge keeps an offset copy of each midpoint.
+TEST(CrossSection, OffsetMiterKeepsCollinearInputVerts) {
+  const SimplePolygon square = {{-10, -10}, {0, -10}, {10, -10}, {10, 0},
+                                {10, 10},   {0, 10},  {-10, 10}, {-10, 0}};
+  const CrossSection cs(square);
+  ASSERT_EQ(cs.NumVert(), 8);
+  const CrossSection out = cs.Offset(1., CrossSection::JoinType::Miter);
+  EXPECT_NEAR(out.Area(), 22. * 22., 1e-9);
+  // Four offset midpoints and four miter points.
+  EXPECT_EQ(out.NumVert(), 8);
+  const Polygons polys = out.ToPolygons();
+  ASSERT_EQ(polys.size(), 1);
+  for (const vec2 mid :
+       {vec2(0, -11), vec2(11, 0), vec2(0, 11), vec2(-11, 0)}) {
+    EXPECT_NE(std::find(polys[0].begin(), polys[0].end(), mid), polys[0].end())
+        << "missing offset midpoint (" << mid.x << ", " << mid.y << ")";
+  }
+}
+
+// Found by fuzzing. Regularizing this self-crossing ring leaves two vertices
+// 2e-16 apart where the ring touches itself. Offset gives the edge between
+// them the bisector of its neighbors' normals, so the result matches
+// Clipper2's and the result with the two vertices merged into one.
+TEST(CrossSection, OffsetMiterNextToSubEpsEdge) {
+  const SimplePolygon ring = {{4, 3},  {10, 1}, {8, 3},
+                              {9, -2}, {8, 1},  {9.999999998, 4.999999996}};
+  const CrossSection cs(ring);
+  ASSERT_EQ(cs.NumVert(), 6);
+  const CrossSection out =
+      cs.Offset(1.0083379023984145, CrossSection::JoinType::Miter);
+  EXPECT_EQ(out.NumContour(), 1);
+  EXPECT_NEAR(out.Area(), 30.696439315160, 1e-9);
+  EXPECT_EQ(out.NumVert(), 8);
 }
 
 TEST(CrossSection, OffsetWithHole) {
