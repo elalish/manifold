@@ -1855,16 +1855,13 @@ TEST(Boolean, ReversedFaceNearCoincidentCubes) {
       1, 0, 4, 2, 4, 0, 1, 3, 0, 3, 1, 5, 3, 2, 0, 3, 7, 2,
       5, 4, 6, 5, 1, 4, 6, 4, 2, 7, 6, 2, 7, 3, 5, 7, 5, 6,
   };
-  struct PrecisionGuard {
-    ~PrecisionGuard() { Quality::ResetToDefaults(); }
-  } guard;
-  Quality::SetRelativePrecision(1e-7);
   MeshGL64 ma, mb;
   ma.numProp = mb.numProp = 3;
   ma.vertProperties = vertA;
   mb.vertProperties = vertB;
   ma.triVerts = mb.triVerts = tri;
-  const Manifold a(ma), b(mb);
+  const Manifold a = Manifold(ma).WithPrecision(1e-7);
+  const Manifold b = Manifold(mb).WithPrecision(1e-7);
   const Manifold r = a ^ b;
   EXPECT_EQ(r.Status(), Manifold::Error::NoError);
   EXPECT_EQ(r.Genus(), 0);
@@ -1933,18 +1930,15 @@ TEST(Boolean, FoldedFinNearCoincidentBoxes) {
       1, 0, 4, 2, 4, 0, 1, 3, 0, 3, 1, 5, 3, 2, 0, 3, 7, 2,
       5, 4, 6, 5, 1, 4, 6, 4, 2, 7, 6, 2, 7, 3, 5, 7, 5, 6,
   };
-  struct PrecisionGuard {
-    ~PrecisionGuard() { Quality::ResetToDefaults(); }
-  } guard;
   ManifoldParamGuard paramGuard;
   ManifoldParams().intermediateChecks = false;
-  Quality::SetRelativePrecision(1e-3);
   MeshGL64 ma, mb;
   ma.numProp = mb.numProp = 3;
   ma.vertProperties = vertA;
   mb.vertProperties = vertB;
   ma.triVerts = mb.triVerts = tri;
-  const Manifold r = Manifold(ma) + Manifold(mb);
+  const Manifold r =
+      Manifold(ma).WithPrecision(1e-3) + Manifold(mb).WithPrecision(1e-3);
   EXPECT_EQ(r.Status(), Manifold::Error::NoError);
   // The fold adds surface area: the union is 11.9746 at fine precision. If tie
   // handling stops producing the fold, this no longer pins anything.
