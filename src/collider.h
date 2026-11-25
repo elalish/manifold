@@ -247,6 +247,10 @@ struct FindCollision {
     // Depth-first search
     int node = kRoot;
     Local& local = recorder.local();
+    if (internalChildren_.empty()) {
+      RecordCollision(query, Leaf2Node(0), queryIdx, local);
+      return;
+    }
     while (1) {
       int internal = Node2Internal(node);
       int child1 = internalChildren_[internal].first;
@@ -336,6 +340,7 @@ class Collider {
 
   Box GetBoundingBox() const {
     if (nodeBBox_.empty()) return Box();
+    if (internalChildren_.empty()) return nodeBBox_[0];
     return nodeBBox_[collider_internal::Internal2Node(0)];
   }
 
@@ -346,6 +351,8 @@ class Collider {
     // copy in leaf node Boxes
     auto leaves = StridedRange(nodeBBox_.begin(), nodeBBox_.end(), 2);
     copy(leafBB.cbegin(), leafBB.cend(), leaves.begin());
+    // A single leaf is already the root and has no parent box to update.
+    if (internalChildren_.empty()) return;
     // create global counters
     Vec<int> counter(NumInternal(), 0);
     // kernel over leaves to save internal Boxes
@@ -369,7 +376,7 @@ class Collider {
                   ExecutionContext::Impl* ctx = nullptr) const {
     ZoneScoped;
     using collider_internal::FindCollision;
-    if (internalChildren_.empty()) return;
+    if (nodeBBox_.empty()) return;
     for_each_n(parallel ? autoPolicy(n, collider_internal::kSequentialThreshold)
                         : ExecutionPolicy::Seq,
                countAt(0), n, ctx,
@@ -423,7 +430,7 @@ class Collider {
 
   size_t NumInternal() const { return internalChildren_.size(); };
   size_t NumLeaves() const {
-    return internalChildren_.empty() ? 0 : (NumInternal() + 1);
+    return nodeBBox_.empty() ? 0 : (NumInternal() + 1);
   };
 };
 

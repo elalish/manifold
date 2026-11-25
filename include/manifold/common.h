@@ -167,8 +167,13 @@ using Polygons = std::vector<SimplePolygon>;
  * @brief Result of a ray cast query against a Manifold.
  */
 struct RayHit {
-  /// The triangle index that was hit.
-  uint64_t faceID = 0;
+  /// The originalID of the input mesh the hit triangle came from, as in
+  /// MeshGL::runOriginalID. It is 0 if that mesh was not tracked, e.g. a
+  /// primitive that never went through AsOriginal().
+  uint32_t originalID = 0;
+  /// The faceID the hit triangle got from its input mesh, as in
+  /// MeshGL::faceID. It is 0 if that mesh had no faceID.
+  uint32_t faceID = 0;
   /// The parametric distance along the ray segment in the closed interval
   /// [0, 1], where 0 is the origin and 1 is the endpoint. Hits exactly at
   /// the origin or endpoint are included.
@@ -182,7 +187,7 @@ struct RayHit {
   /// endpoint. Prefer this over the sign of dot(normal, direction), which
   /// can disagree with the mesh's internal crossing in degenerate cases.
   /// A ray grazing a vertex or edge can return a +1/-1 pair at the same
-  /// distance; such ties are ordered by faceID.
+  /// distance. Such ties are returned in a deterministic order.
   int crossing = 0;
 };
 
@@ -654,27 +659,42 @@ enum class JoinType {
            document formats). */
 };
 
-constexpr int DEFAULT_SEGMENTS = 0;
-constexpr double DEFAULT_ANGLE = 10.0;
-constexpr double DEFAULT_LENGTH = 1.0;
 /**
- * @brief These static properties control how circular shapes are quantized by
- * default on construction.
+ * @brief Controls how circular shapes are quantized on construction. Pass one
+ * to CrossSection::Circle(), CrossSection::Offset(), Manifold::Cylinder(),
+ * Manifold::Sphere(), and Manifold::Revolve().
  *
- * If circularSegments is specified, it takes
- * precedence. If it is zero, then instead the minimum is used of the segments
- * calculated based on edge length and angle, rounded up to the nearest
- * multiple of four. To get numbers not divisible by four, circularSegments
- * must be specified.
+ * If segments is greater than two (for a Sphere, positive), it takes
+ * precedence. Otherwise the minimum is used of the segments calculated based on
+ * edge length and angle, rounded up to the nearest multiple of four. To get
+ * numbers not divisible by four, segments must be specified.
+ */
+struct CircularQuality {
+  /// Number of segments in a full 360-degree circle. Pass `{n}` to set just
+  /// this. Partial revolves use the matching fraction of it, rounded up,
+  /// ignoring an excess of one unit in the last place so floating-point error
+  /// cannot add a division (see ForDivisions()). A Sphere rounds it up to a
+  /// multiple of four. Values below 3 apply no constraint, except that Sphere
+  /// takes any positive count.
+  int segments = 0;
+  /// Minimum angle in degrees between consecutive segments. The angle
+  /// increases if the segments hit the minimum edge length.
+  double minAngle = 10.0;
+  /// Minimum length of segments. The length increases if the segments hit
+  /// the minimum angle.
+  double minEdgeLength = 1.0;
+
+  int SegmentsFor(double radius) const;
+  static CircularQuality ForDivisions(int divisions, double degrees);
+};
+
+/**
+ * @brief Global parameters for geometric computations.
  */
 class Quality {
  public:
   static void SetRelativePrecision(double p);
-  static void SetMinCircularAngle(double angle);
-  static void SetMinCircularEdgeLength(double length);
-  static void SetCircularSegments(int number);
   static double GetRelativePrecision();
-  static int GetCircularSegments(double radius);
   static void ResetToDefaults();
 };
 /** @} */
@@ -705,9 +725,6 @@ struct ExecutionParams {
   /// Suppresses printed errors regarding CW triangles. Has no effect if
   /// processOverlaps is true.
   bool suppressErrors = false;
-  /// Deprecated! This value no longer has any effect, as cleanup now only
-  /// occurs on intersected triangles.
-  bool cleanupTriangles = true;
   /// Verbose level:
   /// - 0 for no verbose output
   /// - 1 for Boolean debug dumps on failures and invalid intermediate meshes.

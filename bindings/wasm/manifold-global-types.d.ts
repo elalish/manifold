@@ -100,7 +100,17 @@ export type Box = {
   max: Vec3
 };
 
+/**
+ * One hit of {@link Manifold.rayCast}.
+ *
+ * @property originalID The originalID of the input mesh the hit triangle came
+ * from, as in Mesh.runOriginalID. It is 0 if that mesh was not tracked, e.g. a
+ * primitive that never went through asOriginal().
+ * @property faceID The faceID the hit triangle got from its input mesh, as in
+ * Mesh.faceID. It is 0 if that mesh had no faceID.
+ */
 export type RayHit = {
+  originalID: number,
   faceID: number,
   distance: number,
   position: Vec3,
@@ -109,6 +119,26 @@ export type RayHit = {
 };
 
 export type JoinType = 'Square'|'Round'|'Miter'|'Bevel';
+
+/**
+ * Controls how circular shapes are quantized on construction. A number sets
+ * `segments`. Missing fields use their defaults.
+ *
+ * If segments is greater than two (for a sphere, positive), it takes
+ * precedence. Otherwise the minimum is used of the segments calculated based on
+ * edge length and angle, rounded up to the nearest multiple of four.
+ *
+ * - `segments`: Number of segments in a full 360-degree circle, the same as
+ *   passing a number. Partial revolves use the matching fraction of it,
+ *   rounded up, ignoring an excess of one unit in the last place so
+ *   floating-point error cannot add a division. A sphere rounds it up to a
+ *   multiple of four. Default is 0, meaning no constraint is applied.
+ * - `minAngle`: Minimum angle in degrees between consecutive segments. Default
+ *   is 10.
+ * - `minEdgeLength`: Minimum length of segments. Default is 1.
+ */
+export type CircularQuality =
+    number|{segments?: number, minAngle?: number, minEdgeLength?: number};
 
 /**
  * @see {@link Manifold.status}

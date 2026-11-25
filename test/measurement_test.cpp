@@ -19,6 +19,7 @@
 //     MinGap is built on)
 
 #include <limits>
+#include <utility>
 
 #include "../src/tri_dist.h"
 #include "gtest/gtest.h"
@@ -63,7 +64,7 @@ TEST(Measurement, RayCastBehindOrigin) {
 }
 
 TEST(Measurement, RayCastSphere) {
-  Manifold sphere = Manifold::Sphere(1.0, 128);
+  Manifold sphere = Manifold::Sphere(1.0, {128});
 
   auto hits = sphere.RayCast(vec3(0, 0, -5), vec3(0, 0, 5));
   ASSERT_EQ(hits.size(), 2);
@@ -158,11 +159,11 @@ TEST(Measurement, RayCastCrossingMatchesWinding) {
   }
 }
 
-TEST(Measurement, RayCastTiesSortedByFaceID) {
+TEST(Measurement, RayCastTiesAtGrazedVertex) {
   // A ray through the same vertex of a row of rotated cubes grazes each one,
   // giving a pair of hits at equal distance per cube. With more than 16 hits
-  // std::sort is no longer stable in practice, so ties must be ordered by
-  // faceID explicitly.
+  // std::sort is no longer stable in practice, so RayCast orders ties itself.
+  // Each tied pair must still cancel.
   const Manifold cube = Manifold::Cube(vec3(1.0), true).Rotate(30, 40, 50);
   std::vector<Manifold> cubes;
   for (int i = 0; i < 20; ++i) cubes.push_back(cube.Translate({3.0 * i, 0, 0}));
@@ -177,7 +178,7 @@ TEST(Measurement, RayCastTiesSortedByFaceID) {
     for (size_t i = 1; i < hits.size(); ++i) {
       if (hits[i - 1].distance != hits[i].distance) continue;
       ++ties;
-      EXPECT_LT(hits[i - 1].faceID, hits[i].faceID) << "vert " << v;
+      EXPECT_EQ(hits[i - 1].crossing + hits[i].crossing, 0) << "vert " << v;
     }
   }
   EXPECT_GT(ties, 0);
@@ -198,7 +199,73 @@ TEST(Measurement, RayCastDistantObliqueGrazing) {
   ASSERT_EQ(hits.size(), 2);
   EXPECT_EQ(hits[0].crossing + hits[1].crossing, 0);
   EXPECT_DOUBLE_EQ(hits[0].distance, hits[1].distance);
-  EXPECT_LT(hits[0].faceID, hits[1].faceID);
+}
+
+namespace {
+// Returns true if p lies on triangle tri of mesh, within tol.
+bool PointOnTri(const MeshGL64& mesh, size_t tri, vec3 p, double tol) {
+  vec3 v[3];
+  for (const int i : {0, 1, 2}) {
+    const double* q =
+        &mesh.vertProperties[mesh.numProp * mesh.triVerts[3 * tri + i]];
+    v[i] = vec3(q[0], q[1], q[2]);
+  }
+  const vec3 n = la::normalize(la::cross(v[1] - v[0], v[2] - v[0]));
+  if (std::abs(la::dot(p - v[0], n)) > tol) return false;
+  for (const int i : {0, 1, 2}) {
+    if (la::dot(la::cross(v[(i + 1) % 3] - v[i], p - v[i]), n) < -tol)
+      return false;
+  }
+  return true;
+}
+}  // namespace
+
+TEST(Measurement, RayCastProvenance) {
+  // A Boolean result has several runs, and its internal triangle order is not
+  // the GetMeshGL order. Each hit must name the run's originalID and the
+  // MeshGL faceID of a GetMeshGL triangle under the hit point.
+  MeshGL64 cubeGL = Manifold::Cube(vec3(1), true).GetMeshGL64();
+  cubeGL.runOriginalID = {Manifold::ReserveIDs(1)};
+  cubeGL.faceID.resize(cubeGL.NumTri());
+  for (size_t i = 0; i < cubeGL.NumTri(); ++i) cubeGL.faceID[i] = 100 + i;
+  const Manifold cube(cubeGL);
+  const Manifold sphere = Manifold::Sphere(0.6, {48}).AsOriginal();
+  const Manifold cyl = Manifold::Cylinder(2, 0.2, 0.2, {32})
+                           .AsOriginal()
+                           .Translate({0.3, 0.3, -1});
+  const Manifold result = (sphere - cube.Translate({0.5, 0.5, 0.5})) + cyl;
+  const MeshGL64 mesh = result.GetMeshGL64();
+  ASSERT_EQ(mesh.NumRun(), 3);
+  ASSERT_EQ(mesh.faceID.size(), mesh.NumTri());
+
+  int numHits = 0;
+  for (int i = 0; i < 100; ++i) {
+    const double x = -0.7 + 1.4 * ((i * 37) % 100) / 100.0;
+    const double y = -0.7 + 1.4 * ((i * 91) % 100) / 100.0;
+    for (const auto& [origin, endpoint] :
+         {std::pair<vec3, vec3>{{x, y, -5}, {x, y, 5}},
+          {{-5, x, y}, {5, x, y}},
+          {{x, -5, y}, {x + 0.3, 5, y - 0.2}}}) {
+      for (const RayHit& hit : result.RayCast(origin, endpoint)) {
+        ++numHits;
+        bool found = false;
+        for (size_t run = 0; run < mesh.NumRun(); ++run) {
+          for (size_t tri = mesh.runIndex[run] / 3;
+               tri < mesh.runIndex[run + 1] / 3; ++tri) {
+            if (mesh.runOriginalID[run] == hit.originalID &&
+                mesh.faceID[tri] == hit.faceID &&
+                PointOnTri(mesh, tri, hit.position, 1e-9)) {
+              found = true;
+            }
+          }
+        }
+        EXPECT_TRUE(found) << "originalID " << hit.originalID << " faceID "
+                           << hit.faceID << " at " << hit.position.x << ", "
+                           << hit.position.y << ", " << hit.position.z;
+      }
+    }
+  }
+  EXPECT_GT(numHits, 100);
 }
 
 TEST(Measurement, MinGapCubeCube) {
@@ -226,6 +293,32 @@ TEST(Measurement, MinGapCubeSphereOverlapping) {
   float distance = a.MinGap(b, 0.1);
 
   EXPECT_FLOAT_EQ(distance, 0);
+}
+
+TEST(Measurement, MinGapUnequalResolutionOperands) {
+  const Manifold cube = Manifold::Cube();
+  for (int segments : {16, 64}) {
+    const Manifold sphere =
+        Manifold::Sphere(1, {segments}).Translate({4, 0.5, 0.5});
+    ASSERT_LT(cube.NumTri(), sphere.NumTri());
+    for (double limit : {0.0, -0.25, 1.0, 2.01, 3.0}) {
+      const double expected = std::min(2.0, std::abs(limit));
+      EXPECT_NEAR(cube.MinGap(sphere, limit), expected, 1e-12);
+      EXPECT_NEAR(sphere.MinGap(cube, limit), expected, 1e-12);
+    }
+  }
+}
+
+TEST(Measurement, MinGapRetessellatedOperands) {
+  const Manifold cube = Manifold::Cube();
+  for (int divisions : {2, 8}) {
+    const Manifold dense = cube.Refine(divisions).Translate({3, 4, 0});
+    ASSERT_LT(cube.NumTri(), dense.NumTri());
+    // Retessellation leaves the cube unchanged: its closest corners are at
+    // axis separations 2 and 3, regardless of which mesh supplies the queries.
+    EXPECT_NEAR(cube.MinGap(dense, 4), std::sqrt(13.0), 1e-12);
+    EXPECT_NEAR(dense.MinGap(cube, 4), std::sqrt(13.0), 1e-12);
+  }
 }
 
 TEST(Measurement, MinGapSphereSphere) {
@@ -260,7 +353,7 @@ TEST(Measurement, MinGapBoundingBoxClearance) {
   }
 
   // Intersecting bounding boxes do not imply intersecting solids.
-  const auto sphere = Manifold::Sphere(1, 32);
+  const auto sphere = Manifold::Sphere(1, {32});
   const auto diagonal = sphere.Translate({2, 2, 0});
   EXPECT_DOUBLE_EQ(sphere.MinGap(diagonal, 0.5), 0.5);
   EXPECT_NEAR(sphere.MinGap(diagonal, 1), 2 * std::sqrt(2) - 2, 1e-12);
@@ -341,9 +434,9 @@ TEST(Measurement, MinGapClosestPointOnTriangleFace) {
 }
 
 TEST(Measurement, MingapAfterTransformations) {
-  auto a = Manifold::Sphere(1, 512).Rotate(30, 30, 30);
+  auto a = Manifold::Sphere(1, {512}).Rotate(30, 30, 30);
   auto b =
-      Manifold::Sphere(1, 512).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
+      Manifold::Sphere(1, {512}).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
           {3, 0, 0});
 
   float distance = a.MinGap(b, 1.1);
@@ -361,9 +454,9 @@ TEST(Measurement, MingapStretchyBracelet) {
 }
 
 TEST(Measurement, MinGapAfterTransformationsOutOfBounds) {
-  auto a = Manifold::Sphere(1, 512).Rotate(30, 30, 30);
+  auto a = Manifold::Sphere(1, {512}).Rotate(30, 30, 30);
   auto b =
-      Manifold::Sphere(1, 512).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
+      Manifold::Sphere(1, {512}).Scale({3, 1, 1}).Rotate(0, 90, 45).Translate(
           {3, 0, 0});
 
   float distance = a.MinGap(b, 0.95);
@@ -422,6 +515,52 @@ TEST(Measurement, TriangleDistanceOverlapping) {
   EXPECT_FLOAT_EQ(distance, 0);
 }
 
+TEST(Measurement, NearParallelEdgeDistance) {
+  for (double angle : {1e-4, 1e-6, 1e-8}) {
+    for (double scale : {1.0, 1e6}) {
+      SCOPED_TRACE(angle);
+      SCOPED_TRACE(scale);
+      const double gap = angle / 10;
+      const vec3 p = vec3(-0.5, 0, 0) * scale;
+      const vec3 a = vec3(1, 0, 0) * scale;
+      const vec3 q = vec3(-0.5, -angle / 2, gap) * scale;
+      const vec3 b = vec3(1, angle, 0) * scale;
+      vec3 x, y;
+      // The two segments cross at their midpoints when projected onto XY.
+      EdgeEdgeDist(x, y, p, a, q, b);
+      EXPECT_NEAR(la::length(x - y) / (gap * scale), 1.0, 1e-9);
+      EXPECT_NEAR(x.x / scale, 0.0, 1e-9);
+      EXPECT_NEAR(y.x / scale, 0.0, 1e-9);
+      EdgeEdgeDist(y, x, q, b, p, a);
+      EXPECT_NEAR(la::length(x - y) / (gap * scale), 1.0, 1e-9);
+    }
+  }
+}
+
+TEST(Measurement, MinGapNearParallelEdges) {
+  for (double scale : {1.0, 1e6}) {
+    SCOPED_TRACE(scale);
+    const double angle = 1e-8;
+    const double gap = angle / 10;
+    // One tetrahedron lies at z <= 0, the other at z >= gap. Their boundary
+    // edges cross in XY at (0, 0), so the exact solid-to-solid gap is gap.
+    const Manifold a =
+        Manifold::Hull(std::vector<vec3>{
+                           {-0.5, 0, 0}, {0.5, 0, 0}, {0, 1, -1}, {0, -1, -1}})
+            .Scale(vec3(scale));
+    const Manifold b = Manifold::Hull(std::vector<vec3>{{-0.5, -angle / 2, gap},
+                                                        {0.5, angle / 2, gap},
+                                                        {0, 1, 1 + gap},
+                                                        {0, -1, 1 + gap}})
+                           .Scale(vec3(scale));
+    ASSERT_EQ(a.Status(), Manifold::Error::NoError);
+    ASSERT_EQ(b.Status(), Manifold::Error::NoError);
+    EXPECT_NEAR(a.MinGap(b, 1e-3 * scale) / (gap * scale), 1.0, 1e-7);
+    EXPECT_NEAR(b.MinGap(a, 1e-3 * scale) / (gap * scale), 1.0, 1e-7);
+    EXPECT_NEAR(a.MinGap(b, gap * scale / 2) / (gap * scale), 0.5, 1e-7);
+  }
+}
+
 // A tall box where the query point is far below the top face. The +Z ray from
 // the point must reach the top face even though it's well outside the point's
 // 3D bounding-box in Z. This exercises the XY-projected collider query.
@@ -455,7 +594,7 @@ TEST(Measurement, WindingWatertight) {
 // Hollow shell (sphere - sphere): cavity center must return winding 0, wall
 // point 1, outside 0. Proves real winding number, not just ray parity.
 TEST(Measurement, WindingHollowShell) {
-  Manifold shell = Manifold::Sphere(2, 32) - Manifold::Sphere(1, 32);
+  Manifold shell = Manifold::Sphere(2, {32}) - Manifold::Sphere(1, {32});
   const auto w = shell.WindingNumber({{0, 0, 0}, {0, 0, 1.5}, {0, 0, 3}});
   EXPECT_EQ(w[0], 0);  // cavity
   EXPECT_EQ(w[1], 1);  // wall

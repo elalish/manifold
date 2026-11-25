@@ -13,7 +13,6 @@
 // limitations under the License.
 
 #pragma once
-#include <cstring>
 #include <vector>
 
 #include "manifold/common.h"
@@ -39,7 +38,6 @@ ManifoldRect* to_c(manifold::Rect* m);
 ManifoldError to_c(manifold::Manifold::Error error);
 ManifoldVec2 to_c(vec2 v);
 ManifoldVec3 to_c(vec3 v);
-ManifoldIVec3 to_c(ivec3 v);
 ManifoldTriangulation* to_c(std::vector<int>* m);
 ManifoldRayHitVec* to_c(RayHitVec* v);
 ManifoldExecutionContext* to_c(ExecutionContext* ctx);
@@ -56,14 +54,14 @@ const manifold::MeshGL* from_c(const ManifoldMeshGL* m);
 const manifold::MeshGL64* from_c(const ManifoldMeshGL64* m);
 OpType from_c(ManifoldOpType op);
 CrossSection::JoinType from_c(ManifoldJoinType jt);
+// NULL gives the default CircularQuality.
+CircularQuality from_c(const ManifoldCircularQuality* q);
 manifold::Box* from_c(ManifoldBox* m);
 const manifold::Box* from_c(const ManifoldBox* m);
 manifold::Rect* from_c(ManifoldRect* r);
 const manifold::Rect* from_c(const ManifoldRect* r);
 vec2 from_c(ManifoldVec2 v);
 vec3 from_c(ManifoldVec3 v);
-ivec3 from_c(ManifoldIVec3 v);
-vec4 from_c(ManifoldVec4 v);
 const std::vector<int>* from_c(const ManifoldTriangulation* m);
 const RayHitVec* from_c(const ManifoldRayHitVec* v);
 const ExecutionContext* from_c(const ManifoldExecutionContext* ctx);

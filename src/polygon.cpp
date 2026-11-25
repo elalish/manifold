@@ -205,8 +205,11 @@ bool IsConvex(const PolygonsIdx& polys, double epsilon) {
 }
 
 /**
- * Triangulates a set of convex polygons by alternating instead of a fan, to
- * avoid creating high-degree vertices.
+ * Triangulates a set of convex polygons. Each pass clips every other vertex of
+ * the remaining ring, halving it, until one triangle is left. The first
+ * passes, which make most of the triangles, add only short edges, and no
+ * vertex touches more than about 2 log2(n) triangles. Short edges keep
+ * triangle bounding boxes small, which keeps later booleans fast.
  */
 HalfedgeTriangulation TriangulateConvex(const PolygonsIdx& polys) {
   const size_t numTri = manifold::transform_reduce(
@@ -216,20 +219,23 @@ HalfedgeTriangulation TriangulateConvex(const PolygonsIdx& polys) {
   HalfedgeTriangulation result;
   result.AddContours(polys);
   result.ReserveTriangles(numTri);
+  std::vector<int> ring;
+  std::vector<int> next;
   for (const SimplePolygonIdx& poly : polys) {
-    size_t i = 0;
-    size_t k = poly.size() - 1;
-    bool right = true;
-    while (i + 1 < k) {
-      const size_t j = right ? i + 1 : k - 1;
-      result.AddTriangle(poly[i].idx, poly[j].idx, poly[k].idx);
-      if (right) {
-        i = j;
-      } else {
-        k = j;
+    ring.clear();
+    for (const PolyVert& v : poly) ring.push_back(v.idx);
+    while (ring.size() > 3) {
+      next.clear();
+      const size_t size = ring.size();
+      size_t i = 0;
+      for (; i + 1 < size; i += 2) {
+        result.AddTriangle(ring[i], ring[i + 1], ring[(i + 2) % size]);
+        next.push_back(ring[i]);
       }
-      right = !right;
+      if (i < size) next.push_back(ring[i]);
+      ring.swap(next);
     }
+    if (ring.size() == 3) result.AddTriangle(ring[0], ring[1], ring[2]);
   }
   return result;
 }
@@ -492,35 +498,37 @@ class EarClip {
       return std::min(cost, openCost);
     }
 
-    // For verts outside the ear, apply a cost based on the Delaunay condition
-    // to aid in prioritization and produce cleaner triangulations. This doesn't
-    // affect robustness, but may be adjusted to improve output.
-    static double DelaunayCost(vec2 diff, double scale, double epsilon) {
-      return -epsilon - scale * la::dot(diff, diff);
-    }
-
     // This is the expensive part of the algorithm, checking this ear against
     // every Vert to ensure none are inside. The Collider brings the total
     // triangulator cost down from O(n^2) to O(nlogn) for most large polygons.
     //
     // Think of a cost as vaguely a distance metric - 0 is right on the edge of
     // being invalid. cost > epsilon is definitely invalid. Cost < -epsilon
-    // is definitely valid, so all improvement costs are designed to always give
-    // values < -epsilon so they will never affect validity. The first
-    // totalCost is designed to give priority to sharper angles. Any cost < (-1
-    // - epsilon) has satisfied the Delaunay condition.
-    double EarCost(double epsilon, IdxCollider& collider) const {
+    // is definitely valid, so every priority cost stays below -epsilon and
+    // never changes which ears are valid.
+    //
+    // EarClip ranks collinear ears by sharpness, so it clips folded ears,
+    // which double back, first, with costs near -2 - epsilon. It ranks other
+    // valid ears by the length of their open side, shortest first, with costs
+    // in (-2 - epsilon, -1.5 - epsilon] for open sides up to scale, the
+    // bounding box diagonal.
+    //
+    // Short ears add short edges, which keeps the search below fast, since its
+    // box spans the open side, and keeps triangle bounding boxes small for
+    // later booleans. Sharpness doesn't serve as the ranking: on a smooth
+    // contour the sharpest ears are also the longest.
+    double EarCost(double epsilon, double scale, IdxCollider& collider) const {
       vec2 openSide = left->pos - right->pos;
       const vec2 center = 0.5 * (left->pos + right->pos);
-      const double scale = 4 / la::dot(openSide, openSide);
-      const double radius = la::length(openSide) / 2;
+      const double openLength = la::length(openSide);
+      const double radius = openLength / 2;
       openSide = la::normalize(openSide);
 
-      double totalCost = la::dot(left->rightDir, rightDir) - 1 - epsilon;
       if (CCW(pos, left->pos, right->pos, epsilon) == 0) {
         // Clip folded ears first
-        return totalCost;
+        return la::dot(left->rightDir, rightDir) - 1 - epsilon;
       }
+      double totalCost = -1 - epsilon - scale / (scale + openLength);
 
       Rect earBox = Rect(vec2(center.x - radius, center.y - radius),
                          vec2(center.x + radius, center.y + radius));
@@ -534,11 +542,8 @@ class EarClip {
         const VertItr test = collider.itr[point.idx];
         if (test->mesh_idx != mesh_idx && test->mesh_idx != lid &&
             test->mesh_idx != rid) {  // Skip duplicated verts
-          double cost = Cost(test, openSide, epsilon);
-          if (cost < -epsilon) {
-            cost = DelaunayCost(test->pos - center, scale, epsilon);
-          }
-          if (cost > totalCost) totalCost = cost;
+          const double cost = Cost(test, openSide, epsilon);
+          if (cost >= -epsilon && cost > totalCost) totalCost = cost;
         }
       });
       return totalCost;
@@ -861,7 +866,7 @@ class EarClip {
       v->cost = kBest;
       v->ear = earsQueue_.insert(v);
     } else if (v->IsConvex(2 * epsilon_)) {
-      v->cost = v->EarCost(epsilon_, collider);
+      v->cost = v->EarCost(epsilon_, la::length(bBox_.Size()), collider);
       v->ear = earsQueue_.insert(v);
     } else {
       v->cost = 1;  // not used, but marks reflex verts for debug

@@ -65,6 +65,69 @@ TEST(SDF, InvalidGrid) {
             Manifold::Error::ResultTooLarge);
 }
 
+TEST(SDF, CoarseGridSamplesFiniteCoordinates) {
+  const Box bounds(vec3(-1.0), vec3(1.0));
+  for (const double edgeLength : {2.0, 3.0, 10.0}) {
+    SCOPED_TRACE(edgeLength);
+    int calls = 0;
+    bool finite = true;
+    const Manifold box = Manifold::LevelSet(
+        [&](vec3 p) {
+          ++calls;
+          finite &= la::all(la::isfinite(p));
+          return 1.0;
+        },
+        bounds, edgeLength, 0.0, -1.0, false);
+    EXPECT_GT(calls, 0);
+    EXPECT_TRUE(finite);
+    EXPECT_EQ(box.Status(), Manifold::Error::NoError);
+    EXPECT_FALSE(box.IsEmpty());
+    EXPECT_NEAR(box.Volume(), 8.0, 1e-10);
+    EXPECT_EQ(box.BoundingBox().min, bounds.min);
+    EXPECT_EQ(box.BoundingBox().max, bounds.max);
+  }
+}
+
+TEST(SDF, ThinBoundsKeepFiniteGridSpacing) {
+  for (const int axis : {0, 1, 2}) {
+    SCOPED_TRACE(axis);
+    vec3 size(2.0);
+    size[axis] = 0.1;
+    const Box bounds(vec3(0.0), size);
+    bool finite = true;
+    const Manifold box = Manifold::LevelSet(
+        [&](vec3 p) {
+          finite &= la::all(la::isfinite(p));
+          return 1.0;
+        },
+        bounds, 0.5, 0.0, -1.0, false);
+    EXPECT_TRUE(finite);
+    EXPECT_EQ(box.Status(), Manifold::Error::NoError);
+    EXPECT_FALSE(box.IsEmpty());
+    EXPECT_NEAR(box.Volume(), 0.4, 1e-10);
+    EXPECT_EQ(box.BoundingBox().min, bounds.min);
+    EXPECT_EQ(box.BoundingBox().max, bounds.max);
+  }
+}
+
+TEST(SDF, DegenerateBoundsSampleFiniteCoordinates) {
+  for (const vec3 size :
+       {vec3(0, 2, 2), vec3(2, 0, 2), vec3(2, 2, 0), vec3(0.0)}) {
+    SCOPED_TRACE(::testing::Message() << "size=(" << size.x << "," << size.y
+                                      << "," << size.z << ")");
+    bool finite = true;
+    const Manifold empty = Manifold::LevelSet(
+        [&](vec3 p) {
+          finite &= la::all(la::isfinite(p));
+          return 1.0;
+        },
+        {vec3(0.0), size}, 0.5, 0.0, -1.0, false);
+    EXPECT_TRUE(finite);
+    EXPECT_EQ(empty.Status(), Manifold::Error::NoError);
+    EXPECT_TRUE(empty.IsEmpty());
+  }
+}
+
 TEST(SDF, SphereShell) {
   Manifold sphere = Manifold::LevelSet(
       [](vec3 pos) {

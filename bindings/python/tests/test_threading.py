@@ -16,7 +16,7 @@ TIMEOUT = 60
 
 def sponge(offset=0.0):
     m = Manifold.cube((2, 2, 2), True)
-    hole = Manifold.cylinder(3, 0.3, circular_segments=48, center=True)
+    hole = Manifold.cylinder(3, 0.3, quality=48, center=True)
     for i in range(6):
         h = hole.translate((0.3 * (i - 2.5) + offset, 0, 0))
         m = m - h - h.rotate((90, 0, 0)) - h.rotate((0, 90, 0))
@@ -75,7 +75,7 @@ def refine_to_length_case(ctx):
 
 
 def refine_to_tolerance_case(ctx):
-    m = Manifold.sphere(1, 32).calculate_normals(0).smooth_by_normals(0)
+    m = Manifold.sphere(1, 32).calculate_normals().smooth_by_normals()
     m = evaluated(m).with_context(ctx)
     return lambda: m.refine_to_tolerance(1e-5).status()
 
@@ -169,7 +169,7 @@ def test_import_keeps_gil_disabled():
 def test_merge_while_others_read_mesh():
     # Normals split the vertices, so the mesh without its merge list is open
     # and merge() builds the list.
-    full = sponge().calculate_normals(0).to_mesh()
+    full = sponge().calculate_normals().to_mesh()
     mesh = Mesh(np.array(full.vert_properties), np.array(full.tri_verts))
     merged = mesh_key(Manifold(full))
     before = mesh_key(Manifold(mesh))

@@ -118,7 +118,7 @@ TEST(Context, ExecutionContextAlreadyEvaluated) {
 TEST(Context, ExecutionContextCancelBeforeEval) {
   std::vector<Manifold> items;
   for (int i = 0; i < 10; i++) {
-    items.push_back(Manifold::Sphere(1.0, 32).Translate(vec3(i * 0.5, 0, 0)));
+    items.push_back(Manifold::Sphere(1.0, {32}).Translate(vec3(i * 0.5, 0, 0)));
   }
   Manifold u = Manifold::BatchBoolean(items, OpType::Add);
 
@@ -140,7 +140,7 @@ TEST(Context, ExecutionContextCancelConcurrent) {
   // Build a large enough tree that evaluation takes measurable time.
   std::vector<Manifold> items;
   for (int i = 0; i < 50; i++) {
-    items.push_back(Manifold::Sphere(1.0, 64).Translate(vec3(i * 0.3, 0, 0)));
+    items.push_back(Manifold::Sphere(1.0, {64}).Translate(vec3(i * 0.3, 0, 0)));
   }
   Manifold u = Manifold::BatchBoolean(items, OpType::Add);
 
@@ -175,8 +175,8 @@ TEST(Context, ExecutionContextCancelMidBoolean) {
   // One big boolean — N-1 = 1 op, so outer-loop cancel only has a single
   // checkpoint. The work itself (two large spheres overlapping) takes long
   // enough that cancel fires reliably while Boolean3 is running.
-  Manifold a = Manifold::Sphere(1.0, 256);
-  Manifold b = Manifold::Sphere(1.0, 256).Translate(vec3(0.5, 0, 0));
+  Manifold a = Manifold::Sphere(1.0, {256});
+  Manifold b = Manifold::Sphere(1.0, {256}).Translate(vec3(0.5, 0, 0));
   Manifold u = a + b;
 
   ExecutionContext ctx;
@@ -195,12 +195,12 @@ TEST(Context, ExecutionContextCancelMidBoolean) {
 
 // Status() and Status(ctx) should return identical results when no cancel.
 TEST(Context, ExecutionContextMatchesPlainStatus) {
-  Manifold u = (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, 32)) -
+  Manifold u = (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, {32})) -
                Manifold::Tetrahedron();
 
   // Build two equivalent manifolds (CsgOpNodes) to avoid caching effects.
   auto makeTree = [] {
-    return (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, 32)) -
+    return (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, {32})) -
            Manifold::Tetrahedron();
   };
   Manifold a = makeTree();
@@ -215,7 +215,7 @@ TEST(Context, ExecutionContextMatchesPlainStatus) {
 // N-1 invariant holds for Subtract trees too.
 TEST(Context, ExecutionContextProgressSubtract) {
   // Tree shape: (cube + sphere) - tet - octahedron
-  Manifold u = (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, 16)) -
+  Manifold u = (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, {16})) -
                Manifold::Tetrahedron() - Manifold::Cube(vec3(0.5), true);
 
   ExecutionContext ctx;
@@ -254,7 +254,7 @@ TEST(Context, ExecutionContextReuse) {
 TEST(Context, ExecutionContextCancelPermanent) {
   std::vector<Manifold> items;
   for (int i = 0; i < 30; i++) {
-    items.push_back(Manifold::Sphere(1.0, 48).Translate(vec3(i * 0.3, 0, 0)));
+    items.push_back(Manifold::Sphere(1.0, {48}).Translate(vec3(i * 0.3, 0, 0)));
   }
   Manifold u = Manifold::BatchBoolean(items, OpType::Add);
 
@@ -319,7 +319,7 @@ TEST(Context, ExecutionContextCancelSkippedOnLeaf) {
 TEST(Context, ExecutionContextConcurrentProgress) {
   std::vector<Manifold> items;
   for (int i = 0; i < 30; i++) {
-    items.push_back(Manifold::Sphere(1.0, 48).Translate(vec3(i * 0.5, 0, 0)));
+    items.push_back(Manifold::Sphere(1.0, {48}).Translate(vec3(i * 0.5, 0, 0)));
   }
   Manifold u = Manifold::BatchBoolean(items, OpType::Add);
 
@@ -359,7 +359,7 @@ TEST(Context, ExecutionContextSharedSubtreeConcurrent) {
   constexpr int kThreads = 4;
   for (int round = 0; round < 50; ++round) {
     Manifold shared = Manifold::Cube(vec3(2), true);
-    const Manifold hole = Manifold::Cylinder(3, 0.3, -1, 12, true);
+    const Manifold hole = Manifold::Cylinder(3, 0.3, -1, {12}, true);
     for (int i = 0; i < 4; ++i) {
       const Manifold h = hole.Translate(vec3(0.4 * (i - 1.5), 0, 0));
       shared = (shared - h) + h.Rotate(90, 0, 0).Translate(vec3(0, 0, 3));
@@ -413,8 +413,8 @@ TEST(Context, ExecutionContextSubBooleanProgress) {
   // end. Any observed Progress() > 0 mid-eval comes from sub-Boolean phase
   // advancement. Two overlapping spheres ensure the Boolean takes the full
   // path (no degenerate-input early return that would short-circuit phases).
-  Manifold a = Manifold::Sphere(1.0, 256);
-  Manifold b = Manifold::Sphere(1.0, 256).Translate(vec3(0.5, 0, 0));
+  Manifold a = Manifold::Sphere(1.0, {256});
+  Manifold b = Manifold::Sphere(1.0, {256}).Translate(vec3(0.5, 0, 0));
   Manifold result = a + b;
 
   ExecutionContext ctx;
@@ -801,6 +801,163 @@ TEST(Context, ManifoldContextRefineDropsAttachmentFromResult) {
   EXPECT_EQ(other.impl_->totalBooleans.load(), kSentinel);
 }
 
+// True if `m` still carries `ctx`: Status() through an attached ctx resets
+// its counters, so a sentinel left in them is overwritten.
+static bool CarriesContext(const Manifold& m, ExecutionContext& ctx) {
+  constexpr int kSentinel = 97;
+  ctx.impl_->totalBooleans.store(kSentinel);
+  (void)m.Status();
+  return ctx.impl_->totalBooleans.load() != kSentinel;
+}
+
+// Every op that returns a new Manifold drops the attachment, whatever its
+// inputs, including compound assignment, which assigns a derived result.
+// Each case attaches a ctx, runs the op, and checks that no result still
+// observes it. The attached Manifold is used as either operand.
+TEST(Context, ManifoldContextEveryOpDropsAttachment) {
+  using Op = std::function<std::vector<Manifold>(const Manifold&)>;
+  const Manifold other = Manifold::Cube(vec3(1), true).Translate({5, 0, 0});
+  const Manifold empty;
+  const auto pair = [](std::pair<Manifold, Manifold> p) {
+    return std::vector{p.first, p.second};
+  };
+  const std::vector<std::pair<const char*, Op>> ops = {
+      {"Decompose", [](const Manifold& m) { return m.Decompose(); }},
+      {"AsOriginal",
+       [](const Manifold& m) { return std::vector{m.AsOriginal()}; }},
+      {"Translate",
+       [](const Manifold& m) { return std::vector{m.Translate(vec3(0.0))}; }},
+      {"Scale",
+       [](const Manifold& m) { return std::vector{m.Scale(vec3(1))}; }},
+      {"Rotate", [](const Manifold& m) { return std::vector{m.Rotate(0)}; }},
+      {"Mirror",
+       [](const Manifold& m) { return std::vector{m.Mirror({1, 0, 0})}; }},
+      {"MirrorZero",
+       [](const Manifold& m) { return std::vector{m.Mirror(vec3(0.0))}; }},
+      {"Transform",
+       [](const Manifold& m) {
+         return std::vector{m.Transform(la::identity)};
+       }},
+      {"Warp",
+       [](const Manifold& m) { return std::vector{m.Warp([](vec3&) {})}; }},
+      {"WarpBatch",
+       [](const Manifold& m) {
+         return std::vector{m.WarpBatch([](VecView<vec3>) {})};
+       }},
+      {"Simplify", [](const Manifold& m) { return std::vector{m.Simplify()}; }},
+      {"RemoveDegenerates",
+       [](const Manifold& m) { return std::vector{m.RemoveDegenerates()}; }},
+      {"Boolean",
+       [&](const Manifold& m) {
+         return std::vector{m.Boolean(other, OpType::Add)};
+       }},
+      {"BooleanOther",
+       [&](const Manifold& m) {
+         return std::vector{other.Boolean(m, OpType::Add)};
+       }},
+      {"AddEmpty", [&](const Manifold& m) { return std::vector{m + empty}; }},
+      {"EmptyAdd", [&](const Manifold& m) { return std::vector{empty + m}; }},
+      {"SubtractEmpty",
+       [&](const Manifold& m) { return std::vector{m - empty}; }},
+      {"IntersectEmpty",
+       [&](const Manifold& m) { return std::vector{m ^ empty}; }},
+      {"AddAssign",
+       [&](const Manifold& m) {
+         Manifold r = m;
+         r += other;
+         return std::vector{r};
+       }},
+      {"SubtractAssign",
+       [&](const Manifold& m) {
+         Manifold r = m;
+         r -= other;
+         return std::vector{r};
+       }},
+      {"IntersectAssign",
+       [&](const Manifold& m) {
+         Manifold r = m;
+         r ^= other;
+         return std::vector{r};
+       }},
+      {"BatchBooleanOne",
+       [](const Manifold& m) {
+         return std::vector{Manifold::BatchBoolean({m}, OpType::Add)};
+       }},
+      {"BatchBooleanSubtractOne",
+       [](const Manifold& m) {
+         return std::vector{Manifold::BatchBoolean({m}, OpType::Subtract)};
+       }},
+      {"BatchBooleanEmpty",
+       [&](const Manifold& m) {
+         return std::vector{Manifold::BatchBoolean({m, empty}, OpType::Add)};
+       }},
+      {"Split", [&](const Manifold& m) { return pair(m.Split(other)); }},
+      {"SplitEmpty", [&](const Manifold& m) { return pair(m.Split(empty)); }},
+      {"SplitByPlane",
+       [&](const Manifold& m) { return pair(m.SplitByPlane({1, 0, 0}, 0)); }},
+      {"SplitByPlaneAway",
+       [&](const Manifold& m) { return pair(m.SplitByPlane({1, 0, 0}, 100)); }},
+      {"TrimByPlaneAway",
+       [](const Manifold& m) {
+         return std::vector{m.TrimByPlane({1, 0, 0}, -100)};
+       }},
+      {"MinkowskiSumOther",
+       [&](const Manifold& m) { return std::vector{other.MinkowskiSum(m)}; }},
+      {"MinkowskiDifferenceOther",
+       [&](const Manifold& m) {
+         return std::vector{other.MinkowskiDifference(m)};
+       }},
+      {"SetProperties",
+       [](const Manifold& m) {
+         return std::vector{m.SetProperties(0, nullptr)};
+       }},
+      {"CalculateCurvature",
+       [](const Manifold& m) {
+         return std::vector{m.CalculateCurvature(-1, -1)};
+       }},
+      {"CalculateNormals",
+       [](const Manifold& m) { return std::vector{m.CalculateNormals()}; }},
+      {"Refine", [](const Manifold& m) { return std::vector{m.Refine(1)}; }},
+      {"RefineToLength",
+       [](const Manifold& m) { return std::vector{m.RefineToLength(100)}; }},
+      {"RefineToTolerance",
+       [](const Manifold& m) { return std::vector{m.RefineToTolerance(100)}; }},
+      {"SmoothByNormals",
+       [](const Manifold& m) { return std::vector{m.SmoothByNormals()}; }},
+      {"Hull", [](const Manifold& m) { return std::vector{m.Hull()}; }},
+      {"HullVector",
+       [](const Manifold& m) {
+         return std::vector{Manifold::Hull(std::vector{m})};
+       }},
+      {"MinkowskiSum",
+       [&](const Manifold& m) { return std::vector{m.MinkowskiSum(other)}; }},
+      {"MinkowskiDifference",
+       [&](const Manifold& m) {
+         return std::vector{m.MinkowskiDifference(other)};
+       }},
+  };
+
+  // An empty Manifold, an evaluated leaf, a lazy tree that is one piece, and
+  // a lazy tree of two disjoint pieces.
+  const auto makeSource = [](int kind) {
+    const Manifold cube = Manifold::Cube(vec3(1), true);
+    if (kind == 0) return Manifold();
+    if (kind == 1) return cube;
+    return cube + cube.Translate({kind == 2 ? 0.5 : 2.0, 0, 0});
+  };
+  for (int kind : {0, 1, 2, 3}) {
+    for (const auto& [name, op] : ops) {
+      SCOPED_TRACE(std::string(name) + " source " + std::to_string(kind));
+      ExecutionContext ctx;
+      for (const Manifold& result : op(makeSource(kind).WithContext(ctx))) {
+        EXPECT_FALSE(CarriesContext(result, ctx));
+      }
+      // The probe can detect an attachment.
+      EXPECT_TRUE(CarriesContext(makeSource(kind).WithContext(ctx), ctx));
+    }
+  }
+}
+
 // Eager Hull observes attached ctx -- a pre-cancelled ctx aborts the
 // post-pass that runs after QuickHull's buildMesh, returning a Cancelled
 // result rather than a finished hull.
@@ -808,7 +965,7 @@ TEST(Context, ManifoldContextCancelMidHull) {
   ExecutionContext ctx;
   ctx.Cancel();
   // Non-trivial input so the post-buildMesh path is reached.
-  Manifold sphere = Manifold::Sphere(1.0, 64).WithContext(ctx);
+  Manifold sphere = Manifold::Sphere(1.0, {64}).WithContext(ctx);
   Manifold hull = sphere.Hull();
   EXPECT_EQ(hull.Status(), Manifold::Error::Cancelled);
 }
@@ -838,7 +995,7 @@ TEST(Context, ManifoldContextCancelMidMinkowski) {
 TEST(Context, ManifoldContextCancelConcurrentHull) {
   // High-resolution sphere so QuickHull + SortGeometry have measurable
   // work to do.
-  Manifold sphere = Manifold::Sphere(1.0, 256);
+  Manifold sphere = Manifold::Sphere(1.0, {256});
 
   ExecutionContext ctx;
   Manifold::Error result = RunConcurrentEvalAndCancel(
@@ -914,7 +1071,7 @@ TEST(Context, MeshGLHappyPath) {
 
 // Equivalent geometry to the plain ctor.
 TEST(Context, MeshGLMatchesCtor) {
-  MeshGL mesh = Manifold::Sphere(1.0, 32).GetMeshGL();
+  MeshGL mesh = Manifold::Sphere(1.0, {32}).GetMeshGL();
   ExecutionContext ctx;
   Manifold viaCtx = ctx.FromMeshGL(mesh);
   Manifold viaCtor(mesh);
@@ -974,7 +1131,7 @@ TEST(Context, MeshGLValidationErrorWithoutCancel) {
 // each Cancelled hit also pins donePhases < totalPhases.
 #if MANIFOLD_PAR == 1
 TEST(Context, MeshGLCancelConcurrent) {
-  MeshGL mesh = Manifold::Sphere(1.0, 512).GetMeshGL();  // ~524k tris
+  MeshGL mesh = Manifold::Sphere(1.0, {512}).GetMeshGL();  // ~524k tris
   int cancelledHits = 0;
   auto sleep = std::chrono::microseconds(100);
   for (int attempt = 0; attempt < 12 && cancelledHits == 0; ++attempt) {
@@ -999,7 +1156,7 @@ TEST(Context, MeshGLCancelConcurrent) {
 // MANIFOLD_TIMING so the phase timing is compiled in.
 #if MANIFOLD_PAR == 1
 TEST(Context, MeshGLSharedContextConcurrent) {
-  MeshGL mesh = Manifold::Sphere(1.0, 64).GetMeshGL();
+  MeshGL mesh = Manifold::Sphere(1.0, {64}).GetMeshGL();
   ExecutionContext ctx;
   auto ingest = [&] {
     for (int i = 0; i < 20; ++i) {
@@ -1061,6 +1218,21 @@ TEST(Context, LevelSetHappyPath) {
   EXPECT_EQ(m.Status(), Manifold::Error::NoError);
   EXPECT_EQ(ctx.impl_->totalPhases.load(), kPhasesPerLevelSet);
   EXPECT_EQ(ctx.impl_->donePhases.load(), kPhasesPerLevelSet);
+  EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
+}
+
+TEST(Context, LevelSetCoarseGrid) {
+  ExecutionContext ctx;
+  bool finite = true;
+  const Manifold box = ctx.LevelSet(
+      [&](vec3 p) {
+        finite &= la::all(la::isfinite(p));
+        return 1.0;
+      },
+      {vec3(-1.0), vec3(1.0)}, 3.0, 0.0, -1.0, false);
+  EXPECT_TRUE(finite);
+  EXPECT_EQ(box.Status(), Manifold::Error::NoError);
+  EXPECT_NEAR(box.Volume(), 8.0, 1e-10);
   EXPECT_DOUBLE_EQ(ctx.Progress(), 1.0);
 }
 

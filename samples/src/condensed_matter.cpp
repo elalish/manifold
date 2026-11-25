@@ -39,7 +39,7 @@ Manifold bond(int fn, vec3 p1 = {0, 0, 0}, vec3 p2 = {1, 1, 1},
   double beta = degrees(acos((p1.z - p2.z) / dist));
   double gamma = degrees(atan2(p1.y - p2.y, p1.x - p2.x));
   vec3 rot = {0.0, beta, gamma};
-  return Manifold::Cylinder(dist, cyR, -1, fn, true)
+  return Manifold::Cylinder(dist, cyR, -1, {fn}, true)
       .Rotate(rot.x, rot.y, rot.z)
       .Translate(cyC);
 }
@@ -48,7 +48,7 @@ Manifold bondPair(int fn, double d = 0.0, double ar = 1.0) {
   double axD = pow(d, 1.0 / 3.0);
   vec3 p1 = {+axD, -axD, -axD};
   vec3 p2 = {-axD, +axD, +axD};
-  Manifold sphere = Manifold::Sphere(ar, fn);
+  Manifold sphere = Manifold::Sphere(ar, {fn});
   return sphere.Translate(p1) + sphere.Translate(p2) + bond(fn, p1, p2, ar, ar);
 }
 
@@ -56,14 +56,14 @@ Manifold hexagonalClosePacked(int fn, vec3 dst = {1.0, 1.0, 1.0},
                               double ar = 1.0) {
   std::vector<Manifold> parts;
   vec3 p1 = {0, 0, 0};
-  parts.push_back(Manifold::Sphere(ar, fn));
+  parts.push_back(Manifold::Sphere(ar, {fn}));
   double baseAg = 30;
   vec3 ag = {baseAg, baseAg + 120, baseAg + 240};
   vec3 points[] = {{cosd(ag.x) * dst.x, sind(ag.x) * dst.x, 0},
                    {cosd(ag.y) * dst.y, sind(ag.y) * dst.y, 0},
                    {cosd(ag.z) * dst.z, sind(ag.z) * dst.z, 0}};
   for (vec3 p2 : points) {
-    parts.push_back(Manifold::Sphere(ar, fn).Translate(p2));
+    parts.push_back(Manifold::Sphere(ar, {fn}).Translate(p2));
     parts.push_back(bond(fn, p1, p2, ar, ar));
   }
   return Manifold::BatchBoolean(parts, OpType::Add);
@@ -82,11 +82,12 @@ Manifold fccDiamond(int fn, double ar = 1.0, double unitCell = 2.0,
                     {-huc, -huc, +huc}};
   vec3 fcc[] = {{+huc, 0, 0}, {-huc, 0, 0}, {0, +huc, 0},
                 {0, -huc, 0}, {0, 0, +huc}, {0, 0, -huc}};
-  for (auto p : corners) parts.push_back(Manifold::Sphere(ar, fn).Translate(p));
+  for (auto p : corners)
+    parts.push_back(Manifold::Sphere(ar, {fn}).Translate(p));
 
-  for (auto p : fcc) parts.push_back(Manifold::Sphere(ar, fn).Translate(p));
+  for (auto p : fcc) parts.push_back(Manifold::Sphere(ar, {fn}).Translate(p));
   for (auto p : interstitial)
-    parts.push_back(Manifold::Sphere(ar, fn).Translate(p));
+    parts.push_back(Manifold::Sphere(ar, {fn}).Translate(p));
 
   vec3 bonds[][2] = {{interstitial[0], corners[0]}, {interstitial[0], fcc[0]},
                      {interstitial[0], fcc[2]},     {interstitial[0], fcc[4]},
