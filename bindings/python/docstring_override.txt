@@ -44,6 +44,8 @@ manifold__level_set__sdf__bounds__edge_length__level__tolerance__can_parallel:
   Cubes, but better for manifoldness). Instead of using a cubic grid, it uses a
   body-centered cubic grid (two shifted cubic grids). These grid points are
   snapped to the surface where possible to keep short edges from forming.
+  Invalid bounds or edge_length raise ManifoldError with code
+  InvalidConstruction.
   :param sdf: The signed-distance function sdf(x, y, z), which returns the
   signed distance of a given point in R^3. Positive values are inside,
   negative outside. There is no requirement that the function be a true
@@ -51,9 +53,10 @@ manifold__level_set__sdf__bounds__edge_length__level__tolerance__can_parallel:
   :param bounds: The extent of the grid as (xmin, ymin, zmin, xmax, ymax,
   zmax), the same format as bounding_box().
   :param edge_length: Approximate maximum edge length of the triangles in the
-  final result. This affects grid spacing, and hence has a strong effect on
-  performance. Every positive-length axis has at least one grid interval,
-  including when its extent is smaller than edge_length.
+  final result. Must be positive and finite. This affects grid spacing, and
+  hence has a strong effect on performance. Every positive-length axis has at
+  least one grid interval, including when its extent is smaller than
+  edge_length.
   :param level: Extract the surface at this value of your sdf; defaults to
   zero. You can inset your mesh by using a positive value, or outset it with a
   negative value.
@@ -61,3 +64,14 @@ manifold__level_set__sdf__bounds__edge_length__level__tolerance__can_parallel:
   surface. Defaults to -1, which will return the interpolated
   crossing-point based on the two nearest grid points. Small positive values
   will require more sdf evaluations per output vertex.
+manifold__status:
+  Returns the error status of this Manifold without raising. Calls that
+  evaluate a Manifold with an error raise ManifoldError instead, so this is
+  the way to check a lazy result, such as a Boolean or a transform. An error
+  carries on through lazy operations like NaN propagation, so it doesn't get
+  mysteriously lost. Every error leaves an empty Manifold. Empty Manifolds
+  may still show NoError: empty input gives empty output with no error, as
+  does the intersection of non-overlapping meshes.
+manifold__is_empty:
+  Does the Manifold have any triangles? Raises ManifoldError for a Manifold
+  with an error status, since it is invalid rather than empty.

@@ -129,8 +129,11 @@ def all_manifold():
     # wired, since NoError + progress==1 also hold for an untouched ctx.
     cancel_factory_ctx = ExecutionContext()
     cancel_factory_ctx.cancel()
-    cancelled = cancel_factory_ctx.from_mesh(Manifold.cube().to_mesh())
-    assert cancelled.status() == Error.Cancelled
+    try:
+        cancel_factory_ctx.from_mesh(Manifold.cube().to_mesh())
+        assert False, "from_mesh on a cancelled context should raise"
+    except ManifoldCancelled as e:
+        assert e.code == Error.Cancelled
     m = Manifold.tetrahedron()
     mesh = m.to_mesh()
     merged = mesh.merge()

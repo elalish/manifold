@@ -69,17 +69,21 @@ def test_merge_floor():
         verts = soup.copy()
         verts[0, 0] += offset
         mesh = md.Mesh64(vert_properties=verts, tri_verts=tris.astype(np.uint64))
-        return md.Manifold(mesh.merge(tolerance)).status()
+        return mesh.merge(tolerance)
 
-    assert merged64(0.5 * float_eps) == md.Error.NotManifold
-    assert merged64(0.5 * float_eps, float_eps) == md.Error.NoError
-    assert merged64(0.5e-12) == md.Error.NoError
+    with pytest.raises(md.ManifoldError) as e:
+        md.Manifold(merged64(0.5 * float_eps))
+    assert e.value.code == md.Error.NotManifold
+    assert not md.Manifold(merged64(0.5 * float_eps, float_eps)).is_empty()
+    assert not md.Manifold(merged64(0.5e-12)).is_empty()
 
     verts = soup.astype(np.float32)
     verts[0, 0] += 1e-4
     mesh = md.Mesh(vert_properties=verts, tri_verts=tris.astype(np.uint32))
-    assert md.Manifold(mesh.merge()).status() == md.Error.NotManifold
-    assert md.Manifold(mesh.merge(1e-3)).status() == md.Error.NoError
+    with pytest.raises(md.ManifoldError) as e:
+        md.Manifold(mesh.merge())
+    assert e.value.code == md.Error.NotManifold
+    assert not md.Manifold(mesh.merge(1e-3)).is_empty()
 
 
 def test_no_precision_argument():

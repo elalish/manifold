@@ -25,6 +25,27 @@ def python_param_modifier(comment):
     comment = re.sub("MeshGL", "Mesh", comment)
     comment = re.sub("kMinRelativePrecision", "MIN_RELATIVE_PRECISION", comment)
     comment = re.sub("kDefaultRelativePrecision", "float epsilon", comment)
+    # python raises where C++ gives an empty Manifold with an error status
+    comment = re.sub(
+        r"an empty Manifold with\s+InvalidConstruction\s+status will be returned",
+        "ManifoldError with code InvalidConstruction is raised",
+        comment,
+    )
+    comment = re.sub(
+        r"\b(return|returns|gives) an empty Manifold with\s+InvalidConstruction"
+        r"\s+status",
+        lambda m: ("raise" if m[1] == "return" else "raises")
+        + " ManifoldError with code InvalidConstruction",
+        comment,
+    )
+    comment = re.sub(
+        r"Will return an empty Manifold\s+and set an Error Status if",
+        "Raises ManifoldError if",
+        comment,
+    )
+    comment = re.sub(
+        r"will report an error status", "will raise ManifoldError", comment
+    )
     return comment
 
 

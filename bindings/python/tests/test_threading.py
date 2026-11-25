@@ -8,7 +8,14 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import pytest
 
-from manifold3d import Error, ExecutionContext, Manifold, Mesh
+from manifold3d import (
+    Error,
+    ExecutionContext,
+    Manifold,
+    ManifoldCancelled,
+    ManifoldError,
+    Mesh,
+)
 
 THREADS = 4
 TIMEOUT = 60
@@ -48,6 +55,13 @@ def mesh_key(m):
     return (status, mesh.vert_properties.copy(), mesh.tri_verts.copy())
 
 
+def construct_key(mesh):
+    try:
+        return mesh_key(Manifold(mesh))
+    except ManifoldError as e:
+        return e.code
+
+
 def assert_same_mesh(a, b):
     assert a[0] == b[0]
     np.testing.assert_array_equal(a[1], b[1])
@@ -55,7 +69,8 @@ def assert_same_mesh(a, b):
 
 
 # Each case takes an ExecutionContext, builds its inputs, and returns a call
-# that takes a few hundred ms unless cancelled.
+# that takes a few hundred ms unless cancelled. status() returns
+# Error.Cancelled, and the other calls raise ManifoldCancelled.
 def status_case(ctx):
     m = sponge(0.01)
     for k in range(1, 3):
@@ -66,45 +81,45 @@ def status_case(ctx):
 
 def refine_case(ctx):
     m = evaluated(sponge()).with_context(ctx)
-    return lambda: m.refine(12).status()
+    return lambda: m.refine(12)
 
 
 def refine_to_length_case(ctx):
     m = evaluated(sponge()).with_context(ctx)
-    return lambda: m.refine_to_length(0.01).status()
+    return lambda: m.refine_to_length(0.01)
 
 
 def refine_to_tolerance_case(ctx):
     m = Manifold.sphere(1, 32).calculate_normals().smooth_by_normals()
     m = evaluated(m).with_context(ctx)
-    return lambda: m.refine_to_tolerance(1e-5).status()
+    return lambda: m.refine_to_tolerance(1e-5)
 
 
 def minkowski_sum_case(ctx):
     m = evaluated(sponge()).with_context(ctx)
     other = evaluated(Manifold.sphere(0.1, 8))
-    return lambda: m.minkowski_sum(other).status()
+    return lambda: m.minkowski_sum(other)
 
 
 def minkowski_difference_case(ctx):
     m = evaluated(sponge()).with_context(ctx)
     other = evaluated(Manifold.sphere(0.1, 8))
-    return lambda: m.minkowski_difference(other).status()
+    return lambda: m.minkowski_difference(other)
 
 
 def hull_case(ctx):
     m = evaluated(Manifold.sphere(1, 600)).with_context(ctx)
-    return lambda: m.hull().status()
+    return lambda: m.hull()
 
 
 def from_mesh_case(ctx):
     mesh = Manifold.sphere(1, 1024).to_mesh()
-    return lambda: ctx.from_mesh(mesh).status()
+    return lambda: ctx.from_mesh(mesh)
 
 
 def from_mesh64_case(ctx):
     mesh = Manifold.sphere(1, 1024).to_mesh64()
-    return lambda: ctx.from_mesh(mesh).status()
+    return lambda: ctx.from_mesh(mesh)
 
 
 # level_set() holds the GIL, but other threads run between its callbacks.
@@ -113,7 +128,7 @@ def level_set_case(ctx):
         return 1 - (x * x + y * y + z * z) ** 0.5
 
     bounds = [-1.2, -1.2, -1.2, 1.2, 1.2, 1.2]
-    return lambda: ctx.level_set(sdf, bounds, 0.03).status()
+    return lambda: ctx.level_set(sdf, bounds, 0.03)
 
 
 @pytest.mark.parametrize(
@@ -139,7 +154,10 @@ def test_cancel_from_another_thread(case):
 
     def worker():
         started.set()
-        result["status"] = call()
+        try:
+            result["status"] = call()
+        except ManifoldCancelled as e:
+            result["status"] = e.code
 
     # A long switch interval keeps the worker on the GIL from started.set()
     # until it enters the call. Without the GIL release, this thread then
@@ -172,17 +190,19 @@ def test_merge_while_others_read_mesh():
     full = sponge().calculate_normals().to_mesh()
     mesh = Mesh(np.array(full.vert_properties), np.array(full.tri_verts))
     merged = mesh_key(Manifold(full))
-    before = mesh_key(Manifold(mesh))
-    assert before[0] != merged[0]
+    assert construct_key(mesh) == Error.NotManifold
 
     def work(i):
         if i % 2:
-            return mesh_key(Manifold(mesh.merge()))
-        return mesh_key(Manifold(mesh))
+            return construct_key(mesh.merge())
+        return construct_key(mesh)
 
     for _ in range(10):
         for i, key in enumerate(run_concurrently(work)):
-            assert_same_mesh(merged if i % 2 else before, key)
+            if i % 2:
+                assert_same_mesh(merged, key)
+            else:
+                assert key == Error.NotManifold
     assert len(mesh.merge_from_vert) == 0
 
 

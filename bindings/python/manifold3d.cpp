@@ -217,6 +217,26 @@ CircularQuality ToQuality(const QualityArg& quality) {
   return std::get<CircularQuality>(*quality);
 }
 
+// Thrown for a Manifold with an error status. The module's translator turns it
+// into ManifoldError, or ManifoldCancelled for Error.Cancelled, with the status
+// as `code`. It needs no GIL, so calls that release the GIL can throw it.
+struct StatusError : std::exception {
+  Manifold::Error code;
+  explicit StatusError(Manifold::Error code) : code(code) {}
+  const char* what() const noexcept override { return ToString(code); }
+};
+
+// Checks a call's Manifold result, or an input the call evaluates anyway.
+// Every error path leaves an empty Manifold, so Status() is only asked of an
+// empty one.
+Manifold Check(Manifold m) {
+  if (m.IsEmpty()) {
+    const Manifold::Error code = m.Status();
+    if (code != Manifold::Error::NoError) throw StatusError(code);
+  }
+  return m;
+}
+
 // strip original :params: and replace with ours
 const std::string manifold__rotate_xyz =
     manifold__rotate__x_degrees__y_degrees__z_degrees;
@@ -250,29 +270,74 @@ NB_MODULE(manifold3d, m) {
                   nb::arg("divisions"), nb::arg("degrees"),
                   circular_quality__for_divisions__divisions__degrees);
 
+  // nb::exception would only set the message, so this translator builds the
+  // instance itself to give it `code`.
+  static PyObject* errorTypes[2];
+  errorTypes[0] = PyErr_NewExceptionWithDoc(
+      "manifold3d.ManifoldError",
+      "Raised by a call that evaluates a Manifold with an error status. "
+      "`code` holds the Error, and the message is str(code).",
+      PyExc_Exception, nullptr);
+  errorTypes[1] = PyErr_NewExceptionWithDoc(
+      "manifold3d.ManifoldCancelled",
+      "The ManifoldError raised when an ExecutionContext was cancelled. "
+      "`code` is Error.Cancelled.",
+      errorTypes[0], nullptr);
+  m.attr("ManifoldError") = nb::handle(errorTypes[0]);
+  m.attr("ManifoldCancelled") = nb::handle(errorTypes[1]);
+  nb::register_exception_translator([](const std::exception_ptr& p, void*) {
+    try {
+      std::rethrow_exception(p);
+    } catch (const StatusError& e) {
+      nb::handle type =
+          errorTypes[e.code == Manifold::Error::Cancelled ? 1 : 0];
+      nb::object exc = type(e.what());
+      exc.attr("code") = e.code;
+      PyErr_SetObject(type.ptr(), exc.ptr());
+    }
+  });
+
   m.def("triangulate", &Triangulate, nb::arg("polygons"),
         nb::arg("epsilon") = -1, nb::arg("allow_convex") = true,
         triangulate__polygons__epsilon__allow_convex);
 
-  nb::class_<Manifold>(m, "Manifold")
+  nb::class_<Manifold>(
+      m, "Manifold",
+      "A solid, an oriented 2-manifold triangle mesh. A failed construction "
+      "or operation gives a Manifold with an error status, which raises "
+      "ManifoldError, with the status as `code`, once a call evaluates it. "
+      "Calls that return a Manifold check their result, and queries such as "
+      "to_mesh(), volume() and is_empty() check their inputs. Booleans, "
+      "transforms, trim_by_plane() and with_context() are lazy and never "
+      "raise, and status() reads the error without raising. A cancelled "
+      "ExecutionContext raises ManifoldCancelled from the calls that observe "
+      "it. Empty input gives an empty result with no error.")
       .def(nb::init<>(), manifold__manifold)
-      .def(nb::init<const MeshGL&>(), nb::arg("mesh"),
-           manifold__manifold__mesh_gl)
-      .def(nb::init<const MeshGL64&>(), nb::arg("mesh"),
-           manifold__manifold__mesh_gl64)
+      .def(
+          "__init__",
+          [](Manifold* self, const MeshGL& mesh) {
+            new (self) Manifold(Check(Manifold(mesh)));
+          },
+          nb::arg("mesh"), manifold__manifold__mesh_gl)
+      .def(
+          "__init__",
+          [](Manifold* self, const MeshGL64& mesh) {
+            new (self) Manifold(Check(Manifold(mesh)));
+          },
+          nb::arg("mesh"), manifold__manifold__mesh_gl64)
       .def(nb::self + nb::self, manifold__operator_plus__q)
       .def(nb::self - nb::self, manifold__operator_minus__q)
       .def(nb::self ^ nb::self, manifold__operator_xor__q)
       .def(
-          "hull", [](const Manifold& self) { return self.Hull(); },
+          "hull", [](const Manifold& self) { return Check(self.Hull()); },
           manifold__hull, release_gil())
       .def_static(
           "batch_hull",
-          [](std::vector<Manifold> ms) { return Manifold::Hull(ms); },
+          [](std::vector<Manifold> ms) { return Check(Manifold::Hull(ms)); },
           nb::arg("manifolds"), manifold__hull__manifolds)
       .def_static(
           "hull_points",
-          [](std::vector<vec3> pts) { return Manifold::Hull(pts); },
+          [](std::vector<vec3> pts) { return Check(Manifold::Hull(pts)); },
           nb::arg("points"), manifold__hull__points)
       .def("transform", &Manifold::Transform, nb::arg("m"),
            manifold__transform__m)
@@ -298,7 +363,8 @@ NB_MODULE(manifold3d, m) {
           "warp",
           [](const Manifold& self, std::function<vec3(vec3)> warp_func) {
             // need a wrapper because python cant modify a reference in-place
-            return self.Warp([&warp_func](vec3& v) { v = warp_func(v); });
+            return Check(
+                self.Warp([&warp_func](vec3& v) { v = warp_func(v); }));
           },
           nb::arg("warp_func"), manifold__warp__warp_func)
       .def(
@@ -306,7 +372,7 @@ NB_MODULE(manifold3d, m) {
           [](const Manifold& self,
              std::function<nb::object(VecView<vec3>)> warp_func) {
             // need a wrapper because python cant modify a reference in-place
-            return self.WarpBatch([&warp_func](VecView<vec3> v) {
+            return Check(self.WarpBatch([&warp_func](VecView<vec3> v) {
               auto tmp = warp_func(v);
               nb::ndarray<double, nb::shape<-1, 3>, nanobind::c_contig> tmpnd;
               if (!nb::try_cast(tmp, tmpnd) || tmpnd.ndim() != 2 ||
@@ -316,7 +382,7 @@ NB_MODULE(manifold3d, m) {
               if (v.size() > 0)
                 std::copy(tmpnd.data(), tmpnd.data() + v.size() * 3,
                           &v.data()->x);
-            });
+            }));
           },
           nb::arg("warp_func"), manifold__warp_batch__warp_func)
       .def(
@@ -326,102 +392,202 @@ NB_MODULE(manifold3d, m) {
                  vec3, const nb::ndarray<nb::numpy, const double,
                                          nb::c_contig>&)>& f) {
             const int oldNumProp = self.NumProp();
-            return self.SetProperties(newNumProp, [newNumProp, oldNumProp, &f](
-                                                      double* newProps, vec3 v,
-                                                      const double* oldProps) {
-              auto result =
-                  f(v, nb::ndarray<nb::numpy, const double, nb::c_contig>(
-                           oldProps, {static_cast<unsigned long>(oldNumProp)},
-                           nb::handle()));
-              nb::ndarray<double, nb::shape<-1>> array;
-              std::vector<double> vec;
-              if (nb::try_cast(result, array)) {
-                if (array.ndim() != 1 ||
-                    array.shape(0) != static_cast<size_t>(newNumProp))
-                  throw std::runtime_error("Invalid vector shape, expected (" +
-                                           std::to_string(newNumProp) + ")");
-                for (int i = 0; i < newNumProp; i++) newProps[i] = array(i);
-              } else if (nb::try_cast(result, vec)) {
-                if (vec.size() != static_cast<size_t>(newNumProp))
-                  throw std::runtime_error("Invalid vector length, expected " +
-                                           std::to_string(newNumProp));
-                for (int i = 0; i < newNumProp; i++) newProps[i] = vec[i];
-              } else {
-                throw std::runtime_error(
-                    "Callback in set_properties should return an array");
-              }
-            });
+            return Check(self.SetProperties(
+                newNumProp,
+                [newNumProp, oldNumProp, &f](double* newProps, vec3 v,
+                                             const double* oldProps) {
+                  auto result = f(
+                      v, nb::ndarray<nb::numpy, const double, nb::c_contig>(
+                             oldProps, {static_cast<unsigned long>(oldNumProp)},
+                             nb::handle()));
+                  nb::ndarray<double, nb::shape<-1>> array;
+                  std::vector<double> vec;
+                  if (nb::try_cast(result, array)) {
+                    if (array.ndim() != 1 ||
+                        array.shape(0) != static_cast<size_t>(newNumProp))
+                      throw std::runtime_error(
+                          "Invalid vector shape, expected (" +
+                          std::to_string(newNumProp) + ")");
+                    for (int i = 0; i < newNumProp; i++) newProps[i] = array(i);
+                  } else if (nb::try_cast(result, vec)) {
+                    if (vec.size() != static_cast<size_t>(newNumProp))
+                      throw std::runtime_error(
+                          "Invalid vector length, expected " +
+                          std::to_string(newNumProp));
+                    for (int i = 0; i < newNumProp; i++) newProps[i] = vec[i];
+                  } else {
+                    throw std::runtime_error(
+                        "Callback in set_properties should return an array");
+                  }
+                }));
           },
           nb::arg("num_prop"), nb::arg("prop_func"),
           manifold__set_properties__num_prop__prop_func)
-      .def("calculate_curvature", &Manifold::CalculateCurvature,
-           nb::arg("gaussian_idx"), nb::arg("mean_idx"),
-           manifold__calculate_curvature__gaussian_idx__mean_idx)
-      .def("min_gap", &Manifold::MinGap, nb::arg("other"),
-           nb::arg("search_length"), manifold__min_gap__other__search_length)
-      .def("ray_cast", &Manifold::RayCast, nb::arg("origin"),
-           nb::arg("endpoint"),
-           "Cast a ray segment, returning all hits sorted by distance.")
-      .def("winding_number", &Manifold::WindingNumber, nb::arg("points"),
-           "Returns the winding number of this manifold around each of the "
-           "given points. 0 means outside, non-zero means inside.")
-      .def("calculate_normals", &Manifold::CalculateNormals,
-           nb::arg("min_sharp_angle") = 52.5,
-           manifold__calculate_normals__min_sharp_angle)
-      .def("smooth_by_normals", &Manifold::SmoothByNormals,
-           manifold__smooth_by_normals)
-      .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n,
-           release_gil())
-      .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
-           manifold__refine_to_length__length, release_gil())
-      .def("refine_to_tolerance", &Manifold::RefineToTolerance,
-           nb::arg("tolerance"), manifold__refine_to_tolerance__tolerance,
-           release_gil())
-      .def("to_mesh", &Manifold::GetMeshGL, manifold__get_mesh_gl)
-      .def("to_mesh64", &Manifold::GetMeshGL64, manifold__get_mesh_gl64)
-      .def("num_vert", &Manifold::NumVert, manifold__num_vert)
-      .def("num_edge", &Manifold::NumEdge, manifold__num_edge)
-      .def("num_tri", &Manifold::NumTri, manifold__num_tri)
-      .def("num_prop", &Manifold::NumProp, manifold__num_prop)
-      .def("num_prop_vert", &Manifold::NumPropVert, manifold__num_prop_vert)
-      .def("genus", &Manifold::Genus, manifold__genus)
       .def(
-          "volume", [](const Manifold& self) { return self.Volume(); },
+          "calculate_curvature",
+          [](const Manifold& self, int gaussianIdx, int meanIdx) {
+            return Check(self.CalculateCurvature(gaussianIdx, meanIdx));
+          },
+          nb::arg("gaussian_idx"), nb::arg("mean_idx"),
+          manifold__calculate_curvature__gaussian_idx__mean_idx)
+      .def(
+          "min_gap",
+          [](const Manifold& self, const Manifold& other, double searchLength) {
+            return Check(self).MinGap(Check(other), searchLength);
+          },
+          nb::arg("other"), nb::arg("search_length"),
+          manifold__min_gap__other__search_length)
+      .def(
+          "ray_cast",
+          [](const Manifold& self, vec3 origin, vec3 endpoint) {
+            return Check(self).RayCast(origin, endpoint);
+          },
+          nb::arg("origin"), nb::arg("endpoint"),
+          "Cast a ray segment, returning all hits sorted by distance.")
+      .def(
+          "winding_number",
+          [](const Manifold& self, const std::vector<vec3>& points) {
+            return Check(self).WindingNumber(points);
+          },
+          nb::arg("points"),
+          "Returns the winding number of this manifold around each of the "
+          "given points. 0 means outside, non-zero means inside.")
+      .def(
+          "calculate_normals",
+          [](const Manifold& self, double minSharpAngle) {
+            return Check(self.CalculateNormals(minSharpAngle));
+          },
+          nb::arg("min_sharp_angle") = 52.5,
+          manifold__calculate_normals__min_sharp_angle)
+      .def(
+          "smooth_by_normals",
+          [](const Manifold& self) { return Check(self.SmoothByNormals()); },
+          manifold__smooth_by_normals)
+      .def(
+          "refine",
+          [](const Manifold& self, int n) { return Check(self.Refine(n)); },
+          nb::arg("n"), manifold__refine__n, release_gil())
+      .def(
+          "refine_to_length",
+          [](const Manifold& self, double length) {
+            return Check(self.RefineToLength(length));
+          },
+          nb::arg("length"), manifold__refine_to_length__length, release_gil())
+      .def(
+          "refine_to_tolerance",
+          [](const Manifold& self, double tolerance) {
+            return Check(self.RefineToTolerance(tolerance));
+          },
+          nb::arg("tolerance"), manifold__refine_to_tolerance__tolerance,
+          release_gil())
+      .def(
+          "to_mesh",
+          [](const Manifold& self) { return Check(self).GetMeshGL(); },
+          manifold__get_mesh_gl)
+      .def(
+          "to_mesh64",
+          [](const Manifold& self) { return Check(self).GetMeshGL64(); },
+          manifold__get_mesh_gl64)
+      .def(
+          "num_vert",
+          [](const Manifold& self) { return Check(self).NumVert(); },
+          manifold__num_vert)
+      .def(
+          "num_edge",
+          [](const Manifold& self) { return Check(self).NumEdge(); },
+          manifold__num_edge)
+      .def(
+          "num_tri", [](const Manifold& self) { return Check(self).NumTri(); },
+          manifold__num_tri)
+      .def(
+          "num_prop",
+          [](const Manifold& self) { return Check(self).NumProp(); },
+          manifold__num_prop)
+      .def(
+          "num_prop_vert",
+          [](const Manifold& self) { return Check(self).NumPropVert(); },
+          manifold__num_prop_vert)
+      .def(
+          "genus", [](const Manifold& self) { return Check(self).Genus(); },
+          manifold__genus)
+      .def(
+          "volume", [](const Manifold& self) { return Check(self).Volume(); },
           manifold__volume)
       .def(
           "surface_area",
-          [](const Manifold& self) { return self.SurfaceArea(); },
+          [](const Manifold& self) { return Check(self).SurfaceArea(); },
           manifold__surface_area)
-      .def("original_id", &Manifold::OriginalID, manifold__original_id)
-      .def("simplify", &Manifold::Simplify, nb::arg("tolerance") = 0,
-           manifold__simplify__tolerance)
-      .def("as_original", &Manifold::AsOriginal, nb::arg("id") = -1,
-           manifold__as_original__id)
-      .def("is_empty", &Manifold::IsEmpty, manifold__is_empty)
-      .def("decompose", &Manifold::Decompose, manifold__decompose)
-      .def("split", &Manifold::Split, nb::arg("cutter"),
-           manifold__split__cutter)
-      .def("split_by_plane", &Manifold::SplitByPlane, nb::arg("normal"),
-           nb::arg("origin_offset"),
-           manifold__split_by_plane__normal__origin_offset)
+      .def(
+          "original_id",
+          [](const Manifold& self) { return Check(self).OriginalID(); },
+          manifold__original_id)
+      .def(
+          "simplify",
+          [](const Manifold& self, double tolerance) {
+            return Check(self.Simplify(tolerance));
+          },
+          nb::arg("tolerance") = 0, manifold__simplify__tolerance)
+      .def(
+          "as_original",
+          [](const Manifold& self, int id) {
+            return Check(self.AsOriginal(id));
+          },
+          nb::arg("id") = -1, manifold__as_original__id)
+      .def(
+          "is_empty",
+          [](const Manifold& self) { return Check(self).IsEmpty(); },
+          manifold__is_empty)
+      .def(
+          "decompose",
+          [](const Manifold& self) {
+            std::vector<Manifold> parts = self.Decompose();
+            for (const Manifold& part : parts) Check(part);
+            return parts;
+          },
+          manifold__decompose)
+      .def(
+          "split",
+          [](const Manifold& self, const Manifold& cutter) {
+            auto [first, second] = self.Split(cutter);
+            return std::make_pair(Check(first), Check(second));
+          },
+          nb::arg("cutter"), manifold__split__cutter)
+      .def(
+          "split_by_plane",
+          [](const Manifold& self, vec3 normal, double originOffset) {
+            auto [first, second] = self.SplitByPlane(normal, originOffset);
+            return std::make_pair(Check(first), Check(second));
+          },
+          nb::arg("normal"), nb::arg("origin_offset"),
+          manifold__split_by_plane__normal__origin_offset)
       .def("trim_by_plane", &Manifold::TrimByPlane, nb::arg("normal"),
            nb::arg("origin_offset"),
            manifold__trim_by_plane__normal__origin_offset)
-      .def("minkowski_sum", &Manifold::MinkowskiSum, nb::arg("other"),
-           manifold__minkowski_sum__other, release_gil())
-      .def("minkowski_difference", &Manifold::MinkowskiDifference,
-           nb::arg("other"), manifold__minkowski_difference__other,
-           release_gil())
+      .def(
+          "minkowski_sum",
+          [](const Manifold& self, const Manifold& other) {
+            return Check(self.MinkowskiSum(other));
+          },
+          nb::arg("other"), manifold__minkowski_sum__other, release_gil())
+      .def(
+          "minkowski_difference",
+          [](const Manifold& self, const Manifold& other) {
+            return Check(self.MinkowskiDifference(other));
+          },
+          nb::arg("other"), manifold__minkowski_difference__other,
+          release_gil())
       .def(
           "slice",
           [](const Manifold& self, double height) {
-            return CrossSection(self.Slice(height));
+            return CrossSection(Check(self).Slice(height));
           },
           nb::arg("height") = 0.0, manifold__slice__height)
       .def(
           "project",
           [](const Manifold& self) {
-            return CrossSection(self.Project()).Simplify(self.GetEpsilon());
+            const Manifold checked = Check(self);
+            return CrossSection(checked.Project())
+                .Simplify(checked.GetEpsilon());
           },
           "Returns a CrossSection of the projected outline of this object onto "
           "the X-Y plane. The outline polygons are combined with the positive "
@@ -429,14 +595,27 @@ NB_MODULE(manifold3d, m) {
       .def("status", &Manifold::Status, manifold__status, release_gil())
       .def("with_context", &Manifold::WithContext, nb::arg("ctx"),
            manifold__with_context__ctx)
-      .def("with_precision", &Manifold::WithPrecision, nb::arg("rel_precision"),
-           manifold__with_precision__rel_precision, release_gil())
-      .def("get_precision", &Manifold::GetPrecision, manifold__get_precision,
-           release_gil())
+      .def(
+          "with_precision",
+          [](const Manifold& self, double relPrecision) {
+            return Check(self.WithPrecision(relPrecision));
+          },
+          nb::arg("rel_precision"), manifold__with_precision__rel_precision,
+          release_gil())
+      .def(
+          "get_precision",
+          [](const Manifold& self) {
+            // GetPrecision evaluates under the attached context, so the
+            // check comes after it to see a cancel.
+            const double precision = self.GetPrecision();
+            Check(self);
+            return precision;
+          },
+          manifold__get_precision, release_gil())
       .def(
           "bounding_box",
           [](const Manifold& self) {
-            Box b = self.BoundingBox();
+            Box b = Check(self).BoundingBox();
             return nb::make_tuple(b.min[0], b.min[1], b.min[2], b.max[0],
                                   b.max[1], b.max[2]);
           },
@@ -445,16 +624,22 @@ NB_MODULE(manifold3d, m) {
       .def_static("batch_boolean", &Manifold::BatchBoolean,
                   nb::arg("manifolds"), nb::arg("op"),
                   manifold__batch_boolean__manifolds__op)
-      .def_static("tetrahedron", &Manifold::Tetrahedron, manifold__tetrahedron)
-      .def_static("cube", &Manifold::Cube,
-                  nb::arg("size") = std::make_tuple(1.0, 1.0, 1.0),
-                  nb::arg("center") = false, manifold__cube__size__center)
+      .def_static(
+          "tetrahedron", []() { return Check(Manifold::Tetrahedron()); },
+          manifold__tetrahedron)
+      .def_static(
+          "cube",
+          [](vec3 size, bool center) {
+            return Check(Manifold::Cube(size, center));
+          },
+          nb::arg("size") = std::make_tuple(1.0, 1.0, 1.0),
+          nb::arg("center") = false, manifold__cube__size__center)
       .def_static(
           "extrude",
           [](const CrossSection& crossSection, double height, int nDivisions,
              double twistDegrees, vec2 scaleTop) {
-            return Manifold::Extrude(crossSection.ToPolygons(), height,
-                                     nDivisions, twistDegrees, scaleTop);
+            return Check(Manifold::Extrude(crossSection.ToPolygons(), height,
+                                           nDivisions, twistDegrees, scaleTop));
           },
           nb::arg("cross_section"), nb::arg("height"),
           nb::arg("n_divisions") = 0, nb::arg("twist_degrees") = 0.0f,
@@ -464,8 +649,8 @@ NB_MODULE(manifold3d, m) {
           "revolve",
           [](const CrossSection& crossSection, const QualityArg& quality,
              double revolveDegrees) {
-            return Manifold::Revolve(crossSection.ToPolygons(),
-                                     ToQuality(quality), revolveDegrees);
+            return Check(Manifold::Revolve(crossSection.ToPolygons(),
+                                           ToQuality(quality), revolveDegrees));
           },
           nb::arg("cross_section"), nb::arg("quality") = nb::none(),
           nb::arg("revolve_degrees") = 360.0,
@@ -484,8 +669,8 @@ NB_MODULE(manifold3d, m) {
             std::function<double(vec3)> cppToPython = [&f](vec3 v) {
               return f(v.x, v.y, v.z);
             };
-            return Manifold::LevelSet(cppToPython, bound, edgeLength, level,
-                                      tolerance, false);
+            return Check(Manifold::LevelSet(cppToPython, bound, edgeLength,
+                                            level, tolerance, false));
           },
           nb::arg("sdf"), nb::arg("bounds"), nb::arg("edge_length"),
           nb::arg("level") = 0.0, nb::arg("tolerance") = -1,
@@ -494,8 +679,8 @@ NB_MODULE(manifold3d, m) {
           "cylinder",
           [](double height, double radiusLow, double radiusHigh,
              const QualityArg& quality, bool center) {
-            return Manifold::Cylinder(height, radiusLow, radiusHigh,
-                                      ToQuality(quality), center);
+            return Check(Manifold::Cylinder(height, radiusLow, radiusHigh,
+                                            ToQuality(quality), center));
           },
           nb::arg("height"), nb::arg("radius_low"),
           nb::arg("radius_high") = -1.0f, nb::arg("quality") = nb::none(),
@@ -504,7 +689,7 @@ NB_MODULE(manifold3d, m) {
       .def_static(
           "sphere",
           [](double radius, const QualityArg& quality) {
-            return Manifold::Sphere(radius, ToQuality(quality));
+            return Check(Manifold::Sphere(radius, ToQuality(quality)));
           },
           nb::arg("radius"), nb::arg("quality") = nb::none(),
           manifold__sphere__radius__quality)
@@ -758,7 +943,9 @@ NB_MODULE(manifold3d, m) {
       "Reports progress and allows cancellation. Another thread can call "
       "cancel() while Manifold.status(), with_precision(), get_precision(), "
       "refine*(), minkowski_*() or hull(), or this class's from_mesh() or "
-      "level_set(), runs. On Python before "
+      "level_set(), runs. After a cancel, those calls raise "
+      "ManifoldCancelled, except status(), which returns Error.Cancelled. "
+      "On Python before "
       "3.13.8, join any thread running these calls before the interpreter "
       "exits.")
       .def(nb::init<>())
@@ -772,7 +959,7 @@ NB_MODULE(manifold3d, m) {
           "from_mesh",
           [](ExecutionContext& ctx, const MeshGL& mesh) {
             nb::gil_scoped_release release;
-            return ctx.FromMeshGL(mesh);
+            return Check(ctx.FromMeshGL(mesh));
           },
           nb::arg("mesh"),
           "Ingest a Mesh into a Manifold under this context, so the ingest "
@@ -782,7 +969,7 @@ NB_MODULE(manifold3d, m) {
           "from_mesh",
           [](ExecutionContext& ctx, const MeshGL64& mesh) {
             nb::gil_scoped_release release;
-            return ctx.FromMeshGL(mesh);
+            return Check(ctx.FromMeshGL(mesh));
           },
           nb::arg("mesh"),
           "Ingest a Mesh64 into a Manifold under this context, so the ingest "
@@ -801,8 +988,8 @@ NB_MODULE(manifold3d, m) {
             std::function<double(vec3)> cppToPython = [&f](vec3 v) {
               return f(v.x, v.y, v.z);
             };
-            return ctx.LevelSet(cppToPython, bound, edgeLength, level,
-                                tolerance, false);
+            return Check(ctx.LevelSet(cppToPython, bound, edgeLength, level,
+                                      tolerance, false));
           },
           nb::arg("sdf"), nb::arg("bounds"), nb::arg("edge_length"),
           nb::arg("level") = 0.0, nb::arg("tolerance") = -1,
@@ -957,8 +1144,8 @@ NB_MODULE(manifold3d, m) {
           "extrude",
           [](const CrossSection& self, double height, int nDivisions,
              double twistDegrees, vec2 scaleTop) {
-            return Manifold::Extrude(self.ToPolygons(), height, nDivisions,
-                                     twistDegrees, scaleTop);
+            return Check(Manifold::Extrude(self.ToPolygons(), height,
+                                           nDivisions, twistDegrees, scaleTop));
           },
           nb::arg("height"), nb::arg("n_divisions") = 0,
           nb::arg("twist_degrees") = 0.0f,
@@ -968,8 +1155,8 @@ NB_MODULE(manifold3d, m) {
           "revolve",
           [](const CrossSection& self, const QualityArg& quality,
              double revolveDegrees) {
-            return Manifold::Revolve(self.ToPolygons(), ToQuality(quality),
-                                     revolveDegrees);
+            return Check(Manifold::Revolve(self.ToPolygons(),
+                                           ToQuality(quality), revolveDegrees));
           },
           nb::arg("quality") = nb::none(), nb::arg("revolve_degrees") = 360.0,
           manifold__revolve__cross_section__quality__revolve_degrees)
