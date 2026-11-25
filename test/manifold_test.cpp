@@ -2746,7 +2746,8 @@ TEST(Manifold, InvalidParameterWithEmptyCrossSection) {
     }
     expectInvalid(Manifold::Extrude(polys, 1, -1));
     expectInvalid(Manifold::Extrude(polys, 1, 0, nan));
-    for (vec2 scaleTop : {vec2(nan, 1), vec2(1, inf)}) {
+    for (vec2 scaleTop :
+         {vec2(-1, 1), vec2(1, -0.5), vec2(nan, 1), vec2(1, inf)}) {
       expectInvalid(Manifold::Extrude(polys, 1, 0, 0, scaleTop));
     }
   }

@@ -40,9 +40,6 @@ std::shared_ptr<Manifold::Impl> ExtrudeImpl(const Polygons& crossSection,
                                             double twistDegrees, vec2 scaleTop,
                                             double zOffset = 0.0,
                                             bool flipZ = false) {
-  scaleTop.x = std::max(scaleTop.x, 0.0);
-  scaleTop.y = std::max(scaleTop.y, 0.0);
-
   auto pImpl_ = std::make_shared<Manifold::Impl>();
   ++nDivisions;
   auto& vertPos = pImpl_->vertPos_;
@@ -246,15 +243,16 @@ Manifold Manifold::Sphere(double radius, CircularQuality quality) {
  * @param twistDegrees Amount to twist the top cross-section relative to the
  * bottom, interpolated linearly for the divisions in between. Must be finite.
  * @param scaleTop Amount to scale the top (independently in X and Y). Must be
- * finite. If the scale is {0, 0}, a pure cone is formed with only a single
- * vertex at the top. Note that scale is applied after twist.
+ * non-negative and finite. If the scale is {0, 0}, a pure cone is formed with
+ * only a single vertex at the top. Note that scale is applied after twist.
  * Default {1, 1}.
  */
 Manifold Manifold::Extrude(const Polygons& crossSection, double height,
                            int nDivisions, double twistDegrees, vec2 scaleTop) {
   ZoneScoped;
   if (!(height > 0.0) || !std::isfinite(height) || nDivisions < 0 ||
-      !std::isfinite(twistDegrees) || !la::all(la::isfinite(scaleTop))) {
+      !std::isfinite(twistDegrees) || !la::all(la::isfinite(scaleTop)) ||
+      scaleTop.x < 0.0 || scaleTop.y < 0.0) {
     return Invalid();
   }
   // Contours with fewer than 3 verts have no area.
