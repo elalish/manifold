@@ -287,13 +287,11 @@ suite('Manifold Bindings', () => {
 
   test('ManifoldError messages', () => {
     const ManifoldError = (manifoldModule as any).ManifoldError;
-    const codes = [
-      'NoError', 'NonFiniteVertex', 'NotManifold', 'VertexOutOfBounds',
-      'PropertiesWrongLength', 'MissingPositionProperties',
-      'MergeVectorsDifferentLengths', 'MergeIndexOutOfBounds',
-      'TransformWrongLength', 'RunIndexWrongLength', 'FaceIDWrongLength',
-      'InvalidConstruction', 'ResultTooLarge', 'InvalidTangents', 'Cancelled'
-    ];
+    const status = (manifoldModule as any).status;
+    const codes =
+        Object.keys(status).filter(k => typeof status[k]?.value === 'number');
+    expect(codes).toContain('Cancelled');
+    expect(codes.map(code => status[code].value)).toEqual([...codes.keys()]);
     const messages = codes.map(code => {
       const error = new ManifoldError(code);
       expect(error).toBeInstanceOf(Error);

@@ -369,45 +369,53 @@ class Manifold {
 };
 /** @} */
 
+namespace detail {
+struct ErrorStrings {
+  const char* name;
+  const char* message;
+};
+// One entry per Manifold::Error, indexed by its value.
+inline constexpr ErrorStrings kErrorStrings[] = {
+    {"NoError", "No error"},
+    {"NonFiniteVertex", "Non-finite vertex"},
+    {"NotManifold", "Not manifold"},
+    {"VertexOutOfBounds", "Vertex index out of bounds"},
+    {"PropertiesWrongLength", "Properties have wrong length"},
+    {"MissingPositionProperties", "Fewer than three properties per vertex"},
+    {"MergeVectorsDifferentLengths", "Merge vectors have different lengths"},
+    {"MergeIndexOutOfBounds", "Merge index out of bounds"},
+    {"TransformWrongLength", "Transform vector has wrong length"},
+    {"RunIndexWrongLength", "Invalid run index vector"},
+    {"FaceIDWrongLength", "Face ID vector has wrong length"},
+    {"InvalidConstruction", "Manifold constructed with invalid parameters"},
+    {"ResultTooLarge", "Result exceeds maximum size"},
+    {"InvalidTangents", "Invalid halfedge tangents"},
+    {"Cancelled", "Operation cancelled"},
+};
+static_assert(std::size(kErrorStrings) ==
+              static_cast<size_t>(Manifold::Error::Cancelled) + 1);
+}  // namespace detail
+
+/**
+ * Returns the enumerator name of an error status, such as "NotManifold". The
+ * bindings use it to name their enum values and as the JS error code. Values
+ * outside the enum give "UnknownError".
+ */
+inline const char* ErrorName(Manifold::Error error) {
+  const size_t i = static_cast<size_t>(error);
+  return i < std::size(detail::kErrorStrings) ? detail::kErrorStrings[i].name
+                                              : "UnknownError";
+}
+
 /**
  * Returns a short English description of an error status, such as "Not
  * manifold". Every binding uses these messages. Values outside the enum give
  * "Unknown error".
  */
 inline const char* ToString(Manifold::Error error) {
-  switch (error) {
-    case Manifold::Error::NoError:
-      return "No error";
-    case Manifold::Error::NonFiniteVertex:
-      return "Non-finite vertex";
-    case Manifold::Error::NotManifold:
-      return "Not manifold";
-    case Manifold::Error::VertexOutOfBounds:
-      return "Vertex index out of bounds";
-    case Manifold::Error::PropertiesWrongLength:
-      return "Properties have wrong length";
-    case Manifold::Error::MissingPositionProperties:
-      return "Fewer than three properties per vertex";
-    case Manifold::Error::MergeVectorsDifferentLengths:
-      return "Merge vectors have different lengths";
-    case Manifold::Error::MergeIndexOutOfBounds:
-      return "Merge index out of bounds";
-    case Manifold::Error::TransformWrongLength:
-      return "Transform vector has wrong length";
-    case Manifold::Error::RunIndexWrongLength:
-      return "Invalid run index vector";
-    case Manifold::Error::FaceIDWrongLength:
-      return "Face ID vector has wrong length";
-    case Manifold::Error::InvalidConstruction:
-      return "Manifold constructed with invalid parameters";
-    case Manifold::Error::ResultTooLarge:
-      return "Result exceeds maximum size";
-    case Manifold::Error::InvalidTangents:
-      return "Invalid halfedge tangents";
-    case Manifold::Error::Cancelled:
-      return "Operation cancelled";
-  }
-  return "Unknown error";
+  const size_t i = static_cast<size_t>(error);
+  return i < std::size(detail::kErrorStrings) ? detail::kErrorStrings[i].message
+                                              : "Unknown error";
 }
 
 /** @addtogroup Debug

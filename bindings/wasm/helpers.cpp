@@ -247,46 +247,7 @@ Manifold ExecutionContextLevelSet(ExecutionContext& ctx, uintptr_t funcPtr,
   return ctx.LevelSet(f, bounds, edgeLength, level, tolerance, false);
 }
 
-std::string ErrorToString(Manifold::Error error) {
-  switch (error) {
-    case Manifold::Error::NoError:
-      return "NoError";
-    case Manifold::Error::NonFiniteVertex:
-      return "NonFiniteVertex";
-    case Manifold::Error::NotManifold:
-      return "NotManifold";
-    case Manifold::Error::VertexOutOfBounds:
-      return "VertexOutOfBounds";
-    case Manifold::Error::PropertiesWrongLength:
-      return "PropertiesWrongLength";
-    case Manifold::Error::MissingPositionProperties:
-      return "MissingPositionProperties";
-    case Manifold::Error::MergeVectorsDifferentLengths:
-      return "MergeVectorsDifferentLengths";
-    case Manifold::Error::MergeIndexOutOfBounds:
-      return "MergeIndexOutOfBounds";
-    case Manifold::Error::TransformWrongLength:
-      return "TransformWrongLength";
-    case Manifold::Error::RunIndexWrongLength:
-      return "RunIndexWrongLength";
-    case Manifold::Error::FaceIDWrongLength:
-      return "FaceIDWrongLength";
-    case Manifold::Error::InvalidConstruction:
-      return "InvalidConstruction";
-    case Manifold::Error::ResultTooLarge:
-      return "ResultTooLarge";
-    case Manifold::Error::InvalidTangents:
-      return "InvalidTangents";
-    case Manifold::Error::Cancelled:
-      return "Cancelled";
-    default:
-      return "UnknownError";
-  }
-}
-
-std::string Status(Manifold& manifold) {
-  return ErrorToString(manifold.Status());
-}
+std::string Status(Manifold& manifold) { return ErrorName(manifold.Status()); }
 
 std::vector<Manifold> Split(Manifold& a, Manifold& b) {
   auto [r1, r2] = a.Split(b);

@@ -272,18 +272,26 @@ TEST(Manifold, Empty) {
 
 TEST(Manifold, ErrorStrings) {
   using Error = Manifold::Error;
+  const std::string unknownName = ErrorName(static_cast<Error>(-1));
   const std::string unknown = ToString(static_cast<Error>(-1));
+  std::set<std::string> names;
   std::set<std::string> messages;
   for (int i = 0; i <= static_cast<int>(Error::Cancelled); ++i) {
+    const std::string name = ErrorName(static_cast<Error>(i));
     const std::string message = ToString(static_cast<Error>(i));
+    EXPECT_FALSE(name.empty());
     EXPECT_FALSE(message.empty());
+    EXPECT_NE(name, unknownName);
     EXPECT_NE(message, unknown);
+    names.insert(name);
     messages.insert(message);
   }
+  EXPECT_EQ(names.size(), static_cast<size_t>(Error::Cancelled) + 1);
   EXPECT_EQ(messages.size(), static_cast<size_t>(Error::Cancelled) + 1);
-  EXPECT_EQ(
-      ToString(static_cast<Error>(static_cast<int>(Error::Cancelled) + 1)),
-      unknown);
+  EXPECT_STREQ(ErrorName(Error::Cancelled), "Cancelled");
+  const auto past = static_cast<Error>(static_cast<int>(Error::Cancelled) + 1);
+  EXPECT_EQ(ErrorName(past), unknownName);
+  EXPECT_EQ(ToString(past), unknown);
 }
 
 TEST(Manifold, ValidInput) {
