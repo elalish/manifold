@@ -417,7 +417,7 @@ NB_MODULE(manifold3d, m) {
           [](const Manifold& self, double height) {
             return CrossSection(self.Slice(height));
           },
-          nb::arg("height"), manifold__slice__height)
+          nb::arg("height") = 0.0, manifold__slice__height)
       .def(
           "project",
           [](const Manifold& self) {
