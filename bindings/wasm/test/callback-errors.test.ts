@@ -81,9 +81,10 @@ function observeNativeResults(input: any, method: string) {
   const native = input[method];
   input[method] = (...args: any[]) => {
     const handle = keep(native.apply(input, args));
+    // The unchecked volume, since an errored result would throw.
     results.push({
       handle,
-      measure: handle.volume ? handle.volume() : handle.area(),
+      measure: handle.status ? handle._Volume() : handle.area(),
       status: handle.status ? handle.status() : 'NoError'
     });
     return handle;
@@ -222,13 +223,14 @@ test.each([
     'deletes a native Manifold rejected by the %s constructor',
     (meshType, Float) => {
       const prototype = Object.getPrototypeOf(module.Manifold.prototype);
-      const status = prototype.status;
+      const status = prototype._EvaluatedStatus;
       const rejected: any[] = [];
-      vi.spyOn(prototype, 'status').mockImplementation(function(this: any) {
-        const result = status.call(this);
-        if (result !== 'NoError') rejected.push(keep(this));
-        return result;
-      });
+      vi.spyOn(prototype, '_EvaluatedStatus')
+          .mockImplementation(function(this: any) {
+            const result = status.call(this);
+            if (result !== 'NoError') rejected.push(keep(this));
+            return result;
+          });
       const mesh = new module[meshType]({
         numProp: 3,
         vertProperties: new Float([0, 0, 0, 1, 0, 0, 0, 1, 0]),

@@ -281,6 +281,12 @@ Manifold ExecutionContextLevelSet(ExecutionContext& ctx, uintptr_t funcPtr,
 
 std::string Status(Manifold& manifold) { return ErrorName(manifold.Status()); }
 
+// The status of an evaluated Manifold, read through a fresh context so the
+// progress of its attached context is left alone.
+std::string EvaluatedStatus(Manifold& manifold) {
+  return ErrorName(manifold.WithContext(ExecutionContext()).Status());
+}
+
 std::vector<Manifold> Split(Manifold& a, Manifold& b) {
   auto [r1, r2] = a.Split(b);
   return {r1, r2};

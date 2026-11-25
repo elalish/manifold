@@ -270,13 +270,17 @@ suite('Manifold Bindings', () => {
     // wired (NoError + progress==1 also hold for an untouched ctx).
     const cancelCtx = new manifoldModule.ExecutionContext();
     cancelCtx.cancel();
-    const cancelled = cancelCtx.fromMesh(cube.getMesh());
-    expect(cancelled.status()).toEqual('Cancelled');
+    let thrown: any;
+    try {
+      cancelCtx.fromMesh(cube.getMesh());
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown.code).toEqual('Cancelled');
 
     sphere.delete();
     cube.delete();
     ingested.delete();
-    cancelled.delete();
     sdfCtx.delete();
     ingestCtx.delete();
     cancelCtx.delete();

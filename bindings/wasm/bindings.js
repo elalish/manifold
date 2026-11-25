@@ -68,13 +68,34 @@ Module.setup = function() {
     return result;
   }
 
-  function checkedManifold(manifold) {
-    const status = manifold.status();
-    if (status !== 'NoError') {
-      manifold.delete();
-      throw new Module.ManifoldError(status);
+  // Every error leaves an empty Manifold, so the status is only read when the
+  // Manifold is empty. This evaluates the Manifold without its context, so it
+  // is only called where the call evaluates the Manifold anyway.
+  function errorStatus(manifold) {
+    return manifold._IsEmpty() ? manifold._EvaluatedStatus() : 'NoError';
+  }
+
+  // Throws a ManifoldError if this evaluated Manifold has an error.
+  function checkInput(manifold) {
+    const status = errorStatus(manifold);
+    if (status !== 'NoError') throw new Module.ManifoldError(status);
+  }
+
+  // Returns the results, or deletes all of them and throws a ManifoldError if
+  // any has an error.
+  function checkedManifolds(manifolds) {
+    for (const manifold of manifolds) {
+      const status = errorStatus(manifold);
+      if (status !== 'NoError') {
+        for (const m of manifolds) m.delete();
+        throw new Module.ManifoldError(status);
+      }
     }
-    return manifold;
+    return manifolds;
+  }
+
+  function checkedManifold(manifold) {
+    return checkedManifolds([manifold])[0];
   }
 
   function vec2polygons(vec, f = x => x) {
@@ -147,9 +168,11 @@ Module.setup = function() {
     const polygonsVec = polygons2vec(polygons);
     const cs = new CrossSectionCtor(polygonsVec);
     polygonsVec.delete();
-    const result = f(cs);
-    cs.delete();
-    return result;
+    try {
+      return f(cs);
+    } finally {
+      cs.delete();
+    }
   }
 
   Module.CrossSection.prototype.translate = function(...vec) {
@@ -242,11 +265,12 @@ Module.setup = function() {
     }
     scaleTop = vararg2vec2([scaleTop]);
     const polygonsVec = this._ToPolygons();
-    const man = Module._Extrude(
+    const extruded = Module._Extrude(
         polygonsVec, height, nDivisions, twistDegrees, scaleTop);
     polygonsVec.delete();
+    const man = checkedManifold(extruded);
     if (!center) return man;
-    const centered = man.translate([0., 0., -height / 2.]);
+    const centered = man._Translate({x: 0, y: 0, z: -height / 2});
     man.delete();
     return centered;
   };
@@ -257,7 +281,7 @@ Module.setup = function() {
     const man =
         Module._Revolve(polygonsVec, toQuality(quality), revolveDegrees);
     polygonsVec.delete();
-    return man;
+    return checkedManifold(man);
   };
 
   Module.CrossSection.prototype.add = function(other) {
@@ -325,17 +349,57 @@ Module.setup = function() {
     return checkedManifold(out);
   };
 
+  // These evaluate this Manifold and return a new one, which carries any error
+  // of the input.
+  for (const name
+           of ['hull', 'refine', 'refineToLength', 'refineToTolerance',
+               'minkowskiSum', 'minkowskiDifference', 'withPrecision',
+               'calculateCurvature', 'asOriginal']) {
+    const op =
+        Module.Manifold.prototype['_' + name[0].toUpperCase() + name.slice(1)];
+    Module.Manifold.prototype[name] = function(...args) {
+      return checkedManifold(op.apply(this, args));
+    };
+  }
+
+  // These queries evaluate this Manifold anyway, so checking it first costs
+  // nothing extra.
+  for (const name
+           of ['isEmpty', 'numVert', 'numEdge', 'numTri', 'numProp',
+               'numPropVert', 'genus', 'volume', 'surfaceArea', 'originalID']) {
+    const query =
+        Module.Manifold.prototype['_' + name[0].toUpperCase() + name.slice(1)];
+    Module.Manifold.prototype[name] = function(...args) {
+      checkInput(this);
+      return query.apply(this, args);
+    };
+  }
+
+  // Checked after the call, which evaluates this Manifold under its attached
+  // context, so a cancel is seen.
+  Module.Manifold.prototype.getPrecision = function() {
+    const precision = this._GetPrecision();
+    checkInput(this);
+    return precision;
+  };
+
+  Module.Manifold.prototype.minGap = function(other, searchLength) {
+    checkInput(this);
+    checkInput(other);
+    return this._MinGap(other, searchLength);
+  };
+
   Module.Manifold.prototype.calculateNormals = function(minSharpAngle = 52.5) {
-    return this._CalculateNormals(minSharpAngle);
+    return checkedManifold(this._CalculateNormals(minSharpAngle));
   };
 
   Module.Manifold.prototype.smoothByNormals = function() {
-    return this._SmoothByNormals();
+    return checkedManifold(this._SmoothByNormals());
   };
 
   Module.Manifold.prototype.setProperties = function(numProp, func) {
-    const oldNumProp = this.numProp();
-    return withCallback(state => function(newPtr, vec3Ptr, oldPtr) {
+    const oldNumProp = this._NumProp();
+    const out = withCallback(state => function(newPtr, vec3Ptr, oldPtr) {
       if (state.failed) return;
       try {
         const newProp = [];
@@ -362,6 +426,7 @@ Module.setup = function() {
         state.failure = error;
       }
     }, 'viii', pointer => this._SetProperties(numProp, pointer));
+    return checkedManifold(out);
   };
 
   Module.Manifold.prototype.translate = function(...vec) {
@@ -393,6 +458,7 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.slice = function(height = 0.) {
+    checkInput(this);
     const polygonsVec = this._Slice(height);
     const result = new CrossSectionCtor(polygonsVec);
     polygonsVec.delete();
@@ -400,6 +466,7 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.project = function() {
+    checkInput(this);
     const polygonsVec = this._Project();
     const result = new CrossSectionCtor(polygonsVec);
     polygonsVec.delete();
@@ -407,6 +474,7 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.windingNumber = function(points) {
+    checkInput(this);
     const inVec = new Module.Vector_vec3();
     for (const p of points) inVec.push_back(vararg2vec3([p]));
     const outVec = this._WindingNumber(inVec);
@@ -417,6 +485,7 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.rayCast = function(origin, endpoint) {
+    checkInput(this);
     const vec = this._RayCast(vararg2vec3([origin]), vararg2vec3([endpoint]));
     const result =
         fromVec(vec, hit => ({
@@ -436,24 +505,25 @@ Module.setup = function() {
     const vec = this._Split(manifold);
     const result = fromVec(vec);
     vec.delete();
-    return result;
+    return checkedManifolds(result);
   };
 
   Module.Manifold.prototype.splitByPlane = function(normal, offset = 0.) {
     const vec = this._SplitByPlane(vararg2vec3([normal]), offset);
     const result = fromVec(vec);
     vec.delete();
-    return result;
+    return checkedManifolds(result);
   };
 
   Module.Manifold.prototype.decompose = function() {
     const vec = this._Decompose();
     const result = fromVec(vec);
     vec.delete();
-    return result;
+    return checkedManifolds(result);
   };
 
   Module.Manifold.prototype.boundingBox = function() {
+    checkInput(this);
     const result = this._boundingBox();
     return {
       min: ['x', 'y', 'z'].map(f => result.min[f]),
@@ -462,7 +532,7 @@ Module.setup = function() {
   };
 
   Module.Manifold.prototype.simplify = function(tolerance = 0) {
-    return this._Simplify(tolerance);
+    return checkedManifold(this._Simplify(tolerance));
   };
 
   // Shared by Mesh and Mesh64, which differ only in float precision.
@@ -577,10 +647,12 @@ Module.setup = function() {
   Module.Mesh64 = Mesh64;
 
   Module.Manifold.prototype.getMesh = function() {
+    checkInput(this);
     return new Mesh(this._GetMeshJS());
   };
 
   Module.Manifold.prototype.getMesh64 = function() {
+    checkInput(this);
     return new Mesh64(this._GetMesh64JS());
   };
 
@@ -699,7 +771,7 @@ Module.setup = function() {
   };
 
   Module.Manifold.tetrahedron = function() {
-    return Module._Tetrahedron();
+    return checkedManifold(Module._Tetrahedron());
   };
 
   Module.Manifold.cube = function(...args) {
@@ -711,17 +783,17 @@ Module.setup = function() {
     else
       size = vararg2vec3(args);
     const center = args[1] || false;
-    return Module._Cube(size, center);
+    return checkedManifold(Module._Cube(size, center));
   };
 
   Module.Manifold.cylinder = function(
       height, radiusLow, radiusHigh = -1.0, quality = 0, center = false) {
-    return Module._Cylinder(
-        height, radiusLow, radiusHigh, toQuality(quality), center);
+    return checkedManifold(Module._Cylinder(
+        height, radiusLow, radiusHigh, toQuality(quality), center));
   };
 
   Module.Manifold.sphere = function(radius, quality = 0) {
-    return Module._Sphere(radius, toQuality(quality));
+    return checkedManifold(Module._Sphere(radius, toQuality(quality)));
   };
 
   Module.Manifold.extrude = function(
@@ -781,16 +853,17 @@ Module.setup = function() {
       min: {x: bounds.min[0], y: bounds.min[1], z: bounds.min[2]},
       max: {x: bounds.max[0], y: bounds.max[1], z: bounds.max[2]},
     };
-    return withLevelSetCallback(
+    return checkedManifold(withLevelSetCallback(
         sdf, level,
         pointer =>
-            Module._LevelSet(pointer, bounds2, edgeLength, level, tolerance));
+            Module._LevelSet(pointer, bounds2, edgeLength, level, tolerance)));
   };
 
   // ctx-aware static factories: mirror new Manifold / levelSet but
   // run under this ExecutionContext so progress/cancellation are observed.
   Module.ExecutionContext.prototype.fromMesh = function(mesh) {
-    return mesh?.[isMesh64] ? this._FromMesh64(mesh) : this._FromMesh(mesh);
+    return checkedManifold(
+        mesh?.[isMesh64] ? this._FromMesh64(mesh) : this._FromMesh(mesh));
   };
 
   Module.ExecutionContext.prototype.levelSet = function(
@@ -799,10 +872,10 @@ Module.setup = function() {
       min: {x: bounds.min[0], y: bounds.min[1], z: bounds.min[2]},
       max: {x: bounds.max[0], y: bounds.max[1], z: bounds.max[2]},
     };
-    return withLevelSetCallback(
+    return checkedManifold(withLevelSetCallback(
         sdf, level,
         pointer =>
-            this._LevelSet(pointer, bounds2, edgeLength, level, tolerance));
+            this._LevelSet(pointer, bounds2, edgeLength, level, tolerance)));
   };
 
   function pushVec3(vec, ps) {
@@ -832,25 +905,34 @@ Module.setup = function() {
       pts.delete();
       const result = Module._manifoldHull(vec);
       vec.delete();
-      return result;
+      return checkedManifold(result);
     }
     let relPrecision = Infinity;
     for (const m of manifolds) {
+      // Collecting the vertices would drop the input's error, so check it
+      // here, as the hull of Manifolds alone does.
+      const status = errorStatus(m);
+      if (status !== 'NoError') {
+        pts.delete();
+        throw new Module.ManifoldError(status);
+      }
       Module._manifoldCollectVertices(pts, m);
-      if (!m.isEmpty()) relPrecision = Math.min(relPrecision, m.getPrecision());
+      if (!m._IsEmpty()) {
+        relPrecision = Math.min(relPrecision, m._GetPrecision());
+      }
     }
     const result = Module._manifoldHullPoints(pts);
     pts.delete();
-    if (!isFinite(relPrecision) || relPrecision == result.getPrecision())
-      return result;
+    if (!isFinite(relPrecision) || relPrecision == result._GetPrecision())
+      return checkedManifold(result);
     // Like the other operations on several Manifolds, the hull uses the
     // smallest precision among the non-empty input Manifolds, so it is
     // recomputed at that precision.
-    const stamped = result.withPrecision(relPrecision);
+    const stamped = result._WithPrecision(relPrecision);
     result.delete();
-    const hull = stamped.hull();
+    const hull = stamped._Hull();
     stamped.delete();
-    return hull;
+    return checkedManifold(hull);
   };
 
   Module.Manifold.prototype = Object.create(ManifoldCtor.prototype);
