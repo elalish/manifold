@@ -113,7 +113,9 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("cancel", &ExecutionContext::Cancel)
       .function("cancelled", &ExecutionContext::Cancelled)
       .function("progress", &ExecutionContext::Progress)
-      .function("_FromMesh", &man_js::ExecutionContextFromMesh)
+      .function("_FromMesh", &man_js::ExecutionContextFromMesh<float, uint32_t>)
+      .function("_FromMesh64",
+                &man_js::ExecutionContextFromMesh<double, uint64_t>)
       .function("_LevelSet", &man_js::ExecutionContextLevelSet);
 
   register_vector<RayHit>("Vector_rayHit");
@@ -164,7 +166,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
                &CrossSection::Hull));
 
   class_<Manifold>("Manifold")
-      .constructor(&man_js::FromMeshJS)
       .function("add", &man_js::Union)
       .function("subtract", &man_js::Difference)
       .function("intersect", &man_js::Intersection)
@@ -177,6 +178,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Project", &Manifold::Project)
       .function("hull", select_overload<Manifold() const>(&Manifold::Hull))
       .function("_GetMeshJS", &js::GetMeshJS)
+      .function("_GetMesh64JS", &js::GetMesh64JS)
       .function("refine", &Manifold::Refine)
       .function("refineToLength", &Manifold::RefineToLength)
       .function("refineToTolerance", &Manifold::RefineToTolerance)
@@ -221,7 +223,10 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_Triangulate", &Triangulate);
   function("_Revolve", &Manifold::Revolve);
   function("_LevelSet", &man_js::LevelSet);
-  function("_Merge", &js::Merge);
+  function("_Merge", &js::Merge<float, uint32_t>);
+  function("_Merge64", &js::Merge<double, uint64_t>);
+  function("_FromMesh", &man_js::FromMeshJS<float, uint32_t>);
+  function("_FromMesh64", &man_js::FromMeshJS<double, uint64_t>);
   function("_ReserveIDs", &Manifold::ReserveIDs);
   function("_manifoldUnionN", &man_js::UnionN);
   function("_manifoldDifferenceN", &man_js::DifferenceN);

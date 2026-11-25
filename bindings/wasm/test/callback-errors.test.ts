@@ -159,24 +159,29 @@ test.each(['warp', 'warpBatch'] as const)(
       expect(input.volume()).toBeCloseTo(1);
     });
 
-test('deletes a native Manifold rejected by the mesh constructor', () => {
-  const prototype = Object.getPrototypeOf(module.Manifold.prototype);
-  const status = prototype.status;
-  const rejected: any[] = [];
-  vi.spyOn(prototype, 'status').mockImplementation(function(this: any) {
-    const result = status.call(this);
-    if (result !== 'NoError') rejected.push(keep(this));
-    return result;
-  });
-  const mesh = new module.Mesh({
-    numProp: 3,
-    vertProperties: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
-    triVerts: new Uint32Array([0, 1, 9])
-  });
-  expect(() => new module.Manifold(mesh)).toThrow();
-  expect(rejected).toHaveLength(1);
-  expect(rejected[0].isDeleted()).toBe(true);
-});
+test.each([
+  ['Mesh', Float32Array],
+  ['Mesh64', Float64Array],
+] as const)(
+    'deletes a native Manifold rejected by the %s constructor',
+    (meshType, Float) => {
+      const prototype = Object.getPrototypeOf(module.Manifold.prototype);
+      const status = prototype.status;
+      const rejected: any[] = [];
+      vi.spyOn(prototype, 'status').mockImplementation(function(this: any) {
+        const result = status.call(this);
+        if (result !== 'NoError') rejected.push(keep(this));
+        return result;
+      });
+      const mesh = new module[meshType]({
+        numProp: 3,
+        vertProperties: new Float([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+        triVerts: new Uint32Array([0, 1, 9])
+      });
+      expect(() => new module.Manifold(mesh)).toThrow();
+      expect(rejected).toHaveLength(1);
+      expect(rejected[0].isDeleted()).toBe(true);
+    });
 
 test('preserves successful scalar and batch geometry mutations', () => {
   const input = keep(module.Manifold.cube());

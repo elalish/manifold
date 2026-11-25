@@ -234,3 +234,275 @@ suite('Manifold Bindings', () => {
     expect(refined.volume()).toBeGreaterThan(0);
   });
 });
+
+suite('Mesh64', () => {
+  // Not representable in float32, so any float round trip changes it.
+  const offset = 1234567.123456789;
+
+  // A unit cube moved to [offset, offset + 1]^3, with doubles computed in JS.
+  function doubleCube() {
+    const cube = manifoldModule.Manifold.cube();
+    const mesh = cube.getMesh();
+    cube.delete();
+    const vertProperties =
+        Float64Array.from(mesh.vertProperties, x => x + offset);
+    return new manifoldModule.Mesh64(
+        {numProp: mesh.numProp, triVerts: mesh.triVerts, vertProperties});
+  }
+
+  // The distinct vertex positions, sorted.
+  function sortedVerts(
+      mesh: {numProp: number, vertProperties: ArrayLike<number>}) {
+    const keys = new Set<string>();
+    const props = Array.from(mesh.vertProperties);
+    for (let i = 0; i < props.length; i += mesh.numProp) {
+      keys.add(JSON.stringify(props.slice(i, i + 3)));
+    }
+    return [...keys]
+        .map(key => JSON.parse(key) as number[])
+        .sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+  }
+
+  test('getMesh() stays float, getMesh64() is exact', () => {
+    const {Manifold, Mesh, Mesh64} = manifoldModule;
+    const input = doubleCube();
+    expect(input.numTri).toBe(12);
+    expect(input.numVert).toBe(8);
+    expect(input.position(0)).toBeInstanceOf(Float64Array);
+    const manifold = new Manifold(input);
+
+    const float = manifold.getMesh();
+    expect(float).toBeInstanceOf(Mesh);
+    expect(float.vertProperties).toBeInstanceOf(Float32Array);
+    expect(float.vertProperties).toContain(Math.fround(offset));
+
+    const double = manifold.getMesh64();
+    expect(double).toBeInstanceOf(Mesh64);
+    expect(double.vertProperties).toBeInstanceOf(Float64Array);
+    expect(double.triVerts).toBeInstanceOf(Uint32Array);
+    expect(double.mergeFromVert).toBeInstanceOf(Uint32Array);
+    expect(double.mergeToVert).toBeInstanceOf(Uint32Array);
+    expect(double.runFlags).toBeInstanceOf(Uint8Array);
+    expect(double.runIndex).toBeInstanceOf(Uint32Array);
+    expect(double.runOriginalID).toBeInstanceOf(Uint32Array);
+    expect(double.faceID).toBeInstanceOf(Uint32Array);
+    expect(double.runTransform).toBeInstanceOf(Float64Array);
+    expect(typeof double.numProp).toBe('number');
+    expect(double.position(0)).toBeInstanceOf(Float64Array);
+    expect(sortedVerts(double)).toEqual(sortedVerts(input));
+    manifold.delete();
+  });
+
+  test('Boolean of Mesh64 inputs keeps exact input coordinates', () => {
+    const {Manifold} = manifoldModule;
+    // A slab through the middle of the cube, wider in x and y.
+    const slabMesh = doubleCube();
+    for (let i = 0; i < slabMesh.vertProperties.length; i += 3) {
+      const v = slabMesh.vertProperties;
+      v[i] = v[i] == offset ? offset - 1 : offset + 2;
+      v[i + 1] = v[i + 1] == offset ? offset - 1 : offset + 2;
+      v[i + 2] = v[i + 2] == offset ? offset + 0.5 : offset + 0.75;
+    }
+    const cube = new Manifold(doubleCube());
+    const slab = new Manifold(slabMesh);
+    const result = cube.subtract(slab);
+    expect(result.volume()).toBeCloseTo(0.75, 6);
+    const zs = new Set<number>();
+    for (const [x, y, z] of sortedVerts(result.getMesh64())) {
+      // New verts lie on the cube's vertical edges and the slab's planes.
+      expect([offset, offset + 1]).toContain(x);
+      expect([offset, offset + 1]).toContain(y);
+      zs.add(z);
+    }
+    expect([...zs].sort((a, b) => a - b)).toEqual([
+      offset, offset + 0.5, offset + 0.75, offset + 1
+    ]);
+    cube.delete();
+    slab.delete();
+    result.delete();
+  });
+
+  test('faceID and runOriginalID survive a Mesh64 round trip', () => {
+    const {Manifold} = manifoldModule;
+    const input = doubleCube();
+    const id = Manifold.reserveIDs(2);
+    input.faceID = Uint32Array.from({length: input.numTri}, (_, i) => 100 + i);
+    input.runOriginalID = new Uint32Array([id, id + 1]);
+    input.runIndex = new Uint32Array([0, 18, input.triVerts.length]);
+    const manifold = new Manifold(input);
+    const output = manifold.getMesh64();
+    expect(Array.from(output.runOriginalID)).toEqual([id, id + 1]);
+    expect(Array.from(output.faceID).sort((a, b) => a - b))
+        .toEqual(Array.from(input.faceID));
+
+    // Feed the output back in: a lossless round trip.
+    const again = new Manifold(output);
+    const againMesh = again.getMesh64();
+    expect(Array.from(againMesh.runOriginalID)).toEqual([id, id + 1]);
+    expect(Array.from(againMesh.faceID).sort((a, b) => a - b))
+        .toEqual(Array.from(input.faceID));
+    expect(sortedVerts(againMesh)).toEqual(sortedVerts(input));
+    manifold.delete();
+    again.delete();
+  });
+
+  test('extras, tangents, run transforms and flags stay double', () => {
+    const {Manifold} = manifoldModule;
+    // Normals add extra properties and set runFlags bit 1, smoothByNormals adds
+    // tangents, and moving an original records its run transform.
+    const sphere = Manifold.sphere(1, 8).calculateNormals();
+    const smooth = sphere.smoothByNormals();
+    const original = smooth.asOriginal();
+    const manifold = original.translate(offset, 0, 0);
+    const float = manifold.getMesh();
+    const double = manifold.getMesh64();
+    expect(double.halfedgeTangent).toBeInstanceOf(Float64Array);
+    expect(double.halfedgeTangent.length).toBeGreaterThan(0);
+    expect(double.halfedgeTangent)
+        .not.toEqual(Float64Array.from(float.halfedgeTangent));
+    expect(double.tangent(0)).toBeInstanceOf(Float64Array);
+    expect(double.runTransform[9]).toBe(offset);
+    expect(float.runTransform[9]).toBe(Math.fround(offset));
+    expect(double.transform(0)[12]).toBe(offset);
+    expect(double.hasNormals(0)).toBe(true);
+    expect(double.extras(0)).toBeInstanceOf(Float64Array);
+
+    // Feed it back in: every field comes back unchanged.
+    const roundTrip = new Manifold(double);
+    const again = roundTrip.getMesh64();
+    const rows = (values: Float64Array, stride: number) => {
+      const out = [];
+      for (let i = 0; i < values.length; i += stride) {
+        out.push(Array.from(values.subarray(i, i + stride)));
+      }
+      return out.sort((a, b) => {
+        for (let j = 0; j < stride; ++j) {
+          if (a[j] != b[j]) return a[j] - b[j];
+        }
+        return 0;
+      });
+    };
+    expect(again.numProp).toBe(double.numProp);
+    expect(rows(again.vertProperties, again.numProp))
+        .toEqual(rows(double.vertProperties, double.numProp));
+    expect(rows(again.halfedgeTangent, 4))
+        .toEqual(rows(double.halfedgeTangent, 4));
+    expect(again.runTransform).toEqual(double.runTransform);
+    expect(again.runFlags).toEqual(double.runFlags);
+    for (const m of [sphere, smooth, original, manifold, roundTrip]) m.delete();
+  });
+
+  test('Mesh64.merge() stays double', () => {
+    const {Manifold, Mesh64} = manifoldModule;
+    const cube = new Manifold(doubleCube());
+    const withNormals = cube.calculateNormals();
+    const normalsMesh = withNormals.getMesh64();
+    const open = new Mesh64({
+      numProp: normalsMesh.numProp,
+      vertProperties: normalsMesh.vertProperties,
+      triVerts: normalsMesh.triVerts
+    });
+    const merged = open.merge();
+    expect(merged).toBeInstanceOf(Mesh64);
+    expect(merged.vertProperties).toBeInstanceOf(Float64Array);
+    expect(merged.mergeFromVert).toBeInstanceOf(Uint32Array);
+    expect(merged.mergeFromVert.length).toBeGreaterThan(0);
+    expect(merged.vertProperties).toEqual(normalsMesh.vertProperties);
+    const manifold = new Manifold(merged);
+    expect(manifold.volume()).toBeCloseTo(1, 6);
+    expect(sortedVerts(manifold.getMesh64()))
+        .toEqual(sortedVerts(doubleCube()));
+    for (const m of [cube, withNormals, manifold]) m.delete();
+  });
+
+  test('ofMesh and fromMesh also read a Mesh64 as double', () => {
+    const {Manifold, ExecutionContext} = manifoldModule;
+    const input = doubleCube();
+    const ctx = new ExecutionContext();
+    for (const manifold of [Manifold.ofMesh(input), ctx.fromMesh(input)]) {
+      expect(sortedVerts(manifold.getMesh64())).toEqual(sortedVerts(input));
+      manifold.delete();
+    }
+    ctx.delete();
+  });
+
+  test('a Mesh64 from another module instance reads as double', async () => {
+    const other = await Module();
+    other.setup();
+    const input = doubleCube();
+    const ctx = new other.ExecutionContext();
+    for (const manifold
+             of [new other.Manifold(input), other.Manifold.ofMesh(input),
+                 ctx.fromMesh(input)]) {
+      expect(sortedVerts(manifold.getMesh64())).toEqual(sortedVerts(input));
+      manifold.delete();
+    }
+    ctx.delete();
+  });
+
+  test('a plain object wrapped in Mesh64 reads as double', () => {
+    const {Manifold, Mesh64, ExecutionContext} = manifoldModule;
+    const input = doubleCube();
+    const plain = {
+      numProp: input.numProp,
+      triVerts: input.triVerts,
+      vertProperties: input.vertProperties
+    };
+    const ctx = new ExecutionContext();
+    for (const manifold
+             of [new Manifold(new Mesh64(plain)),
+                 Manifold.ofMesh(new Mesh64(plain)),
+                 ctx.fromMesh(new Mesh64(plain))]) {
+      expect(sortedVerts(manifold.getMesh64())).toEqual(sortedVerts(input));
+      manifold.delete();
+    }
+    ctx.delete();
+  });
+
+  test('a bad Mesh64 throws', () => {
+    const {Manifold} = manifoldModule;
+    const input = doubleCube();
+    input.triVerts = Uint32Array.from(input.triVerts, v => v == 0 ? 8 : v);
+    expect(() => new Manifold(input)).toThrow('Vertex index out of bounds');
+    expect(() => Manifold.ofMesh(input)).toThrow('Vertex index out of bounds');
+  });
+
+  test('a Mesh reads as float, whatever its array type', () => {
+    const {Manifold, Mesh} = manifoldModule;
+    const input = doubleCube();
+    const expected = sortedVerts(input).map(v => v.map(Math.fround));
+    for (const vertProperties
+             of [Array.from(input.vertProperties),
+                 Float32Array.from(input.vertProperties),
+                 Float64Array.from(input.vertProperties)]) {
+      const mesh = new Mesh({
+        numProp: input.numProp,
+        triVerts: input.triVerts,
+        vertProperties: vertProperties as Float32Array
+      });
+      for (const manifold of [new Manifold(mesh), Manifold.ofMesh(mesh)]) {
+        expect(sortedVerts(manifold.getMesh64())).toEqual(expected);
+        manifold.delete();
+      }
+    }
+  });
+
+  test('a Boolean can mix Mesh64 and Mesh inputs', () => {
+    const {Manifold, Mesh} = manifoldModule;
+    const double = new Manifold(doubleCube());
+    const floatMesh = doubleCube();
+    const floatManifold = new Manifold(new Mesh({
+      numProp: floatMesh.numProp,
+      triVerts: floatMesh.triVerts,
+      vertProperties: Float32Array.from(floatMesh.vertProperties)
+    }));
+    const moved = floatManifold.translate(0, 0, 2);
+    const union = double.add(moved);
+    expect(union.volume()).toBeCloseTo(2, 6);
+    const xs = new Set(sortedVerts(union.getMesh64()).map(v => v[0]));
+    expect([...xs].sort((a, b) => a - b)).toEqual([
+      Math.fround(offset), offset, Math.fround(offset + 1), offset + 1
+    ].sort((a, b) => a - b));
+    for (const m of [double, floatManifold, moved, union]) m.delete();
+  });
+});
