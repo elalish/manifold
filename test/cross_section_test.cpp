@@ -27,6 +27,7 @@
 #include <atomic>
 #include <iostream>
 #include <limits>
+#include <random>
 #include <thread>
 #include <vector>
 
@@ -2849,7 +2850,8 @@ TEST(CrossSection, SimplifyReducesCurveWithoutCollapsing) {
 
 TEST(CrossSection, SimplifyEqualDeviationsKeepDeterministicCorners) {
   // Every initial vertex is sqrt(0.4) from the line through its neighbors.
-  // Removing tied vertices in their original order leaves these four corners.
+  // Removing tied vertices in their original order leaves these four corners,
+  // in this cyclic order (the fill rule pass picks the ring's start).
   const CrossSection input(SimplePolygon{
       {0, 0}, {2, 0}, {3, 1}, {3, 3}, {2, 4}, {0, 4}, {-1, 3}, {-1, 1}});
   const Polygons before = input.ToPolygons();
@@ -2858,9 +2860,14 @@ TEST(CrossSection, SimplifyEqualDeviationsKeepDeterministicCorners) {
 
   ASSERT_EQ(actual.size(), 1);
   ASSERT_EQ(actual[0].size(), expected.size());
+  const size_t start =
+      std::find(actual[0].begin(), actual[0].end(), expected[0]) -
+      actual[0].begin();
+  ASSERT_LT(start, actual[0].size());
   for (size_t i = 0; i < expected.size(); ++i) {
-    EXPECT_EQ(actual[0][i].x, expected[i].x);
-    EXPECT_EQ(actual[0][i].y, expected[i].y);
+    const vec2 v = actual[0][(start + i) % actual[0].size()];
+    EXPECT_EQ(v.x, expected[i].x);
+    EXPECT_EQ(v.y, expected[i].y);
   }
   const Polygons after = input.ToPolygons();
   ASSERT_EQ(after[0].size(), before[0].size());
@@ -2868,6 +2875,107 @@ TEST(CrossSection, SimplifyEqualDeviationsKeepDeterministicCorners) {
     EXPECT_EQ(after[0][i].x, before[0][i].x);
     EXPECT_EQ(after[0][i].y, before[0][i].y);
   }
+}
+
+// Simplify(0.1) removes the dent vertex at (0, 0.05), so A's bottom edge cuts
+// through the top of B. If the overlap survives as winding 2, Intersect (which
+// keeps winding > 1 over both operands) returns it even against an empty
+// operand.
+TEST(CrossSection, SimplifyKeepsContoursDisjoint) {
+  const CrossSection c =
+      CrossSection(
+          Polygons{{{-10, 0}, {0, 0.05}, {10, 0}, {10, 5}, {-10, 5}},
+                   {{-0.2, -1}, {0.2, -1}, {0.2, 0.025}, {-0.2, 0.025}}})
+          .Simplify(0.1);
+  const CrossSection sq = CrossSection::Square({1, 1});
+  const CrossSection far = sq.Translate({50, 50});
+
+  EXPECT_NEAR(c.Area(), 100.4, 1e-9);
+  EXPECT_TRUE((CrossSection() ^ c).IsEmpty());
+  EXPECT_TRUE((far ^ c).IsEmpty());
+  EXPECT_TRUE(
+      CrossSection::BatchBoolean({c, far, sq}, OpType::Intersect).IsEmpty());
+  EXPECT_NEAR((c - CrossSection::Square({1, 1}, true)).Area(), 99.7, 1e-9);
+}
+
+// The outer ring's long spike gives it a 100-wide box but area ~1, so the area
+// filter drops it at tolerance 0.02 and keeps its 0.8 x 0.8 hole. A lone hole
+// must not survive as negative area.
+TEST(CrossSection, SimplifyDropsOrphanedHole) {
+  const CrossSection s =
+      CrossSection(Polygons{{{0, 0},
+                             {1, 0},
+                             {1, 0.5},
+                             {100, 0.5},
+                             {100, 0.5001},
+                             {1, 0.5001},
+                             {1, 1},
+                             {0, 1}},
+                            {{0.1, 0.1}, {0.1, 0.9}, {0.9, 0.9}, {0.9, 0.1}}})
+          .Simplify(0.02);
+  EXPECT_TRUE(s.IsEmpty());
+  EXPECT_TRUE((CrossSection() - s).IsEmpty());
+}
+
+// Simplify can fold a ring over itself or across a neighbor. Over generated
+// rings and tolerances, its output must still behave as a regularized
+// CrossSection in every boolean.
+TEST(CrossSection, SimplifyOutputIsRegularized) {
+  std::mt19937_64 rng(2056);
+  auto unit = [&rng]() {
+    return static_cast<double>(rng() >> 11) * (1.0 / 9007199254740992.0);
+  };
+  int changed = 0;
+  for (int seed = 0; seed < 300; ++seed) {
+    Polygons rings;
+    if (seed % 3 == 0) {
+      // A shallow dent in a wide ring, with a post poking into it: removing
+      // the dent vertex makes the two contours overlap.
+      const double w = 5 + 15 * unit(), d = 0.02 + 0.06 * unit(),
+                   p = 0.12 + 0.4 * unit(), h = 0.5 + 2.5 * unit();
+      rings = {{{-w, 0}, {0, d}, {w, 0}, {w, 5}, {-w, 5}},
+               {{-p, -h}, {p, -h}, {p, d / 2}, {-p, d / 2}}};
+    } else {
+      const int numRings = 1 + static_cast<int>(rng() % 8);
+      for (int r = 0; r < numRings; ++r) {
+        std::vector<double> radii(8 + rng() % 56);
+        for (double& radius : radii) radius = unit();
+        const vec2 center(5 * unit() - 2.5, 5 * unit() - 2.5);
+        for (vec2& v : rings.emplace_back(StarRing(radii))) v += center;
+      }
+    }
+    const CrossSection in = CrossSection(rings).Rotate(360 * unit());
+    const CrossSection s = in.Simplify(0.02 + 0.5 * unit());
+    const CrossSection self(s.ToPolygons());
+    const Rect box = s.Bounds();
+    const CrossSection cover(Rect(box.min - vec2(1), box.max + vec2(1)));
+    const CrossSection other = CrossSection(StarRing({1, 2, 1, 2, 1, 2}))
+                                   .Translate({6 * unit() - 3, 6 * unit() - 3});
+    const double tol = 1e-9 * (1 + cover.Area());
+    if (std::fabs(s.Area() - in.Area()) > tol) ++changed;
+
+    EXPECT_NEAR(s.Area(), self.Area(), tol) << "seed " << seed;
+    for (const OpType op : {OpType::Add, OpType::Subtract, OpType::Intersect}) {
+      EXPECT_NEAR(CrossSection().Boolean(s, op).Area(),
+                  CrossSection().Boolean(self, op).Area(), tol)
+          << "seed " << seed << " op " << static_cast<int>(op);
+      EXPECT_NEAR(s.Boolean(CrossSection(), op).Area(),
+                  self.Boolean(CrossSection(), op).Area(), tol)
+          << "seed " << seed << " op " << static_cast<int>(op);
+      EXPECT_NEAR(s.Boolean(other, op).Area(), self.Boolean(other, op).Area(),
+                  tol)
+          << "seed " << seed << " op " << static_cast<int>(op);
+      EXPECT_NEAR(other.Boolean(s, op).Area(), other.Boolean(self, op).Area(),
+                  tol)
+          << "seed " << seed << " op " << static_cast<int>(op);
+    }
+    EXPECT_NEAR((cover + s).Area(), cover.Area(), tol) << "seed " << seed;
+    EXPECT_NEAR((s - cover).Area(), 0, tol) << "seed " << seed;
+    EXPECT_LE((s ^ other).Area(), std::min(s.Area(), other.Area()) + tol)
+        << "seed " << seed;
+  }
+  // The tolerances must actually move vertices for this to test anything.
+  EXPECT_GT(changed, 150);
 }
 
 TEST(CrossSection, Empty) {

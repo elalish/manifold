@@ -622,16 +622,16 @@ CrossSection CrossSection::WarpBatch(
  * large-coordinate geometry. Pass an explicit value to override.
  */
 CrossSection CrossSection::Simplify(double tolerance) const {
-  // Stored paths are already fill-rule-regularized, so Simplify only decimates:
-  // drop tiny contours, then remove near-collinear verts per ring at
-  // `tolerance` (clipper2 SimplifyPaths style, not Ramer-Douglas-Peucker). Like
-  // clipper2, the result is NOT re-regularized - a coarse tolerance can
-  // self-intersect a ring, so healing is left to a later boolean. Tolerance 0
-  // decimates at the cross-section's own tolerance, matching Manifold.
-  tolerance = std::max(InferEps(GetPaths()->paths_, {}), tolerance);
+  // Drop tiny contours, then remove near-collinear verts per ring at
+  // `tolerance` (clipper2 SimplifyPaths style, not Ramer-Douglas-Peucker).
+  // Tolerance 0 decimates at the cross-section's own tolerance, matching
+  // Manifold.
   const Polygons& paths = GetPaths()->paths_;
+  const double eps = InferEps(paths, {});
+  tolerance = std::max(eps, tolerance);
   Polygons out;
   out.reserve(paths.size());
+  bool changed = false;
   for (const auto& ring : paths) {
     const double area = SignedArea(ring);
     Rect box;
@@ -639,10 +639,19 @@ CrossSection CrossSection::Simplify(double tolerance) const {
     const vec2 size = box.Size();
     if (std::fabs(area) > std::max(size.x, size.y) * tolerance) {
       SimplePolygon simplified = SimplifyRing(ring, tolerance);
+      changed |= simplified.size() != ring.size();
       if (simplified.size() >= 3) out.push_back(std::move(simplified));
+    } else {
+      changed = true;
     }
   }
-  return CrossSection(shared_paths(std::move(out)));
+  // Decimation can fold a ring over itself or across a neighbor, and dropping
+  // a tiny outer ring can orphan its hole. Re-apply the fill rule to keep the
+  // class invariant (no overlaps or self-intersections) that Area, Decompose
+  // and the booleans rely on. If nothing was removed, the stored paths
+  // already hold it.
+  if (!changed) return *this;
+  return CrossSection(shared_paths(ApplyFillRule(out, eps, WindRule::Add)));
 }
 
 /**
