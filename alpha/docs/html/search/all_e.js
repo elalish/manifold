@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['offset_0',['Offset',['../classmanifold_1_1_cross_section.html#acc76f09a11a354440c735d5dba4d9c7a',1,'manifold::CrossSection']]],
+  ['offset_0',['Offset',['../classmanifold_1_1_cross_section.html#a8f30a6fe3351a8a1a7fec6c7b3cb7c1f',1,'manifold::CrossSection']]],
   ['op_5fadd_1',['op_add',['../structlinalg_1_1detail_1_1op__add.html',1,'linalg::detail']]],
   ['op_5fand_2',['op_and',['../structlinalg_1_1detail_1_1op__and.html',1,'linalg::detail']]],
   ['op_5fcmp_3',['op_cmp',['../structlinalg_1_1detail_1_1op__cmp.html',1,'linalg::detail']]],

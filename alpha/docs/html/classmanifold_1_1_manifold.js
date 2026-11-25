@@ -64,7 +64,7 @@ var classmanifold_1_1_manifold =
     [ "SmoothByNormals", "classmanifold_1_1_manifold.html#af97abee92407e3c97e721c80eb10d057", null ],
     [ "Hull", "classmanifold_1_1_manifold.html#a9dc9e00112e2b063cfa6fe8482b1afe8", null ],
     [ "Hull", "classmanifold_1_1_manifold.html#a0b45afc24015963e82745f1f83f3f310", null ],
-    [ "Hull", "classmanifold_1_1_manifold.html#ab0a6fa5c97e3e47118ee69b741e64ad0", null ],
+    [ "Hull", "classmanifold_1_1_manifold.html#ad2105eb6a66e3d42817925ceb0b7b424", null ],
     [ "MatchesTriNormals", "classmanifold_1_1_manifold.html#a611a5fd95dc5d49cd88182b8ead722b7", null ],
     [ "HasSimpleProps", "classmanifold_1_1_manifold.html#a229504ceeba4cfe69d815e46496090f7", null ],
     [ "NumDegenerateTris", "classmanifold_1_1_manifold.html#af46a22b8e84924f7159ae2a2db6cc956", null ],

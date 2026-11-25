@@ -10,7 +10,7 @@ var searchData=
   ['scalars_7',['scalars',['../structlinalg_1_1detail_1_1scalars.html',1,'linalg::detail']]],
   ['scalars_3c_20t_2c_20u_2e_2e_2e_20_3e_8',['scalars&lt; T, U... &gt;',['../structlinalg_1_1detail_1_1scalars_3_01_t_00_01_u_8_8_8_01_4.html',1,'linalg::detail']]],
   ['scalars_3c_3e_9',['scalars&lt;&gt;',['../structlinalg_1_1detail_1_1scalars_3_4.html',1,'linalg::detail']]],
-  ['scale_10',['Scale',['../classmanifold_1_1_manifold.html#aa6153eb69d3a69e38e6508bf58449f04',1,'manifold::Manifold::Scale()'],['../classmanifold_1_1_cross_section.html#ad0f8a0ea9c4e2394bc4808dfb7ae1c69',1,'manifold::CrossSection::Scale()'],['../structmanifold_1_1_box.html#a76ea0a2f7ed4af7b1439104df4d72969',1,'manifold::Box::Scale()'],['../structmanifold_1_1_rect.html#a76ea0a2f7ed4af7b1439104df4d72969',1,'manifold::Rect::Scale()']]],
+  ['scale_10',['Scale',['../classmanifold_1_1_manifold.html#aa6153eb69d3a69e38e6508bf58449f04',1,'manifold::Manifold::Scale()'],['../classmanifold_1_1_cross_section.html#a8671be06f6286268b5df477d69d3e2be',1,'manifold::CrossSection::Scale()'],['../structmanifold_1_1_box.html#a76ea0a2f7ed4af7b1439104df4d72969',1,'manifold::Box::Scale()'],['../structmanifold_1_1_rect.html#a76ea0a2f7ed4af7b1439104df4d72969',1,'manifold::Rect::Scale()']]],
   ['scallop_11',['Scallop',['../group___samples.html#ga45f5b5c2a374a8c67d9208a2bf9acc36',1,'manifold']]],
   ['segments_12',['segments',['../structmanifold_1_1_circular_quality.html#a32e4172d8952ac9f1db668982da57128',1,'manifold::CircularQuality']]],
   ['segmentsfor_13',['SegmentsFor',['../structmanifold_1_1_circular_quality.html#a92192ebb955898b1948cf906d21694bf',1,'manifold::CircularQuality']]],

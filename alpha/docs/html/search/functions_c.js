@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['offset_0',['Offset',['../classmanifold_1_1_cross_section.html#acc76f09a11a354440c735d5dba4d9c7a',1,'manifold::CrossSection']]],
+  ['offset_0',['Offset',['../classmanifold_1_1_cross_section.html#a8f30a6fe3351a8a1a7fec6c7b3cb7c1f',1,'manifold::CrossSection']]],
   ['operator_21_3d_1',['operator!=',['../structmanifold_1_1_box.html#ab0d7290108500d1d826d7f6c93efeabe',1,'manifold::Box']]],
   ['operator_2a_2',['operator*',['../structmanifold_1_1_box.html#acb30e18687fad5081e4795e8cef538cb',1,'manifold::Box::operator*()'],['../structmanifold_1_1_rect.html#a7eb0f2bbed9bc92a4c1cd1c7ef4181a6',1,'manifold::Rect::operator*()']]],
   ['operator_2a_3d_3',['operator*=',['../structmanifold_1_1_box.html#ab0ec4bdbe1a152a83073874d2d62db67',1,'manifold::Box::operator*=()'],['../structmanifold_1_1_rect.html#a02fcd8a4fd938f130493a48349dcbabe',1,'manifold::Rect::operator*=()']]],

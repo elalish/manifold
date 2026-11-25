@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['scale_0',['Scale',['../classmanifold_1_1_manifold.html#aa6153eb69d3a69e38e6508bf58449f04',1,'manifold::Manifold::Scale()'],['../classmanifold_1_1_cross_section.html#ad0f8a0ea9c4e2394bc4808dfb7ae1c69',1,'manifold::CrossSection::Scale()'],['../structmanifold_1_1_box.html#a76ea0a2f7ed4af7b1439104df4d72969',1,'manifold::Box::Scale()'],['../structmanifold_1_1_rect.html#a76ea0a2f7ed4af7b1439104df4d72969',1,'manifold::Rect::Scale()']]],
+  ['scale_0',['Scale',['../classmanifold_1_1_manifold.html#aa6153eb69d3a69e38e6508bf58449f04',1,'manifold::Manifold::Scale()'],['../classmanifold_1_1_cross_section.html#a8671be06f6286268b5df477d69d3e2be',1,'manifold::CrossSection::Scale()'],['../structmanifold_1_1_box.html#a76ea0a2f7ed4af7b1439104df4d72969',1,'manifold::Box::Scale()'],['../structmanifold_1_1_rect.html#a76ea0a2f7ed4af7b1439104df4d72969',1,'manifold::Rect::Scale()']]],
   ['scallop_1',['Scallop',['../group___samples.html#ga45f5b5c2a374a8c67d9208a2bf9acc36',1,'manifold']]],
   ['segmentsfor_2',['SegmentsFor',['../structmanifold_1_1_circular_quality.html#a92192ebb955898b1948cf906d21694bf',1,'manifold::CircularQuality']]],
   ['select_3',['select',['../group__selection.html#ga893f21cd3ca71bef694516732ad0bca3',1,'linalg']]],

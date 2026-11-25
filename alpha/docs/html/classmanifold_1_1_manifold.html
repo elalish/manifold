@@ -249,7 +249,7 @@ Smoothing</h2></td></tr>
 Convex Hull</h2></td></tr>
 <tr class="memitem:a9dc9e00112e2b063cfa6fe8482b1afe8" id="r_a9dc9e00112e2b063cfa6fe8482b1afe8"><td class="memItemLeft"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a9dc9e00112e2b063cfa6fe8482b1afe8">Hull</a> () const</td></tr>
 <tr class="memitem:a0b45afc24015963e82745f1f83f3f310" id="r_a0b45afc24015963e82745f1f83f3f310"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#a0b45afc24015963e82745f1f83f3f310">Hull</a> (const std::vector&lt; <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> &gt; &amp;manifolds)</td></tr>
-<tr class="memitem:ab0a6fa5c97e3e47118ee69b741e64ad0" id="r_ab0a6fa5c97e3e47118ee69b741e64ad0"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#ab0a6fa5c97e3e47118ee69b741e64ad0">Hull</a> (const std::vector&lt; vec3 &gt; &amp;pts)</td></tr>
+<tr class="memitem:ad2105eb6a66e3d42817925ceb0b7b424" id="r_ad2105eb6a66e3d42817925ceb0b7b424"><td class="memItemLeft">static <a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a>&#160;</td><td class="memItemRight"><a class="el" href="#ad2105eb6a66e3d42817925ceb0b7b424">Hull</a> (const std::vector&lt; vec3 &gt; &amp;points)</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 id="header-member-group" class="groupheader"><a id="member-group" name="member-group"></a>
 I/O</h2></td></tr>
@@ -632,7 +632,7 @@ Testing Hooks</h2></td></tr>
   <table class="params">
     <tr><td class="paramname">sdf</td><td>The signed-distance functor, containing this function signature: <span class="tt">double operator()(vec3 point)</span>, which returns the signed distance of a given point in R^3. Positive values are inside, negative outside. There is no requirement that the function be a true distance, or even continuous. </td></tr>
     <tr><td class="paramname">bounds</td><td>An axis-aligned box that defines the extent of the grid. </td></tr>
-    <tr><td class="paramname">edgeLength</td><td>Approximate maximum edge length of the triangles in the final result. This affects grid spacing, and hence has a strong effect on performance. Every positive-length axis has at least one grid interval, including when its extent is smaller than edgeLength. </td></tr>
+    <tr><td class="paramname">edgeLength</td><td>Approximate maximum edge length of the triangles in the final result. This affects grid spacing, and hence has a strong effect on performance. Every positive-length axis has at least one grid interval, including when its extent is smaller than the edge length. </td></tr>
     <tr><td class="paramname">level</td><td>Extract the surface at this value of your sdf; defaults to zero. You can inset your mesh by using a positive value, or outset it with a negative value. </td></tr>
     <tr><td class="paramname">tolerance</td><td>Ensure each vertex is within this distance of the true surface. Defaults to -1, which will return the interpolated crossing-point based on the two nearest grid points. Small positive values will require more sdf evaluations per output vertex. </td></tr>
     <tr><td class="paramname">canParallel</td><td>Parallel policies violate will crash language runtimes with runtime locks that expect to not be called back by unregistered threads. This allows bindings use LevelSet despite being compiled with MANIFOLD_PAR active. </td></tr>
@@ -724,8 +724,8 @@ Testing Hooks</h2></td></tr>
   <table class="params">
     <tr><td class="paramname">crossSection</td><td>A set of non-overlapping polygons to extrude. </td></tr>
     <tr><td class="paramname">height</td><td>Z-extent of extrusion. </td></tr>
-    <tr><td class="paramname">nDivisions</td><td>Number of extra copies of the crossSection to insert into the shape vertically; especially useful in combination with twistDegrees to avoid interpolation artifacts. Default is none. </td></tr>
-    <tr><td class="paramname">twistDegrees</td><td>Amount to twist the top crossSection relative to the bottom, interpolated linearly for the divisions in between. </td></tr>
+    <tr><td class="paramname">nDivisions</td><td>Number of extra copies of the cross-section to insert into the shape vertically; especially useful in combination with twistDegrees to avoid interpolation artifacts. Default is none. </td></tr>
+    <tr><td class="paramname">twistDegrees</td><td>Amount to twist the top cross-section relative to the bottom, interpolated linearly for the divisions in between. </td></tr>
     <tr><td class="paramname">scaleTop</td><td>Amount to scale the top (independently in X and Y). If the scale is {0, 0}, a pure cone is formed with only a single vertex at the top. Note that scale is applied after twist. Default {1, 1}. </td></tr>
   </table>
   </dd>
@@ -1903,8 +1903,8 @@ Testing Hooks</h2></td></tr>
 
 </div>
 </div>
-<a id="ab0a6fa5c97e3e47118ee69b741e64ad0" name="ab0a6fa5c97e3e47118ee69b741e64ad0"></a>
-<h2 class="memtitle"><span class="permalink"><a href="#ab0a6fa5c97e3e47118ee69b741e64ad0">&#9670;&#160;</a></span>Hull() <span class="overload">[3/3]</span></h2>
+<a id="ad2105eb6a66e3d42817925ceb0b7b424" name="ad2105eb6a66e3d42817925ceb0b7b424"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad2105eb6a66e3d42817925ceb0b7b424">&#9670;&#160;</a></span>Hull() <span class="overload">[3/3]</span></h2>
 
 <div class="memitem">
 <div class="memproto">
@@ -1915,7 +1915,7 @@ Testing Hooks</h2></td></tr>
         <tr>
           <td class="memname"><a class="el" href="#ad5f60691d05e3402630122740cdf3a0b">Manifold</a> Hull </td>
           <td>(</td>
-          <td class="paramtype">const std::vector&lt; vec3 &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>pts</em></span></td><td>)</td>
+          <td class="paramtype">const std::vector&lt; vec3 &gt; &amp;</td>          <td class="paramname"><span class="paramname"><em>points</em></span></td><td>)</td>
           <td></td>
         </tr>
       </table>
@@ -1928,7 +1928,7 @@ Testing Hooks</h2></td></tr>
 <p>Compute the convex hull of a set of points. If the given points are fewer than 4, or they are all coplanar, an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> will be returned.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
-    <tr><td class="paramname">pts</td><td>A vector of 3-dimensional points over which to compute a convex hull. </td></tr>
+    <tr><td class="paramname">points</td><td>A vector of 3-dimensional points over which to compute a convex hull. </td></tr>
   </table>
   </dd>
 </dl>

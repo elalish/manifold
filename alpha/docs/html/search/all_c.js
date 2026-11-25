@@ -36,6 +36,6 @@ var searchData=
   ['mingap_33',['MinGap',['../classmanifold_1_1_manifold.html#a1b7ab47f4da039eb3dff5b46ba71658b',1,'manifold::Manifold']]],
   ['minkowskidifference_34',['MinkowskiDifference',['../classmanifold_1_1_manifold.html#a47715067c292eeaafdc48aab3a604829',1,'manifold::Manifold']]],
   ['minkowskisum_35',['MinkowskiSum',['../classmanifold_1_1_manifold.html#ae174a8240802779eca5a0416af7ea78b',1,'manifold::Manifold']]],
-  ['mirror_36',['Mirror',['../classmanifold_1_1_manifold.html#ad76d89178ca970900c81f2927f8c7f11',1,'manifold::Manifold::Mirror()'],['../classmanifold_1_1_cross_section.html#a3bdcbaf979a769af24a9d61624e639e8',1,'manifold::CrossSection::Mirror()']]],
+  ['mirror_36',['Mirror',['../classmanifold_1_1_manifold.html#ad76d89178ca970900c81f2927f8c7f11',1,'manifold::Manifold::Mirror()'],['../classmanifold_1_1_cross_section.html#af93c39e19b8fd185989b9015b58bcc08',1,'manifold::CrossSection::Mirror()']]],
   ['miter_37',['Miter',['../group___structs.html#ggaef400c43b34e3ecc3f7b342aa821395dae4396f81cd926bb129ccf3c147c64514',1,'manifold']]]
 ];
