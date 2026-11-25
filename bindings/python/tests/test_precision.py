@@ -38,29 +38,27 @@ def test_precision():
     assert (coarse + stamped).get_precision() == 1e-3
 
 
-def test_merge_precision():
-    cube = md.Manifold.cube((1, 1, 1)).to_mesh()
-    tri_verts = np.asarray(cube.tri_verts).reshape(-1)
-    verts = np.asarray(cube.vert_properties)[tri_verts].astype(np.float32)
-    verts[0, 0] += 1e-4
-    mesh = md.Mesh(
-        vert_properties=verts,
-        tri_verts=np.arange(len(verts), dtype=np.uint32).reshape(-1, 3),
-    )
-    assert md.Manifold(mesh.merge()).status() == md.Error.NotManifold
-    merged = mesh.merge(tolerance=0, rel_precision=1e-3)
-    assert md.Manifold(merged).status() == md.Error.NoError
-
-
-def test_merge64_precision():
+def test_merge_floor():
+    # The merge floor is the ingest precision of the mesh type times the
+    # bounding box scale, which is 1 for this cube.
+    float_eps = float(np.finfo(np.float32).eps)
     cube = md.Manifold.cube((1, 1, 1)).to_mesh64()
     tri_verts = np.asarray(cube.tri_verts).reshape(-1)
-    verts = np.asarray(cube.vert_properties)[tri_verts].astype(np.float64)
-    verts[0, 0] += 1e-9
-    mesh = md.Mesh64(
-        vert_properties=verts,
-        tri_verts=np.arange(len(verts), dtype=np.uint64).reshape(-1, 3),
-    )
+    soup = np.asarray(cube.vert_properties)[tri_verts]
+    tris = np.arange(len(soup)).reshape(-1, 3)
+
+    def merged64(offset, tolerance=0):
+        verts = soup.copy()
+        verts[0, 0] += offset
+        mesh = md.Mesh64(vert_properties=verts, tri_verts=tris.astype(np.uint64))
+        return md.Manifold(mesh.merge(tolerance)).status()
+
+    assert merged64(0.5 * float_eps) == md.Error.NotManifold
+    assert merged64(0.5 * float_eps, float_eps) == md.Error.NoError
+    assert merged64(0.5e-12) == md.Error.NoError
+
+    verts = soup.astype(np.float32)
+    verts[0, 0] += 1e-4
+    mesh = md.Mesh(vert_properties=verts, tri_verts=tris.astype(np.uint32))
     assert md.Manifold(mesh.merge()).status() == md.Error.NotManifold
-    merged = mesh.merge(tolerance=0, rel_precision=1e-6)
-    assert md.Manifold(merged).status() == md.Error.NoError
+    assert md.Manifold(mesh.merge(1e-3)).status() == md.Error.NoError

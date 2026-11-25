@@ -1368,8 +1368,10 @@ export class Mesh {
    * Returns a copy with mergeFromVert and mergeToVert vectors updated in order
    * to create a manifold solid. If the MeshGL is already manifold, the merge
    * vectors are unchanged. Otherwise, verts along open edges are merged within
-   * tolerance (the maximum of the specified tolerance and relPrecision times
-   * the bounding box scale), keeping any from the existing merge vectors.
+   * tolerance (the maximum of the specified tolerance and the baseline
+   * bounding-box tolerance), keeping any from the existing merge vectors. The
+   * baseline is the bounding box scale times float epsilon, the precision a
+   * Manifold made from this mesh gets.
    *
    * There is no guarantee the result will be manifold - this is a best-effort
    * helper function designed primarily to aid in the case where a manifold
@@ -1378,10 +1380,8 @@ export class Mesh {
    * will report a Status if it is not manifold.
    *
    * @param tolerance Default 0, with a bounding-box and precision-based floor.
-   * @param relPrecision The relative precision of the mesh, raised to at least
-   * float epsilon, which is also the default.
    */
-  merge(tolerance?: number, relPrecision?: number): Mesh;
+  merge(tolerance?: number): Mesh;
 
   /**
    * Gets the three vertex indices of this triangle in CCW order.
@@ -1495,11 +1495,12 @@ export class Mesh64 {
   get numRun(): number;
 
   /**
-   * Like Mesh.merge(), in double precision.
+   * Like Mesh.merge(), in double precision. The baseline is the bounding box
+   * scale times 1e-12, the precision a Manifold made from a Mesh64 gets.
    *
    * @param tolerance Default 0, with a bounding-box and precision-based floor.
    */
-  merge(tolerance?: number, relPrecision?: number): Mesh64;
+  merge(tolerance?: number): Mesh64;
 
   verts(tri: number): SealedUint32Array<3>;
 

@@ -340,9 +340,11 @@ double Manifold::GetEpsilon() const {
  * finest.
  */
 Manifold Manifold::WithPrecision(double relPrecision) const {
+  relPrecision = relPrecision > 0 && std::isfinite(relPrecision)
+                     ? std::max(kMinRelativePrecision, relPrecision)
+                     : kDefaultRelativePrecision;
   return Manifold(GetCsgLeafNode(AtomicLoadShared(&ctx_).get())
-                      .WithPrecision(ClampRelPrecision(
-                          relPrecision, kDefaultRelativePrecision)));
+                      .WithPrecision(relPrecision));
 }
 
 /**

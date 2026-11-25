@@ -71,10 +71,7 @@ ManifoldMeshGL* manifold_meshgl_w_options(const float* vert_props,
                                           const ManifoldMeshGLOptions* options);
 ManifoldMeshGL* manifold_get_meshgl(const ManifoldManifold* m);
 ManifoldMeshGL* manifold_meshgl_copy(const ManifoldMeshGL* m);
-// rel_precision: relative precision of the mesh, raised to at least
-// FLT_EPSILON, which is also the default.
-ManifoldMeshGL* manifold_meshgl_merge(const ManifoldMeshGL* m, float tolerance,
-                                      double rel_precision);
+ManifoldMeshGL* manifold_meshgl_merge(const ManifoldMeshGL* m, float tolerance);
 
 ManifoldMeshGL64* manifold_meshgl64(const double* vert_props, size_t n_verts,
                                     size_t n_props, const uint64_t* tri_verts,
@@ -91,11 +88,8 @@ ManifoldMeshGL64* manifold_meshgl64_w_options(
     const ManifoldMeshGL64Options* options);
 ManifoldMeshGL64* manifold_get_meshgl64(const ManifoldManifold* m);
 ManifoldMeshGL64* manifold_meshgl64_copy(const ManifoldMeshGL64* m);
-// rel_precision: relative precision of the mesh. The default is
-// MANIFOLD_MIN_RELATIVE_PRECISION.
 ManifoldMeshGL64* manifold_meshgl64_merge(const ManifoldMeshGL64* m,
-                                          double tolerance,
-                                          double rel_precision);
+                                          double tolerance);
 
 // SDF
 // By default, the execution policy (sequential or parallel) of

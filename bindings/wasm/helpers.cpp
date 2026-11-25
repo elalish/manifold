@@ -77,8 +77,8 @@ val GetMesh64JS(const Manifold& manifold) {
 }
 
 template <typename P, typename I>
-val Merge(const val& mesh, P tolerance, double relPrecision) {
-  return MeshGL2JS(MeshJS2GL<P, I>(mesh).Merge(tolerance, relPrecision));
+val Merge(const val& mesh, P tolerance) {
+  return MeshGL2JS(MeshJS2GL<P, I>(mesh).Merge(tolerance));
 }
 
 CircularQuality DefaultCircularQuality() { return {}; }

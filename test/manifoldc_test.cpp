@@ -799,7 +799,7 @@ TEST(CBIND, meshgl_merge_returns_mem) {
 
   // This mesh is already manifold, so Merge() returns an unchanged copy.
   // The bug: old code returned the input pointer instead of the output buffer.
-  ManifoldMeshGL* merged = manifold_meshgl_merge(original, 0.0f, 0);
+  ManifoldMeshGL* merged = manifold_meshgl_merge(original, 0.0f);
 
   EXPECT_NE(merged, original);
 
@@ -818,7 +818,7 @@ TEST(CBIND, meshgl64_merge_returns_mem) {
   ManifoldManifold* cube = manifold_cube(1.0, 1.0, 1.0, 0);
   ManifoldMeshGL64* original = manifold_get_meshgl64(cube);
 
-  ManifoldMeshGL64* merged = manifold_meshgl64_merge(original, 0.0, 0);
+  ManifoldMeshGL64* merged = manifold_meshgl64_merge(original, 0.0);
 
   EXPECT_NE(merged, original);
 

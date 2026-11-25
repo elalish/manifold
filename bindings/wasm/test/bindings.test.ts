@@ -155,7 +155,7 @@ suite('Manifold Bindings', () => {
     expect(Manifold.hull([coarse, stamped]).getPrecision()).toEqual(1e-3);
   });
 
-  test('merge closes gaps up to its precision', () => {
+  test('merge closes gaps up to its tolerance', () => {
     const {Manifold, Mesh} = manifoldModule;
     const cube = Manifold.cube().calculateNormals(0).getMesh();
     const vertProperties = cube.vertProperties.slice();
@@ -163,7 +163,7 @@ suite('Manifold Bindings', () => {
     const open = new Mesh(
         {numProp: cube.numProp, vertProperties, triVerts: cube.triVerts});
     expect(() => new Manifold(open.merge())).toThrow();
-    expect(new Manifold(open.merge(0, 1e-3)).status()).toEqual('NoError');
+    expect(new Manifold(open.merge(1e-3)).status()).toEqual('NoError');
   });
 
   test('hull of Manifolds is computed at their smallest precision', () => {

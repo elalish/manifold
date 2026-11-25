@@ -76,8 +76,7 @@ struct ReindexFace {
 };
 
 template <typename Precision, typename I>
-void MergeMeshGLP(MeshGLP<Precision, I>& mesh, Precision requestedTolerance,
-                  double relPrecision) {
+void MergeMeshGLP(MeshGLP<Precision, I>& mesh, Precision requestedTolerance) {
   ZoneScoped;
 
   if (mesh.numProp < 3 || mesh.vertProperties.size() % mesh.numProp != 0 ||
@@ -174,12 +173,10 @@ void MergeMeshGLP(MeshGLP<Precision, I>& mesh, Precision requestedTolerance,
     bBox.max[i] = minMax.second;
   }
 
-  const double minPrecision = std::is_same<Precision, float>::value
-                                  ? std::numeric_limits<float>::epsilon()
-                                  : kMinRelativePrecision;
   const double tolerance = std::max(
       static_cast<double>(requestedTolerance),
-      std::max(minPrecision, ClampRelPrecision(relPrecision, minPrecision)) *
+      (std::is_same<Precision, float>::value ? kDefaultRelativePrecision
+                                             : kMinRelativePrecision) *
           bBox.Scale());
 
   auto policy = autoPolicy(numOpenVert, 1e5);
@@ -621,11 +618,11 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
  * to create a manifold solid. If the MeshGL is already manifold, or is invalid
  * (fewer than 3 properties, merge vectors of different lengths, or out-of-range
  * indices), the copy is unchanged. Otherwise, verts along open edges are merged
- * within tolerance (the maximum of the specified tolerance and relPrecision
- * times the bounding box scale), keeping any from the existing merge vectors.
- * relPrecision is raised to at least float epsilon for MeshGL and
- * kMinRelativePrecision for MeshGL64, which are also the defaults that 0,
- * negative values, NaN and infinity give.
+ * within tolerance (the maximum of the specified tolerance and the baseline
+ * bounding-box tolerance), keeping any from the existing merge vectors. The
+ * baseline is the bounding box scale times the relative precision a Manifold
+ * made from this mesh gets: kDefaultRelativePrecision for MeshGL and
+ * kMinRelativePrecision for MeshGL64.
  *
  * There is no guarantee the result will be manifold - this is a best-effort
  * helper function designed primarily to aid in the case where a manifold
@@ -634,16 +631,16 @@ void Manifold::Impl::ReorderHalfedges(ExecutionContext::Impl* ctx) {
  * will report an error status if it is not manifold.
  */
 template <>
-MeshGL MeshGL::Merge(float tolerance, double relPrecision) const {
+MeshGL MeshGL::Merge(float tolerance) const {
   MeshGL merged = *this;
-  MergeMeshGLP(merged, tolerance, relPrecision);
+  MergeMeshGLP(merged, tolerance);
   return merged;
 }
 
 template <>
-MeshGL64 MeshGL64::Merge(double tolerance, double relPrecision) const {
+MeshGL64 MeshGL64::Merge(double tolerance) const {
   MeshGL64 merged = *this;
-  MergeMeshGLP(merged, tolerance, relPrecision);
+  MergeMeshGLP(merged, tolerance);
   return merged;
 }
 

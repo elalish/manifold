@@ -2108,13 +2108,22 @@ TEST(Manifold, MergeTolerance) {
 }
 
 TEST(Precision, Merge) {
+  // The merge floor is the ingest precision of the mesh type times the
+  // bounding box scale, which is 0.5 for the centered cube.
   MeshGL mesh = CubeSTL();
   mesh.vertProperties[0] += 1e-4f;
   EXPECT_EQ(Manifold(mesh.Merge()).Status(), Manifold::Error::NotManifold);
-  EXPECT_EQ(Manifold(mesh.Merge(0, 1e-3)).Status(), Manifold::Error::NoError);
-  EXPECT_EQ(Manifold(mesh.Merge(0, INFINITY)).Status(),
-            Manifold::Error::NotManifold);
-  EXPECT_EQ(Manifold(mesh.Merge(0, 0)).Status(), Manifold::Error::NotManifold);
+  EXPECT_EQ(Manifold(mesh.Merge(1e-3f)).Status(), Manifold::Error::NoError);
+  // Shifted to [0, 1], the scale is 1 and an offset from 0 is exact in float.
+  mesh = CubeSTL();
+  for (size_t v = 0; v < mesh.NumVert(); ++v) {
+    for (const int i : {0, 1, 2})
+      mesh.vertProperties[mesh.numProp * v + i] += 0.5f;
+  }
+  size_t atZero = 0;
+  while (mesh.vertProperties[mesh.numProp * atZero] != 0) ++atZero;
+  mesh.vertProperties[mesh.numProp * atZero] += 0.5 * kDefaultRelativePrecision;
+  EXPECT_EQ(Manifold(mesh.Merge()).Status(), Manifold::Error::NoError);
 
   const MeshGL stl = CubeSTL();
   MeshGL64 mesh64;
@@ -2122,9 +2131,13 @@ TEST(Precision, Merge) {
   mesh64.vertProperties.assign(stl.vertProperties.begin(),
                                stl.vertProperties.end());
   mesh64.triVerts.assign(stl.triVerts.begin(), stl.triVerts.end());
-  mesh64.vertProperties[0] += 1e-9;
-  EXPECT_EQ(Manifold(mesh64.Merge()).Status(), Manifold::Error::NotManifold);
-  EXPECT_EQ(Manifold(mesh64.Merge(0, 1e-6)).Status(), Manifold::Error::NoError);
+  MeshGL64 coarse64 = mesh64;
+  coarse64.vertProperties[0] += 0.1 * kDefaultRelativePrecision;
+  EXPECT_EQ(Manifold(coarse64.Merge()).Status(), Manifold::Error::NotManifold);
+  EXPECT_EQ(Manifold(coarse64.Merge(kDefaultRelativePrecision)).Status(),
+            Manifold::Error::NoError);
+  mesh64.vertProperties[0] += 0.1 * kMinRelativePrecision;
+  EXPECT_EQ(Manifold(mesh64.Merge()).Status(), Manifold::Error::NoError);
 }
 
 TEST(Precision, Ingest) {

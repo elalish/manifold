@@ -14,9 +14,7 @@
 // limitations under the License.
 
 #pragma once
-#include <algorithm>
 #include <atomic>
-#include <cmath>
 #include <memory>
 #include <mutex>
 
@@ -38,14 +36,6 @@
 #include "parallel.h"
 
 namespace manifold {
-
-// A requested relative precision raised to at least kMinRelativePrecision.
-// 0, negative values, NaN and infinity give defaultPrecision.
-inline double ClampRelPrecision(double relPrecision, double defaultPrecision) {
-  return relPrecision > 0 && std::isfinite(relPrecision)
-             ? std::max(kMinRelativePrecision, relPrecision)
-             : defaultPrecision;
-}
 
 inline int Next3(int i) {
   constexpr ivec3 next3(1, 2, 0);

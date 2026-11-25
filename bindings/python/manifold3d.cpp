@@ -628,8 +628,7 @@ NB_MODULE(manifold3d, m) {
       .def("backside", &MeshGL::Backside, nb::arg("run"))
       .def("has_normals", &MeshGL::HasNormals, nb::arg("run"))
       .def("merge", &MeshGL::Merge, nb::arg("tolerance") = 0.0f,
-           nb::arg("rel_precision") = kDefaultRelativePrecision,
-           mesh_gl__merge__tolerance__rel_precision);
+           mesh_gl__merge__tolerance);
 
   nb::class_<MeshGL64>(m, "Mesh64")
       .def(
@@ -746,8 +745,7 @@ NB_MODULE(manifold3d, m) {
       .def("backside", &MeshGL64::Backside, nb::arg("run"))
       .def("has_normals", &MeshGL64::HasNormals, nb::arg("run"))
       .def("merge", &MeshGL64::Merge, nb::arg("tolerance") = 0.0,
-           nb::arg("rel_precision") = kMinRelativePrecision,
-           mesh_gl__merge__tolerance__rel_precision);
+           mesh_gl__merge__tolerance);
 
   nb::class_<RayHit>(m, "RayHit")
       .def_ro("original_id", &RayHit::originalID)

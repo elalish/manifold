@@ -523,8 +523,8 @@ Module.setup = function() {
       super(Float32Array, options);
     }
 
-    merge(tolerance = 0, relPrecision = 0) {
-      return new Mesh(Module._Merge(this, tolerance, relPrecision));
+    merge(tolerance = 0) {
+      return new Mesh(Module._Merge(this, tolerance));
     }
   }
 
@@ -533,8 +533,8 @@ Module.setup = function() {
       super(Float64Array, options);
     }
 
-    merge(tolerance = 0, relPrecision = 0) {
-      return new Mesh64(Module._Merge64(this, tolerance, relPrecision));
+    merge(tolerance = 0) {
+      return new Mesh64(Module._Merge64(this, tolerance));
     }
   }
 
