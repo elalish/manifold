@@ -316,8 +316,6 @@ TEST(Boolean, DegenerateSwapLoop) {
 // which only added a zero-length edge, so SwapDegenerateEdges split the same
 // quad again and again, growing the mesh until it crashed.
 TEST(Boolean, DegenerateSplitQuadAtEnd) {
-  ManifoldParamGuard guard;
-  ManifoldParams().intermediateChecks = false;
   Manifold first = ReadTestOBJ("degenerate_split_quad_first.obj");
   Manifold second = ReadTestOBJ("degenerate_split_quad_second.obj");
   Manifold result = first + second;
