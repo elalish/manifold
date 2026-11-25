@@ -221,6 +221,9 @@ export async function importModel(
  * and then union the results together.  If a child node has no mesh, the mesh
  * has no geometry, or the mesh is not manifold, that child node will be
  * silently excluded.
+ *
+ * The result has float relative precision, since the file does not store a
+ * precision. Use `withPrecision()` to change it.
  */
 export async function importManifold(
     source: string|Blob|URL|ArrayBuffer,

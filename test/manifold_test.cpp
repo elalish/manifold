@@ -2179,6 +2179,15 @@ TEST(Precision, Ingest) {
   EXPECT_EQ(coarse.Translate({10, 0, 0}).GetPrecision(), 1e-3);
   EXPECT_DOUBLE_EQ(coarse.Translate({10, 0, 0}).GetEpsilon(), 1e-3 * 11);
   EXPECT_EQ(coarse.Refine(2).GetPrecision(), 1e-3);
+  EXPECT_EQ(coarse.Simplify().GetPrecision(), 1e-3);
+  EXPECT_EQ(coarse.AsOriginal().GetPrecision(), 1e-3);
+  EXPECT_EQ(coarse.CalculateNormals().GetPrecision(), 1e-3);
+  EXPECT_EQ(coarse.Warp([](vec3& v) { v.x *= 2; }).GetPrecision(), 1e-3);
+  EXPECT_EQ(coarse
+                .SetProperties(4, [](double* newProp, vec3 pos,
+                                     const double*) { newProp[3] = pos.x; })
+                .GetPrecision(),
+            1e-3);
   EXPECT_EQ(coarse.Hull().GetPrecision(), 1e-3);
   EXPECT_EQ(coarse.TrimByPlane({0, 0, 1}, 0).GetPrecision(), 1e-3);
   const auto halves = coarse.SplitByPlane({0, 0, 1}, 0);
@@ -2242,6 +2251,11 @@ TEST(Precision, BuiltShapesDefaultToFloat) {
   for (const Manifold& shape : shapes) {
     EXPECT_EQ(shape.GetPrecision(), kDefaultRelativePrecision);
   }
+  ExecutionContext ctx;
+  EXPECT_EQ(ctx.LevelSet([](vec3 p) { return 1 - la::length(p); },
+                         {vec3(-2), vec3(2)}, 0.5)
+                .GetPrecision(),
+            kDefaultRelativePrecision);
   // A MeshGL64 operand keeps a Boolean at double precision.
   const Manifold fine(Manifold::Sphere(1).GetMeshGL64());
   EXPECT_EQ((fine - Manifold::Cube()).GetPrecision(), kMinRelativePrecision);
@@ -2297,6 +2311,13 @@ TEST(Precision, SmallestKeepsFineDetail) {
             1e-3);
   EXPECT_EQ(Manifold::Hull({Manifold(), far}).GetPrecision(), 1e-2);
   EXPECT_EQ(sphere.WithPrecision(1e-3).MinkowskiSum(far).GetPrecision(), 1e-3);
+  EXPECT_EQ(far.MinkowskiDifference(cube.WithPrecision(1e-3).Scale(vec3(0.1)))
+                .GetPrecision(),
+            1e-3);
+  const auto [inside, outside] = cube.WithPrecision(1e-2).Split(
+      cube.WithPrecision(1e-3).Translate({0.5, 0.5, 0.5}));
+  EXPECT_EQ(inside.GetPrecision(), 1e-3);
+  EXPECT_EQ(outside.GetPrecision(), 1e-3);
 }
 
 TEST(Precision, UnionOrder) {
@@ -2307,11 +2328,13 @@ TEST(Precision, UnionOrder) {
   const Manifold ab = a + b;
   const Manifold ba = b + a;
   EXPECT_EQ(ab.NumTri(), ba.NumTri());
-  EXPECT_EQ(ab.GetPrecision(), ba.GetPrecision());
+  EXPECT_EQ(ab.GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_EQ(ba.GetPrecision(), kDefaultRelativePrecision);
   const Manifold abc = Manifold::BatchBoolean({a, b, c}, OpType::Add);
   const Manifold cba = Manifold::BatchBoolean({c, b, a}, OpType::Add);
   EXPECT_EQ(abc.NumTri(), cba.NumTri());
-  EXPECT_EQ(abc.GetPrecision(), cba.GetPrecision());
+  EXPECT_EQ(abc.GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_EQ(cba.GetPrecision(), kDefaultRelativePrecision);
 }
 
 TEST(Precision, SharedSubtree) {

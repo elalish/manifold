@@ -240,6 +240,8 @@ size_t manifold_num_edge(const ManifoldManifold* m);
 size_t manifold_num_tri(const ManifoldManifold* m);
 size_t manifold_num_prop(const ManifoldManifold* m);
 ManifoldBox* manifold_bounding_box(const ManifoldManifold* m);
+// Returns the relative precision of m times its bounding box scale, or -1 if
+// m is empty.
 double manifold_epsilon(const ManifoldManifold* m);
 size_t manifold_num_prop_vert(const ManifoldManifold* m);
 int manifold_genus(const ManifoldManifold* m);

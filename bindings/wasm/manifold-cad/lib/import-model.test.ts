@@ -63,6 +63,7 @@ suite('importManifold()', () => {
     const model = await importer.importManifold(new URL(
         '../test/fixtures/models/boxExtMeshManifold.glb', import.meta.url));
     expect(model.volume()).to.be.closeTo(100 * 100 * 100, 1);
+    expect(model.getPrecision()).toEqual(2 ** -23);
   });
 
   test('imports a model without EXT_mesh_manifold', async () => {

@@ -1143,7 +1143,7 @@ export class Manifold {
    * their non-empty inputs.
    *
    * @param relPrecision The relative precision. 0, negative values, NaN and
-   * infinity give the default, float epsilon. Positive values below
+   * infinity give float epsilon. Positive values below
    * {@link MIN_RELATIVE_PRECISION} (1e-12) are raised to it, so pass it for the
    * finest.
    * @group Information
@@ -1151,10 +1151,13 @@ export class Manifold {
   withPrecision(relPrecision: number): Manifold;
 
   /**
-   * Returns the relative precision of this Manifold, set by its input mesh or
-   * withPrecision(), or taken from its inputs. Shapes, extrusions,
-   * revolutions, level sets and hulls of points have the default, float
-   * epsilon.
+   * Returns the relative precision of this Manifold. A Manifold made from a
+   * Mesh or built by a factory such as cube(), extrude(), levelSet() or hull()
+   * of points has float epsilon, about 1.2e-7. One made from a Mesh64 has
+   * {@link MIN_RELATIVE_PRECISION} (1e-12). withPrecision() sets it, other
+   * operations on one Manifold keep it, and operations on several take the
+   * smallest among their non-empty inputs. An empty Boolean result takes the
+   * smallest among all its inputs.
    *
    * @group Information
    */

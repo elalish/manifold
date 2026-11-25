@@ -63,6 +63,16 @@ export default coarse;`;
   cleanup();
 });
 
+test('Static hull keeps the smallest precision', async () => {
+  const code = `import {Manifold} from 'manifold-cad/manifoldCAD';
+const coarse = Manifold.cube().withPrecision(1e-3);
+const hull = Manifold.hull([coarse, Manifold.sphere(1).withPrecision(1e-2)]);
+if (hull.getPrecision() !== 1e-3) throw new Error('precision');
+export default hull;`;
+  await expect(evaluate(code)).resolves.toBeTruthy();
+  cleanup();
+});
+
 test('A script can import the finest precision', async () => {
   const code =
       `import {Manifold, MIN_RELATIVE_PRECISION} from 'manifold-cad/manifoldCAD';

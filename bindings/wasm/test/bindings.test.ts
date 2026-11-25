@@ -133,6 +133,16 @@ suite('Manifold Bindings', () => {
     expect(new manifoldModule.ExecutionContext().fromMesh(mesh).getPrecision())
         .toEqual(2 ** -23);
     expect(Manifold.cube().getPrecision()).toEqual(2 ** -23);
+    const square = manifoldModule.CrossSection.square();
+    for (const shape
+             of [Manifold.extrude(square, 1),
+                 Manifold.revolve(square.translate([1, 0])),
+                 Manifold.levelSet(
+                     p => 1 - Math.hypot(...p),
+   {min: [-2, -2, -2], max: [2, 2, 2]}, 0.5),
+                 Manifold.hull([[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]])]) {
+      expect(shape.getPrecision()).toEqual(2 ** -23);
+    }
     // 0, negative values, NaN and infinity give the default.
     for (const unset of [0, -1, NaN, Infinity]) {
       expect(Manifold.cube()

@@ -77,8 +77,8 @@ class CsgLeafNode final : public CsgNode {
   // Returns the relative precision without triggering eager transform.
   double RelPrecision() const { return relPrecision_; }
 
-  // Returns this leaf with the given relative precision, without copying the
-  // mesh. GetImpl() applies it along with any pending transform.
+  // Returns this leaf with the given relative precision. The first GetImpl()
+  // copies the mesh to apply it, along with any pending transform.
   std::shared_ptr<CsgLeafNode> WithPrecision(double relPrecision) const;
 
  private:

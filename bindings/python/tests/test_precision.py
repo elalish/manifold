@@ -37,6 +37,23 @@ def test_precision():
     assert (stamped + coarse).get_precision() == 1e-3
     assert (coarse + stamped).get_precision() == 1e-3
 
+    # Built shapes have float epsilon.
+    square = md.CrossSection.square((1, 1))
+    built = [
+        md.Manifold.extrude(square, 1),
+        md.Manifold.revolve(square.translate((1, 0))),
+        md.Manifold.level_set(
+            lambda x, y, z: 1 - (x * x + y * y + z * z) ** 0.5,
+            [-2, -2, -2, 2, 2, 2],
+            0.5,
+        ),
+        md.Manifold.hull_points([(0, 0, 0), (1, 0, 0), (0, 1, 0), (0, 0, 1)]),
+    ]
+    for shape in built:
+        assert shape.get_precision() == float_eps
+    assert "kDefault" not in md.Manifold.get_precision.__doc__
+    assert "float epsilon" in md.Manifold.with_precision.__doc__
+
 
 def test_merge_floor():
     # The merge floor is the ingest precision of the mesh type times the

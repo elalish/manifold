@@ -319,9 +319,9 @@ size_t Manifold::NumPropVert() const {
 Box Manifold::BoundingBox() const { return GetCsgLeafNode().GetImpl()->bBox_; }
 
 /**
- * Returns the epsilon value of this Manifold's vertices, which tracks the
- * approximate rounding error over all the transforms and operations that have
- * led to this state. This is the value of &epsilon; defining
+ * Returns the epsilon value of this Manifold's vertices: its relative
+ * precision times its bounding box scale, or -1 if it is empty. This is the
+ * value of &epsilon; defining
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
 double Manifold::GetEpsilon() const {
@@ -337,7 +337,8 @@ double Manifold::GetEpsilon() const {
  * non-empty inputs.
  *
  * @param relPrecision The relative precision. 0, negative values, NaN and
- * infinity give kDefaultRelativePrecision. Positive values below
+ * infinity give kDefaultRelativePrecision, even for a Manifold made from
+ * MeshGL64. Positive values below
  * kMinRelativePrecision are raised to it, so pass kMinRelativePrecision for the
  * finest.
  */
@@ -350,9 +351,13 @@ Manifold Manifold::WithPrecision(double relPrecision) const {
 }
 
 /**
- * Returns the relative precision of this Manifold, set by its input mesh or
- * WithPrecision(), or taken from its inputs. Shapes, extrusions, revolutions,
- * level sets and hulls of points have kDefaultRelativePrecision.
+ * Returns the relative precision of this Manifold. A Manifold made from
+ * MeshGL or built by a factory such as Cube(), Extrude(), LevelSet() or Hull()
+ * of points has kDefaultRelativePrecision. One made from MeshGL64 or by
+ * ReadOBJ() has kMinRelativePrecision. WithPrecision() sets it, other
+ * operations on one Manifold keep it, and operations on several take the
+ * smallest among their non-empty inputs. An empty Boolean result takes the
+ * smallest among all its inputs.
  */
 double Manifold::GetPrecision() const {
   return GetCsgLeafNode(AtomicLoadShared(&ctx_).get()).RelPrecision();
@@ -462,7 +467,7 @@ uint32_t Manifold::ReserveIDs(uint32_t n) {
 /**
  * The triangle normal vectors are saved over the course of operations rather
  * than recalculated to avoid rounding error. This checks that triangles still
- * match their normal vectors within Precision().
+ * match their normal vectors within GetEpsilon().
  */
 bool Manifold::MatchesTriNormals() const {
   return GetCsgLeafNode().GetImpl()->MatchesTriNormals();
@@ -481,7 +486,7 @@ bool Manifold::HasSimpleProps() const {
 }
 
 /**
- * The number of triangles that are colinear within Precision(). This library
+ * The number of triangles that are colinear within GetEpsilon(). This library
  * attempts to remove all of these, but it cannot always remove all of them
  * without changing the mesh by too much.
  */
