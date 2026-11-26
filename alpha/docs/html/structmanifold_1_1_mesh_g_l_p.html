@@ -305,7 +305,7 @@ template&lt;typename Precision, typename I&gt; </div>
   </tr>
 </table>
 </div><div class="memdoc">
-<p>Returns the transformation matrix for the specified run.</p>
+<p>Returns the transformation matrix for the specified run, or the identity if runTransform does not hold one.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">run</td><td>The index of the triangle run (0 &lt;= run &lt; runOriginalID.size()). </td></tr>
@@ -500,7 +500,7 @@ template&lt;typename Precision, typename I&gt; </div>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Optional: For each run, a 3x4 transform is stored representing how the corresponding original mesh was transformed to create this triangle run. This matrix is stored in column-major order and the length of the overall vector is 12 * runOriginalID.size(). It is empty in the output of a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> that is an original (see OriginalID()). </p>
+<p>Optional: For each run, a 3x4 transform is stored representing how the corresponding original mesh was transformed to create this triangle run. This matrix is stored in column-major order and the length of the overall vector is either 12 * runOriginalID.size() or 0. It is empty in the output of a <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> that is an original (see OriginalID()), and every run then has the identity transform. </p>
 
 </div>
 </div>

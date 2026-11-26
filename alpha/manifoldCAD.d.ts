@@ -226,6 +226,17 @@ export declare class CrossSection {
     warp(warpFunc: (vert: Vec2) => void): CrossSection;
 
     /**
+     * Batch version of warp(). The callback receives the vertices of all
+     * contours, in contour order, as a flat array of xyxy... (length = count *
+     * 2) and may modify it in-place. Rethrows any error from warpFunc.
+     *
+     * @param warpFunc A function that modifies the given vertex positions.
+     * @group Transformations
+     */
+    warpBatch(warpFunc: (verts: Float64Array, count: number) => void):
+    CrossSection;
+
+    /**
      * Inflate the contours in CrossSection by the specified delta, handling
      * corners according to the given JoinType.
      *
@@ -1618,8 +1629,9 @@ export declare class Mesh {
      * Optional: For each run, a 3x4 transform is stored representing how the
      * corresponding original mesh was transformed to create this triangle run.
      * This matrix is stored in column-major order and the length of the overall
-     * vector is 12 * runOriginalID.size(). It is empty in the output of a
-     * Manifold that is an original (see originalID()).
+     * vector is either 12 * runOriginalID.size() or 0. It is empty in the output
+     * of a Manifold that is an original (see originalID()), and every run then
+     * has the identity transform.
      */
     runTransform: Float32Array;
 
@@ -1713,7 +1725,7 @@ export declare class Mesh {
 
     /**
      * Gets the column-major 4x4 matrix transform from the original mesh to these
-     * related triangles.
+     * related triangles, or the identity if runTransform does not hold one.
      *
      * @param run triangle run index.
      */
@@ -2003,6 +2015,13 @@ export declare type Vec2 = [number, number];
  * A vector in three dimensional space.
  */
 export declare type Vec3 = [number, number, number];
+
+/**
+ * Returns the version of the Manifold library.
+ *
+ * @return Version as [major, minor, patch].
+ */
+export declare function version(): Vec3;
 
 /**
  * Include an imported model for visualization purposes.
