@@ -224,25 +224,24 @@ std::shared_ptr<CsgNode> Manifold::LoadPNode() const {
 
 CsgLeafNode& Manifold::GetCsgLeafNode(ExecutionContext::Impl* ctx) const {
   std::lock_guard<std::mutex> lock(*pNodeMutex_);
-  if (ctx != nullptr) {
-    // Reset counters to reflect this evaluation. For pre-evaluated leaf
-    // Manifolds, NumLeaves() returns 1 so totalBooleans is 0 — no work.
-    // This also prevents stale counters from a previous use of the same
-    // ctx. The cancel flag is intentionally NOT reset — sticky cancel is
-    // part of the documented API contract (see ExecutionContext in
-    // common.h).
-    const size_t leaves = pNode_->NumLeaves();
-    const int booleans = leaves > 0 ? static_cast<int>(leaves - 1) : 0;
-    // Reset numerators before denominators so a concurrent `Progress()`
-    // observer cannot see (old donePhases / new totalPhases), which could
-    // yield Progress > 1.0 transiently when a ctx is reused across evals.
-    ctx->doneBooleans.store(0, std::memory_order_relaxed);
-    ctx->donePhases.store(0, std::memory_order_relaxed);
-    ctx->totalBooleans.store(booleans, std::memory_order_relaxed);
-    ctx->totalPhases.store(booleans * kPhasesPerBoolean,
-                           std::memory_order_relaxed);
-  }
   if (pNode_->GetNodeType() != CsgNodeType::Leaf) {
+    // Reset the counters only when Booleans remain to evaluate. An evaluated
+    // op node counts as one leaf, so a call with no Boolean work leaves the
+    // ctx's progress from its last evaluation untouched. The cancel flag is
+    // never reset: sticky cancel is part of the documented API contract (see
+    // ExecutionContext in common.h).
+    const size_t leaves = ctx != nullptr ? pNode_->NumLeaves() : 0;
+    if (leaves > 1) {
+      const int booleans = static_cast<int>(leaves - 1);
+      // Reset numerators before denominators so a concurrent `Progress()`
+      // observer cannot see (old donePhases / new totalPhases), which could
+      // yield Progress > 1.0 transiently when a ctx is reused across evals.
+      ctx->doneBooleans.store(0, std::memory_order_relaxed);
+      ctx->donePhases.store(0, std::memory_order_relaxed);
+      ctx->totalBooleans.store(booleans, std::memory_order_relaxed);
+      ctx->totalPhases.store(booleans * kPhasesPerBoolean,
+                             std::memory_order_relaxed);
+    }
     pNode_ = pNode_->ToLeafNode(ctx);
   }
   return *std::static_pointer_cast<CsgLeafNode>(pNode_);
