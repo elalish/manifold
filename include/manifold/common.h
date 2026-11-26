@@ -318,7 +318,7 @@ struct Box {
   vec3 max = vec3(-std::numeric_limits<double>::infinity());
 
   /**
-   * Default constructor is an infinite box that contains all space.
+   * Default constructor is an empty box, the bounding box of no points.
    */
   constexpr Box() {}
 

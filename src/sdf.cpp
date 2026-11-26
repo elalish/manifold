@@ -449,16 +449,22 @@ namespace manifold {
  * body-centered cubic grid (two shifted cubic grids). These grid points are
  * snapped to the surface where possible to keep short edges from forming.
  *
+ * Invalid bounds or edgeLength give an empty Manifold with InvalidConstruction
+ * status.
+ *
  * @param sdf The signed-distance functor, containing this function signature:
  * `double operator()(vec3 point)`, which returns the
  * signed distance of a given point in R^3. Positive values are inside,
  * negative outside. There is no requirement that the function be a true
  * distance, or even continuous.
- * @param bounds An axis-aligned box that defines the extent of the grid.
+ * @param bounds An axis-aligned box that defines the extent of the grid. It
+ * must be finite with min <= max, or be the default Box, which is the bounding
+ * box of an empty Manifold and gives an empty Manifold with no error.
  * @param edgeLength Approximate maximum edge length of the triangles in the
- * final result. This affects grid spacing, and hence has a strong effect on
- * performance. Every positive-length axis has at least one grid interval,
- * including when its extent is smaller than the edge length.
+ * final result. Must be positive and finite. This affects grid spacing, and
+ * hence has a strong effect on performance. Every positive-length axis has at
+ * least one grid interval, including when its extent is smaller than the edge
+ * length.
  * @param level Extract the surface at this value of your sdf; defaults to
  * zero. You can inset your mesh by using a positive value, or outset it with a
  * negative value.
@@ -495,8 +501,16 @@ void Manifold::Impl::CreateLevelSet(std::function<double(vec3)> sdf, Box bounds,
     return;
   }
 
-  if (!bounds.IsFinite() || la::any(la::less(bounds.max, bounds.min)) ||
-      !std::isfinite(edgeLength) || edgeLength <= 0) {
+  if (!std::isfinite(edgeLength) || edgeLength <= 0) {
+    MakeEmpty(Error::InvalidConstruction);
+    return;
+  }
+  // The default Box is the bounding box of empty geometry, so there is no work.
+  if (bounds == Box()) {
+    if (ctx) ctx->donePhases.store(ctx->totalPhases.load());
+    return;
+  }
+  if (!bounds.IsFinite() || la::any(la::less(bounds.max, bounds.min))) {
     MakeEmpty(Error::InvalidConstruction);
     return;
   }

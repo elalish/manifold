@@ -1100,6 +1100,20 @@ TEST(Context, MeshGLCancelBeforeIngest) {
   EXPECT_EQ(m.Status(), Manifold::Error::Cancelled);
 }
 
+// Empty input is finished work: no error and full progress.
+TEST(Context, EmptyInputFactoriesComplete) {
+  ExecutionContext ctx;
+  const auto expectComplete = [&ctx](const Manifold& m) {
+    EXPECT_EQ(m.Status(), Manifold::Error::NoError);
+    EXPECT_TRUE(m.IsEmpty());
+    EXPECT_EQ(ctx.Progress(), 1.0);
+  };
+  expectComplete(ctx.FromMeshGL(MeshGL{}));
+  expectComplete(ctx.FromMeshGL(MeshGL64{}));
+  expectComplete(
+      ctx.LevelSet([](vec3 p) { return 1 - la::length(p); }, Box(), 0.5));
+}
+
 // Pre-cancel beats the empty-input fast path (would otherwise be NoError).
 TEST(Context, MeshGLCancelBeforeEmptyInputWinsOverNoError) {
   ExecutionContext ctx;

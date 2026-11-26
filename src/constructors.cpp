@@ -40,9 +40,6 @@ std::shared_ptr<Manifold::Impl> ExtrudeImpl(const Polygons& crossSection,
                                             double twistDegrees, vec2 scaleTop,
                                             double zOffset = 0.0,
                                             bool flipZ = false) {
-  scaleTop.x = std::max(scaleTop.x, 0.0);
-  scaleTop.y = std::max(scaleTop.y, 0.0);
-
   auto pImpl_ = std::make_shared<Manifold::Impl>();
   ++nDivisions;
   auto& vertPos = pImpl_->vertPos_;
@@ -236,23 +233,29 @@ Manifold Manifold::Sphere(double radius, CircularQuality quality) {
  * self-intersection. This is not checked here and it is up to the user to
  * choose the correct parameters.
  *
+ * Contours with fewer than three vertices are ignored. If none remain, the
+ * result is an empty Manifold with no error. An invalid parameter or a
+ * non-finite vertex in a remaining contour gives an empty Manifold with
+ * InvalidConstruction status.
+ *
  * @param crossSection A set of non-overlapping polygons to extrude.
- * @param height Z-extent of extrusion.
+ * @param height Z-extent of extrusion. Must be positive and finite.
  * @param nDivisions Number of extra copies of the cross-section to insert into
  * the shape vertically; especially useful in combination with twistDegrees to
- * avoid interpolation artifacts. Default is none.
+ * avoid interpolation artifacts. Must be non-negative. Default is none.
  * @param twistDegrees Amount to twist the top cross-section relative to the
- * bottom, interpolated linearly for the divisions in between.
- * @param scaleTop Amount to scale the top (independently in X and Y). If the
- * scale is {0, 0}, a pure cone is formed with only a single vertex at the top.
- * Note that scale is applied after twist.
+ * bottom, interpolated linearly for the divisions in between. Must be finite.
+ * @param scaleTop Amount to scale the top (independently in X and Y). Must be
+ * non-negative and finite. If the scale is {0, 0}, a pure cone is formed with
+ * only a single vertex at the top. Note that scale is applied after twist.
  * Default {1, 1}.
  */
 Manifold Manifold::Extrude(const Polygons& crossSection, double height,
                            int nDivisions, double twistDegrees, vec2 scaleTop) {
   ZoneScoped;
   if (!(height > 0.0) || !std::isfinite(height) || nDivisions < 0 ||
-      !std::isfinite(twistDegrees) || !la::all(la::isfinite(scaleTop))) {
+      !std::isfinite(twistDegrees) || !la::all(la::isfinite(scaleTop)) ||
+      scaleTop.x < 0.0 || scaleTop.y < 0.0) {
     return Invalid();
   }
   // Contours with fewer than 3 verts have no area.
@@ -264,7 +267,7 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
     }
     polygons.push_back(poly);
   }
-  if (polygons.empty()) return Invalid();
+  if (polygons.empty()) return Manifold();
   // Vert indices are int.
   int64_t numVert = 0;
   for (const SimplePolygon& poly : polygons) numVert += poly.size();
@@ -281,6 +284,12 @@ Manifold Manifold::Extrude(const Polygons& crossSection, double height,
  * manifold. If the polygons cross the Y-axis, only the part on the positive X
  * side is used. Geometrically valid input will result in geometrically valid
  * output.
+ *
+ * Contours with fewer than three vertices, and contours entirely on the
+ * negative X side, are ignored. If none remain, the result is an empty Manifold
+ * with no error. An invalid angle, or a non-finite vertex in a contour of at
+ * least three vertices, gives an empty Manifold with InvalidConstruction
+ * status.
  *
  * @param crossSection A set of non-overlapping polygons to revolve.
  * @param quality Number of segments in a full circle, see CircularQuality.
@@ -334,9 +343,7 @@ Manifold Manifold::Revolve(const Polygons& crossSection,
     } while (i != start);
   }
 
-  if (polygons.empty()) {
-    return Invalid();
-  }
+  if (polygons.empty()) return Manifold();
 
   if (revolveDegrees > 360.0) {
     revolveDegrees = 360.0;

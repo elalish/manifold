@@ -277,10 +277,14 @@ MeshGL64 Manifold::GetMeshGL64() const {
  */
 bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
 /**
- * Returns the reason for an input Mesh producing an empty Manifold. This Status
- * will carry on through operations like NaN propagation, ensuring an errored
- * mesh doesn't get mysteriously lost. Empty meshes may still show
- * NoError, for instance the intersection of non-overlapping meshes.
+ * Returns the error status of this Manifold. This is the way to check for
+ * errors, since the library reports them only through this status. A failed
+ * constructor or operation always gives an empty Manifold, and its status
+ * carries on through later operations like NaN propagation, so an error
+ * doesn't get mysteriously lost. Invalid parameters, such as a non-finite or
+ * negative size, give InvalidConstruction. Empty Manifolds may still show
+ * NoError: empty input gives empty output with no error, as does the
+ * intersection of non-overlapping meshes.
  */
 Manifold::Error Manifold::Status() const {
   // Routes through any attached ExecutionContext (see WithContext). The
@@ -1010,7 +1014,7 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(
 
 /**
  * Identical to SplitByPlane(), but calculating and returning only the first
- * result.
+ * result. An empty input gives an empty result with the same status.
  *
  * @param normal This vector is normal to the cutting plane and its length does
  * not matter. The result is in the direction of this vector from the plane.
@@ -1018,6 +1022,8 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(
  * direction of the normal vector.
  */
 Manifold Manifold::TrimByPlane(vec3 normal, double originOffset) const {
+  // An empty input, errored or not, has no bounding box to size the cutter.
+  if (IsEmpty()) return Manifold(LoadPNode());
   return *this ^ Halfspace(BoundingBox(), normal, originOffset, GetPrecision());
 }
 
