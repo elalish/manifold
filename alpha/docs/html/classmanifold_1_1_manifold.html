@@ -267,7 +267,7 @@ I/O</h2></td></tr>
 <div class="line">               &lt;&lt; <span class="keyword">static_cast&lt;</span><span class="keywordtype">int</span><span class="keyword">&gt;</span>(obj_m.<a class="code hl_function" href="#a423e2f2a67ccc0662a97e018b2c3886d">Status</a>()) &lt;&lt; <span class="stringliteral">&quot;\n&quot;</span>;</div>
 <div class="line">  }</div>
 <div class="line">}</div>
-<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:285</div></div>
+<div class="ttc" id="aclassmanifold_1_1_manifold_html_a423e2f2a67ccc0662a97e018b2c3886d"><div class="ttname"><a href="#a423e2f2a67ccc0662a97e018b2c3886d">manifold::Manifold::Status</a></div><div class="ttdeci">Error Status() const</div><div class="ttdef"><b>Definition</b> manifold.cpp:289</div></div>
 <div class="ttc" id="aclassmanifold_1_1_manifold_html_ad5f60691d05e3402630122740cdf3a0b"><div class="ttname"><a href="#ad5f60691d05e3402630122740cdf3a0b">manifold::Manifold::Manifold</a></div><div class="ttdeci">Manifold()</div><div class="ttdef"><b>Definition</b> manifold.cpp:97</div></div>
 </div><!-- fragment --><p>Writing: </p><div class="fragment"><div class="line">std::ofstream ofile;</div>
 <div class="line">ofile.open(filename);</div>
@@ -634,11 +634,12 @@ Testing Hooks</h2></td></tr>
 </table>
 </div><div class="memdoc">
 <p>Constructs a level-set manifold from the input Signed-Distance Function (SDF). This uses a form of Marching Tetrahedra (akin to Marching Cubes, but better for manifoldness). Instead of using a cubic grid, it uses a body-centered cubic grid (two shifted cubic grids). These grid points are snapped to the surface where possible to keep short edges from forming.</p>
+<p>Invalid bounds or edgeLength give an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with InvalidConstruction status.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">sdf</td><td>The signed-distance functor, containing this function signature: <span class="tt">double operator()(vec3 point)</span>, which returns the signed distance of a given point in R^3. Positive values are inside, negative outside. There is no requirement that the function be a true distance, or even continuous. </td></tr>
-    <tr><td class="paramname">bounds</td><td>An axis-aligned box that defines the extent of the grid. </td></tr>
-    <tr><td class="paramname">edgeLength</td><td>Approximate maximum edge length of the triangles in the final result. This affects grid spacing, and hence has a strong effect on performance. Every positive-length axis has at least one grid interval, including when its extent is smaller than the edge length. </td></tr>
+    <tr><td class="paramname">bounds</td><td>An axis-aligned box that defines the extent of the grid. It must be finite with min &lt;= max, or be the default <a class="el" href="structmanifold_1_1_box.html" title="Axis-aligned 3D box, primarily for bounding.">Box</a>, which is the bounding box of an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> and gives an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with no error. </td></tr>
+    <tr><td class="paramname">edgeLength</td><td>Approximate maximum edge length of the triangles in the final result. Must be positive and finite. This affects grid spacing, and hence has a strong effect on performance. Every positive-length axis has at least one grid interval, including when its extent is smaller than the edge length. </td></tr>
     <tr><td class="paramname">level</td><td>Extract the surface at this value of your sdf; defaults to zero. You can inset your mesh by using a positive value, or outset it with a negative value. </td></tr>
     <tr><td class="paramname">tolerance</td><td>Ensure each vertex is within this distance of the true surface. Defaults to -1, which will return the interpolated crossing-point based on the two nearest grid points. Small positive values will require more sdf evaluations per output vertex. </td></tr>
     <tr><td class="paramname">canParallel</td><td>Parallel policies violate will crash language runtimes with runtime locks that expect to not be called back by unregistered threads. This allows bindings use LevelSet despite being compiled with MANIFOLD_PAR active. </td></tr>
@@ -726,13 +727,14 @@ Testing Hooks</h2></td></tr>
 </table>
 </div><div class="memdoc">
 <p>Constructs a manifold from a set of polygons by extruding them along the Z-axis. Note that high twistDegrees with small nDivisions may cause self-intersection. This is not checked here and it is up to the user to choose the correct parameters.</p>
+<p>Contours with fewer than three vertices are ignored. If none remain, the result is an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with no error. An invalid parameter or a non-finite vertex in a remaining contour gives an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with InvalidConstruction status.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">crossSection</td><td>A set of non-overlapping polygons to extrude. </td></tr>
-    <tr><td class="paramname">height</td><td>Z-extent of extrusion. </td></tr>
-    <tr><td class="paramname">nDivisions</td><td>Number of extra copies of the cross-section to insert into the shape vertically; especially useful in combination with twistDegrees to avoid interpolation artifacts. Default is none. </td></tr>
-    <tr><td class="paramname">twistDegrees</td><td>Amount to twist the top cross-section relative to the bottom, interpolated linearly for the divisions in between. </td></tr>
-    <tr><td class="paramname">scaleTop</td><td>Amount to scale the top (independently in X and Y). If the scale is {0, 0}, a pure cone is formed with only a single vertex at the top. Note that scale is applied after twist. Default {1, 1}. </td></tr>
+    <tr><td class="paramname">height</td><td>Z-extent of extrusion. Must be positive and finite. </td></tr>
+    <tr><td class="paramname">nDivisions</td><td>Number of extra copies of the cross-section to insert into the shape vertically; especially useful in combination with twistDegrees to avoid interpolation artifacts. Must be non-negative. Default is none. </td></tr>
+    <tr><td class="paramname">twistDegrees</td><td>Amount to twist the top cross-section relative to the bottom, interpolated linearly for the divisions in between. Must be finite. </td></tr>
+    <tr><td class="paramname">scaleTop</td><td>Amount to scale the top (independently in X and Y). Must be non-negative and finite. If the scale is {0, 0}, a pure cone is formed with only a single vertex at the top. Note that scale is applied after twist. Default {1, 1}. </td></tr>
   </table>
   </dd>
 </dl>
@@ -771,6 +773,7 @@ Testing Hooks</h2></td></tr>
 </table>
 </div><div class="memdoc">
 <p>Constructs a manifold from a set of polygons by revolving this cross-section around its Y-axis and then setting this as the Z-axis of the resulting manifold. If the polygons cross the Y-axis, only the part on the positive X side is used. Geometrically valid input will result in geometrically valid output.</p>
+<p>Contours with fewer than three vertices, and contours entirely on the negative X side, are ignored. If none remain, the result is an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with no error. An invalid angle, or a non-finite vertex in a contour of at least three vertices, gives an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a> with InvalidConstruction status.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">crossSection</td><td>A set of non-overlapping polygons to revolve. </td></tr>
@@ -796,7 +799,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Returns the reason for an input Mesh producing an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>. This Status will carry on through operations like NaN propagation, ensuring an errored mesh doesn't get mysteriously lost. Empty meshes may still show NoError, for instance the intersection of non-overlapping meshes. </p>
+<p>Returns the error status of this <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>. This is the way to check for errors, since the library reports them only through this status. A failed constructor or operation always gives an empty <a class="el" href="classmanifold_1_1_manifold.html" title="This library&#39;s internal representation of an oriented, 2-manifold, triangle mesh - a simple boundary-...">Manifold</a>, and its status carries on through later operations like NaN propagation, so an error doesn't get mysteriously lost. Invalid parameters, such as a non-finite or negative size, give InvalidConstruction. Empty Manifolds may still show NoError: empty input gives empty output with no error, as does the intersection of non-overlapping meshes. </p>
 
 </div>
 </div>
@@ -1664,7 +1667,7 @@ Testing Hooks</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-<p>Identical to <a class="el" href="#a40c2716b965886e4fb952e5ade866a5a">SplitByPlane()</a>, but calculating and returning only the first result.</p>
+<p>Identical to <a class="el" href="#a40c2716b965886e4fb952e5ade866a5a">SplitByPlane()</a>, but calculating and returning only the first result. An empty input gives an empty result with the same status.</p>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">normal</td><td>This vector is normal to the cutting plane and its length does not matter. The result is in the direction of this vector from the plane. </td></tr>
