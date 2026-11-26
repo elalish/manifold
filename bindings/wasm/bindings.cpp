@@ -126,6 +126,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_subtract", &cross_js::Difference)
       .function("_intersect", &cross_js::Intersection)
       .function("_Warp", &cross_js::Warp)
+      .function("_WarpBatch", &cross_js::WarpBatch)
       .function("transform", &cross_js::Transform)
       .function("_Translate", &CrossSection::Translate)
       .function("rotate", &CrossSection::Rotate)
@@ -235,6 +236,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_DefaultCircularQuality", &js::DefaultCircularQuality);
   function("_SegmentsFor", &js::SegmentsFor);
   function("_ForDivisions", &CircularQuality::ForDivisions);
+  function("_Version", &js::Version);
 
   constant("MIN_RELATIVE_PRECISION", kMinRelativePrecision);
 

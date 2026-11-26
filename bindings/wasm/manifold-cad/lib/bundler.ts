@@ -104,7 +104,7 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       // Manifold classes.
       'Mesh', 'Mesh64', 'Manifold', 'CrossSection', 'MIN_RELATIVE_PRECISION',
       // Manifold methods.
-      'triangulate', 'segmentsFor', 'forDivisions',
+      'triangulate', 'segmentsFor', 'forDivisions', 'version',
 
       // Scene builder exports.
       'show', 'only', 'setMaterial',

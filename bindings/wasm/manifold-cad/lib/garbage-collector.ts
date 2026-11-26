@@ -75,8 +75,8 @@ const crossSectionStaticFunctions = [
 // CrossSection member functions (that return new geometry)
 const crossSectionMemberFunctions = [
   'add', 'subtract', 'intersect', 'decompose', 'transform', 'translate',
-  'rotate', 'scale', 'mirror', 'warp', 'simplify', 'offset', 'hull', 'extrude',
-  'revolve'
+  'rotate', 'scale', 'mirror', 'warp', 'warpBatch', 'simplify', 'offset',
+  'hull', 'extrude', 'revolve'
 ];
 
 /**
