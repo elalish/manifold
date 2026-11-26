@@ -69,7 +69,7 @@ export {importManifold, importModel} from '../lib/import-model';
 /** @group Material */
 export {setMaterial} from '../lib/material';
 /** @group Basics */
-export {CrossSection, Manifold, MIN_RELATIVE_PRECISION} from 'manifold-3d';
+export {CrossSection, Manifold, MIN_RELATIVE_PRECISION, version} from 'manifold-3d';
 /** @group Polygons */
 export {triangulate} from 'manifold-3d';
 /** @group Level of Detail */

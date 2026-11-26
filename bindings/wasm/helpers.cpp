@@ -86,6 +86,11 @@ CircularQuality DefaultCircularQuality() { return {}; }
 int SegmentsFor(CircularQuality quality, double radius) {
   return quality.SegmentsFor(radius);
 }
+
+ivec3 Version() {
+  const auto v = manifold::Version();
+  return {v[0], v[1], v[2]};
+}
 }  // namespace js
 
 namespace cross_js {

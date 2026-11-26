@@ -244,6 +244,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_DefaultCircularQuality", &js::DefaultCircularQuality);
   function("_SegmentsFor", &js::SegmentsFor);
   function("_ForDivisions", &CircularQuality::ForDivisions);
+  function("_Version", &js::Version);
 
   constant("MIN_RELATIVE_PRECISION", kMinRelativePrecision);
 

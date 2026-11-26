@@ -888,4 +888,9 @@ Module.setup = function() {
     trianglesVec.delete();
     return result;
   };
+
+  Module.version = function() {
+    const v = Module._Version();
+    return [v[0], v[1], v[2]];
+  };
 };

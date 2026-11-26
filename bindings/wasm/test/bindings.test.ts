@@ -765,4 +765,14 @@ suite('Bindings match C++', () => {
     expect(hull.volume()).toBeCloseTo(1 / 6, 12);
     hull.delete();
   });
+
+  test('version is three non-negative integers', () => {
+    const v = manifoldModule.version();
+    expect(Array.isArray(v)).toBe(true);
+    expect(v).toHaveLength(3);
+    for (const x of v) {
+      expect(Number.isInteger(x)).toBe(true);
+      expect(x).toBeGreaterThanOrEqual(0);
+    }
+  });
 });

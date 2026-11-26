@@ -68,6 +68,13 @@ export function segmentsFor(radius: number, quality?: CircularQuality): number;
  */
 export function forDivisions(divisions: number, degrees: number):
     {segments: number, minAngle: number, minEdgeLength: number};
+
+/**
+ * Returns the version of the Manifold library.
+ *
+ * @return Version as [major, minor, patch].
+ */
+export function version(): Vec3;
 ///@}
 
 /**
