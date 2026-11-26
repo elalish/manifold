@@ -206,6 +206,16 @@ ManifoldCrossSection* manifold_cross_section_warp(
   return to_c(new CrossSection(warped));
 }
 
+ManifoldCrossSection* manifold_cross_section_warp_batch(
+    const ManifoldCrossSection* cs,
+    void (*fun)(double* xy, size_t count, void* ctx), void* ctx) {
+  static_assert(sizeof(vec2) == 2 * sizeof(double));
+  auto warped = from_c(cs)->WarpBatch([fun, ctx](VecView<vec2> verts) {
+    fun(reinterpret_cast<double*>(verts.data()), verts.size(), ctx);
+  });
+  return to_c(new CrossSection(warped));
+}
+
 ManifoldCrossSection* manifold_cross_section_simplify(
     const ManifoldCrossSection* cs, double tolerance) {
   auto simplified = from_c(cs)->Simplify(tolerance);
