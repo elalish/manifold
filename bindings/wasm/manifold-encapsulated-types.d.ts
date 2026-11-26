@@ -225,6 +225,17 @@ export class CrossSection {
   warp(warpFunc: (vert: Vec2) => void): CrossSection;
 
   /**
+   * Batch version of warp(). The callback receives the vertices of all
+   * contours, in contour order, as a flat array of xyxy... (length = count *
+   * 2) and may modify it in-place. Rethrows any error from warpFunc.
+   *
+   * @param warpFunc A function that modifies the given vertex positions.
+   * @group Transformations
+   */
+  warpBatch(warpFunc: (verts: Float64Array, count: number) => void):
+      CrossSection;
+
+  /**
    * Inflate the contours in CrossSection by the specified delta, handling
    * corners according to the given JoinType.
    *

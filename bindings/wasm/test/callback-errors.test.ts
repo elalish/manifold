@@ -51,6 +51,12 @@ const mutations: MutationCase[] = [
     call: (input, callback) => input.warp(callback)
   },
   {
+    name: 'CrossSection.warpBatch',
+    nativeMethod: '_WarpBatch',
+    create: () => module.CrossSection.square(),
+    call: (input, callback) => input.warpBatch(callback)
+  },
+  {
     name: 'Manifold.warp',
     nativeMethod: '_Warp',
     create: () => module.Manifold.cube(),
@@ -206,6 +212,27 @@ test('preserves successful scalar and batch geometry mutations', () => {
   expect(keep(warped.subtract(shifted)).area()).toBe(0);
   expect(keep(shifted.subtract(warped)).area()).toBe(0);
   expect(square.bounds()).toEqual({min: [0, 0], max: [1, 1]});
+});
+
+test('CrossSection warpBatch matches warp with the same function', () => {
+  const circle = keep(module.CrossSection.circle(1, 32));
+  const input = keep(circle.translate([3, 0]));
+  const before = input.toPolygons();
+  const numVert = input.numVert();
+  const bend = (x: number, y: number) => [x * Math.cos(y), y + x * x / 4];
+  const scalar = keep(input.warp(vertex => {
+    [vertex[0], vertex[1]] = bend(vertex[0], vertex[1]);
+  }));
+  const batch = keep(input.warpBatch((vertices, count) => {
+    expect(count).toBe(numVert);
+    expect(vertices.length).toBe(count * 2);
+    for (let i = 0; i < vertices.length; i += 2) {
+      [vertices[i], vertices[i + 1]] = bend(vertices[i], vertices[i + 1]);
+    }
+  }));
+  expect(batch.toPolygons()).toEqual(scalar.toPolygons());
+  expect(batch.area()).toBeGreaterThan(0);
+  expect(input.toPolygons()).toEqual(before);
 });
 
 test('preserves successful property mutations', () => {

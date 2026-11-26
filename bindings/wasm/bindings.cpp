@@ -135,6 +135,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_subtract", &cross_js::Difference)
       .function("_intersect", &cross_js::Intersection)
       .function("_Warp", &cross_js::Warp)
+      .function("_WarpBatch", &cross_js::WarpBatch)
       .function("transform", &cross_js::Transform)
       .function("_Translate", &CrossSection::Translate)
       .function("rotate", &CrossSection::Rotate)

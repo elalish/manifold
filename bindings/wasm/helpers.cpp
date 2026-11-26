@@ -143,6 +143,33 @@ CrossSection Warp(CrossSection& cross_section, uintptr_t funcPtr) {
   return cross_section.Warp(f);
 }
 
+CrossSection WarpBatch(CrossSection& cross_section, uintptr_t funcPtr) {
+  void (*f)(uintptr_t, size_t) =
+      reinterpret_cast<void (*)(uintptr_t, size_t)>(funcPtr);
+
+  return cross_section.WarpBatch([&](manifold::VecView<manifold::vec2> vecs) {
+    const size_t n = vecs.size();
+
+    // Flatten
+    std::vector<double> flat;
+    flat.resize(n * 2);
+    for (size_t i = 0; i < n; ++i) {
+      const manifold::vec2& v = vecs[i];
+      flat[i * 2 + 0] = v[0];
+      flat[i * 2 + 1] = v[1];
+    }
+
+    f(reinterpret_cast<uintptr_t>(flat.data()), n);
+
+    // Copy back to vecs
+    for (size_t i = 0; i < n; ++i) {
+      manifold::vec2& v = vecs[i];
+      v[0] = flat[i * 2 + 0];
+      v[1] = flat[i * 2 + 1];
+    }
+  });
+}
+
 CrossSection Offset(CrossSection& cross_section, double delta, int join_type,
                     double miter_limit, CircularQuality quality) {
   auto jt = join_type == 0   ? CrossSection::JoinType::Square

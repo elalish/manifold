@@ -186,6 +186,28 @@ Module.setup = function() {
     }, 'vi', pointer => this._Warp(pointer));
   };
 
+  Module.CrossSection.prototype.warpBatch = function(func) {
+    return withCallback(state => function(ptr, count) {
+      if (state.failed) return;
+      try {
+        const heapF64 = Module.HEAPF64 ?? HEAPF64;
+        if (!heapF64) {
+          throw new Error('WASM heap is not initialized (HEAPF64 unavailable)');
+        }
+        // Commit only after success, as in scalar warp. The temporary also
+        // stays valid if the callback allocates enough to grow WASM memory.
+        const verts = new Float64Array(heapF64.buffer, ptr, count * 2).slice();
+        func(verts, count);
+        const currentHeap = Module.HEAPF64 ?? HEAPF64;
+        new Float64Array(currentHeap.buffer, ptr, count * 2).set(verts);
+      } catch (error) {
+        // Return normally so C++ can destroy its local allocations.
+        state.failed = true;
+        state.failure = error;
+      }
+    }, 'vii', pointer => this._WarpBatch(pointer));
+  };
+
   Module.CrossSection.prototype.decompose = function() {
     const vec = this._Decompose();
     const result = fromVec(vec);
