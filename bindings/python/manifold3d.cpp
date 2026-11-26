@@ -301,6 +301,15 @@ NB_MODULE(manifold3d, m) {
         nb::arg("epsilon") = -1, nb::arg("allow_convex") = true,
         triangulate__polygons__epsilon__allow_convex);
 
+  m.def(
+      "version",
+      []() {
+        const auto v = Version();
+        return std::make_tuple(v[0], v[1], v[2]);
+      },
+      "Returns the version of the Manifold library.\n\n"
+      ":return: Version as (major, minor, patch).");
+
   nb::class_<Manifold>(
       m, "Manifold",
       "A solid, an oriented 2-manifold triangle mesh. A failed construction "

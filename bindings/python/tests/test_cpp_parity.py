@@ -1,9 +1,9 @@
-"""Mesh run transforms and project() behave as they do in C++."""
+"""Mesh run transforms, project() and version() behave as they do in C++."""
 
 import numpy as np
 import pytest
 
-from manifold3d import Manifold, Mesh, Mesh64
+from manifold3d import Manifold, Mesh, Mesh64, version
 
 EXPORTS = [(Mesh, "to_mesh"), (Mesh64, "to_mesh64")]
 
@@ -83,3 +83,10 @@ def test_project_keeps_outline_vertices(n):
     section = Manifold.cube().refine(n).project()
     assert section.num_vert() == 4 * n
     assert section.area() == pytest.approx(1)
+
+
+def test_version_is_three_non_negative_ints():
+    v = version()
+    assert isinstance(v, tuple)
+    assert len(v) == 3
+    assert all(type(x) is int and x >= 0 for x in v)
