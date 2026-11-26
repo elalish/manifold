@@ -72,7 +72,7 @@ Module.setup = function() {
   // Manifold is empty. This evaluates the Manifold without its context, so it
   // is only called where the call evaluates the Manifold anyway.
   function errorStatus(manifold) {
-    return manifold._IsEmpty() ? manifold._EvaluatedStatus() : 'NoError';
+    return manifold._IsEmpty() ? manifold.status() : 'NoError';
   }
 
   // Throws a ManifoldError if this evaluated Manifold has an error.

@@ -223,14 +223,13 @@ test.each([
     'deletes a native Manifold rejected by the %s constructor',
     (meshType, Float) => {
       const prototype = Object.getPrototypeOf(module.Manifold.prototype);
-      const status = prototype._EvaluatedStatus;
+      const status = prototype.status;
       const rejected: any[] = [];
-      vi.spyOn(prototype, '_EvaluatedStatus')
-          .mockImplementation(function(this: any) {
-            const result = status.call(this);
-            if (result !== 'NoError') rejected.push(keep(this));
-            return result;
-          });
+      vi.spyOn(prototype, 'status').mockImplementation(function(this: any) {
+        const result = status.call(this);
+        if (result !== 'NoError') rejected.push(keep(this));
+        return result;
+      });
       const mesh = new module[meshType]({
         numProp: 3,
         vertProperties: new Float([0, 0, 0, 1, 0, 0, 0, 1, 0]),

@@ -187,7 +187,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
                                   &Manifold::Decompose))
       .function("_IsEmpty", &Manifold::IsEmpty)
       .function("status", &man_js::Status)
-      .function("_EvaluatedStatus", &man_js::EvaluatedStatus)
       .function("withContext", &Manifold::WithContext)
       .function("_WithPrecision", &Manifold::WithPrecision)
       .function("_GetPrecision", &Manifold::GetPrecision)
