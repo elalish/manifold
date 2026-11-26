@@ -175,6 +175,19 @@ ManifoldManifold* manifold_warp(const ManifoldManifold* m,
                                 ManifoldVec3 (*fun)(double, double, double,
                                                     void*),
                                 void* ctx);
+// Like manifold_warp, but fun is called once with all count vertex positions
+// as interleaved x, y, z doubles. fun may read and overwrite all count points
+// in place. These become the vertices of the returned manifold. m is not
+// modified, since the buffer belongs to a copy. The pointer is only valid
+// during the call: do not free it, keep it, or access past count points. xyz
+// may be NULL when count is 0. fun runs exactly once, synchronously, before
+// manifold_warp_batch returns. If m has an error status, fun is not called and
+// the result carries that status. If fun writes a non-finite value, the result
+// is empty with MANIFOLD_NON_FINITE_VERTEX.
+ManifoldManifold* manifold_warp_batch(const ManifoldManifold* m,
+                                      void (*fun)(double* xyz, size_t count,
+                                                  void* ctx),
+                                      void* ctx);
 ManifoldManifold* manifold_smooth_by_normals(const ManifoldManifold* m);
 ManifoldManifold* manifold_refine(const ManifoldManifold* m, int refine);
 ManifoldManifold* manifold_refine_to_length(const ManifoldManifold* m,
@@ -378,6 +391,17 @@ ManifoldCrossSection* manifold_cross_section_transform(
 ManifoldCrossSection* manifold_cross_section_warp(
     const ManifoldCrossSection* cs, ManifoldVec2 (*fun)(double, double, void*),
     void* ctx);
+// Like manifold_cross_section_warp, but fun is called once with all count
+// vertex positions as interleaved x, y doubles. fun may read and overwrite all
+// count points in place. The returned cross section is built from these
+// points, with the fill rule re-applied as in manifold_cross_section_warp. cs
+// is not modified, since the buffer belongs to a copy. The pointer is only
+// valid during the call: do not free it, keep it, or access past count points.
+// xy may be NULL when count is 0. fun runs exactly once, synchronously, before
+// manifold_cross_section_warp_batch returns.
+ManifoldCrossSection* manifold_cross_section_warp_batch(
+    const ManifoldCrossSection* cs,
+    void (*fun)(double* xy, size_t count, void* ctx), void* ctx);
 ManifoldCrossSection* manifold_cross_section_simplify(
     const ManifoldCrossSection* cs, double tolerance);
 ManifoldCrossSection* manifold_cross_section_offset(
