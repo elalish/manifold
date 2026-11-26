@@ -1,0 +1,10 @@
+/target/
+/pom.xml.versionsBackup
+/*.3mf
+/*.stl
+/hs_err_*.log
+/.project
+/.classpath
+/.settings
+/.project
+/src/main/resources/manifold3d
