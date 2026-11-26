@@ -14,6 +14,8 @@
 
 #include <algorithm>
 #include <limits>
+#include <string_view>
+#include <utility>
 
 #include "atomic_compat.h"
 #include "boolean3.h"
@@ -64,6 +66,66 @@ namespace manifold {
 std::array<int, 3> Version() {
   return {MANIFOLD_VERSION_MAJOR, MANIFOLD_VERSION_MINOR,
           MANIFOLD_VERSION_PATCH};
+}
+
+// Returns the {name, message} pair of an error status.
+static constexpr std::pair<const char*, const char*> ErrorStrings(
+    Manifold::Error error) {
+  using Error = Manifold::Error;
+  switch (error) {
+    case Error::NoError:
+      return {"NoError", "No error"};
+    case Error::NonFiniteVertex:
+      return {"NonFiniteVertex", "Non-finite vertex"};
+    case Error::NotManifold:
+      return {"NotManifold", "Not manifold"};
+    case Error::VertexOutOfBounds:
+      return {"VertexOutOfBounds", "Vertex index out of bounds"};
+    case Error::PropertiesWrongLength:
+      return {"PropertiesWrongLength", "Properties have wrong length"};
+    case Error::MissingPositionProperties:
+      return {"MissingPositionProperties",
+              "Fewer than three properties per vertex"};
+    case Error::MergeVectorsDifferentLengths:
+      return {"MergeVectorsDifferentLengths",
+              "Merge vectors have different lengths"};
+    case Error::MergeIndexOutOfBounds:
+      return {"MergeIndexOutOfBounds", "Merge index out of bounds"};
+    case Error::TransformWrongLength:
+      return {"TransformWrongLength", "Transform vector has wrong length"};
+    case Error::RunIndexWrongLength:
+      return {"RunIndexWrongLength", "Invalid run index vector"};
+    case Error::FaceIDWrongLength:
+      return {"FaceIDWrongLength", "Face ID vector has wrong length"};
+    case Error::InvalidConstruction:
+      return {"InvalidConstruction",
+              "Manifold constructed with invalid parameters"};
+    case Error::ResultTooLarge:
+      return {"ResultTooLarge", "Result exceeds maximum size"};
+    case Error::InvalidTangents:
+      return {"InvalidTangents", "Invalid halfedge tangents"};
+    case Error::Cancelled:
+      return {"Cancelled", "Operation cancelled"};
+  }
+  return {"UnknownError", "Unknown error"};
+}
+
+// The bindings and tests loop over 0..Cancelled, so Cancelled must be last.
+static_assert(
+    std::string_view(
+        ErrorStrings(static_cast<Manifold::Error>(
+                         static_cast<int>(Manifold::Error::Cancelled) + 1))
+            .first) == "UnknownError",
+    "Cancelled is no longer the last Manifold::Error: add the new value to "
+    "ManifoldError in the C bindings and move the Cancelled bound in the "
+    "binding and test loops and in this assert");
+
+const char* ErrorName(Manifold::Error error) {
+  return ErrorStrings(error).first;
+}
+
+const char* ToString(Manifold::Error error) {
+  return ErrorStrings(error).second;
 }
 
 /**

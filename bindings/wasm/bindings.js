@@ -555,48 +555,7 @@ Module.setup = function() {
   };
 
   Module.ManifoldError = function ManifoldError(code, ...args) {
-    let message = 'Unknown error';
-    switch (code) {
-      case 'NonFiniteVertex':
-        message = 'Non-finite vertex';
-        break;
-      case 'NotManifold':
-        message = 'Not manifold';
-        break;
-      case 'VertexOutOfBounds':
-        message = 'Vertex index out of bounds';
-        break;
-      case 'PropertiesWrongLength':
-        message = 'Properties have wrong length';
-        break;
-      case 'MissingPositionProperties':
-        message = 'Less than three properties';
-        break;
-      case 'MergeVectorsDifferentLengths':
-        message = 'Merge vectors have different lengths';
-        break;
-      case 'MergeIndexOutOfBounds':
-        message = 'Merge index out of bounds';
-        break;
-      case 'TransformWrongLength':
-        message = 'Transform vector has wrong length';
-        break;
-      case 'RunIndexWrongLength':
-        message = 'Run index vector has wrong length';
-        break;
-      case 'FaceIDWrongLength':
-        message = 'Face ID vector has wrong length';
-        break;
-      case 'InvalidConstruction':
-        message = 'Manifold constructed with invalid parameters';
-        break;
-      case 'ResultTooLarge':
-        message = 'Result exceeds maximum size';
-        break;
-      case 'InvalidTangents':
-        message = 'Invalid halfedge tangents';
-        break;
-    }
+    const message = Module._ErrorMessage(Module.status[code]?.value ?? -1);
 
     const base = Error.apply(this, [message, ...args]);
     base.name = this.name = 'ManifoldError';

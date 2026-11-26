@@ -61,55 +61,39 @@ ManifoldMeshGL64* to_c(manifold::MeshGL64* m) {
   return reinterpret_cast<ManifoldMeshGL64*>(m);
 }
 
+// ManifoldError matches Manifold::Error value for value, so the two convert
+// with a cast.
+using Error = manifold::Manifold::Error;
+static_assert(MANIFOLD_NO_ERROR == static_cast<int>(Error::NoError));
+static_assert(MANIFOLD_NON_FINITE_VERTEX ==
+              static_cast<int>(Error::NonFiniteVertex));
+static_assert(MANIFOLD_NOT_MANIFOLD == static_cast<int>(Error::NotManifold));
+static_assert(MANIFOLD_VERTEX_OUT_OF_BOUNDS ==
+              static_cast<int>(Error::VertexOutOfBounds));
+static_assert(MANIFOLD_PROPERTIES_WRONG_LENGTH ==
+              static_cast<int>(Error::PropertiesWrongLength));
+static_assert(MANIFOLD_MISSING_POSITION_PROPERTIES ==
+              static_cast<int>(Error::MissingPositionProperties));
+static_assert(MANIFOLD_MERGE_VECTORS_DIFFERENT_LENGTHS ==
+              static_cast<int>(Error::MergeVectorsDifferentLengths));
+static_assert(MANIFOLD_MERGE_INDEX_OUT_OF_BOUNDS ==
+              static_cast<int>(Error::MergeIndexOutOfBounds));
+static_assert(MANIFOLD_TRANSFORM_WRONG_LENGTH ==
+              static_cast<int>(Error::TransformWrongLength));
+static_assert(MANIFOLD_RUN_INDEX_WRONG_LENGTH ==
+              static_cast<int>(Error::RunIndexWrongLength));
+static_assert(MANIFOLD_FACE_ID_WRONG_LENGTH ==
+              static_cast<int>(Error::FaceIDWrongLength));
+static_assert(MANIFOLD_INVALID_CONSTRUCTION ==
+              static_cast<int>(Error::InvalidConstruction));
+static_assert(MANIFOLD_RESULT_TOO_LARGE ==
+              static_cast<int>(Error::ResultTooLarge));
+static_assert(MANIFOLD_INVALID_TANGENTS ==
+              static_cast<int>(Error::InvalidTangents));
+static_assert(MANIFOLD_CANCELLED == static_cast<int>(Error::Cancelled));
+
 ManifoldError to_c(manifold::Manifold::Error error) {
-  ManifoldError e = MANIFOLD_NO_ERROR;
-  switch (error) {
-    case Manifold::Error::NoError:
-      break;
-    case Manifold::Error::NonFiniteVertex:
-      e = MANIFOLD_NON_FINITE_VERTEX;
-      break;
-    case Manifold::Error::NotManifold:
-      e = MANIFOLD_NOT_MANIFOLD;
-      break;
-    case Manifold::Error::VertexOutOfBounds:
-      e = MANIFOLD_VERTEX_OUT_OF_BOUNDS;
-      break;
-    case Manifold::Error::PropertiesWrongLength:
-      e = MANIFOLD_PROPERTIES_WRONG_LENGTH;
-      break;
-    case Manifold::Error::MissingPositionProperties:
-      e = MANIFOLD_MISSING_POSITION_PROPERTIES;
-      break;
-    case Manifold::Error::MergeVectorsDifferentLengths:
-      e = MANIFOLD_MERGE_VECTORS_DIFFERENT_LENGTHS;
-      break;
-    case Manifold::Error::MergeIndexOutOfBounds:
-      e = MANIFOLD_MERGE_INDEX_OUT_OF_BOUNDS;
-      break;
-    case Manifold::Error::TransformWrongLength:
-      e = MANIFOLD_TRANSFORM_WRONG_LENGTH;
-      break;
-    case Manifold::Error::RunIndexWrongLength:
-      e = MANIFOLD_RUN_INDEX_WRONG_LENGTH;
-      break;
-    case Manifold::Error::FaceIDWrongLength:
-      e = MANIFOLD_FACE_ID_WRONG_LENGTH;
-      break;
-    case Manifold::Error::InvalidConstruction:
-      e = MANIFOLD_INVALID_CONSTRUCTION;
-      break;
-    case Manifold::Error::ResultTooLarge:
-      e = MANIFOLD_RESULT_TOO_LARGE;
-      break;
-    case Manifold::Error::InvalidTangents:
-      e = MANIFOLD_INVALID_TANGENTS;
-      break;
-    case Manifold::Error::Cancelled:
-      e = MANIFOLD_CANCELLED;
-      break;
-  };
-  return e;
+  return static_cast<ManifoldError>(error);
 }
 
 ManifoldBox* to_c(manifold::Box* m) {

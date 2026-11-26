@@ -24,6 +24,16 @@ TEST(CBIND, version) {
 const ManifoldCircularQuality kQuality32 = {32, 10.0, 1.0};
 const ManifoldCircularQuality kQuality100 = {100, 10.0, 1.0};
 
+TEST(CBIND, error_string) {
+  for (int i = 0; i <= MANIFOLD_CANCELLED; ++i) {
+    EXPECT_STREQ(manifold_error_string(static_cast<ManifoldError>(i)),
+                 manifold::ToString(static_cast<manifold::Manifold::Error>(i)));
+  }
+  EXPECT_STREQ(
+      manifold_error_string(static_cast<ManifoldError>(MANIFOLD_CANCELLED + 1)),
+      "Unknown error");
+}
+
 TEST(CBIND, circular_quality) {
   const ManifoldCircularQuality q = {0, 22.5, 0.125};
   EXPECT_EQ(manifold_circular_quality_segments_for(2.0, &q), 16);

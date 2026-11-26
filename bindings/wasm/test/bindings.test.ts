@@ -282,6 +282,41 @@ suite('Manifold Bindings', () => {
     cancelCtx.delete();
   });
 
+  test('ManifoldError messages', () => {
+    const ManifoldError = (manifoldModule as any).ManifoldError;
+    const status = (manifoldModule as any).status;
+    const codes =
+        Object.keys(status).filter(k => typeof status[k]?.value === 'number');
+    expect(codes).toContain('Cancelled');
+    expect(codes.map(code => status[code].value)).toEqual([...codes.keys()]);
+    const messages = codes.map(code => {
+      const error = new ManifoldError(code);
+      expect(error).toBeInstanceOf(Error);
+      expect(error.name).toEqual('ManifoldError');
+      expect(error.code).toEqual(code);
+      return error.message;
+    });
+    const unknown = new ManifoldError('Bogus').message;
+    expect(messages.every(m => m.length > 0 && m !== unknown)).toBe(true);
+    expect(new Set(messages).size).toEqual(codes.length);
+    expect(new ManifoldError('Cancelled').message).not.toEqual('Unknown error');
+
+    const mesh = new manifoldModule.Mesh({
+      numProp: 3,
+      vertProperties: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      triVerts: new Uint32Array([0, 1, 2])
+    });
+    let thrown: any;
+    try {
+      new manifoldModule.Manifold(mesh);
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(ManifoldError);
+    expect(thrown.code).toEqual('NotManifold');
+    expect(thrown.message).toEqual(new ManifoldError('NotManifold').message);
+  });
+
   test('refineToTolerance does not throw (issue #1545)', () => {
     // Reproduces the original failing geometry from issue #1545: a flat-faced
     // mesh with normals set via calculateNormals + smoothByNormals. On flat

@@ -214,6 +214,10 @@ ManifoldManifold* manifold_as_original(const ManifoldManifold* m, int id);
 
 int manifold_is_empty(const ManifoldManifold* m);
 ManifoldError manifold_status(const ManifoldManifold* m);
+// Returns a short English description of the error, the same text every
+// binding uses. Values outside the enum give "Unknown error". The string is
+// static and must not be freed.
+const char* manifold_error_string(ManifoldError error);
 // Returns a copy of the manifold with the given ExecutionContext attached.
 // Only manifold_status, manifold_with_precision, manifold_get_precision and
 // the eager ops (the manifold_refine* family, manifold_hull,

@@ -727,6 +727,10 @@ ManifoldError manifold_status(const ManifoldManifold* m) {
   return to_c(error);
 }
 
+const char* manifold_error_string(ManifoldError error) {
+  return ToString(static_cast<Manifold::Error>(error));
+}
+
 ManifoldManifold* manifold_with_context(const ManifoldManifold* m,
                                         const ManifoldExecutionContext* ctx) {
   auto attached = from_c(m)->WithContext(*from_c(ctx));
