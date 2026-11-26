@@ -17,6 +17,7 @@ DEFAULT_GTEST_FILTER = ":".join(
         "Manifold.DeepChainDoesNotOverflowNumLeaves",
         "Boolean.BatchBoolean",
         "Boolean.SmoothExtrusionCrossing",
+        "Boolean.ConvexExtrusionCrossing",
         "CrossSection.BatchBoolean",
         "CrossSectionComplex.MergeVertsSharedColumns",
         "CrossSectionComplex.MergeVertsGrid",
@@ -32,11 +33,13 @@ DEFAULT_GTEST_FILTER = ":".join(
         "CrossSectionComplex.SweepCrossingContours",
         "CrossSectionComplex.OffsetRoundMergingContours",
         "CrossSectionComplex.OffsetMiterWavyRing",
+        "CrossSectionComplex.OffsetMiterCleanupChain",
         "CrossSectionComplex.DifferenceManyContoursFewCrossings",
         "Polygon.Sponge4",
         "Polygon.Zebra1",
         "Polygon.Zebra3",
         "Triangulation.LargeSmoothContour",
+        "Triangulation.LargeConvexContour",
         "ExecutionContextFromMeshGL.CancelConcurrent",
     ]
 )

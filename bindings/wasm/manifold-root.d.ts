@@ -24,26 +24,25 @@
  */
 
 export type * from './manifold-global-types';
-export type {MeshOptions, triangulate, setRelativePrecision, getRelativePrecision, setMinCircularAngle, setMinCircularEdgeLength, getMinCircularAngle, getMinCircularEdgeLength, setCircularSegments, getCircularSegments, resetToCircularDefaults} from './manifold-encapsulated-types';
-export {CrossSection, Manifold, Mesh} from './manifold-encapsulated-types';
+export type {MeshOptions, Mesh64Options, MIN_RELATIVE_PRECISION, triangulate, segmentsFor, forDivisions} from './manifold-encapsulated-types';
+export {CrossSection, Manifold, ManifoldError, Mesh, Mesh64} from './manifold-encapsulated-types';
 
-import type {triangulate, setRelativePrecision, getRelativePrecision, setMinCircularAngle, setMinCircularEdgeLength, getMinCircularAngle, getMinCircularEdgeLength, setCircularSegments, getCircularSegments, resetToCircularDefaults} from './manifold-encapsulated-types';
-import {CrossSection, Manifold, Mesh} from './manifold-encapsulated-types';
+import type {MIN_RELATIVE_PRECISION, triangulate, segmentsFor, forDivisions} from './manifold-encapsulated-types';
+import {CrossSection, Manifold, ManifoldError, Mesh, Mesh64} from './manifold-encapsulated-types';
+
+import type {ExecutionContext} from './manifold-global-types';
 
 export interface ManifoldToplevel {
   CrossSection: typeof CrossSection;
   Manifold: typeof Manifold;
+  ManifoldError: typeof ManifoldError;
+  ExecutionContext: new() => ExecutionContext;
   Mesh: typeof Mesh;
+  Mesh64: typeof Mesh64;
+  MIN_RELATIVE_PRECISION: typeof MIN_RELATIVE_PRECISION;
   triangulate: typeof triangulate;
-  setRelativePrecision: typeof setRelativePrecision;
-  getRelativePrecision: typeof getRelativePrecision;
-  setMinCircularAngle: typeof setMinCircularAngle;
-  setMinCircularEdgeLength: typeof setMinCircularEdgeLength;
-  getMinCircularAngle: typeof getMinCircularAngle;
-  getMinCircularEdgeLength: typeof getMinCircularEdgeLength;
-  setCircularSegments: typeof setCircularSegments;
-  getCircularSegments: typeof getCircularSegments;
-  resetToCircularDefaults: typeof resetToCircularDefaults;
+  segmentsFor: typeof segmentsFor;
+  forDivisions: typeof forDivisions;
   setup: () => void;
 }
 

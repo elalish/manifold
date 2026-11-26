@@ -153,17 +153,9 @@ void Manifold::Impl::EagerTransformPropNormals(
     const Halfedges& halfedge, const MeshRelationD& meshRelation,
     const mat3& normalTransform, Vec<double>& properties, int numPropVert,
     int stride, int offset) {
-  // Short-circuit when no meshID carries normals. OR semantics (any has
-  // it), unlike AllHaveNormals() - mixed inputs still need the per-meshID
-  // iteration below to rotate the with-normals subset.
-  bool anyHasNormals = false;
-  for (const auto& m : meshRelation.meshIDtransform) {
-    if (m.second.hasNormals) {
-      anyHasNormals = true;
-      break;
-    }
-  }
-  if (!anyHasNormals) return;
+  // Short-circuit when no meshID carries normals. Mixed inputs still need the
+  // per-meshID iteration below to rotate the with-normals subset.
+  if (!AnyHasNormals(meshRelation)) return;
   Vec<bool> propVisited(numPropVert, false);
   for (size_t e = 0; e < halfedge.size(); ++e) {
     if (!TriHasNormals(meshRelation, e / 3)) continue;
@@ -192,18 +184,42 @@ void Manifold::Impl::InitializeOriginal(int id) {
   const int meshID = id < 0 ? ReserveIDs(1) : id;
   meshRelation_.originalID = meshID;
   auto& triRef = meshRelation_.triRef;
-  triRef.resize_nofill(NumTri());
-  for_each_n(autoPolicy(NumTri(), 1e5), countAt(0), NumTri(),
-             [meshID, &triRef](const int tri) {
-               triRef[tri] = {meshID, meshID, -1, tri};
-             });
-  // Preserve the AND-across-old-Relations state so AsOriginal keeps the
-  // recording when it builds a fresh Relation. Primitives start with an
-  // empty map, which AllHaveNormals() returns false for.
-  const bool hadNormals = AllHaveNormals();
+  const int numTri = NumTri();
+  // AsOriginal of a result where only some runs record normals keeps two
+  // runs under one originalID, one for the triangles with normals and one for
+  // the rest. triID is the triangle's index in GetMeshGL's output order, which
+  // sorts an original with two relations by meshID.
+  Vec<bool> hasN;
+  if (triRef.size() == numTri && AnyHasNormals(meshRelation_)) {
+    hasN.resize_nofill(numTri);
+    for (int tri = 0; tri < numTri; ++tri)
+      hasN[tri] = TriHasNormals(meshRelation_, tri);
+  }
+  const int numN = std::count(hasN.begin(), hasN.end(), true);
+  const bool split = numN > 0 && numN < numTri;
+  int otherID = meshID;
+  // An explicit id can equal the next reserved one.
+  while (split && otherID == meshID) otherID = ReserveIDs(1);
   meshRelation_.meshIDtransform.clear();
   meshRelation_.meshIDtransform[meshID] = {meshID, la::identity, false,
-                                           hadNormals};
+                                           numN > 0};
+  if (split) {
+    meshRelation_.meshIDtransform[otherID] = {meshID, la::identity, false,
+                                              false};
+  }
+  triRef.resize_nofill(numTri);
+  // GetMeshGL sorts the runs by meshID, so the run with normals comes first
+  // unless an explicit id is above the reserved range.
+  const bool nFirst = otherID > meshID;
+  int nextN = nFirst ? 0 : numTri - numN;
+  int nextOther = nFirst ? numN : 0;
+  for (int tri = 0; tri < numTri; ++tri) {
+    if (split && !hasN[tri]) {
+      triRef[tri] = {otherID, meshID, -1, nextOther++};
+    } else {
+      triRef[tri] = {meshID, meshID, -1, split ? nextN++ : tri};
+    }
+  }
 }
 
 void Manifold::Impl::SetFaceAndVertNormals() {
@@ -555,6 +571,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   if (transform_ == mat3x4(la::identity)) return *this;
   auto policy = autoPolicy(NumVert());
   Impl result;
+  result.relPrecision_ = relPrecision_;
   if (status_ != Manifold::Error::NoError) {
     result.status_ = status_;
     return result;
@@ -849,8 +866,9 @@ bool WriteOBJ(std::ostream& stream, const MeshGL64& mesh) {
  * Debugging output using high precision OBJ files with specialized comments
  */
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
-  MeshGL64 mesh = GetMeshGLImpl<double, uint64_t>(impl, -1);
-  return WriteOBJWithEpsilon(stream, mesh, {impl.epsilon_});
+  MeshGL64 mesh = GetMeshGLImpl<double, uint64_t>(impl);
+  return WriteOBJWithEpsilon(stream, mesh,
+                             {impl.IsEmpty() ? -1 : impl.epsilon_});
 }
 
 /**

@@ -102,27 +102,20 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
     const ManifoldCADExportMatch = /^manifold-(3d|cad)\/manifoldCAD(.ts|.js)?$/
     const manifoldCADExportNames = [
       // Manifold classes.
-      'Mesh', 'Manifold', 'CrossSection',
+      'Mesh', 'Mesh64', 'Manifold', 'CrossSection', 'MIN_RELATIVE_PRECISION',
       // Manifold methods.
-      'triangulate',
+      'triangulate', 'segmentsFor', 'forDivisions',
 
       // Scene builder exports.
       'show', 'only', 'setMaterial',
       // GLTFNode and utilities.
-      'GLTFMaterial', 'GLTFNode', 'getGLTFNodes', 'VisualizationGLTFNode',
+      'GLTFNode', 'getGLTFNodes', 'resetGLTFNodes', 'VisualizationGLTFNode',
       'CrossSectionGLTFNode',
       // Import
       'importModel', 'importManifold',
-      // Getters for global properties
-      'getCircularSegments', 'getMinCircularAngle', 'getMinCircularEdgeLength',
-      'getRelativePrecision', 'getAnimationDuration', 'getAnimationFPS',
-      'getAnimationMode',
-      // Setters for global properties.
-      // These will only be defined for top level scripts
-      'setMinCircularAngle', 'setMinCircularEdgeLength', 'setCircularSegments',
-      'setRelativePrecision', 'resetToCircularDefaults', 'setMorphStart',
-      'setMorphEnd', 'setAnimationDuration', 'setAnimationFPS',
-      'setAnimationMode', 'resetGLTFNodes',
+      // Animation.
+      'getAnimationDuration', 'getAnimationFPS', 'getAnimationMode',
+      'setMorphStart', 'setMorphEnd',
 
       // ManifoldCAD specific exports.
       'isManifoldCAD'
@@ -168,9 +161,17 @@ export const esbuildManifoldPlugin = (options: BundlerOptions = {}):
       }
 
       // Is this a virtual file?
-      // FIXME Resolve paths!
-      if (options.files && Object.keys(options.files).includes(args.path)) {
-        return {namespace: 'virtual-file', path: args.path};
+      const files = options.files;
+      if (files) {
+        const resolved = /^\.\.?\//.test(args.path) ?
+            resolve(args.path, args.importer || '<stdin>') :
+            args.path;
+        const path = [resolved, resolved.replace(/^\.\//, ''), args.path].find(
+            path => Object.hasOwn(files, path));
+        if (path !== undefined) {
+          if (args.kind === 'entry-point') entrypoint = path;
+          return {namespace: 'virtual-file', path};
+        }
       }
 
       // Try esbuilds' resolver first.

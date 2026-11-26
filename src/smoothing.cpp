@@ -24,7 +24,7 @@ using namespace manifold;
 // ref and altIn.
 vec3 OrthogonalTo(vec3 in, vec3 altIn, vec3 ref) {
   vec3 out = in - la::dot(in, ref) * ref;
-  if (la::dot(out, out) < Quality::GetRelativePrecision() * la::dot(in, in)) {
+  if (la::dot(out, out) < kMinRelativePrecision * la::dot(in, in)) {
     out = altIn - la::dot(altIn, ref) * ref;
   }
   return SafeNormalize(out);
@@ -261,16 +261,16 @@ struct InterpTri {
 namespace manifold {
 
 /**
- * Get the property normal associated with the startVert of this halfedge, where
- * normalIdx shows the beginning of where normals are stored in the properties.
+ * Get the standard property normal associated with the startVert of this
+ * halfedge.
  */
-vec3 Manifold::Impl::GetNormal(int halfedge, int normalIdx) const {
-  // Channels past numProp_ count as missing normals.
-  if (normalIdx > numProp_ - 3) return vec3(0.0);
+vec3 Manifold::Impl::GetNormal(int halfedge) const {
+  // Fewer than three properties count as missing normals.
+  if (numProp_ < 3) return vec3(0.0);
   const int prop = halfedge_.Prop(halfedge);
   vec3 normal;
   for (const int i : {0, 1, 2}) {
-    normal[i] = properties_[prop * numProp_ + normalIdx + i];
+    normal[i] = properties_[prop * numProp_ + i];
   }
   // hasNormals=true means CalculateNormals (or a flagged round-trip) wrote
   // world-frame values, kept world-frame through Transform/Compose. Without
@@ -392,9 +392,8 @@ Vec<int> Manifold::Impl::VertHalfedge() const {
  * does, this method fills in vertex properties, unshared across edges that
  * are bent more than minSharpAngle.
  */
-void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
+void Manifold::Impl::SetNormals(double minSharpAngle) {
   if (IsEmpty()) return;
-  if (normalIdx < 0) return;
   // Ensure minSharpAngle is large enough to avoid treating nearly-coplanar
   // faces as sharp due to floating point noise in the dihedral computation.
   minSharpAngle = std::max(minSharpAngle, kMinSharpAngle);
@@ -420,7 +419,7 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
                }
              });
 
-  const int numProp = std::max(oldNumProp, normalIdx + 3);
+  const int numProp = std::max(oldNumProp, 3);
   Vec<double> oldProperties(numProp * NumPropVert(), 0);
   properties_.swap(oldProperties);
   numProp_ = numProp;
@@ -454,31 +453,15 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
       std::copy(start, start + oldNumProp,
                 properties_.begin() + newProp * numProp);
       for (const int i : {0, 1, 2})
-        properties_[newProp * numProp + normalIdx + i] = normal[i];
+        properties_[newProp * numProp + i] = normal[i];
     }
     return mapped.y;
   };
 
-  // Cached per-meshID inverse-normal-transform for the legacy non-zero
-  // normalIdx path. Lazily populated on first lookup; reused across all
-  // verts in the loop below.
-  // TODO: drop this and its only caller below when the non-zero normalIdx
-  // parameter on CalculateNormals is removed.
-  std::map<int, mat3> meshIDtoNormalTransform;
-  auto getTransform = [&](int meshID) {
-    if (meshIDtoNormalTransform.find(meshID) == meshIDtoNormalTransform.end()) {
-      meshIDtoNormalTransform[meshID] =
-          meshRelation_.meshIDtransform[meshID].GetInverseNormalTransform();
-    }
-    return meshIDtoNormalTransform[meshID];
-  };
-
   // Scratch buffers for multi-normal verts, cleared per vert to keep their
-  // allocations. groups: length degree; normals, meshIds: length number of
-  // normals.
+  // allocations. groups: length degree; normals: length number of normals.
   std::vector<int> groups;
   std::vector<vec3> normals;
-  std::vector<int> meshIds;
 
   const int numEdge = halfedge_.size();
   for (int startEdge = 0; startEdge < numEdge; ++startEdge) {
@@ -487,23 +470,10 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
 
     if (vertNumSharp[vert] < 2) {  // vertex has single normal
       const vec3 worldNormal = vertNormal_[vert];
-      // Non-zero normalIdx is the legacy deferred-transform path: store in
-      // per-mesh frame so GetMeshGL's runTransform application on export
-      // recovers world frame even after later transforms. Standard slot 0
-      // uses the eager-transform contract: store world-frame directly.
-      // Caveat: for legacy idx!=0, if a single propVert is shared between
-      // triangles of different meshIDs, we pick startEdge's meshID for the
-      // per-mesh-frame mapping. Other meshIDs reading the same propVert
-      // through a different runTransform on export will get a wrong
-      // rotation. Same shape as master; out of scope here.
-      const vec3 normal =
-          normalIdx == 0
-              ? worldNormal
-              : getTransform(meshRelation_.triRef[startEdge / 3].meshID) *
-                    worldNormal;
       ForVert(startEdge, [&](int current) {
         const int prop = oldHalfedgeProp[current];
-        halfedge_.SetProp(current, setNormal(prop, nextNormalGroup, normal));
+        halfedge_.SetProp(current,
+                          setNormal(prop, nextNormalGroup, worldNormal));
       });
       ++nextNormalGroup;
       continue;
@@ -513,7 +483,6 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
     const vec3 centerPos = vertPos_[vert];
     groups.clear();
     normals.clear();
-    meshIds.clear();
     int current = startEdge;
 
     do {  // find a sharp edge to start on
@@ -539,7 +508,6 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
         [&](int edge, const FaceEdge& here, FaceEdge& next) {
           if (sharpEdge[edge]) {
             normals.push_back(vec3(0.0));
-            meshIds.push_back(meshRelation_.triRef[next.face].meshID);
           }
           groups.push_back(normals.size() - 1);
           if (std::isfinite(next.normalizedEdge.x)) {
@@ -554,8 +522,6 @@ void Manifold::Impl::SetNormals(int normalIdx, double minSharpAngle) {
 
     for (int i = 0; i < normals.size(); ++i) {
       vec3 n = normals[i];
-      // Same frame-storage rule as the single-normal path above.
-      if (normalIdx != 0) n = getTransform(meshIds[i]) * n;
       normals[i] = SafeNormalize(n);
     }
 
@@ -675,7 +641,7 @@ void Manifold::Impl::DistributeTangents(Vec<bool>& fixedHalfedges) {
  * normals are considered missing and will defer to their neighboring normals
  * instead. If all normals are missing, the vertex pseudonormal will be used.
  */
-void Manifold::Impl::CreateTangents(int normalIdx) {
+void Manifold::Impl::CreateTangents() {
   ZoneScoped;
   const int numVert = NumVert();
   const int numHalfedge = halfedge_.size();
@@ -719,10 +685,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
         };
 
         ForVert<vec3>(
-            e,
-            [normalIdx, this](int halfedge) {
-              return GetNormal(halfedge, normalIdx);
-            },
+            e, [this](int halfedge) { return GetNormal(halfedge); },
             [&](int halfedge, const vec3& here, const vec3& next) {
               if (next != vec3(0.) && here != vec3(0.)) {
                 calculateTangent(halfedge, here, next);
@@ -765,8 +728,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
           // Orbit the vertex backwards, pulling the next normal from the
           // tangent where it is stored temporarily.
           int current = startHalfedge;
-          vec3 prevNormal =
-              GetNormal(NextHalfedge(halfedge_.Pair(current)), normalIdx);
+          vec3 prevNormal = GetNormal(NextHalfedge(halfedge_.Pair(current)));
           do {
             DEBUG_ASSERT(prevNormal != vec3(0.), logicErr,
                          "missing prevNormal");
@@ -778,7 +740,7 @@ void Manifold::Impl::CreateTangents(int normalIdx) {
 
               calculateTangent(current, prevNormal, nextNormal);
             }
-            vec3 currentNormal = GetNormal(current, normalIdx);
+            vec3 currentNormal = GetNormal(current);
             if (currentNormal != vec3(0.)) {
               prevNormal = currentNormal;
             }

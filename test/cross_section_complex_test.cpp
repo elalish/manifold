@@ -818,7 +818,7 @@ TEST(CrossSectionComplex, OffsetRoundUsesRequestedSegments) {
   const int segments = 20;
   const double delta = 5.0;
 
-  Polygons rounded = Offset({square}, delta, JoinType::Round, 2.0, segments);
+  Polygons rounded = Offset({square}, delta, JoinType::Round, 2.0, {segments});
 
   ASSERT_EQ(rounded.size(), 1);
   EXPECT_EQ(rounded[0].size(), segments + 4);
@@ -828,7 +828,7 @@ TEST(CrossSectionComplex, OffsetRoundClampsHugeSegmentCount) {
   // An absurd requested count is clamped so the vertex count cannot blow up;
   // the clamp is kMaxRoundJoinSegments == 1 << 15 (file-local in offset.cpp).
   SimplePolygon square = {{0, 0}, {20, 0}, {20, 20}, {0, 20}};
-  Polygons rounded = Offset({square}, 5.0, JoinType::Round, 2.0, 1 << 20);
+  Polygons rounded = Offset({square}, 5.0, JoinType::Round, 2.0, {1 << 20});
   ASSERT_EQ(rounded.size(), 1);
   EXPECT_EQ(rounded[0].size(), (1 << 15) + 4);
 }
@@ -1805,7 +1805,7 @@ TEST(CrossSectionComplex, OffsetRoundMergingContours) {
       delta * delta * (kPi - segments * std::sin(2 * kPi / segments) / 2);
   for (int i = 0; i < 16; ++i) {
     const auto result =
-        input.Offset(delta, CrossSection::JoinType::Round, 2.0, segments);
+        input.Offset(delta, CrossSection::JoinType::Round, 2.0, {segments});
     ASSERT_EQ(result.NumContour(), 1 + (side - 1) * (side - 1));
     ASSERT_EQ(result.NumVert(), 736);
     if (i == 0) {
@@ -1839,11 +1839,51 @@ TEST(CrossSectionComplex, OffsetMiterWavyRing) {
       SCOPED_TRACE(delta);
       const auto result = input.Offset(delta, CrossSection::JoinType::Miter);
       ASSERT_EQ(result.NumContour(), 1);
+      // The fill rule trims the crossing offset edges to 512 corners.
+      EXPECT_EQ(result.NumVert(), 512);
       const double reach = delta > 0 ? 2 * delta : delta;
       EXPECT_GT(result.Area(), kPi * (inner + delta) * (inner + delta));
       EXPECT_LT(result.Area(), kPi * (outer + reach) * (outer + reach));
     }
   }
+}
+
+TEST(CrossSectionComplex, OffsetMiterCleanupChain) {
+  // Timed: shrink, grow by twice as much, then shrink again. This common
+  // cleanup removes details narrower than the offset and leaves the rest in
+  // place. The offset is small compared to every feature, so the cost depends
+  // on the number of corners rather than crossings, and each offset takes the
+  // previous one's output.
+  constexpr int side = 16;
+  constexpr int tips = 16;
+  constexpr double delta = 1.0 / 256;
+  Polygons stars;
+  for (int y = 0; y < side; ++y) {
+    for (int x = 0; x < side; ++x) {
+      SimplePolygon star;
+      for (int i = 0; i < 2 * tips; ++i) {
+        const double a = kPi * i / tips;
+        const double r = i % 2 == 0 ? 1.0 : 0.85;
+        star.push_back({3 * x + r * std::cos(a), 3 * y + r * std::sin(a)});
+      }
+      stars.push_back(star);
+    }
+  }
+  const CrossSection input(stars);
+  ASSERT_EQ(input.NumVert(), side * side * 2 * tips);
+  CrossSection result = input;
+  for (int i = 0; i < 3; ++i) {
+    result = result.Offset(-delta, CrossSection::JoinType::Miter)
+                 .Offset(2 * delta, CrossSection::JoinType::Miter)
+                 .Offset(-delta, CrossSection::JoinType::Miter);
+    ASSERT_EQ(result.NumContour(), side * side);
+    // Every corner angle exceeds 60 degrees, the sharpest corner the default
+    // miter limit allows, so no join is squared and the chain returns the
+    // input shape.
+    EXPECT_NEAR(result.Area(), input.Area(), 1e-9 * input.Area());
+  }
+  // Each corner stays one vertex through the whole chain.
+  EXPECT_EQ(result.NumVert(), side * side * 2 * tips);
 }
 
 TEST(CrossSectionComplex, DifferenceManyContoursFewCrossings) {
@@ -1870,7 +1910,7 @@ TEST(CrossSectionComplex, DifferenceManyContoursFewCrossings) {
   for (int j = 0; j < 4; ++j) {
     for (int i = 0; i < 4; ++i) {
       holeCenters.push_back({5.3 + 10 * i, 5.3 + 10 * j});
-      operands.push_back(CrossSection::Circle(holeRadius, segments)
+      operands.push_back(CrossSection::Circle(holeRadius, {segments})
                              .Translate(holeCenters.back()));
     }
   }

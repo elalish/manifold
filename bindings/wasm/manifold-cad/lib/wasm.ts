@@ -25,6 +25,7 @@ import Module from 'manifold-3d';
 
 // Instantiate Manifold WASM
 let manifoldwasm: ManifoldToplevel|null = null;
+let pendingModule: Promise<ManifoldToplevel>|null = null;
 let wasmUrl: string|null = null;
 
 /**
@@ -59,8 +60,13 @@ export async function instantiateManifold(): Promise<ManifoldToplevel> {
  * @returns A manifold instance.
  */
 export async function getManifoldModule(): Promise<ManifoldToplevel> {
-  if (!manifoldwasm) manifoldwasm = await instantiateManifold();
-  return manifoldwasm;
+  if (manifoldwasm) return manifoldwasm;
+  if (!pendingModule) {
+    pendingModule = instantiateManifold()
+                        .then(module => manifoldwasm = module)
+                        .finally(() => pendingModule = null);
+  }
+  return pendingModule;
 }
 
 /**

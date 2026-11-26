@@ -34,29 +34,19 @@ constexpr int kPhasesPerBoolean = 11;
 
 /** @ingroup Private
  *
- * Heavy phases in the `Manifold::Impl::Impl(MeshGLP, ctx)` ingest;
+ * Heavy phases in the `Manifold::Impl::Impl(MeshGLP, ...)` ingest;
  * credit is published only after a phase completes successfully. Bump
- * in lockstep with the `donePhases.fetch_add(1, ...)` sites in the
+ * in lockstep with the `ADVANCE_PHASE_OR_RETURN(ctx)` sites in the
  * ctor body.
  */
 constexpr int kPhasesPerFromMesh = 6;
 
 /** @ingroup Private
  *
- * Heavy phases in `ExecutionContext::Smooth(MeshGL[64])`: the
- * `kPhasesPerFromMesh` ingest phases followed by 7 tangent-creation
- * phases in `Manifold::Impl::CreateTangents(sharpenedEdges, ctx)`.
- * Bump in lockstep with `ADVANCE_PHASE_OR_RETURN(ctx)` sites in that
- * function.
- */
-constexpr int kPhasesPerSmooth = kPhasesPerFromMesh + 7;
-
-/** @ingroup Private
- *
  * Heavy phases in `Manifold::Impl::CreateLevelSet(...)`: the four grid
  * loops (voxel SDF sampling, NearSurface, ComputeVerts, BuildTris)
  * followed by one lumped finalize phase (CreateHalfedges through
- * SetNormalsAndCoplanar). The NearSurface hash-table resize loop may
+ * InitializeOriginal). The NearSurface hash-table resize loop may
  * re-run NearSurface, but counts as a single phase regardless. Bump in
  * lockstep with `ADVANCE_PHASE_OR_RETURN(ctx)` sites in CreateLevelSet.
  */
@@ -71,9 +61,9 @@ constexpr int kPhasesPerLevelSet = 5;
  *
  * `Progress() = donePhases / totalPhases`. `totalPhases` is the canonical
  * progress denominator across op types; for Boolean trees it is set at
- * `GetCsgLeafNode` to `totalBooleans * kPhasesPerBoolean`. Future
- * non-Boolean ops (Hull, LevelSet, Refine, ...) can add to `totalPhases`
- * and increment `donePhases` independently using the same mechanism.
+ * `GetCsgLeafNode` to `totalBooleans * kPhasesPerBoolean`. The static
+ * factories (`FromMeshGL`, `LevelSet`) set it to their own `kPhasesPer*`
+ * and advance `donePhases` with `ADVANCE_PHASE_OR_RETURN`.
  *
  * `totalBooleans`/`doneBooleans` are kept as introspection counters for
  * tests and tools; they are not used in `Progress()`.

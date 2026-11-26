@@ -21,7 +21,7 @@ def run(warp_single=False):
     # Radius of the small cross-section of the actual object.
     threadRadius = 3.75
     # Number of linear segments making up the threadRadius circle. Default is
-    # getCircularSegments(threadRadius).
+    # CircularQuality().segments_for(threadRadius).
     circularSegments = -1
     # Number of segments along the length of the knot. Default makes roughly
     # square facets.
@@ -33,11 +33,7 @@ def run(warp_single=False):
     kLoops = np.gcd(p, q)
     pk = p / kLoops
     qk = q / kLoops
-    n = (
-        circularSegments
-        if circularSegments > 2
-        else get_circular_segments(threadRadius)
-    )
+    n = CircularQuality(circularSegments).segments_for(threadRadius)
     m = linearSegments if linearSegments > 2 else n * qk * majorRadius / threadRadius
 
     offset = 2

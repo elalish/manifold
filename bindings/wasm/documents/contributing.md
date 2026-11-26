@@ -10,7 +10,7 @@ To debug the WASM build directly in Chrome dev tools, simply build in debug mode
 ```
 emcmake cmake -DCMAKE_BUILD_TYPE=Debug .. && emmake make
 ```
-and install the [DWARF](goo.gle/wasm-debugging-extension) Chrome extension.
+and install the [DWARF](https://goo.gle/wasm-debugging-extension) Chrome extension.
 
 When testing [ManifoldCAD.org](https://manifoldcad.org/) (either locally or the
 deployed version) note that it uses a service worker for faster loading. This
@@ -38,7 +38,7 @@ After this, the User and Developer docs will be in `docs/jsuser` and `docs/jsapi
 
 ### Writing for the User Guide
 
-The ManifoldCAD User Guide is generated from the declaration files present in `types/`.  These mostly re-export declarations, allowing the User Guide to inherit from the Developer Guide.  
+The ManifoldCAD User Guide is generated from the declaration files present in `manifold-cad/types/`.  These mostly re-export declarations, allowing the User Guide to inherit from the Developer Guide.  
 
 TypeDoc reflections (comments) flagged as `@internal` will _not_ be visible in the User Guide, but will be present in the Developer Guide.  Reflections tagged as `@hidden` will not be visible in either guide.
 

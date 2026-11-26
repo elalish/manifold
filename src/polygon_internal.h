@@ -157,8 +157,9 @@ HalfedgeTriangulation TriangulateIdxHalfedges(const PolygonsIdx& polys,
                                               double epsilon = -1,
                                               bool allowConvex = true);
 
-HalfedgeTriangulation TriangulateIdxHalfedges(
-    const PolygonsIdx& polys, double epsilon, bool allowConvex,
-    PolygonTriangulator& triangulator);
+HalfedgeTriangulation TriangulateIdxHalfedges(const PolygonsIdx& polys,
+                                              double epsilon, bool allowConvex,
+                                              PolygonTriangulator& triangulator,
+                                              bool checkCCW = true);
 
 }  // namespace manifold

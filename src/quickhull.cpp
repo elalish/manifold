@@ -251,41 +251,34 @@ std::pair<SharedVec<Halfedge>, Vec<vec3>> QuickHull::buildMesh(double epsilon) {
   }
 
   // reorder halfedges
-  SharedVec<Halfedge> halfedges(mesh.halfedges.size());
-  Vec<int> halfedgeToFace(mesh.halfedges.size());
-  Vec<int> counts(mesh.halfedges.size(), 0);
-  Vec<int> mapping(mesh.halfedges.size());
-  Vec<int> faceMap(mesh.faces.size());
+  const size_t numHalfedge = mesh.halfedges.size();
+  Vec<int> counts(numHalfedge + 1, 0);
+  Vec<int> mapping(numHalfedge);
 
-  // Some faces are disabled and should not go into the halfedge vector, we can
-  // update the face indices of the halfedges at the end using index/3
-  int j = 0;
-  for_each(
-      autoPolicy(mesh.halfedges.size()), countAt(0_uz),
-      countAt(mesh.halfedges.size()), [&](size_t i) {
-        if (mesh.halfedges[i].pairedHalfedge < 0) return;
-        if (mesh.faces[mesh.halfedgeToFace[i]].isDisabled()) return;
-        if (AtomicAdd(counts[mesh.halfedgeToFace[i]], 1) > 0) return;
-        int currIndex = AtomicAdd(j, 3);
-        mapping[i] = currIndex;
-        halfedges[currIndex + 0] = mesh.halfedges[i];
-        halfedgeToFace[currIndex + 0] = mesh.halfedgeToFace[i];
-
-        size_t k = mesh.halfedgeNext[i];
-        mapping[k] = currIndex + 1;
-        halfedges[currIndex + 1] = mesh.halfedges[k];
-        halfedgeToFace[currIndex + 1] = mesh.halfedgeToFace[k];
-
-        k = mesh.halfedgeNext[k];
-        mapping[k] = currIndex + 2;
-        halfedges[currIndex + 2] = mesh.halfedges[k];
-        halfedgeToFace[currIndex + 2] = mesh.halfedgeToFace[k];
-        halfedges[currIndex + 0].startVert = halfedges[currIndex + 2].endVert;
-        halfedges[currIndex + 1].startVert = halfedges[currIndex + 0].endVert;
-        halfedges[currIndex + 2].startVert = halfedges[currIndex + 1].endVert;
-      });
-  halfedges.resize(j);
-  halfedgeToFace.resize(j);
+  // Each face that is kept goes to the output in the order of its lowest
+  // halfedge index, starting from that halfedge, so the result does not depend
+  // on scheduling.
+  for_each_n(autoPolicy(numHalfedge), countAt(0), numHalfedge, [&](int i) {
+    if (mesh.halfedges[i].pairedHalfedge < 0) return;
+    if (mesh.faces[mesh.halfedgeToFace[i]].isDisabled()) return;
+    const int k = mesh.halfedgeNext[i];
+    if (i < k && i < mesh.halfedgeNext[k]) counts[i] = 3;
+  });
+  exclusive_scan(counts.begin(), counts.end(), counts.begin(), 0);
+  SharedVec<Halfedge> halfedges(counts.back());
+  for_each_n(autoPolicy(numHalfedge), countAt(0), numHalfedge, [&](int i) {
+    const int currIndex = counts[i];
+    if (counts[i + 1] == currIndex) return;
+    int k = i;
+    for (const int c : {0, 1, 2}) {
+      mapping[k] = currIndex + c;
+      halfedges[currIndex + c] = mesh.halfedges[k];
+      k = mesh.halfedgeNext[k];
+    }
+    halfedges[currIndex + 0].startVert = halfedges[currIndex + 2].endVert;
+    halfedges[currIndex + 1].startVert = halfedges[currIndex + 0].endVert;
+    halfedges[currIndex + 2].startVert = halfedges[currIndex + 1].endVert;
+  });
   // fix pairedHalfedge id
   for_each(
       autoPolicy(halfedges.size()), halfedges.begin(), halfedges.end(),
@@ -858,7 +851,7 @@ void Manifold::Impl::Hull(VecView<const vec3> vertPos,
   RemoveDegenerates();
   SortGeometry(ctx);
   // SortGeometry returns silently on cancel, leaving the Impl in a
-  // partial state; catch that here so SetNormalsAndCoplanar doesn't
+  // partial state; catch that here so InitializeOriginal doesn't
   // run on broken geometry and the caller sees a Cancelled result.
   if (IsCancelled(ctx)) {
     MakeEmpty(Error::Cancelled);

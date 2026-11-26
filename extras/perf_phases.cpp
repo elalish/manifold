@@ -14,12 +14,12 @@
 //
 // Prints per-phase wall-clock timings on representative workloads for the
 // eager ops that carry phase instrumentation, all driven through an
-// ExecutionContext (phases only record with a ctx attached): Boolean, LevelSet,
-// FromMesh ingest, and Smooth. Boolean's Result stage reports through the
-// shared phase timing like the others; its intersection stage keeps its own
-// Timers (a P/Q sub-op breakdown, not sequential phases). Requires
-// MANIFOLD_TIMING=ON (or MANIFOLD_DEBUG=ON). Used for cancel-latency analysis
-// and identifying dominant phases.
+// ExecutionContext (phases only record with a ctx attached): Boolean, LevelSet
+// and FromMesh ingest, plus an ingest-then-smooth workload. Boolean's Result
+// stage reports through the shared phase timing like the others; its
+// intersection stage keeps its own Timers (a P/Q sub-op breakdown, not
+// sequential phases). Requires MANIFOLD_TIMING=ON (or MANIFOLD_DEBUG=ON). Used
+// for cancel-latency analysis and identifying dominant phases.
 
 #include <algorithm>
 #include <chrono>
@@ -86,9 +86,8 @@ void BenchLevelSet(const std::string& workload,
 }
 
 // Re-ingests a MeshGL through ExecutionContext::FromMeshGL (kPhasesPerFromMesh
-// = 7: CreateHalfedges, CleanupTopology, DedupePropVerts,
-// SetNormalsAndCoplanar, RemoveDegenerates, RemoveUnreferencedVerts,
-// SortGeometry).
+// = 6: CreateHalfedges, CleanupTopology, DedupePropVerts,
+// SetFaceAndVertNormals, RemoveUnreferencedVerts, SortGeometry).
 void BenchFromMesh(const std::string& workload, const MeshGL& gl) {
   std::cout << "=== FromMesh " << workload << ": nTri = " << gl.NumTri()
             << " ===" << std::endl;
@@ -102,10 +101,10 @@ void BenchFromMesh(const std::string& workload, const MeshGL& gl) {
             << std::endl;
 }
 
-// Smooths a control-cage MeshGL through ExecutionContext::Smooth
-// (kPhasesPerSmooth = 14: the 7 FromMesh ingest phases plus 7 tangent/smoothing
-// phases), then refines to materialize the tessellation. The phase lines come
-// from the Smooth call; Refine is just to make it a realistic workload.
+// Ingests a control-cage MeshGL through ExecutionContext::FromMeshGL, then
+// smooths it with SmoothByNormals and refines to materialize the tessellation.
+// The phase lines come from the ingest; smoothing and Refine record no phases
+// and only add to the total.
 void BenchSmooth(const std::string& workload, const MeshGL& gl, int refine) {
   std::cout << "=== Smooth " << workload << ": nTri = " << gl.NumTri()
             << ", refine = " << refine << " ===" << std::endl;
@@ -128,7 +127,7 @@ int main(int argc, char** argv) {
   // so Timer output is readable.
   for (int i = 0; i < 8; ++i) {
     const int segments = (8 << i) * 4;
-    Manifold sphere = Manifold::Sphere(1, segments);
+    Manifold sphere = Manifold::Sphere(1, {segments});
     Manifold sphere2 = sphere.Translate(vec3(0.5));
     BenchAll("Sphere(" + std::to_string(segments) + ")", sphere, sphere2);
   }
@@ -200,7 +199,7 @@ int main(int argc, char** argv) {
   // ---- FromMesh ingest phase timings ----
   // Round-trip representative meshes back through the MeshGL ingest pipeline.
   for (int segments : {64, 128, 256}) {
-    const MeshGL gl = Manifold::Sphere(1, segments).GetMeshGL();
+    const MeshGL gl = Manifold::Sphere(1, {segments}).GetMeshGL();
     BenchFromMesh("Sphere(" + std::to_string(segments) + ")", gl);
   }
   {
@@ -210,9 +209,9 @@ int main(int argc, char** argv) {
   }
 
   // ---- Smooth phase timings ----
-  // A coarse control cage smoothed (FromMesh ingest + tangent phases) then
-  // refined; the phase breakdown comes from the Smooth call.
+  // A coarse control cage ingested, smoothed and refined; the phase breakdown
+  // comes from the FromMesh ingest.
   for (int refine : {16, 64}) {
-    BenchSmooth("Sphere(32)", Manifold::Sphere(1, 32).GetMeshGL(), refine);
+    BenchSmooth("Sphere(32)", Manifold::Sphere(1, {32}).GetMeshGL(), refine);
   }
 }

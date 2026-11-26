@@ -118,13 +118,23 @@ TEST(Context, ExecutionContextAlreadyEvaluated) {
 TEST(Context, ExecutionContextCancelBeforeEval) {
   std::vector<Manifold> items;
   for (int i = 0; i < 10; i++) {
-    items.push_back(Manifold::Sphere(1.0, 32).Translate(vec3(i * 0.5, 0, 0)));
+    items.push_back(Manifold::Sphere(1.0, {32}).Translate(vec3(i * 0.5, 0, 0)));
   }
   Manifold u = Manifold::BatchBoolean(items, OpType::Add);
 
   ExecutionContext ctx;
   ctx.Cancel();
   EXPECT_EQ(u.WithContext(ctx).Status(), Manifold::Error::Cancelled);
+  // WithPrecision evaluates under the attached context.
+  EXPECT_EQ(Manifold::BatchBoolean(items, OpType::Add)
+                .WithContext(ctx)
+                .WithPrecision(1e-3)
+                .Status(),
+            Manifold::Error::Cancelled);
+  // So does GetPrecision.
+  const Manifold lazy = Manifold::BatchBoolean(items, OpType::Add);
+  lazy.WithContext(ctx).GetPrecision();
+  EXPECT_EQ(lazy.Status(), Manifold::Error::Cancelled);
 }
 
 // Cancel from another thread mid-evaluation. Expensive CSG tree so there's
@@ -140,7 +150,7 @@ TEST(Context, ExecutionContextCancelConcurrent) {
   // Build a large enough tree that evaluation takes measurable time.
   std::vector<Manifold> items;
   for (int i = 0; i < 50; i++) {
-    items.push_back(Manifold::Sphere(1.0, 64).Translate(vec3(i * 0.3, 0, 0)));
+    items.push_back(Manifold::Sphere(1.0, {64}).Translate(vec3(i * 0.3, 0, 0)));
   }
   Manifold u = Manifold::BatchBoolean(items, OpType::Add);
 
@@ -175,8 +185,8 @@ TEST(Context, ExecutionContextCancelMidBoolean) {
   // One big boolean — N-1 = 1 op, so outer-loop cancel only has a single
   // checkpoint. The work itself (two large spheres overlapping) takes long
   // enough that cancel fires reliably while Boolean3 is running.
-  Manifold a = Manifold::Sphere(1.0, 256);
-  Manifold b = Manifold::Sphere(1.0, 256).Translate(vec3(0.5, 0, 0));
+  Manifold a = Manifold::Sphere(1.0, {256});
+  Manifold b = Manifold::Sphere(1.0, {256}).Translate(vec3(0.5, 0, 0));
   Manifold u = a + b;
 
   ExecutionContext ctx;
@@ -195,12 +205,12 @@ TEST(Context, ExecutionContextCancelMidBoolean) {
 
 // Status() and Status(ctx) should return identical results when no cancel.
 TEST(Context, ExecutionContextMatchesPlainStatus) {
-  Manifold u = (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, 32)) -
+  Manifold u = (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, {32})) -
                Manifold::Tetrahedron();
 
   // Build two equivalent manifolds (CsgOpNodes) to avoid caching effects.
   auto makeTree = [] {
-    return (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, 32)) -
+    return (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, {32})) -
            Manifold::Tetrahedron();
   };
   Manifold a = makeTree();
@@ -215,7 +225,7 @@ TEST(Context, ExecutionContextMatchesPlainStatus) {
 // N-1 invariant holds for Subtract trees too.
 TEST(Context, ExecutionContextProgressSubtract) {
   // Tree shape: (cube + sphere) - tet - octahedron
-  Manifold u = (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, 16)) -
+  Manifold u = (Manifold::Cube(vec3(1), true) + Manifold::Sphere(1.0, {16})) -
                Manifold::Tetrahedron() - Manifold::Cube(vec3(0.5), true);
 
   ExecutionContext ctx;
@@ -254,7 +264,7 @@ TEST(Context, ExecutionContextReuse) {
 TEST(Context, ExecutionContextCancelPermanent) {
   std::vector<Manifold> items;
   for (int i = 0; i < 30; i++) {
-    items.push_back(Manifold::Sphere(1.0, 48).Translate(vec3(i * 0.3, 0, 0)));
+    items.push_back(Manifold::Sphere(1.0, {48}).Translate(vec3(i * 0.3, 0, 0)));
   }
   Manifold u = Manifold::BatchBoolean(items, OpType::Add);
 
@@ -319,7 +329,7 @@ TEST(Context, ExecutionContextCancelSkippedOnLeaf) {
 TEST(Context, ExecutionContextConcurrentProgress) {
   std::vector<Manifold> items;
   for (int i = 0; i < 30; i++) {
-    items.push_back(Manifold::Sphere(1.0, 48).Translate(vec3(i * 0.5, 0, 0)));
+    items.push_back(Manifold::Sphere(1.0, {48}).Translate(vec3(i * 0.5, 0, 0)));
   }
   Manifold u = Manifold::BatchBoolean(items, OpType::Add);
 
@@ -359,7 +369,7 @@ TEST(Context, ExecutionContextSharedSubtreeConcurrent) {
   constexpr int kThreads = 4;
   for (int round = 0; round < 50; ++round) {
     Manifold shared = Manifold::Cube(vec3(2), true);
-    const Manifold hole = Manifold::Cylinder(3, 0.3, -1, 12, true);
+    const Manifold hole = Manifold::Cylinder(3, 0.3, -1, {12}, true);
     for (int i = 0; i < 4; ++i) {
       const Manifold h = hole.Translate(vec3(0.4 * (i - 1.5), 0, 0));
       shared = (shared - h) + h.Rotate(90, 0, 0).Translate(vec3(0, 0, 3));
@@ -413,8 +423,8 @@ TEST(Context, ExecutionContextSubBooleanProgress) {
   // end. Any observed Progress() > 0 mid-eval comes from sub-Boolean phase
   // advancement. Two overlapping spheres ensure the Boolean takes the full
   // path (no degenerate-input early return that would short-circuit phases).
-  Manifold a = Manifold::Sphere(1.0, 256);
-  Manifold b = Manifold::Sphere(1.0, 256).Translate(vec3(0.5, 0, 0));
+  Manifold a = Manifold::Sphere(1.0, {256});
+  Manifold b = Manifold::Sphere(1.0, {256}).Translate(vec3(0.5, 0, 0));
   Manifold result = a + b;
 
   ExecutionContext ctx;
@@ -925,6 +935,8 @@ TEST(Context, ManifoldContextEveryOpDropsAttachment) {
       {"SmoothByNormals",
        [](const Manifold& m) { return std::vector{m.SmoothByNormals()}; }},
       {"Hull", [](const Manifold& m) { return std::vector{m.Hull()}; }},
+      {"WithPrecision",
+       [](const Manifold& m) { return std::vector{m.WithPrecision(1e-3)}; }},
       {"HullVector",
        [](const Manifold& m) {
          return std::vector{Manifold::Hull(std::vector{m})};
@@ -965,7 +977,7 @@ TEST(Context, ManifoldContextCancelMidHull) {
   ExecutionContext ctx;
   ctx.Cancel();
   // Non-trivial input so the post-buildMesh path is reached.
-  Manifold sphere = Manifold::Sphere(1.0, 64).WithContext(ctx);
+  Manifold sphere = Manifold::Sphere(1.0, {64}).WithContext(ctx);
   Manifold hull = sphere.Hull();
   EXPECT_EQ(hull.Status(), Manifold::Error::Cancelled);
 }
@@ -995,7 +1007,7 @@ TEST(Context, ManifoldContextCancelMidMinkowski) {
 TEST(Context, ManifoldContextCancelConcurrentHull) {
   // High-resolution sphere so QuickHull + SortGeometry have measurable
   // work to do.
-  Manifold sphere = Manifold::Sphere(1.0, 256);
+  Manifold sphere = Manifold::Sphere(1.0, {256});
 
   ExecutionContext ctx;
   Manifold::Error result = RunConcurrentEvalAndCancel(
@@ -1071,7 +1083,7 @@ TEST(Context, MeshGLHappyPath) {
 
 // Equivalent geometry to the plain ctor.
 TEST(Context, MeshGLMatchesCtor) {
-  MeshGL mesh = Manifold::Sphere(1.0, 32).GetMeshGL();
+  MeshGL mesh = Manifold::Sphere(1.0, {32}).GetMeshGL();
   ExecutionContext ctx;
   Manifold viaCtx = ctx.FromMeshGL(mesh);
   Manifold viaCtor(mesh);
@@ -1131,7 +1143,7 @@ TEST(Context, MeshGLValidationErrorWithoutCancel) {
 // each Cancelled hit also pins donePhases < totalPhases.
 #if MANIFOLD_PAR == 1
 TEST(Context, MeshGLCancelConcurrent) {
-  MeshGL mesh = Manifold::Sphere(1.0, 512).GetMeshGL();  // ~524k tris
+  MeshGL mesh = Manifold::Sphere(1.0, {512}).GetMeshGL();  // ~524k tris
   int cancelledHits = 0;
   auto sleep = std::chrono::microseconds(100);
   for (int attempt = 0; attempt < 12 && cancelledHits == 0; ++attempt) {
@@ -1156,7 +1168,7 @@ TEST(Context, MeshGLCancelConcurrent) {
 // MANIFOLD_TIMING so the phase timing is compiled in.
 #if MANIFOLD_PAR == 1
 TEST(Context, MeshGLSharedContextConcurrent) {
-  MeshGL mesh = Manifold::Sphere(1.0, 64).GetMeshGL();
+  MeshGL mesh = Manifold::Sphere(1.0, {64}).GetMeshGL();
   ExecutionContext ctx;
   auto ingest = [&] {
     for (int i = 0; i < 20; ++i) {

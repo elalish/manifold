@@ -24,8 +24,8 @@
  * representing objects that are *already* part of a gltf-transform document.
  * That class can mostly be seen in import and export related code.
  *
- * This leads to the confusing case where, `NonManifoldGLTFNode` is both.  It is
- * a manifoldCAD node that contains an imported gltf-transform `Node`.  It
+ * This leads to the confusing case where, `VisualizationGLTFNode` is both.  It
+ * is a manifoldCAD node that contains an imported gltf-transform `Node`.  It
  * specifies how that gltf-transform node will be scaled, rotated and translated
  * when it is eventually copied into a new gltf-transform document at export
  * time.
@@ -66,11 +66,16 @@ export interface GLTFMaterial {
    * Every vertex in a glTF Mesh has a set of attributes.
    * `POSITION` cannot be specified -- ManifoldCAD will set it internally.
    *
-   * This array specifies how vertex properties are arranged in memory.
-   * For example, a value of `['TEXCOORD_0', 'NORMAL', 'SKIP_2', 'COLOR_0']`
-   * would implicitly use property channels 0-2 for position, followed by
-   * channels 3-4 for texture, 5-7 for surface normal, ignore 8-9, and 10-12 for
-   * color.
+   * This array specifies how vertex properties are arranged in memory. If it
+   * includes `NORMAL`, ManifoldCAD reads it from the channels directly after
+   * position. For
+   * example, `['TEXCOORD_0', 'NORMAL', 'SKIP_2', 'COLOR_0']` uses channels
+   * 0-2 for position, 3-5 for surface normal, 6-7 for texture, ignores 8-9,
+   * and uses 10-12 for color.
+   *
+   * Normals follow transforms only when they come from `calculateNormals()` or
+   * a Mesh input whose corresponding runFlags bit 1 is set. Values supplied
+   * by `setProperties()` remain ordinary properties.
    *
    * Some properties such as `TEXCOORD_0` or `COLOR_0` may be set when importing
    * a model that has a texture or material.

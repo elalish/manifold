@@ -87,7 +87,7 @@ export interface ImportOptions {
   mimetype?: string;
   /**
    * When an imported model is not manifold, try closing gaps smaller than
-   * tolerance in an effort to make it manifold.
+   * tolerance, in millimeters, in an effort to make it manifold.
    */
   tolerance?: number;
 }
@@ -97,15 +97,13 @@ register(gltfIO);
 register(import3MF);
 
 const id2mesh = new Map<number, GLTFTransform.Mesh>();
-const mesh2node = new Map<GLTFTransform.Mesh, Array<GLTFTransform.Node>>();
-const mesh2mesh = new Map<Mesh, GLTFTransform.Mesh>();
-const node2doc = new Map<GLTFTransform.Node, GLTFTransform.Document>();
+const mesh2doc = new Map<GLTFTransform.Mesh, GLTFTransform.Document>();
+const mesh2sourceNode = new Map<Mesh, GLTFTransform.Node>();
 
 export const cleanup = () => {
   id2mesh.clear();
-  mesh2node.clear();
-  mesh2mesh.clear();
-  node2doc.clear();
+  mesh2doc.clear();
+  mesh2sourceNode.clear();
 };
 
 /**
@@ -114,9 +112,7 @@ export const cleanup = () => {
 export const getDocumentByID = (runID: number): GLTFTransform.Document|null => {
   const mesh = id2mesh.get(runID);
   if (!mesh) return null;
-  const [node] = mesh2node.get(mesh) ?? [];
-  if (!node) return null;
-  return node2doc.get(node) ?? null;
+  return mesh2doc.get(mesh) ?? null;
 };
 
 function getFormat(identifier: string): ImportFormat {
@@ -164,7 +160,7 @@ function getSourceFilename(source: string|Blob|URL|ArrayBuffer): string|
  * Returns true if a given extension or mimetype can be imported.
  *
  * @param filetype
- * @param throwOnFailure If true, throw an `UnsupportedFormatException` rather
+ * @param throwOnFailure If true, throw an `UnsupportedFormatError` rather
  *     than return false.
  * @group Management
  */
@@ -225,6 +221,9 @@ export async function importModel(
  * and then union the results together.  If a child node has no mesh, the mesh
  * has no geometry, or the mesh is not manifold, that child node will be
  * silently excluded.
+ *
+ * The result has float relative precision, since the file does not store a
+ * precision. Use `withPrecision()` to change it.
  */
 export async function importManifold(
     source: string|Blob|URL|ArrayBuffer,
@@ -377,8 +376,10 @@ function importTransform(doc: GLTFTransform.Document): GLTFTransform.Document {
     if (nodes.length === 1) {
       // If there's just one node, transform it in place.
       const [node] = nodes;
+      const [x, y, z] = node.getTranslation();
+      node.setTranslation([x * scale, -z * scale, y * scale]);
       node.setScale(node.getScale().map(n => n * scale) as GLTFTransform.vec3);
-      node.setRotation(multiplyQuat(node.getRotation(), rotate));
+      node.setRotation(multiplyQuat(rotate, node.getRotation()));
 
     } else {
       // If there's more than one node, create a parent node and transform that.
@@ -442,12 +443,9 @@ function gltfNodeToMeshes(
         const gltfmesh = descendant.getMesh();
         if (!gltfmesh) return null;
 
-        node2doc.set(descendant, document);
-        const nodes = mesh2node.get(gltfmesh) ?? [];
-        nodes.push(descendant);
-        mesh2node.set(gltfmesh, nodes);
-
+        mesh2doc.set(gltfmesh, document);
         const mesh = gltfMeshToMesh(gltfmesh);
+        mesh2sourceNode.set(mesh, descendant);
         return mesh;
       })
       .filter(mesh => !!mesh);
@@ -482,10 +480,12 @@ const tryToMakeManifold = (mesh: Mesh): Manifold|null => {
  */
 function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
   const {Manifold} = getManifoldModuleSync()!;
-  const mesh2nextNode = new Map<GLTFTransform.Mesh, number>();
-
   const manifolds = [];
   for (const mesh of meshes) {
+    // The mesh is in the local coordinate system of the original
+    // glTF-transform node.  Find that node, so the result can be transformed
+    // back if possible.
+    const matrix = mesh2sourceNode.get(mesh)?.getWorldMatrix();
     let manifold = tryToMakeManifold(mesh);
     let merged = mesh;
     if (!manifold) {
@@ -495,25 +495,18 @@ function meshesToManifold(meshes: Array<Mesh>, tolerance?: number): Manifold {
     }
     if (!manifold && tolerance) {
       // That didn't work either.
-      // Can we adjust the model within tolerance?
-      merged = merged.merge(tolerance);
+      // Can we adjust the model within tolerance?  The tolerance is in world
+      // units, so divide it by the largest scale of the node.
+      const scale = matrix ?
+          Math.max(...[0, 4, 8].map(
+              i => Math.hypot(matrix[i], matrix[i + 1], matrix[i + 2]))) :
+          1;
+      merged = merged.merge(tolerance / scale);
       manifold = tryToMakeManifold(merged);
     }
     if (!manifold) continue;
 
-    // We have a manifold object, but it is in the local coordinate system of
-    // the original glTF-transform node.  Find that node, and transform it back
-    // if possible.
-    const sourceMesh = mesh2mesh.get(mesh);
-    const sourceNodes = sourceMesh ? mesh2node.get(sourceMesh) : null;
-    const nextNode = sourceMesh ? (mesh2nextNode.get(sourceMesh) ?? 0) : 0;
-    const sourceNode = sourceNodes?.[nextNode] ?? null;
-    if (sourceMesh && sourceNode) mesh2nextNode.set(sourceMesh, nextNode + 1);
-    if (sourceNode) {
-      manifolds.push(manifold.transform(sourceNode.getWorldMatrix()));
-    } else {
-      manifolds.push(manifold);
-    }
+    manifolds.push(matrix ? manifold.transform(matrix) : manifold);
   }
 
   if (!manifolds?.length) {
@@ -560,19 +553,19 @@ function gltfMeshToMesh(gltfmesh: GLTFTransform.Mesh): Mesh {
     setMaterialByID(runID, {
       // 'POSITION' is always present; we don't need to specify it.
       attributes: attributes.filter(x => x !== 'POSITION'),
-      alpha: material.getAlpha(),
-      baseColorFactor: material.getBaseColorFactor().slice(0, 3) as Vec3,
-      metallic: material.getMetallicFactor(),
-      roughness: material.getRoughnessFactor(),
-      name: material.getName(),
+      alpha: material?.getAlpha() ?? 1,
+      baseColorFactor:
+          (material?.getBaseColorFactor().slice(0, 3) ?? [1, 1, 1]) as Vec3,
+      metallic: material?.getMetallicFactor() ?? 1,
+      roughness: material?.getRoughnessFactor() ?? 1,
+      name: material?.getName(),
 
       // Make sure we can find this source material later.
-      sourceMaterial: material,
+      sourceMaterial: material ?? undefined,
       sourceRunID: runID,
     });
   }
 
   const manifoldMesh = new Mesh(mesh);
-  mesh2mesh.set(manifoldMesh, gltfmesh);
   return manifoldMesh;
 }

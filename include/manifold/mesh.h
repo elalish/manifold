@@ -61,13 +61,12 @@ namespace manifold {
  *
  * You can have any number of arbitrary floating-point properties per vertex,
  * and they will all be interpolated as necessary during operations. It is up to
- * you to keep track of which channel represents what type of data. A few of
- * Manifold's methods allow you to specify the channel where normals data
- * starts, in order to update it automatically for transforms and such. This
- * will be easier if your meshes all use the same channels for properties, but
- * this is not a requirement. Operations between meshes with different numbers
- * of properties will simply use the larger numProp and pad the smaller one
- * with zeroes.
+ * you to keep track of which channel represents what type of data. Normals,
+ * when recorded, always occupy the first three extra property channels. Each
+ * triangle run records whether it carries those normals with runFlags bit 1;
+ * only recorded normals are updated automatically by transforms. Operations
+ * between meshes with different numbers of properties use the larger numProp
+ * and pad the smaller one with zeroes.
  *
  * On output, the triangles are sorted into runs (runIndex, runOriginalID,
  * runTransform) that correspond to different mesh inputs. Other 3D libraries
@@ -91,7 +90,7 @@ namespace manifold {
  * The halfedgeTangent vector is used to specify the weighted tangent vectors of
  * each halfedge for the purpose of using the Refine methods to create a
  * smoothly-interpolated surface. They can also be output when calculated
- * automatically by the Smooth functions.
+ * automatically by SmoothByNormals().
  *
  * MeshGL is an alias for the standard single-precision version. Use MeshGL64 to
  * output the full double precision that Manifold uses internally.
@@ -112,7 +111,8 @@ struct MeshGLP {
   I numProp = 3;
   /// Flat, GL-style interleaved list of all vertex properties: propVal =
   /// vertProperties[vert * numProp + propIdx]. The first three properties are
-  /// always the position x, y, z. The stride of the array is numProp.
+  /// always the position x, y, z. The stride of the array is numProp, and its
+  /// length must be a multiple of numProp.
   std::vector<Precision> vertProperties;
   /// The vertex indices of the three triangle corners in CCW (from the outside)
   /// order, for each triangle.
@@ -141,7 +141,8 @@ struct MeshGLP {
   /// Optional: For each run, a 3x4 transform is stored representing how the
   /// corresponding original mesh was transformed to create this triangle run.
   /// This matrix is stored in column-major order and the length of the overall
-  /// vector is 12 * runOriginalID.size().
+  /// vector is 12 * runOriginalID.size(). It is empty in the output of a
+  /// Manifold that is an original (see OriginalID()).
   std::vector<Precision> runTransform;
   /// Optional: For each run, defines a set of flags giving extra information
   /// about the run. See the corresponding getter functions for details on the
@@ -166,7 +167,9 @@ struct MeshGLP {
    * out-of-range indices), the copy is unchanged. Otherwise, verts along open
    * edges are merged within tolerance (the maximum of the specified tolerance
    * and the baseline bounding-box tolerance), keeping any from the existing
-   * merge vectors.
+   * merge vectors. The baseline is the bounding box scale times the relative
+   * precision a Manifold made from this mesh gets: kDefaultRelativePrecision
+   * for MeshGL and kMinRelativePrecision for MeshGL64.
    *
    * There is no guarantee the result will be manifold - this is a
    * best-effort helper function designed primarily to aid in the case where
@@ -175,7 +178,8 @@ struct MeshGLP {
    * Manifold from the result will report an error status if it is not
    * manifold.
    *
-   * @param tolerance Merge open-edge verts closer than this.
+   * @param tolerance Merge open-edge verts closer than this. NaN is treated
+   * as 0.
    */
   [[nodiscard]] MeshGLP Merge(Precision tolerance = 0) const;
 
@@ -242,7 +246,7 @@ struct MeshGLP {
   /**
    * Returns true if the first three extra-property channels (slots 3, 4, 5)
    * of this run carry world-frame vertex normals (set by
-   * `Manifold::CalculateNormals(0)` and round-tripped via `runFlags` bit 1).
+   * `Manifold::CalculateNormals()` and round-tripped via `runFlags` bit 1).
    * Consumers should treat the slot as normals and skip re-applying
    * `runTransform` to it.
    *

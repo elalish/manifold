@@ -31,7 +31,7 @@ import {addAnimationToDoc, addMotion, cleanup as cleanupAnimation, cleanupAnimat
 import {cleanup as cleanupDebug, getDebugGLTFMesh, getMaterialByID} from './debug.ts'
 import {cleanup as cleanupExport, getPropertyResolver} from './export-model.ts';
 import type {Properties} from './gltf-io.ts';
-import {attributeDefs, writeMesh} from './gltf-io.ts';
+import {writeMesh} from './gltf-io.ts';
 import type {GLTFMaterial} from './gltf-node.ts';
 import {BaseGLTFNode, CrossSectionGLTFNode, GLTFNode, VisualizationGLTFNode} from './gltf-node.ts';
 import {cleanup as cleanupImport} from './import-model.ts';
@@ -44,7 +44,6 @@ export {getAnimationDuration, getAnimationFPS, getAnimationMode, setAnimationDur
 export {only, show} from './debug.ts';
 export type {GLTFAttribute, GLTFMaterial} from './gltf-node.ts';
 export {GLTFNode} from './gltf-node.ts';
-export {getCircularSegments, getMinCircularAngle, getMinCircularEdgeLength, getRelativePrecision, resetToCircularDefaults, setCircularSegments, setMinCircularAngle, setMinCircularEdgeLength, setRelativePrecision} from './level-of-detail.ts';
 export {setMaterial} from './material.ts';
 
 type Cacheable = Manifold|CrossSection;
@@ -95,18 +94,7 @@ function writeManifold(
   if (nodeDef.name) node.setName(nodeDef.name);
   const manifold = nodeDef.manifold!;
 
-  var normalIdx = -1;
-  if (nodeDef.material?.attributes != null) {
-    const {attributes} = nodeDef.material;
-    if (attributes.includes('NORMAL')) {
-      normalIdx = 0;
-      for (const attribute of attributes) {
-        if (attribute === 'NORMAL') break;
-        normalIdx += attributeDefs[attribute].components;
-      }
-    }
-  }
-  const manifoldMesh = manifold.getMesh(normalIdx);
+  const manifoldMesh = manifold.getMesh();
 
   // Log this conversion
   const name = nodeDef.name ? `"${nodeDef.name}"` : 'object';

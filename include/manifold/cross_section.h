@@ -79,7 +79,7 @@ class CrossSection {
   ///@{
   std::vector<CrossSection> Decompose() const;
   static CrossSection Square(const vec2 dims, bool center = false);
-  static CrossSection Circle(double radius, int circularSegments = 0);
+  static CrossSection Circle(double radius, CircularQuality quality = {});
   ///@}
 
   /** @name Information
@@ -98,14 +98,15 @@ class CrossSection {
   ///@{
   CrossSection Translate(const vec2 v) const;
   CrossSection Rotate(double degrees) const;
-  CrossSection Scale(const vec2 s) const;
-  CrossSection Mirror(const vec2 ax) const;
+  CrossSection Scale(const vec2 v) const;
+  CrossSection Mirror(const vec2 normal) const;
   CrossSection Transform(const mat2x3& m) const;
   CrossSection Warp(std::function<void(vec2&)> warpFunc) const;
   CrossSection WarpBatch(std::function<void(VecView<vec2>)> warpFunc) const;
   CrossSection Simplify(double tolerance = 0) const;
-  CrossSection Offset(double delta, JoinType jt = JoinType::Round,
-                      double miter_limit = 2.0, int circularSegments = 0) const;
+  CrossSection Offset(double delta, JoinType joinType = JoinType::Round,
+                      double miter_limit = 2.0,
+                      CircularQuality quality = {}) const;
   ///@}
 
   /** @name Boolean
@@ -128,7 +129,7 @@ class CrossSection {
   ///@{
   CrossSection Hull() const;
   static CrossSection Hull(const std::vector<CrossSection>& crossSections);
-  static CrossSection Hull(const SimplePolygon& pts);
+  static CrossSection Hull(const SimplePolygon& points);
   static CrossSection Hull(const Polygons& polys);
   ///@}
 

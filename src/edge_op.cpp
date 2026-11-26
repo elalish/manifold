@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cmath>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -83,29 +84,51 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
   CleanupTopology();
 
   Vec<int> scratch;
-  int shortCollapsed = 0;
-  const int numHalfedge = halfedge_.size();
-  for (int edge = 0; edge < numHalfedge; ++edge) {
-    if (!halfedge_.Valid(edge) ||
-        length2(vertPos_[halfedge_.End(edge)] -
-                vertPos_[halfedge_.Start(edge)]) > epsilon_ * epsilon_)
-      continue;
+  auto collapseShortEdges = [&](bool keepNewVerts) {
+    int shortCollapsed = 0;
+    const int numHalfedge = halfedge_.size();
+    for (int edge = 0; edge < numHalfedge; ++edge) {
+      if (!halfedge_.Valid(edge) ||
+          length2(vertPos_[halfedge_.End(edge)] -
+                  vertPos_[halfedge_.Start(edge)]) > epsilon_ * epsilon_)
+        continue;
 
-    // Always collapse forward halfedges so that new verts are retained, which
-    // in turn allow more colinear edges to be collapsed below. We can't skip
-    // backward halfedges because as other edges collapse and swap verts, the
-    // backward halfedge may become a forward halfedge.
-    CollapseDegenerate(halfedge_.IsForward(edge) ? edge : halfedge_.Pair(edge),
-                       scratch);
-    ++shortCollapsed;
-  }
+      // Before the colinear pass, always collapse forward halfedges so that
+      // new verts are retained, which in turn allow more colinear edges to be
+      // collapsed below. After it, keep the older vert instead, which is an
+      // input vert whenever either one is. We can't skip the other halfedges
+      // because as other edges collapse and swap verts, their direction may
+      // change.
+      CollapseDegenerate(halfedge_.IsForward(edge) == keepNewVerts
+                             ? edge
+                             : halfedge_.Pair(edge),
+                         scratch);
+      ++shortCollapsed;
+    }
+    return shortCollapsed;
+  };
+  // A triangle flat along its face normal, but not along its own normal, only
+  // needs its normal replaced. This moves no geometry.
+  auto replaceFlatNormals = [&]() {
+    for (int tri = 0; tri < NumTri(); ++tri) {
+      if (!halfedge_.Valid(3 * tri) || !IsFlat(tri, faceNormal_[tri])) continue;
+      const vec3 v0 = vertPos_[halfedge_.Start(3 * tri)];
+      const vec3 normal =
+          SafeNormalize(la::cross(vertPos_[halfedge_.Start(3 * tri + 1)] - v0,
+                                  vertPos_[halfedge_.Start(3 * tri + 2)] - v0));
+      if (normal != vec3(0.0) && !IsFlat(tri, normal))
+        faceNormal_[tri] = normal;
+    }
+  };
+
+  const int shortCollapsed = collapseShortEdges(true);
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose >= 2) {
     std::cout << "collapsed " << shortCollapsed << " short edges" << std::endl;
   }
 #endif
 
-  const int swapped = SwapDegenerateEdges(scratch);
+  int swapped = SwapDegenerateEdges(scratch, false);
 #ifdef MANIFOLD_DEBUG
   if (ManifoldParams().verbose >= 2) {
     std::cout << "swapped " << swapped << " edges" << std::endl;
@@ -126,6 +149,21 @@ void Manifold::Impl::RemoveDegenerates(int firstNewVert) {
     std::cout << "collapsed " << colinear << " long edges" << std::endl;
   }
 #endif
+
+  // The passes above can leave short edges and stale normals, which may be
+  // what kept the first swap pass from removing a flat triangle. Swapping again
+  // starts only near the triangles still flat, so that it changes nothing the
+  // first pass already cleaned.
+  collapseShortEdges(false);
+  replaceFlatNormals();
+  swapped += SwapDegenerateEdges(scratch, true);
+  replaceFlatNormals();
+#ifdef MANIFOLD_DEBUG
+  if (ManifoldParams().verbose >= 2) {
+    std::cout << "swapped " << swapped << " edges in total" << std::endl;
+  }
+#endif
+
   // Merging verts causes their normals to change
   CalculateVertNormals();
 }
@@ -371,7 +409,7 @@ void Manifold::Impl::Decimate(double tolerance) {
   Vec<double> totalCost(vertPos_.size(), 0);
   size_t totalCollapsed = 0;
   Vec<Merger> merger(edges.size(), {});
-  tolerance = std::max(tolerance, epsilon_);
+  tolerance = std::max(epsilon_, tolerance);
   const double maxCost = tolerance * tolerance;
   Vec<int> scratchBuffer;
   scratchBuffer.reserve(10);
@@ -513,13 +551,33 @@ void Manifold::Impl::Decimate(double tolerance) {
 // Swaps the long edge of every degenerate triangle until none remain, using a
 // work stack of triangles. Any triangle touched by a swap or split is
 // re-queued, since its degeneracy or its neighbor's blocking condition may
-// have changed. Returns the number of swaps.
-int Manifold::Impl::SwapDegenerateEdges(Vec<int>& scratch) {
+// have changed. With nearFlatOnly, the stack starts only from triangles that
+// share a vert with one NumDegenerateTris() counts. Returns the number of
+// swaps.
+int Manifold::Impl::SwapDegenerateEdges(Vec<int>& scratch, bool nearFlatOnly) {
   // Per-edge cap guards against swap cycles between coincident triangulations.
   constexpr uint8_t kMaxSwapsPerEdge = 255;
   std::vector<uint8_t> swapCount(halfedge_.size(), 0);
   std::vector<int> stack;
-  for (int tri = 0; tri < NumTri(); ++tri) stack.push_back(tri);
+  std::vector<bool> nearFlat(nearFlatOnly ? NumVert() : 0, false);
+  for (int tri = 0; tri < NumTri(); ++tri) {
+    if (nearFlatOnly && halfedge_.Valid(3 * tri) &&
+        IsFlat(tri, faceNormal_[tri]))
+      for (int i : {0, 1, 2}) nearFlat[halfedge_.Start(3 * tri + i)] = true;
+  }
+  for (int tri = 0; tri < NumTri(); ++tri) {
+    if (nearFlatOnly && (!halfedge_.Valid(3 * tri) ||
+                         !(nearFlat[halfedge_.Start(3 * tri)] ||
+                           nearFlat[halfedge_.Start(3 * tri + 1)] ||
+                           nearFlat[halfedge_.Start(3 * tri + 2)])))
+      continue;
+    stack.push_back(tri);
+  }
+  // Each split adds a vert and two triangles. Capping splits at the starting
+  // triangle count caps the mesh size, and with it the swaps (per-edge cap).
+  // Like the per-edge swap cap, running out leaves any remaining degenerate
+  // triangles in place.
+  int splitsLeft = NumTri();
 
   int swaps = 0;
   while (!stack.empty()) {
@@ -558,15 +616,21 @@ int Manifold::Impl::SwapDegenerateEdges(Vec<int>& scratch) {
       if (IsColinear(newDiag, base - last, epsilon_) ||
           IsColinear(newDiag, end - last, epsilon_)) {
         const int longEdge = 3 * (pair / 3) + pairResult.longEdge;
-        if (longEdge != pair && dot(last - base, end - next) < 0 &&
-            SplitQuad(longEdge, NextHalfedge(longEdge) == pair)) {
-          ++count;
-          swapCount.resize(halfedge_.size(), 0);
-          const int numTri = NumTri();
-          for (int t : {tri, pair / 3, numTri - 1, numTri - 2, neighborTris[0],
-                        neighborTris[1], neighborTris[2], neighborTris[3]})
-            stack.push_back(t);
-          continue;
+        if (longEdge != pair && dot(last - base, end - next) < 0) {
+          // Out of splits, the triangle stays in place rather than taking the
+          // swap that the split exists to avoid.
+          if (splitsLeft == 0) continue;
+          if (SplitQuad(longEdge, NextHalfedge(longEdge) == pair)) {
+            --splitsLeft;
+            ++count;
+            swapCount.resize(halfedge_.size(), 0);
+            const int numTri = NumTri();
+            for (int t :
+                 {tri, pair / 3, numTri - 1, numTri - 2, neighborTris[0],
+                  neighborTris[1], neighborTris[2], neighborTris[3]})
+              stack.push_back(t);
+            continue;
+          }
         }
       }
     }
@@ -611,7 +675,6 @@ void Manifold::Impl::DedupeEdge(const int edge) {
       // Single topological unit needs 2 faces added to be split
       const int newVert = vertPos_.size();
       vertPos_.push_back(vertPos_[endVert]);
-      if (vertNormal_.size() > 0) vertNormal_.push_back(vertNormal_[endVert]);
       current = halfedge_.Pair(NextHalfedge(current));
       const int opposite = halfedge_.Pair(nextEdge);
 
@@ -652,7 +715,6 @@ void Manifold::Impl::DedupeEdge(const int edge) {
     // Separate topological unit needs no new faces to be split
     const int newVert = vertPos_.size();
     vertPos_.push_back(vertPos_[endVert]);
-    if (vertNormal_.size() > 0) vertNormal_.push_back(vertNormal_[endVert]);
 
     ForVert(NextHalfedge(current), [this, newVert](int e) {
       halfedge_.SetStart(e, newVert);
@@ -675,7 +737,6 @@ void Manifold::Impl::DedupeEdge(const int edge) {
     // Split the pinched vert the previous split created.
     const int newVert = vertPos_.size();
     vertPos_.push_back(vertPos_[endVert]);
-    if (vertNormal_.size() > 0) vertNormal_.push_back(vertNormal_[endVert]);
 
     ForVert(NextHalfedge(current), [this, newVert](int e) {
       halfedge_.SetStart(e, newVert);
@@ -740,9 +801,6 @@ bool Manifold::Impl::SplitQuad(int edge, bool nextDiag) {
     return false;
   const int m = vertPos_.size();
   vertPos_.push_back(ps + t * edgeVec);
-  if (vertNormal_.size() > 0)
-    vertNormal_.push_back(SafeNormalize(vertNormal_[edgeStart] * (1 - t) +
-                                        vertNormal_[edgeEnd] * t));
 
   // Gather everything needed before halfedges are overwritten.
   const int extC0 = halfedge_.Pair(prevP0);  // c -> edgeEnd

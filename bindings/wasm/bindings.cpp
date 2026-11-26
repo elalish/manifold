@@ -92,10 +92,16 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .value("Miter", CrossSection::JoinType::Miter)
       .value("Bevel", CrossSection::JoinType::Bevel);
 
+  value_object<CircularQuality>("circularQuality")
+      .field("segments", &CircularQuality::segments)
+      .field("minAngle", &CircularQuality::minAngle)
+      .field("minEdgeLength", &CircularQuality::minEdgeLength);
+
   value_object<Rect>("rect").field("min", &Rect::min).field("max", &Rect::max);
   value_object<Box>("box").field("min", &Box::min).field("max", &Box::max);
 
   value_object<RayHit>("rayHit")
+      .field("originalID", &RayHit::originalID)
       .field("faceID", &RayHit::faceID)
       .field("distance", &RayHit::distance)
       .field("position", &RayHit::position)
@@ -107,7 +113,9 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("cancel", &ExecutionContext::Cancel)
       .function("cancelled", &ExecutionContext::Cancelled)
       .function("progress", &ExecutionContext::Progress)
-      .function("_FromMesh", &man_js::ExecutionContextFromMesh)
+      .function("_FromMesh", &man_js::ExecutionContextFromMesh<float, uint32_t>)
+      .function("_FromMesh64",
+                &man_js::ExecutionContextFromMesh<double, uint64_t>)
       .function("_LevelSet", &man_js::ExecutionContextLevelSet);
 
   register_vector<RayHit>("Vector_rayHit");
@@ -158,7 +166,6 @@ EMSCRIPTEN_BINDINGS(whatever) {
                &CrossSection::Hull));
 
   class_<Manifold>("Manifold")
-      .constructor(&man_js::FromMeshJS)
       .function("add", &man_js::Union)
       .function("subtract", &man_js::Difference)
       .function("intersect", &man_js::Intersection)
@@ -171,6 +178,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_Project", &Manifold::Project)
       .function("hull", select_overload<Manifold() const>(&Manifold::Hull))
       .function("_GetMeshJS", &js::GetMeshJS)
+      .function("_GetMesh64JS", &js::GetMesh64JS)
       .function("refine", &Manifold::Refine)
       .function("refineToLength", &Manifold::RefineToLength)
       .function("refineToTolerance", &Manifold::RefineToTolerance)
@@ -188,6 +196,8 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("isEmpty", &Manifold::IsEmpty)
       .function("status", &man_js::Status)
       .function("withContext", &Manifold::WithContext)
+      .function("withPrecision", &Manifold::WithPrecision)
+      .function("getPrecision", &Manifold::GetPrecision)
       .function("numVert", &Manifold::NumVert)
       .function("numEdge", &Manifold::NumEdge)
       .function("numTri", &Manifold::NumTri)
@@ -215,7 +225,10 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_Triangulate", &Triangulate);
   function("_Revolve", &Manifold::Revolve);
   function("_LevelSet", &man_js::LevelSet);
-  function("_Merge", &js::Merge);
+  function("_Merge", &js::Merge<float, uint32_t>);
+  function("_Merge64", &js::Merge<double, uint64_t>);
+  function("_FromMesh", &man_js::FromMeshJS<float, uint32_t>);
+  function("_FromMesh64", &man_js::FromMeshJS<double, uint64_t>);
   function("_ReserveIDs", &Manifold::ReserveIDs);
   function("_manifoldUnionN", &man_js::UnionN);
   function("_manifoldDifferenceN", &man_js::DifferenceN);
@@ -224,17 +237,15 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function(
       "_manifoldHullPoints",
       select_overload<Manifold(const std::vector<vec3>&)>(&Manifold::Hull));
+  function(
+      "_manifoldHull",
+      select_overload<Manifold(const std::vector<Manifold>&)>(&Manifold::Hull));
 
-  // Quality Globals
-  function("setRelativePrecision", &Quality::SetRelativePrecision);
-  function("getRelativePrecision", &Quality::GetRelativePrecision);
-  function("setMinCircularAngle", &Quality::SetMinCircularAngle);
-  function("setMinCircularEdgeLength", &Quality::SetMinCircularEdgeLength);
-  function("getMinCircularAngle", &Quality::GetMinCircularAngle);
-  function("getMinCircularEdgeLength", &Quality::GetMinCircularEdgeLength);
-  function("setCircularSegments", &Quality::SetCircularSegments);
-  function("getCircularSegments", &Quality::GetCircularSegments);
-  function("resetToCircularDefaults", &Quality::ResetToDefaults);
+  function("_DefaultCircularQuality", &js::DefaultCircularQuality);
+  function("_SegmentsFor", &js::SegmentsFor);
+  function("_ForDivisions", &CircularQuality::ForDivisions);
+
+  constant("MIN_RELATIVE_PRECISION", kMinRelativePrecision);
 
   function("initTBB", &initTBB);
 }

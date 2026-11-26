@@ -29,6 +29,7 @@
 #include "nanobind/stl/optional.h"
 #include "nanobind/stl/pair.h"
 #include "nanobind/stl/tuple.h"
+#include "nanobind/stl/variant.h"
 #include "nanobind/stl/vector.h"
 
 namespace nb = nanobind;
@@ -208,38 +209,46 @@ using namespace manifold_docstrings;
 // ExecutionContext, so another Python thread can cancel them.
 using release_gil = nb::call_guard<nb::gil_scoped_release>;
 
+// The factories take `quality=` as an int or a CircularQuality.
+using QualityArg = std::optional<std::variant<CircularQuality, int>>;
+CircularQuality ToQuality(const QualityArg& quality) {
+  if (!quality) return {};
+  if (const int* segments = std::get_if<int>(&*quality)) return {*segments};
+  return std::get<CircularQuality>(*quality);
+}
+
 // strip original :params: and replace with ours
 const std::string manifold__rotate_xyz =
     manifold__rotate__x_degrees__y_degrees__z_degrees;
-const std::string manifold__rotate__v =
+const std::string manifold__rotate__degrees =
     manifold__rotate_xyz.substr(0, manifold__rotate_xyz.find(":param")) +
-    ":param v: [X, Y, Z] rotation in degrees.";
+    ":param degrees: [X, Y, Z] rotation in degrees.";
 
 NB_MODULE(manifold3d, m) {
   m.doc() = "Python binding for the Manifold library.";
 
-  m.def("set_relative_precision", Quality::SetRelativePrecision,
-        nb::arg("precision"));
+  // The finest relative precision, and the precision of a Manifold made from a
+  // Mesh64.
+  m.attr("MIN_RELATIVE_PRECISION") = kMinRelativePrecision;
 
-  m.def("get_relative_precision", Quality::GetRelativePrecision);
-
-  m.def("set_min_circular_angle", Quality::SetMinCircularAngle,
-        nb::arg("angle"), quality__set_min_circular_angle__angle);
-
-  m.def("set_min_circular_edge_length", Quality::SetMinCircularEdgeLength,
-        nb::arg("length"), quality__set_min_circular_edge_length__length);
-
-  m.def("get_min_circular_angle", Quality::GetMinCircularAngle,
-        quality__get_min_circular_angle);
-
-  m.def("get_min_circular_edge_length", Quality::GetMinCircularEdgeLength,
-        quality__get_min_circular_edge_length);
-
-  m.def("set_circular_segments", Quality::SetCircularSegments,
-        nb::arg("number"), quality__set_circular_segments__number);
-
-  m.def("get_circular_segments", Quality::GetCircularSegments,
-        nb::arg("radius"), quality__get_circular_segments__radius);
+  nb::class_<CircularQuality>(m, "CircularQuality")
+      .def(
+          "__init__",
+          [](CircularQuality* self, int segments, double minAngle,
+             double minEdgeLength) {
+            new (self) CircularQuality{segments, minAngle, minEdgeLength};
+          },
+          nb::arg("segments") = CircularQuality{}.segments,
+          nb::arg("min_angle") = CircularQuality{}.minAngle,
+          nb::arg("min_edge_length") = CircularQuality{}.minEdgeLength)
+      .def_rw("segments", &CircularQuality::segments)
+      .def_rw("min_angle", &CircularQuality::minAngle)
+      .def_rw("min_edge_length", &CircularQuality::minEdgeLength)
+      .def("segments_for", &CircularQuality::SegmentsFor, nb::arg("radius"),
+           circular_quality__segments_for__radius)
+      .def_static("for_divisions", &CircularQuality::ForDivisions,
+                  nb::arg("divisions"), nb::arg("degrees"),
+                  circular_quality__for_divisions__divisions__degrees);
 
   m.def("triangulate", &Triangulate, nb::arg("polygons"),
         nb::arg("epsilon") = -1, nb::arg("allow_convex") = true,
@@ -264,10 +273,10 @@ NB_MODULE(manifold3d, m) {
       .def_static(
           "hull_points",
           [](std::vector<vec3> pts) { return Manifold::Hull(pts); },
-          nb::arg("pts"), manifold__hull__pts)
+          nb::arg("points"), manifold__hull__points)
       .def("transform", &Manifold::Transform, nb::arg("m"),
            manifold__transform__m)
-      .def("translate", &Manifold::Translate, nb::arg("t"),
+      .def("translate", &Manifold::Translate, nb::arg("v"),
            manifold__translate__v)
       .def("scale", &Manifold::Scale, nb::arg("v"), manifold__scale__v)
       .def(
@@ -277,13 +286,14 @@ NB_MODULE(manifold3d, m) {
           "Scale this Manifold in space. This operation can be chained. "
           "Transforms are combined and applied lazily.\n\n"
           ":param s: The scalar to multiply every vertex by component.")
-      .def("mirror", &Manifold::Mirror, nb::arg("v"), manifold__mirror__normal)
+      .def("mirror", &Manifold::Mirror, nb::arg("normal"),
+           manifold__mirror__normal)
       .def(
           "rotate",
-          [](const Manifold& self, vec3 v) {
-            return self.Rotate(v.x, v.y, v.z);
+          [](const Manifold& self, vec3 degrees) {
+            return self.Rotate(degrees.x, degrees.y, degrees.z);
           },
-          nb::arg("v"), manifold__rotate__v.c_str())
+          nb::arg("degrees"), manifold__rotate__degrees.c_str())
       .def(
           "warp",
           [](const Manifold& self, std::function<vec3(vec3)> warp_func) {
@@ -342,15 +352,13 @@ NB_MODULE(manifold3d, m) {
               }
             });
           },
-          nb::arg("new_num_prop"), nb::arg("f"),
+          nb::arg("num_prop"), nb::arg("prop_func"),
           manifold__set_properties__num_prop__prop_func)
       .def("calculate_curvature", &Manifold::CalculateCurvature,
            nb::arg("gaussian_idx"), nb::arg("mean_idx"),
            manifold__calculate_curvature__gaussian_idx__mean_idx)
       .def("min_gap", &Manifold::MinGap, nb::arg("other"),
-           nb::arg("search_length"),
-           "Returns the minimum gap between two manifolds."
-           "Returns a double between 0 and searchLength.")
+           nb::arg("search_length"), manifold__min_gap__other__search_length)
       .def("ray_cast", &Manifold::RayCast, nb::arg("origin"),
            nb::arg("endpoint"),
            "Cast a ray segment, returning all hits sorted by distance.")
@@ -358,10 +366,10 @@ NB_MODULE(manifold3d, m) {
            "Returns the winding number of this manifold around each of the "
            "given points. 0 means outside, non-zero means inside.")
       .def("calculate_normals", &Manifold::CalculateNormals,
-           nb::arg("normal_idx") = 0, nb::arg("min_sharp_angle") = 52.5,
-           manifold__calculate_normals__normal_idx__min_sharp_angle)
+           nb::arg("min_sharp_angle") = 52.5,
+           manifold__calculate_normals__min_sharp_angle)
       .def("smooth_by_normals", &Manifold::SmoothByNormals,
-           nb::arg("normal_idx") = 0, manifold__smooth_by_normals__normal_idx)
+           manifold__smooth_by_normals)
       .def("refine", &Manifold::Refine, nb::arg("n"), manifold__refine__n,
            release_gil())
       .def("refine_to_length", &Manifold::RefineToLength, nb::arg("length"),
@@ -369,10 +377,8 @@ NB_MODULE(manifold3d, m) {
       .def("refine_to_tolerance", &Manifold::RefineToTolerance,
            nb::arg("tolerance"), manifold__refine_to_tolerance__tolerance,
            release_gil())
-      .def("to_mesh", &Manifold::GetMeshGL, nb::arg("normal_idx") = -1,
-           manifold__get_mesh_gl__normal_idx)
-      .def("to_mesh64", &Manifold::GetMeshGL64, nb::arg("normal_idx") = -1,
-           manifold__get_mesh_gl64__normal_idx)
+      .def("to_mesh", &Manifold::GetMeshGL, manifold__get_mesh_gl)
+      .def("to_mesh64", &Manifold::GetMeshGL64, manifold__get_mesh_gl64)
       .def("num_vert", &Manifold::NumVert, manifold__num_vert)
       .def("num_edge", &Manifold::NumEdge, manifold__num_edge)
       .def("num_tri", &Manifold::NumTri, manifold__num_tri)
@@ -381,13 +387,11 @@ NB_MODULE(manifold3d, m) {
       .def("genus", &Manifold::Genus, manifold__genus)
       .def(
           "volume", [](const Manifold& self) { return self.Volume(); },
-          "Get the volume of the manifold\n This is clamped to zero for a "
-          "given face if they are within the Epsilon().")
+          manifold__volume)
       .def(
           "surface_area",
           [](const Manifold& self) { return self.SurfaceArea(); },
-          "Get the surface area of the manifold\n This is clamped to zero for "
-          "a given face if they are within the Epsilon().")
+          manifold__surface_area)
       .def("original_id", &Manifold::OriginalID, manifold__original_id)
       .def("simplify", &Manifold::Simplify, nb::arg("tolerance") = 0,
            manifold__simplify__tolerance)
@@ -413,16 +417,22 @@ NB_MODULE(manifold3d, m) {
           [](const Manifold& self, double height) {
             return CrossSection(self.Slice(height));
           },
-          nb::arg("height"), manifold__slice__height)
+          nb::arg("height") = 0.0, manifold__slice__height)
       .def(
           "project",
           [](const Manifold& self) {
             return CrossSection(self.Project()).Simplify(self.GetEpsilon());
           },
-          manifold__project)
+          "Returns a CrossSection of the projected outline of this object onto "
+          "the X-Y plane. The outline polygons are combined with the positive "
+          "fill rule and simplified at this Manifold's epsilon.")
       .def("status", &Manifold::Status, manifold__status, release_gil())
       .def("with_context", &Manifold::WithContext, nb::arg("ctx"),
            manifold__with_context__ctx)
+      .def("with_precision", &Manifold::WithPrecision, nb::arg("rel_precision"),
+           manifold__with_precision__rel_precision, release_gil())
+      .def("get_precision", &Manifold::GetPrecision, manifold__get_precision,
+           release_gil())
       .def(
           "bounding_box",
           [](const Manifold& self) {
@@ -446,20 +456,20 @@ NB_MODULE(manifold3d, m) {
             return Manifold::Extrude(crossSection.ToPolygons(), height,
                                      nDivisions, twistDegrees, scaleTop);
           },
-          nb::arg("crossSection"), nb::arg("height"),
+          nb::arg("cross_section"), nb::arg("height"),
           nb::arg("n_divisions") = 0, nb::arg("twist_degrees") = 0.0f,
           nb::arg("scale_top") = std::make_tuple(1.0f, 1.0f),
           manifold__extrude__cross_section__height__n_divisions__twist_degrees__scale_top)
       .def_static(
           "revolve",
-          [](const CrossSection& crossSection, int circularSegments,
+          [](const CrossSection& crossSection, const QualityArg& quality,
              double revolveDegrees) {
             return Manifold::Revolve(crossSection.ToPolygons(),
-                                     circularSegments, revolveDegrees);
+                                     ToQuality(quality), revolveDegrees);
           },
-          nb::arg("crossSection"), nb::arg("circular_segments") = 0,
+          nb::arg("cross_section"), nb::arg("quality") = nb::none(),
           nb::arg("revolve_degrees") = 360.0,
-          manifold__revolve__cross_section__circular_segments__revolve_degrees)
+          manifold__revolve__cross_section__quality__revolve_degrees)
       .def_static(
           "level_set",
           [](const std::function<double(double, double, double)>& f,
@@ -477,43 +487,53 @@ NB_MODULE(manifold3d, m) {
             return Manifold::LevelSet(cppToPython, bound, edgeLength, level,
                                       tolerance, false);
           },
-          nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
+          nb::arg("sdf"), nb::arg("bounds"), nb::arg("edge_length"),
           nb::arg("level") = 0.0, nb::arg("tolerance") = -1,
           manifold__level_set__sdf__bounds__edge_length__level__tolerance__can_parallel)
       .def_static(
-          "cylinder", &Manifold::Cylinder, nb::arg("height"),
-          nb::arg("radius_low"), nb::arg("radius_high") = -1.0f,
-          nb::arg("circular_segments") = 0, nb::arg("center") = false,
-          manifold__cylinder__height__radius_low__radius_high__circular_segments__center)
-      .def_static("sphere", &Manifold::Sphere, nb::arg("radius"),
-                  nb::arg("circular_segments") = 0,
-                  manifold__sphere__radius__circular_segments)
+          "cylinder",
+          [](double height, double radiusLow, double radiusHigh,
+             const QualityArg& quality, bool center) {
+            return Manifold::Cylinder(height, radiusLow, radiusHigh,
+                                      ToQuality(quality), center);
+          },
+          nb::arg("height"), nb::arg("radius_low"),
+          nb::arg("radius_high") = -1.0f, nb::arg("quality") = nb::none(),
+          nb::arg("center") = false,
+          manifold__cylinder__height__radius_low__radius_high__quality__center)
+      .def_static(
+          "sphere",
+          [](double radius, const QualityArg& quality) {
+            return Manifold::Sphere(radius, ToQuality(quality));
+          },
+          nb::arg("radius"), nb::arg("quality") = nb::none(),
+          manifold__sphere__radius__quality)
       .def_static("reserve_ids", Manifold::ReserveIDs, nb::arg("n"),
                   manifold__reserve_ids__n);
 
   nb::class_<MeshGL>(m, "Mesh")
       .def(
-          // note that reshape requires mutable ndarray, but this will not
-          // affect the original array passed into the function
           "__init__",
           [](MeshGL* self,
-             nb::ndarray<float, nb::shape<-1, -1>, nb::c_contig>& vertProp,
-             nb::ndarray<uint32_t, nb::shape<-1, 3>, nb::c_contig>& triVerts,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<-1>,
+             nb::ndarray<const float, nb::shape<-1, -1>, nb::c_contig>&
+                 vertProp,
+             nb::ndarray<const uint32_t, nb::shape<-1, 3>, nb::c_contig>&
+                 triVerts,
+             const std::optional<nb::ndarray<const uint32_t, nb::shape<-1>,
                                              nb::c_contig>>& mergeFromVert,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<-1>,
+             const std::optional<nb::ndarray<const uint32_t, nb::shape<-1>,
                                              nb::c_contig>>& mergeToVert,
-             const std::optional<
-                 nb::ndarray<uint32_t, nb::shape<-1>, nb::c_contig>>& runIndex,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<-1>,
+             const std::optional<nb::ndarray<const uint32_t, nb::shape<-1>,
+                                             nb::c_contig>>& runIndex,
+             const std::optional<nb::ndarray<const uint32_t, nb::shape<-1>,
                                              nb::c_contig>>& runOriginalID,
-             std::optional<nb::ndarray<float, nb::shape<-1, 4, 3>,
+             std::optional<nb::ndarray<const float, nb::shape<-1, 4, 3>,
                                        nb::c_contig>>& runTransform,
-             const std::optional<
-                 nb::ndarray<uint8_t, nb::shape<-1>, nb::c_contig>>& runFlags,
-             const std::optional<
-                 nb::ndarray<uint32_t, nb::shape<-1>, nb::c_contig>>& faceID,
-             const std::optional<nb::ndarray<float, nb::shape<-1, 3, 4>,
+             const std::optional<nb::ndarray<const uint8_t, nb::shape<-1>,
+                                             nb::c_contig>>& runFlags,
+             const std::optional<nb::ndarray<const uint32_t, nb::shape<-1>,
+                                             nb::c_contig>>& faceID,
+             const std::optional<nb::ndarray<const float, nb::shape<-1, 3, 4>,
                                              nb::c_contig>>& halfedgeTangent) {
             if (vertProp.shape(1) < 3)
               throw std::runtime_error(
@@ -610,27 +630,27 @@ NB_MODULE(manifold3d, m) {
 
   nb::class_<MeshGL64>(m, "Mesh64")
       .def(
-          // note that reshape requires mutable ndarray, but this will not
-          // affect the original array passed into the function
           "__init__",
           [](MeshGL64* self,
-             nb::ndarray<double, nb::shape<-1, -1>, nb::c_contig>& vertProp,
-             nb::ndarray<uint64_t, nb::shape<-1, 3>, nb::c_contig>& triVerts,
-             const std::optional<nb::ndarray<uint64_t, nb::shape<-1>,
+             nb::ndarray<const double, nb::shape<-1, -1>, nb::c_contig>&
+                 vertProp,
+             nb::ndarray<const uint64_t, nb::shape<-1, 3>, nb::c_contig>&
+                 triVerts,
+             const std::optional<nb::ndarray<const uint64_t, nb::shape<-1>,
                                              nb::c_contig>>& mergeFromVert,
-             const std::optional<nb::ndarray<uint64_t, nb::shape<-1>,
+             const std::optional<nb::ndarray<const uint64_t, nb::shape<-1>,
                                              nb::c_contig>>& mergeToVert,
-             const std::optional<
-                 nb::ndarray<uint64_t, nb::shape<-1>, nb::c_contig>>& runIndex,
-             const std::optional<nb::ndarray<uint32_t, nb::shape<-1>,
+             const std::optional<nb::ndarray<const uint64_t, nb::shape<-1>,
+                                             nb::c_contig>>& runIndex,
+             const std::optional<nb::ndarray<const uint32_t, nb::shape<-1>,
                                              nb::c_contig>>& runOriginalID,
-             std::optional<nb::ndarray<double, nb::shape<-1, 4, 3>,
+             std::optional<nb::ndarray<const double, nb::shape<-1, 4, 3>,
                                        nb::c_contig>>& runTransform,
-             const std::optional<
-                 nb::ndarray<uint8_t, nb::shape<-1>, nb::c_contig>>& runFlags,
-             const std::optional<
-                 nb::ndarray<uint64_t, nb::shape<-1>, nb::c_contig>>& faceID,
-             const std::optional<nb::ndarray<double, nb::shape<-1, 3, 4>,
+             const std::optional<nb::ndarray<const uint8_t, nb::shape<-1>,
+                                             nb::c_contig>>& runFlags,
+             const std::optional<nb::ndarray<const uint64_t, nb::shape<-1>,
+                                             nb::c_contig>>& faceID,
+             const std::optional<nb::ndarray<const double, nb::shape<-1, 3, 4>,
                                              nb::c_contig>>& halfedgeTangent) {
             if (vertProp.shape(1) < 3)
               throw std::runtime_error(
@@ -726,6 +746,7 @@ NB_MODULE(manifold3d, m) {
            mesh_gl__merge__tolerance);
 
   nb::class_<RayHit>(m, "RayHit")
+      .def_ro("original_id", &RayHit::originalID)
       .def_ro("face_id", &RayHit::faceID)
       .def_ro("distance", &RayHit::distance)
       .def_ro("position", &RayHit::position)
@@ -735,15 +756,16 @@ NB_MODULE(manifold3d, m) {
   nb::class_<ExecutionContext>(
       m, "ExecutionContext",
       "Reports progress and allows cancellation. Another thread can call "
-      "cancel() while Manifold.status(), refine*(), minkowski_*() or hull(), "
-      "or this class's from_mesh() or level_set(), runs. On Python before "
+      "cancel() while Manifold.status(), with_precision(), get_precision(), "
+      "refine*(), minkowski_*() or hull(), or this class's from_mesh() or "
+      "level_set(), runs. On Python before "
       "3.13.8, join any thread running these calls before the interpreter "
       "exits.")
       .def(nb::init<>())
       .def("cancel", &ExecutionContext::Cancel)
       .def("cancelled", &ExecutionContext::Cancelled)
       .def("progress", &ExecutionContext::Progress)
-      // ctx-aware static factories: like Manifold.from_mesh / level_set, but
+      // ctx-aware static factories: like Manifold(mesh) / level_set, but
       // run under this context so progress / cancellation are observed (these
       // ops have no source Manifold to attach via with_context).
       .def(
@@ -753,8 +775,9 @@ NB_MODULE(manifold3d, m) {
             return ctx.FromMeshGL(mesh);
           },
           nb::arg("mesh"),
-          "Ingest a MeshGL into a Manifold under this context, so the ingest "
-          "reports progress and observes cancellation.")
+          "Ingest a Mesh into a Manifold under this context, so the ingest "
+          "reports progress and observes cancellation. The result has float "
+          "relative precision.")
       .def(
           "from_mesh",
           [](ExecutionContext& ctx, const MeshGL64& mesh) {
@@ -762,8 +785,9 @@ NB_MODULE(manifold3d, m) {
             return ctx.FromMeshGL(mesh);
           },
           nb::arg("mesh"),
-          "Ingest a MeshGL64 into a Manifold under this context, so the ingest "
-          "reports progress and observes cancellation.")
+          "Ingest a Mesh64 into a Manifold under this context, so the ingest "
+          "reports progress and observes cancellation. The result has "
+          "relative precision 1e-12.")
       .def(
           "level_set",
           [](ExecutionContext& ctx,
@@ -780,7 +804,7 @@ NB_MODULE(manifold3d, m) {
             return ctx.LevelSet(cppToPython, bound, edgeLength, level,
                                 tolerance, false);
           },
-          nb::arg("f"), nb::arg("bounds"), nb::arg("edgeLength"),
+          nb::arg("sdf"), nb::arg("bounds"), nb::arg("edge_length"),
           nb::arg("level") = 0.0, nb::arg("tolerance") = -1,
           "Like Manifold.level_set, run under this context so the level-set "
           "evaluation reports progress and observes cancellation.");
@@ -868,8 +892,7 @@ NB_MODULE(manifold3d, m) {
            cross_section__translate__v)
       .def("rotate", &CrossSection::Rotate, nb::arg("degrees"),
            cross_section__rotate__degrees)
-      .def("scale", &CrossSection::Scale, nb::arg("scale"),
-           cross_section__scale__scale)
+      .def("scale", &CrossSection::Scale, nb::arg("v"), cross_section__scale__v)
       .def(
           "scale",
           [](const CrossSection& self, double s) { return self.Scale({s, s}); },
@@ -878,8 +901,8 @@ NB_MODULE(manifold3d, m) {
           "Transforms are combined and applied lazily."
           "\n\n"
           ":param s: The scalar to multiply every vertex by per component.")
-      .def("mirror", &CrossSection::Mirror, nb::arg("ax"),
-           cross_section__mirror__ax)
+      .def("mirror", &CrossSection::Mirror, nb::arg("normal"),
+           cross_section__mirror__normal)
       .def("transform", &CrossSection::Transform, nb::arg("m"),
            cross_section__transform__m)
       .def(
@@ -910,10 +933,16 @@ NB_MODULE(manifold3d, m) {
       .def("simplify", &CrossSection::Simplify, nb::arg("tolerance") = 0,
            cross_section__simplify__tolerance)
       .def(
-          "offset", &CrossSection::Offset, nb::arg("delta"),
+          "offset",
+          [](const CrossSection& self, double delta,
+             CrossSection::JoinType joinType, double miterLimit,
+             const QualityArg& quality) {
+            return self.Offset(delta, joinType, miterLimit, ToQuality(quality));
+          },
+          nb::arg("delta"),
           nb::arg("join_type") = CrossSection::JoinType::Round,
-          nb::arg("miter_limit") = 2.0, nb::arg("circular_segments") = 0,
-          cross_section__offset__delta__jointype__miter_limit__circular_segments)
+          nb::arg("miter_limit") = 2.0, nb::arg("quality") = nb::none(),
+          cross_section__offset__delta__join_type__miter_limit__quality)
       .def(nb::self + nb::self, cross_section__operator_plus__q)
       .def(nb::self - nb::self, cross_section__operator_minus__q)
       .def(nb::self ^ nb::self, cross_section__operator_xor__q)
@@ -927,7 +956,7 @@ NB_MODULE(manifold3d, m) {
       .def_static(
           "hull_points",
           [](std::vector<vec2> pts) { return CrossSection::Hull(pts); },
-          nb::arg("pts"), cross_section__hull__pts)
+          nb::arg("points"), cross_section__hull__points)
       .def("decompose", &CrossSection::Decompose, cross_section__decompose)
       .def_static("batch_boolean", &CrossSection::BatchBoolean,
                   nb::arg("cross_sections"), nb::arg("op"),
@@ -946,18 +975,22 @@ NB_MODULE(manifold3d, m) {
           manifold__extrude__cross_section__height__n_divisions__twist_degrees__scale_top)
       .def(
           "revolve",
-          [](const CrossSection& self, int circularSegments,
+          [](const CrossSection& self, const QualityArg& quality,
              double revolveDegrees) {
-            return Manifold::Revolve(self.ToPolygons(), circularSegments,
+            return Manifold::Revolve(self.ToPolygons(), ToQuality(quality),
                                      revolveDegrees);
           },
-          nb::arg("circular_segments") = 0, nb::arg("revolve_degrees") = 360.0,
-          manifold__revolve__cross_section__circular_segments__revolve_degrees)
+          nb::arg("quality") = nb::none(), nb::arg("revolve_degrees") = 360.0,
+          manifold__revolve__cross_section__quality__revolve_degrees)
 
       .def_static("square", &CrossSection::Square, nb::arg("size"),
                   nb::arg("center") = false,
                   cross_section__square__size__center)
-      .def_static("circle", &CrossSection::Circle, nb::arg("radius"),
-                  nb::arg("circular_segments") = 0,
-                  cross_section__circle__radius__circular_segments);
+      .def_static(
+          "circle",
+          [](double radius, const QualityArg& quality) {
+            return CrossSection::Circle(radius, ToQuality(quality));
+          },
+          nb::arg("radius"), nb::arg("quality") = nb::none(),
+          cross_section__circle__radius__quality);
 }

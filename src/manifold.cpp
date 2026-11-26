@@ -48,14 +48,20 @@ int BoxPlaneSide(Box box, vec3 normal, double originOffset, double epsilon) {
     maxProjection += std::max(a, b);
   }
   if (!std::isfinite(minProjection) || !std::isfinite(maxProjection)) return 0;
+  // Leave two epsilon of headroom for projection roundoff; near-boundary
+  // planes continue through the Boolean path.
   if (minProjection - originOffset > 2 * epsilon) return 1;
   if (maxProjection - originOffset < -2 * epsilon) return -1;
   return 0;
 }
 
-Manifold Halfspace(Box bBox, vec3 normal, double originOffset) {
+// The cutter carries relPrecision, so cutting keeps the source's precision.
+Manifold Halfspace(Box bBox, vec3 normal, double originOffset,
+                   double relPrecision) {
   normal = la::normalize(normal);
-  Manifold cutter = Manifold::Cube(vec3(2.0), true).Translate({1.0, 0.0, 0.0});
+  Manifold cutter = Manifold::Cube(vec3(2.0), true)
+                        .WithPrecision(relPrecision)
+                        .Translate({1.0, 0.0, 0.0});
   double size = la::length(bBox.Center() - normal * originOffset) +
                 0.5 * la::length(bBox.Size());
   cutter = cutter.Scale(vec3(size)).Translate({originOffset, 0.0, 0.0});
@@ -86,109 +92,28 @@ std::array<int, 3> Version() {
           MANIFOLD_VERSION_PATCH};
 }
 
-static std::atomic<double> relativePrecision_ = kPrecision;
-static std::atomic<int> circularSegments_ = DEFAULT_SEGMENTS;
-static std::atomic<double> circularAngle_ = DEFAULT_ANGLE;
-static std::atomic<double> circularEdgeLength_ = DEFAULT_LENGTH;
-
 /**
- * Sets the relative precision for geometric computations, defining what counts
- * as coplanar or degenerate, and therefore how much simplification can occur.
+ * Returns the number of segments a circle of this radius gets with these
+ * settings. A minAngle or minEdgeLength that is not positive (or is NaN) uses
+ * the member default instead.
  *
- * @param p The relative precision value. The default is 1e-12 for double
- * precision, and smaller values will be clamped to this minimum.
+ * @param radius For a given radius of circle, determine how many segments
+ * there will be.
  */
-void Quality::SetRelativePrecision(double p) {
-  relativePrecision_ = std::max(p, kPrecision);
-}
-
-double Quality::GetRelativePrecision() { return relativePrecision_; }
-
-/**
- * Sets an angle constraint the default number of circular segments for the
- * CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and
- * Manifold::Revolve() constructors. The number of segments will be rounded up
- * to the nearest factor of four.
- *
- * @param angle The minimum angle in degrees between consecutive segments. The
- * angle will increase if the the segments hit the minimum edge length.
- * Default is 10 degrees.
- */
-void Quality::SetMinCircularAngle(double angle) {
-  if (!(angle > 0)) return;  // also rejects NaN
-  circularAngle_ = angle;
-}
-
-/**
- * Returns the configured minimum angle in degrees between circular segments.
- * This is the angle constraint, even when SetCircularSegments() overrides it.
- */
-double Quality::GetMinCircularAngle() { return circularAngle_; }
-
-/**
- * Sets a length constraint the default number of circular segments for the
- * CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and
- * Manifold::Revolve() constructors. The number of segments will be rounded up
- * to the nearest factor of four.
- *
- * @param length The minimum length of segments. The length will
- * increase if the the segments hit the minimum angle. Default is 1.0.
- */
-void Quality::SetMinCircularEdgeLength(double length) {
-  if (!(length > 0)) return;  // also rejects NaN
-  circularEdgeLength_ = length;
-}
-
-/**
- * Returns the configured minimum length of circular segments. This is the
- * length constraint, even when SetCircularSegments() overrides it.
- */
-double Quality::GetMinCircularEdgeLength() { return circularEdgeLength_; }
-
-/**
- * Sets the default number of circular segments for the
- * CrossSection::Circle(), Manifold::Cylinder(), Manifold::Sphere(), and
- * Manifold::Revolve() constructors. Overrides the edge length and angle
- * constraints and sets the number of segments to exactly this value.
- *
- * @param number Number of circular segments. Default is 0, meaning no
- * constraint is applied.
- */
-void Quality::SetCircularSegments(int number) {
-  if (number < 3 && number != 0) return;
-  circularSegments_ = number;
-}
-
-/**
- * Determine the result of the SetMinCircularAngle(),
- * SetMinCircularEdgeLength(), and SetCircularSegments() defaults.
- *
- * @param radius For a given radius of circle, determine how many default
- * segments there will be.
- */
-int Quality::GetCircularSegments(double radius) {
-  const int segments = circularSegments_;
-  if (segments > 0) return segments;
+int CircularQuality::SegmentsFor(double radius) const {
+  if (segments > 2) return segments;
+  const CircularQuality kDefault;
+  const double angle = minAngle > 0 ? minAngle : kDefault.minAngle;
+  const double length =
+      minEdgeLength > 0 ? minEdgeLength : kDefault.minEdgeLength;
   // Clamp in double before the truncating cast, which is undefined for a
   // non-finite or huge radius, or a tiny angle.
-  const double nSegA = 360.0 / circularAngle_;
-  const double nSegL = 2.0 * std::abs(radius) * kPi / circularEdgeLength_;
+  const double nSegA = 360.0 / angle;
+  const double nSegL = 2.0 * std::abs(radius) * kPi / length;
   const double kMaxSeg = std::numeric_limits<int>::max() - 3;
   int nSeg = std::min(fmin(nSegA, nSegL), kMaxSeg) + 3;
   nSeg -= nSeg % 4;
   return std::max(nSeg, 4);
-}
-
-/**
- * Resets the circular construction parameters to their defaults if
- * SetMinCircularAngle, SetMinCircularEdgeLength, or SetCircularSegments have
- * been called.
- */
-void Quality::ResetToDefaults() {
-  relativePrecision_ = kPrecision;
-  circularSegments_ = DEFAULT_SEGMENTS;
-  circularAngle_ = DEFAULT_ANGLE;
-  circularEdgeLength_ = DEFAULT_LENGTH;
 }
 
 /**
@@ -243,10 +168,12 @@ Manifold& Manifold::operator=(const Manifold& other) {
 
 /**
  * Returns a copy of this Manifold with the given ExecutionContext attached.
- * The attachment is consumed by the next eager op on the result (Status,
- * Refine family). Deferred ops produce a result with no attached ctx; raw
- * copy preserves the attachment. See ExecutionContext in common.h for the
- * full model.
+ * The attachment is consumed by the eager ops on the result (Status,
+ * WithPrecision, GetPrecision, the Refine family, Hull, MinkowskiSum /
+ * MinkowskiDifference). Every other op
+ * that returns a Manifold produces a result with no attached ctx. A raw copy
+ * preserves the attachment. See ExecutionContext in common.h for the full
+ * model.
  */
 Manifold Manifold::WithContext(const ExecutionContext& ctx) const {
   Manifold result = *this;
@@ -288,13 +215,20 @@ CsgLeafNode& Manifold::GetCsgLeafNode(ExecutionContext::Impl* ctx) const {
 /**
  * Convert a MeshGL into a Manifold, retaining its properties and merging only
  * the positions according to the merge vectors. Will return an empty Manifold
- * and set an Error Status if the result is not an oriented 2-manifold. Will
- * collapse degenerate triangles and unnecessary vertices.
+ * and set an Error Status if the result is not an oriented 2-manifold.
+ * Triangles with a repeated vertex after merging are dropped. Other degenerate
+ * triangles are kept. Use RemoveDegenerates() to collapse them.
  *
  * All fields are read, making this structure suitable for a lossless round-trip
  * of data from GetMeshGL. For multi-material input, use ReserveIDs to set a
  * unique originalID for each material, and sort the materials into triangle
  * runs.
+ *
+ * The result has relative precision kDefaultRelativePrecision. Precision is
+ * not stored in the mesh, so use WithPrecision() to change it after ingest.
+ *
+ * The conversion runs in this constructor, so it cannot be cancelled or report
+ * progress. Use ExecutionContext::FromMeshGL for that.
  *
  * @param meshGL The input MeshGL.
  */
@@ -302,15 +236,22 @@ Manifold::Manifold(const MeshGL& meshGL)
     : pNode_(std::make_shared<CsgLeafNode>(std::make_shared<Impl>(meshGL))) {}
 
 /**
- * Convert a MeshGL into a Manifold, retaining its properties and merging only
+ * Convert a MeshGL64 into a Manifold, retaining its properties and merging only
  * the positions according to the merge vectors. Will return an empty Manifold
- * and set an Error Status if the result is not an oriented 2-manifold. Will
- * collapse degenerate triangles and unnecessary vertices.
+ * and set an Error Status if the result is not an oriented 2-manifold.
+ * Triangles with a repeated vertex after merging are dropped. Other degenerate
+ * triangles are kept. Use RemoveDegenerates() to collapse them.
  *
  * All fields are read, making this structure suitable for a lossless round-trip
- * of data from GetMeshGL. For multi-material input, use ReserveIDs to set a
+ * of data from GetMeshGL64. For multi-material input, use ReserveIDs to set a
  * unique originalID for each material, and sort the materials into triangle
  * runs.
+ *
+ * The result has relative precision kMinRelativePrecision. Precision is not
+ * stored in the mesh, so use WithPrecision() to change it after ingest.
+ *
+ * The conversion runs in this constructor, so it cannot be cancelled or report
+ * progress. Use ExecutionContext::FromMeshGL for that.
  *
  * @param meshGL64 The input MeshGL64.
  */
@@ -323,25 +264,18 @@ Manifold::Manifold(const MeshGL64& meshGL64)
  * that may have been input. It also includes relations to all the input meshes
  * that form a part of this result and the transforms applied to each.
  *
- * @param normalIdx If this manifold has properties corresponding to normal
- * vectors, you can specify the first of the three consecutive property channels
- * forming the (x, y, z) normals, which will cause this output MeshGL to
- * automatically update these normals according to the applied transforms and
- * front/back side. normalIdx + 3 must be <= numProp, and all original meshes
- * must use the same channels for their normals. Default is -1: if
- * `CalculateNormals()` recorded normals at the standard slot, that slot is
- * used automatically; otherwise no normals are applied. If normals are
- * selected, the runTransform matrices will be removed from the output, to
- * avoid them being double-applied when round-tripped.
- * Passing a non-negative `normalIdx` is the legacy interface from before
- * `CalculateNormals` recorded the slot on the Manifold itself; prefer the
- * no-arg form after `CalculateNormals(0)`. The explicit-idx path will be
- * removed in a future release.
+ * For each run that records normals (runFlags bit 1), the first three extra
+ * property channels contain world-frame normals. Non-original results
+ * normalize them for graphics output. Their run transforms are retained as
+ * metadata and must not be applied again to the normal channels.
+ *
+ * Unflagged values in those channels are ordinary properties. To have normals
+ * follow transforms, calculate them on every operand or import a MeshGL with
+ * runFlags bit 1 set.
  */
-MeshGL Manifold::GetMeshGL(int normalIdx) const {
+MeshGL Manifold::GetMeshGL() const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
-  if (normalIdx < 0 && impl.AllHaveNormals()) normalIdx = 0;
-  return GetMeshGLImpl<float, uint32_t>(impl, normalIdx);
+  return GetMeshGLImpl<float, uint32_t>(impl);
 }
 
 /**
@@ -350,23 +284,18 @@ MeshGL Manifold::GetMeshGL(int normalIdx) const {
  * that may have been input. It also includes relations to all the input meshes
  * that form a part of this result and the transforms applied to each.
  *
- * @param normalIdx If this manifold has properties corresponding to normal
- * vectors, you can specify the first of the three consecutive property channels
- * forming the (x, y, z) normals, which will cause this output MeshGL to
- * automatically update these normals according to the applied transforms and
- * front/back side. normalIdx + 3 must be <= numProp, and all original meshes
- * must use the same channels for their normals. Default is -1: if
- * `CalculateNormals()` recorded normals at the standard slot, that slot is
- * used automatically; otherwise no normals are applied. If normals are
- * selected, the runTransform matrices will be removed from the output, to
- * avoid them being double-applied when round-tripped.
- * Same deprecation note as `GetMeshGL`: prefer the no-arg form after
- * `CalculateNormals(0)`.
+ * For each run that records normals (runFlags bit 1), the first three extra
+ * property channels contain world-frame normals. Non-original results
+ * normalize them for graphics output. Their run transforms are retained as
+ * metadata and must not be applied again to the normal channels.
+ *
+ * Unflagged values in those channels are ordinary properties. To have normals
+ * follow transforms, calculate them on every operand or import a MeshGL with
+ * runFlags bit 1 set.
  */
-MeshGL64 Manifold::GetMeshGL64(int normalIdx) const {
+MeshGL64 Manifold::GetMeshGL64() const {
   const Impl& impl = *GetCsgLeafNode().GetImpl();
-  if (normalIdx < 0 && impl.AllHaveNormals()) normalIdx = 0;
-  return GetMeshGLImpl<double, uint64_t>(impl, normalIdx);
+  return GetMeshGLImpl<double, uint64_t>(impl);
 }
 
 /**
@@ -424,13 +353,48 @@ size_t Manifold::NumPropVert() const {
 Box Manifold::BoundingBox() const { return GetCsgLeafNode().GetImpl()->bBox_; }
 
 /**
- * Returns the epsilon value of this Manifold's vertices, which tracks the
- * approximate rounding error over all the transforms and operations that have
- * led to this state. This is the value of &epsilon; defining
+ * Returns the epsilon value of this Manifold's vertices: its relative
+ * precision times its bounding box scale, or -1 if it is empty. This is the
+ * value of &epsilon; defining
  * [&epsilon;-valid](https://github.com/elalish/manifold/wiki/Manifold-Library#definition-of-%CE%B5-valid).
  */
 double Manifold::GetEpsilon() const {
-  return GetCsgLeafNode().GetImpl()->epsilon_;
+  const auto impl = GetCsgLeafNode().GetImpl();
+  return impl->IsEmpty() ? -1 : impl->epsilon_;
+}
+
+/**
+ * Evaluates this Manifold and returns it with the given relative precision,
+ * which defines what counts as coplanar or degenerate. The geometry is not
+ * recomputed: the precision applies only to later operations. Booleans and
+ * other operations on several Manifolds use the smallest precision among their
+ * non-empty inputs.
+ *
+ * @param relPrecision The relative precision. 0, negative values, NaN and
+ * infinity give kDefaultRelativePrecision, even for a Manifold made from
+ * MeshGL64. Positive values below
+ * kMinRelativePrecision are raised to it, so pass kMinRelativePrecision for the
+ * finest.
+ */
+Manifold Manifold::WithPrecision(double relPrecision) const {
+  relPrecision = relPrecision > 0 && std::isfinite(relPrecision)
+                     ? std::max(kMinRelativePrecision, relPrecision)
+                     : kDefaultRelativePrecision;
+  return Manifold(GetCsgLeafNode(AtomicLoadShared(&ctx_).get())
+                      .WithPrecision(relPrecision));
+}
+
+/**
+ * Returns the relative precision of this Manifold. A Manifold made from
+ * MeshGL or built by a factory such as Cube(), Extrude(), LevelSet() or Hull()
+ * of points has kDefaultRelativePrecision. One made from MeshGL64 or by
+ * ReadOBJ() has kMinRelativePrecision. WithPrecision() sets it, other
+ * operations on one Manifold keep it, and operations on several take the
+ * smallest among their non-empty inputs. An empty Boolean or Minkowski result
+ * takes the smallest among all its inputs.
+ */
+double Manifold::GetPrecision() const {
+  return GetCsgLeafNode(AtomicLoadShared(&ctx_).get()).RelPrecision();
 }
 
 /**
@@ -438,7 +402,7 @@ double Manifold::GetEpsilon() const {
  * error when collapsing edges, measured relative to nearby face planes.
  * Simplification tends to remove features thinner than the tolerance.
  * @param tolerance Simplification tolerance, lower-bounded by the manifold's
- * epsilon.
+ * epsilon. NaN is treated as 0.
  */
 Manifold Manifold::Simplify(double tolerance) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
@@ -508,6 +472,9 @@ int Manifold::OriginalID() const {
  * reset may allow triangles of flat faces to be further collapsed with
  * RemoveDegenerates().
  *
+ * If only some of the input recorded normals, the result keeps two runs with
+ * this ID, one for the triangles with normals and one for the rest.
+ *
  * @param id The ID to assign to this manifold. If negative (the default), a new
  * ID is assigned. Use zero to match all default-constructed manifolds, thus not
  * keeping track of the joints between input manifolds.
@@ -534,10 +501,11 @@ uint32_t Manifold::ReserveIDs(uint32_t n) {
 /**
  * The triangle normal vectors are saved over the course of operations rather
  * than recalculated to avoid rounding error. This checks that triangles still
- * match their normal vectors within Precision().
+ * match their normal vectors within GetEpsilon().
  */
 bool Manifold::MatchesTriNormals() const {
-  return GetCsgLeafNode().GetImpl()->MatchesTriNormals();
+  const auto impl = GetCsgLeafNode().GetImpl();
+  return impl->MatchesTriNormals(impl->epsilon_, /*checkFlat=*/true);
 }
 
 /**
@@ -553,7 +521,7 @@ bool Manifold::HasSimpleProps() const {
 }
 
 /**
- * The number of triangles that are colinear within Precision(). This library
+ * The number of triangles that are colinear within GetEpsilon(). This library
  * attempts to remove all of these, but it cannot always remove all of them
  * without changing the mesh by too much.
  */
@@ -649,7 +617,7 @@ Manifold Manifold::Mirror(vec3 normal) const {
     auto leafImpl = GetCsgLeafNode().GetImpl();
     if (leafImpl->status_ != Error::NoError)
       return PropagateStatus(leafImpl->status_);
-    return Manifold();
+    return Manifold().WithPrecision(leafImpl->relPrecision_);
   }
   auto n = la::normalize(normal);
   auto m = mat3x4(mat3(la::identity) - 2.0 * la::outerprod(n, n), vec3());
@@ -791,36 +759,30 @@ Manifold Manifold::CalculateCurvature(int gaussianIdx, int meanIdx) const {
  * Fills in vertex properties for normal vectors, calculated from the mesh
  * geometry.
  *
- * @param normalIdx The property channel in which to store the X values of the
- * normals. The X, Y, and Z channels will be sequential. The property set will
- * be automatically expanded such that NumProp will be at least normalIdx + 3.
- * Default is 0, the standard slot (MeshGL channels 3, 4, 5); the Manifold
- * records the recording per-meshID in that case so subsequent `GetMeshGL()` /
- * `GetMeshGL64()` without an explicit normalIdx will return world-frame
- * normals and mark each output run via runFlags bit 1. Non-zero values are
- * retained for compatibility and will not be supported in a future release.
+ * Normals are stored in the first three extra property channels (MeshGL
+ * channels 3, 4, 5). The Manifold records them per mesh ID so subsequent
+ * `GetMeshGL()` and `GetMeshGL64()` return world-frame normals and mark each
+ * output run via runFlags bit 1.
+ *
+ * Normals written with `SetProperties()` are not recorded. Call this method on
+ * every operand before a transform when those values must follow the geometry.
  *
  * @param minSharpAngle Any edges with angles greater than this value will
  * remain sharp, getting different normal vector properties on each side of the
- * edge. By default, no edges are sharp and all normals are shared. With a value
- * of zero, the model is faceted and all normals match their triangle normals,
- * but in this case it would be better not to calculate normals at all.
+ * edge. Default is 52.5 degrees. With a value of zero, the model is faceted
+ * and all normals match their triangle normals, but in this case it would be
+ * better not to calculate normals at all.
  */
-Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
+Manifold Manifold::CalculateNormals(double minSharpAngle) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
-  if (PropertiesTooLarge(normalIdx + int64_t(3), leafImpl->NumPropVert()))
+  if (PropertiesTooLarge(3, leafImpl->NumPropVert()))
     return PropagateStatus(Error::ResultTooLarge);
   auto pImpl = std::make_shared<Impl>(*leafImpl);
-  pImpl->SetNormals(normalIdx, minSharpAngle);
-  // Mark per-meshID hasNormals so GetMeshGL(-1) can auto-substitute slot 0 on
-  // export. Restricted to the standard slot since a non-zero slot would be
-  // ambiguous when round-tripping through MeshGL.
-  if (normalIdx == 0) {
-    for (auto& m : pImpl->meshRelation_.meshIDtransform) {
-      m.second.hasNormals = true;
-    }
+  pImpl->SetNormals(minSharpAngle);
+  for (auto& m : pImpl->meshRelation_.meshIDtransform) {
+    m.second.hasNormals = true;
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -829,24 +791,20 @@ Manifold Manifold::CalculateNormals(int normalIdx, double minSharpAngle) const {
  * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
  * geometry will remain unchanged until Refine, RefineToLength, or
  * RefineToTolerance is called to interpolate the surface. This version uses the
- * supplied vertex normal properties to define the tangent vectors. Zero-length
+ * standard vertex normal properties to define the tangent vectors. Zero-length
  * normals are considered missing and will defer to their neighboring normals
  * instead. If all normals are missing, the vertex pseudonormal will be used.
  *
- * @param normalIdx The first property channel of the normals. Channels past
- * NumProp count as missing normals. Any vertex where multiple normals exist and
- * don't agree will result in a sharp edge. Default is 0, the standard slot.
- * Non-zero values are retained for compatibility and will not be supported in
- * a future release.
+ * Fewer than three properties count as missing normals. Any vertex where
+ * multiple normals exist and don't agree will result in a sharp edge.
  */
-Manifold Manifold::SmoothByNormals(int normalIdx) const {
+Manifold Manifold::SmoothByNormals() const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
   if (leafImpl->status_ != Error::NoError)
     return PropagateStatus(leafImpl->status_);
-  if (normalIdx < 0) return Invalid();
   auto pImpl = std::make_shared<Impl>(*leafImpl);
   if (!IsEmpty()) {
-    pImpl->CreateTangents(normalIdx);
+    pImpl->CreateTangents();
   }
   return Manifold(std::make_shared<CsgLeafNode>(pImpl));
 }
@@ -856,7 +814,7 @@ Manifold Manifold::SmoothByNormals(int normalIdx) const {
  * instance, with n = 2, each triangle will be split into 4 triangles. Quads
  * will ignore their interior triangle bisector. These will all be coplanar (and
  * will not be immediately collapsed) unless the Mesh/Manifold has
- * halfedgeTangents specified (e.g. from the Smooth() constructor), in which
+ * halfedgeTangents specified (e.g. from SmoothByNormals()), in which
  * case the new vertices will be moved to the interpolated surface according to
  * their barycentric coordinates. Any normals recording set by
  * `CalculateNormals()` is preserved; the new verts get linearly-interpolated
@@ -880,7 +838,7 @@ Manifold Manifold::Refine(int n) const {
  * Increase the density of the mesh by splitting each edge into pieces of
  * roughly the input length. Interior verts are added to keep the rest of the
  * triangulation edges also of roughly the same length. If halfedgeTangents are
- * present (e.g. from the Smooth() constructor), the new vertices will be moved
+ * present (e.g. from SmoothByNormals()), the new vertices will be moved
  * to the interpolated surface according to their barycentric coordinates. Quads
  * will ignore their interior triangle bisector. Any normals recording set by
  * `CalculateNormals()` is preserved; the new verts get linearly-interpolated
@@ -959,6 +917,9 @@ Manifold Manifold::RefineToTolerance(double tolerance) const {
  * These operations are optimized to produce nearly-instant results if either
  * input is empty or their bounding boxes do not overlap.
  *
+ * The result uses the smaller relative precision of the two inputs, ignoring
+ * an empty input unless the result is also empty. See WithPrecision().
+ *
  * @param second The other Manifold.
  * @param op The type of operation to perform.
  */
@@ -971,7 +932,8 @@ Manifold Manifold::Boolean(const Manifold& second, OpType op) const {
  * Subtract, all Manifolds in the tail are differenced from the head. The
  * empty-input case returns a default-constructed Manifold; the
  * single-input case returns the input unchanged, without any attached
- * ExecutionContext.
+ * ExecutionContext. The result's relative precision follows the same rule as
+ * Boolean().
  */
 Manifold Manifold::BatchBoolean(const std::vector<Manifold>& manifolds,
                                 OpType op) {
@@ -1065,17 +1027,19 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(
     Manifold err = PropagateStatus(leafImpl->status_);
     return {err, err};
   }
-  if (IsEmpty()) return {Manifold(), Manifold()};
+  const Manifold empty = Manifold().WithPrecision(leafImpl->relPrecision_);
+  if (IsEmpty()) return {empty, empty};
   const int side =
       BoxPlaneSide(leafImpl->bBox_, normal, originOffset, leafImpl->epsilon_);
   if (side != 0) {
+    // No Boolean work is needed, so retain the source's tangent data too.
     auto resultImpl = std::make_shared<Impl>(*leafImpl);
     resultImpl->meshRelation_.originalID = -1;
     Manifold result(std::make_shared<CsgLeafNode>(resultImpl));
-    return side > 0 ? std::make_pair(result, Manifold())
-                    : std::make_pair(Manifold(), result);
+    return side > 0 ? std::make_pair(result, empty)
+                    : std::make_pair(empty, result);
   }
-  return Split(Halfspace(BoundingBox(), normal, originOffset));
+  return Split(Halfspace(BoundingBox(), normal, originOffset, GetPrecision()));
 }
 
 /**
@@ -1092,14 +1056,15 @@ Manifold Manifold::TrimByPlane(vec3 normal, double originOffset) const {
   if (leafImpl->status_ == Error::NoError && !leafImpl->IsEmpty()) {
     const int side =
         BoxPlaneSide(leafImpl->bBox_, normal, originOffset, leafImpl->epsilon_);
-    if (side < 0) return Manifold();
+    if (side < 0) return Manifold().WithPrecision(leafImpl->relPrecision_);
     if (side > 0) {
+      // Preserve unchanged geometry and tangents, as with an empty cutter.
       auto resultImpl = std::make_shared<Impl>(*leafImpl);
       resultImpl->meshRelation_.originalID = -1;
       return Manifold(std::make_shared<CsgLeafNode>(resultImpl));
     }
   }
-  return *this ^ Halfspace(BoundingBox(), normal, originOffset);
+  return *this ^ Halfspace(BoundingBox(), normal, originOffset, GetPrecision());
 }
 
 /**
@@ -1164,12 +1129,12 @@ ExecutionParams& ManifoldParams() { return manifoldParams; }
  * Compute the convex hull of a set of points. If the given points are fewer
  * than 4, or they are all coplanar, an empty Manifold will be returned.
  *
- * @param pts A vector of 3-dimensional points over which to compute a convex
- * hull.
+ * @param points A vector of 3-dimensional points over which to compute a
+ * convex hull.
  */
-Manifold Manifold::Hull(const std::vector<vec3>& pts) {
+Manifold Manifold::Hull(const std::vector<vec3>& points) {
   std::shared_ptr<Impl> impl = std::make_shared<Impl>();
-  impl->Hull(Vec<vec3>(pts));
+  impl->Hull(Vec<vec3>(points));
   return Manifold(std::make_shared<CsgLeafNode>(impl));
 }
 
@@ -1182,6 +1147,7 @@ Manifold Manifold::Hull() const {
   if (srcImpl->status_ != Error::NoError)
     return PropagateStatus(srcImpl->status_);
   std::shared_ptr<Impl> impl = std::make_shared<Impl>();
+  impl->relPrecision_ = srcImpl->relPrecision_;
   impl->Hull(srcImpl->vertPos_, ctx.get());
   return Manifold(std::make_shared<CsgLeafNode>(impl));
 }
@@ -1191,6 +1157,8 @@ Manifold Manifold::Hull() const {
  * is empty (or all input manifolds are empty), returns a default-constructed
  * Manifold with no attached ExecutionContext (no source operand to inherit
  * from).
+ *
+ * The result uses the smallest relative precision among the non-empty inputs.
  *
  * @param manifolds A vector of manifolds over which to compute a convex hull.
  */
@@ -1205,11 +1173,15 @@ Manifold Manifold::Hull(const std::vector<Manifold>& manifolds) {
   for (const auto& man : manifolds) size += man.NumVert();
   if (size == 0) return Manifold();
   vertPos.reserve(size);
+  double relPrecision = std::numeric_limits<double>::infinity();
   for (const auto& man : manifolds) {
     const auto& impl = man.GetCsgLeafNode().GetImpl();
+    if (impl->IsEmpty()) continue;
+    relPrecision = std::min(relPrecision, impl->relPrecision_);
     vertPos.insert(vertPos.end(), impl->vertPos_.begin(), impl->vertPos_.end());
   }
   std::shared_ptr<Impl> impl = std::make_shared<Impl>();
+  impl->relPrecision_ = relPrecision;
   impl->Hull(VecView<const vec3>(vertPos));
   return Manifold(std::make_shared<CsgLeafNode>(impl));
 }

@@ -32,7 +32,7 @@ python -c 'import manifold3d; help(manifold3d)'
 
 Alternatively you could generate stubs with nanobind python module
 ```
-pip install -m nanobind
+pip install nanobind
 python -m nanobind.stubgen -m manifold3d -o manifold3d.pyi -i=. -p=bindings/python/stub_pattern.txt
 ```
 It will emit some warnings and write a file `manifold3d.pyi`

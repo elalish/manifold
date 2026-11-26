@@ -1,6 +1,7 @@
 #include <emscripten/bind.h>
 #include <emscripten/val.h>
 
+#include <type_traits>
 #include <vector>
 
 #include "manifold/cross_section.h"
@@ -11,92 +12,80 @@ using namespace emscripten;
 using namespace manifold;
 
 namespace js {
-val MeshGL2JS(const MeshGL& mesh) {
-  val meshJS = val::object();
+// JS indices are always Uint32Array: wasm32 memory cannot hold more verts.
+template <typename T>
+val ToJS(const std::vector<T>& v) {
+  if constexpr (std::is_same_v<T, uint64_t>) {
+    return ToJS(std::vector<uint32_t>(v.begin(), v.end()));
+  } else {
+    return val(typed_memory_view(v.size(), v.data())).call<val>("slice");
+  }
+}
 
-  meshJS.set("numProp", mesh.numProp);
-  meshJS.set("triVerts",
-             val(typed_memory_view(mesh.triVerts.size(), mesh.triVerts.data()))
-                 .call<val>("slice"));
-  meshJS.set("vertProperties",
-             val(typed_memory_view(mesh.vertProperties.size(),
-                                   mesh.vertProperties.data()))
-                 .call<val>("slice"));
-  meshJS.set("mergeFromVert", val(typed_memory_view(mesh.mergeFromVert.size(),
-                                                    mesh.mergeFromVert.data()))
-                                  .call<val>("slice"));
-  meshJS.set("mergeToVert", val(typed_memory_view(mesh.mergeToVert.size(),
-                                                  mesh.mergeToVert.data()))
-                                .call<val>("slice"));
-  meshJS.set("runIndex",
-             val(typed_memory_view(mesh.runIndex.size(), mesh.runIndex.data()))
-                 .call<val>("slice"));
-  meshJS.set("runOriginalID", val(typed_memory_view(mesh.runOriginalID.size(),
-                                                    mesh.runOriginalID.data()))
-                                  .call<val>("slice"));
-  meshJS.set("faceID",
-             val(typed_memory_view(mesh.faceID.size(), mesh.faceID.data()))
-                 .call<val>("slice"));
-  meshJS.set("halfedgeTangent",
-             val(typed_memory_view(mesh.halfedgeTangent.size(),
-                                   mesh.halfedgeTangent.data()))
-                 .call<val>("slice"));
-  meshJS.set("runTransform", val(typed_memory_view(mesh.runTransform.size(),
-                                                   mesh.runTransform.data()))
-                                 .call<val>("slice"));
-  meshJS.set("runFlags",
-             val(typed_memory_view(mesh.runFlags.size(), mesh.runFlags.data()))
-                 .call<val>("slice"));
+// Leaves out unchanged if v is undefined.
+template <typename T>
+void FromJS(std::vector<T>& out, const val& v) {
+  if (v == val::undefined()) return;
+  if constexpr (std::is_same_v<T, uint64_t>) {
+    const auto u32 = convertJSArrayToNumberVector<uint32_t>(v);
+    out.assign(u32.begin(), u32.end());
+  } else {
+    out = convertJSArrayToNumberVector<T>(v);
+  }
+}
+
+template <typename P, typename I>
+val MeshGL2JS(const MeshGLP<P, I>& mesh) {
+  val meshJS = val::object();
+  meshJS.set("numProp", static_cast<uint32_t>(mesh.numProp));
+  meshJS.set("triVerts", ToJS(mesh.triVerts));
+  meshJS.set("vertProperties", ToJS(mesh.vertProperties));
+  meshJS.set("mergeFromVert", ToJS(mesh.mergeFromVert));
+  meshJS.set("mergeToVert", ToJS(mesh.mergeToVert));
+  meshJS.set("runIndex", ToJS(mesh.runIndex));
+  meshJS.set("runOriginalID", ToJS(mesh.runOriginalID));
+  meshJS.set("faceID", ToJS(mesh.faceID));
+  meshJS.set("halfedgeTangent", ToJS(mesh.halfedgeTangent));
+  meshJS.set("runTransform", ToJS(mesh.runTransform));
+  meshJS.set("runFlags", ToJS(mesh.runFlags));
   return meshJS;
 }
 
-MeshGL MeshJS2GL(const val& mesh) {
-  MeshGL out;
-  out.numProp = mesh["numProp"].as<int>();
-  out.triVerts = convertJSArrayToNumberVector<uint32_t>(mesh["triVerts"]);
-  out.vertProperties =
-      convertJSArrayToNumberVector<float>(mesh["vertProperties"]);
-  if (mesh["mergeFromVert"] != val::undefined()) {
-    out.mergeFromVert =
-        convertJSArrayToNumberVector<uint32_t>(mesh["mergeFromVert"]);
-  }
-  if (mesh["mergeToVert"] != val::undefined()) {
-    out.mergeToVert =
-        convertJSArrayToNumberVector<uint32_t>(mesh["mergeToVert"]);
-  }
-  if (mesh["runIndex"] != val::undefined()) {
-    out.runIndex = convertJSArrayToNumberVector<uint32_t>(mesh["runIndex"]);
-  }
-  if (mesh["runOriginalID"] != val::undefined()) {
-    out.runOriginalID =
-        convertJSArrayToNumberVector<uint32_t>(mesh["runOriginalID"]);
-  }
-  if (mesh["faceID"] != val::undefined()) {
-    out.faceID = convertJSArrayToNumberVector<uint32_t>(mesh["faceID"]);
-  }
-  if (mesh["halfedgeTangent"] != val::undefined()) {
-    out.halfedgeTangent =
-        convertJSArrayToNumberVector<float>(mesh["halfedgeTangent"]);
-  }
-  if (mesh["runTransform"] != val::undefined()) {
-    out.runTransform =
-        convertJSArrayToNumberVector<float>(mesh["runTransform"]);
-  }
-  if (mesh["runFlags"] != val::undefined()) {
-    out.runFlags = convertJSArrayToNumberVector<uint8_t>(mesh["runFlags"]);
-  }
+template <typename P, typename I>
+MeshGLP<P, I> MeshJS2GL(const val& mesh) {
+  MeshGLP<P, I> out;
+  out.numProp = mesh["numProp"].as<uint32_t>();
+  FromJS(out.triVerts, mesh["triVerts"]);
+  FromJS(out.vertProperties, mesh["vertProperties"]);
+  FromJS(out.mergeFromVert, mesh["mergeFromVert"]);
+  FromJS(out.mergeToVert, mesh["mergeToVert"]);
+  FromJS(out.runIndex, mesh["runIndex"]);
+  FromJS(out.runOriginalID, mesh["runOriginalID"]);
+  FromJS(out.faceID, mesh["faceID"]);
+  FromJS(out.halfedgeTangent, mesh["halfedgeTangent"]);
+  FromJS(out.runTransform, mesh["runTransform"]);
+  FromJS(out.runFlags, mesh["runFlags"]);
   return out;
 }
 
-val GetMeshJS(const Manifold& manifold, int normalIdx) {
-  MeshGL mesh = manifold.GetMeshGL(normalIdx);
-  return MeshGL2JS(mesh);
+val GetMeshJS(const Manifold& manifold) {
+  return MeshGL2JS(manifold.GetMeshGL());
 }
 
-val Merge(const val& mesh, float tolerance) {
-  return MeshGL2JS(MeshJS2GL(mesh).Merge(tolerance));
+val GetMesh64JS(const Manifold& manifold) {
+  return MeshGL2JS(manifold.GetMeshGL64());
 }
 
+template <typename P, typename I>
+val Merge(const val& mesh, P tolerance) {
+  return MeshGL2JS(MeshJS2GL<P, I>(mesh).Merge(tolerance));
+}
+
+CircularQuality DefaultCircularQuality() { return {}; }
+
+int SegmentsFor(CircularQuality quality, double radius) {
+  return quality.SegmentsFor(radius);
+}
 }  // namespace js
 
 namespace cross_js {
@@ -150,12 +139,12 @@ CrossSection Warp(CrossSection& cross_section, uintptr_t funcPtr) {
 }
 
 CrossSection Offset(CrossSection& cross_section, double delta, int join_type,
-                    double miter_limit, double arc_tolerance) {
+                    double miter_limit, CircularQuality quality) {
   auto jt = join_type == 0   ? CrossSection::JoinType::Square
             : join_type == 1 ? CrossSection::JoinType::Round
             : join_type == 2 ? CrossSection::JoinType::Miter
                              : CrossSection::JoinType::Bevel;
-  return cross_section.Offset(delta, jt, miter_limit, arc_tolerance);
+  return cross_section.Offset(delta, jt, miter_limit, quality);
 }
 
 void CollectVertices(std::vector<vec2>& verts, const CrossSection& cs) {
@@ -165,7 +154,10 @@ void CollectVertices(std::vector<vec2>& verts, const CrossSection& cs) {
 }  // namespace cross_js
 
 namespace man_js {
-Manifold FromMeshJS(const val& mesh) { return Manifold(js::MeshJS2GL(mesh)); }
+template <typename P, typename I>
+Manifold FromMeshJS(const val& mesh) {
+  return Manifold(js::MeshJS2GL<P, I>(mesh));
+}
 
 Manifold Union(const Manifold& a, const Manifold& b) { return a + b; }
 
@@ -243,8 +235,9 @@ Manifold LevelSet(uintptr_t funcPtr, Box bounds, double edgeLength,
 // ExecutionContext so progress / cancellation are observed (these ops have no
 // source Manifold to attach via withContext). Bound as ExecutionContext methods
 // (first arg is the receiver).
+template <typename P, typename I>
 Manifold ExecutionContextFromMesh(ExecutionContext& ctx, const val& mesh) {
-  return ctx.FromMeshGL(js::MeshJS2GL(mesh));
+  return ctx.FromMeshGL(js::MeshJS2GL<P, I>(mesh));
 }
 
 Manifold ExecutionContextLevelSet(ExecutionContext& ctx, uintptr_t funcPtr,

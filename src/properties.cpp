@@ -191,11 +191,13 @@ bool Manifold::Impl::IsSelfIntersecting() const {
 }
 
 /**
- * Returns true if all triangles are CCW relative to their triNormals_.
+ * Returns true if all triangles are CCW relative to their faceNormal_, with
+ * tolerances scaled by epsilon. If checkFlat, also returns false if a triangle
+ * is far from the plane of its faceNormal_.
  */
-bool Manifold::Impl::MatchesTriNormals() const {
+bool Manifold::Impl::MatchesTriNormals(double epsilon, bool checkFlat) const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
-  const double tol = 1000 * epsilon_;
+  const double tol = 1000 * epsilon;
   return all_of(countAt(0_uz), countAt(NumTri()), [&](size_t face) {
     if (halfedge_.Pair(3 * face) < 0) return true;
 
@@ -211,35 +213,34 @@ bool Manifold::Impl::MatchesTriNormals() const {
       max = std::max(max, d);
       min = std::min(min, d);
     }
-    if (max - min > tol) return false;
+    if (checkFlat && max - min > tol) return false;
 
-    const int ccw = CCW(v[0], v[1], v[2], tol);
+    // Rejects triangles reversed by more than 10 epsilon.
+    const int ccw = CCW(v[0], v[1], v[2], 20 * epsilon);
     return ccw >= 0;
   });
 }
 
 /**
- * Returns the number of triangles that are colinear.
+ * Returns true if the triangle has no area when projected along the axis
+ * closest to normal.
+ */
+bool Manifold::Impl::IsFlat(int tri, vec3 normal) const {
+  const mat2x3 projection = GetAxisAlignedProjection(normal);
+  vec2 v[3];
+  for (int i : {0, 1, 2})
+    v[i] = projection * vertPos_[halfedge_.Start(3 * tri + i)];
+  return CCW(v[0], v[1], v[2], epsilon_ / 2) == 0;
+}
+
+/**
+ * Returns the number of triangles that are flat along their face normal.
  */
 int Manifold::Impl::NumDegenerateTris() const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return 0;
   return count_if(countAt(0_uz), countAt(NumTri()), [this](size_t face) {
     if (halfedge_.Pair(3 * face) < 0) return false;
-
-    const mat2x3 projection = GetAxisAlignedProjection(faceNormal_[face]);
-    vec2 v[3];
-    for (int i : {0, 1, 2})
-      v[i] = projection * vertPos_[halfedge_.Start(3 * face + i)];
-
-    const int ccw = CCW(v[0], v[1], v[2], epsilon_ / 2);
-    // if (ccw == 0) {
-    //   std::cout << "degenerate tri: " << face << ", e: " << face * 3 << ", "
-    //             << faceNormal_[face] << ", "
-    //             << vertPos_[halfedge_.Start(3 * face + 0)] << ", "
-    //             << vertPos_[halfedge_.Start(3 * face + 1)] << ", "
-    //             << vertPos_[halfedge_.Start(3 * face + 2)] << std::endl;
-    // }
-    return ccw == 0;
+    return IsFlat(face, faceNormal_[face]);
   });
 }
 
@@ -304,7 +305,7 @@ bool Manifold::Impl::IsConvex() const {
 bool Manifold::Impl::IsVug() const {
   const double volume = GetProperty(Property::Volume);
   const double area = GetProperty(Property::SurfaceArea);
-  return volume < -area * bBox_.Scale() * Quality::GetRelativePrecision();
+  return volume < -area * bBox_.Scale() * relPrecision_;
 }
 
 double Manifold::Impl::GetProperty(Property prop) const {
@@ -437,7 +438,7 @@ void Manifold::Impl::CalculateBBox() {
     // Decimated out of existence - early out.
     MakeEmpty(Error::NoError);
   }
-  epsilon_ = Quality::GetRelativePrecision() * bBox_.Scale();
+  epsilon_ = relPrecision_ * bBox_.Scale();
 }
 
 /**

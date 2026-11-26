@@ -92,8 +92,8 @@ class Manifold {
   ///@{
   Manifold(const MeshGL&);
   Manifold(const MeshGL64&);
-  MeshGL GetMeshGL(int normalIdx = -1) const;
-  MeshGL64 GetMeshGL64(int normalIdx = -1) const;
+  MeshGL GetMeshGL() const;
+  MeshGL64 GetMeshGL64() const;
   ///@}
 
   /** @name Constructors
@@ -104,9 +104,9 @@ class Manifold {
   static Manifold Tetrahedron();
   static Manifold Cube(vec3 size = vec3(1.0), bool center = false);
   static Manifold Cylinder(double height, double radiusLow,
-                           double radiusHigh = -1.0, int circularSegments = 0,
-                           bool center = false);
-  static Manifold Sphere(double radius, int circularSegments = 0);
+                           double radiusHigh = -1.0,
+                           CircularQuality quality = {}, bool center = false);
+  static Manifold Sphere(double radius, CircularQuality quality = {});
   static Manifold LevelSet(std::function<double(vec3)> sdf, Box bounds,
                            double edgeLength, double level = 0,
                            double tolerance = -1, bool canParallel = true);
@@ -122,7 +122,7 @@ class Manifold {
                           int nDivisions = 0, double twistDegrees = 0.0,
                           vec2 scaleTop = vec2(1.0));
   static Manifold Revolve(const Polygons& crossSection,
-                          int circularSegments = 0,
+                          CircularQuality quality = {},
                           double revolveDegrees = 360.0f);
   ///@}
 
@@ -151,17 +151,20 @@ class Manifold {
   Error Status() const;
 
   /// Returns a copy of this Manifold with the given ExecutionContext attached.
-  /// The attachment is consumed only by `Status()` (for deferred CSG trees)
-  /// and the eager ops (`Refine` / `RefineToLength` / `RefineToTolerance`,
-  /// `Hull`, `MinkowskiSum` / `MinkowskiDifference`); those snapshot the ctx
-  /// and report progress / observe cancellation through it. Other queries
-  /// that force evaluation (`Volume`, `GetMeshGL`, `BoundingBox`, etc.) do
-  /// not currently observe attached ctx.
+  /// The attachment is consumed only by `Status()`, `WithPrecision()` and
+  /// `GetPrecision()` (for deferred CSG trees) and the eager ops (`Refine` /
+  /// `RefineToLength` / `RefineToTolerance`, `Hull`, `MinkowskiSum` /
+  /// `MinkowskiDifference`); those snapshot the ctx and report progress /
+  /// observe cancellation through it. Other queries that force evaluation
+  /// (`Volume`, `GetMeshGL`, `BoundingBox`, etc.) do not currently observe
+  /// attached ctx.
   ///
-  /// Deferred ops (Boolean operators, Translate / Rotate / Scale / Transform
-  /// / Mirror / Warp / Simplify, BatchBoolean, the
-  /// vector-of-Manifold Hull) ignore any attached ctx and produce a result
-  /// with no attached ctx. Inputs are not mutated. The idiom for observing a
+  /// Every other op that returns a Manifold ignores any attached ctx and
+  /// produces a result with no attached ctx. That includes the deferred ops
+  /// (Boolean operators, Translate / Rotate / Scale / Transform / Mirror,
+  /// BatchBoolean, the vector-of-Manifold Hull) and the ones that evaluate
+  /// their input right away (Warp, Simplify, Split, SetProperties, etc.).
+  /// Inputs are not mutated. The idiom for observing a
   /// deferred tree is therefore:
   ///
   ///   (a + b - c).WithContext(ctx).Status();
@@ -174,6 +177,9 @@ class Manifold {
   /// Raw copy / assignment preserves the attachment (it's the same logical
   /// Manifold). Only ops that derive a *new* Manifold drop the attachment.
   Manifold WithContext(const ExecutionContext& ctx) const;
+
+  Manifold WithPrecision(double relPrecision) const;
+  double GetPrecision() const;
 
   bool IsEmpty() const;
   size_t NumVert() const;
@@ -250,8 +256,7 @@ class Manifold {
       int numProp,
       std::function<void(double*, vec3, const double*)> propFunc) const;
   Manifold CalculateCurvature(int gaussianIdx, int meanIdx) const;
-  Manifold CalculateNormals(int normalIdx = 0,
-                            double minSharpAngle = 52.5) const;
+  Manifold CalculateNormals(double minSharpAngle = 52.5) const;
   ///@}
 
   /** @name Smoothing
@@ -262,7 +267,7 @@ class Manifold {
   Manifold Refine(int) const;
   Manifold RefineToLength(double) const;
   Manifold RefineToTolerance(double) const;
-  Manifold SmoothByNormals(int normalIdx = 0) const;
+  Manifold SmoothByNormals() const;
   ///@}
 
   /** @name Convex Hull
@@ -270,7 +275,7 @@ class Manifold {
   ///@{
   Manifold Hull() const;
   static Manifold Hull(const std::vector<Manifold>& manifolds);
-  static Manifold Hull(const std::vector<vec3>& pts);
+  static Manifold Hull(const std::vector<vec3>& points);
   ///@}
 
   /** @name I/O
@@ -289,10 +294,9 @@ class Manifold {
    *   Manifold obj_m = Manifold::ReadOBJ(ifile);
    *   ifile.close();
    *   if (obj_m.Status() != Manifold::Error::NoError) {
-   *      std::cerr << "Failed reading " << filename << ":\n";
-   *      std::cerr << Manifold::ToString(obj_m.Status()) << "\n";
+   *      std::cerr << "Failed reading " << filename << ": error "
+   *                << static_cast<int>(obj_m.Status()) << "\n";
    *   }
-   *   ifile.close();
    * }
    * @endcode
    *
@@ -307,6 +311,9 @@ class Manifold {
    * }
    * ofile.close();
    * @endcode
+   *
+   * ReadOBJ reads double-precision positions, so the result has
+   * kMinRelativePrecision, like Manifold(MeshGL64).
    */
 #ifndef MANIFOLD_NO_IOSTREAM
   static Manifold ReadOBJ(std::istream& stream);
@@ -344,10 +351,10 @@ class Manifold {
   // the user's ExecutionContext if a ctx-attached Manifold survives it.
   // Propagates through copy ctor / op= (raw copy preserves the attachment).
   // Manifold-returning ops do *not* propagate it: derived Manifolds get a
-  // null ctx_. Eager ops (Status, Refine family) snapshot ctx_ to observe
-  // their in-call work; the snapshot uses an atomic load, which pins the
-  // Impl across long-running evaluations even if a concurrent op= reseats
-  // ctx_ mid-eval.
+  // null ctx_. Eager ops (Status, WithPrecision, GetPrecision, Refine family,
+  // Hull, Minkowski) snapshot ctx_ to observe their in-call work; the snapshot
+  // uses an atomic load, which pins the Impl across long-running evaluations
+  // even if a concurrent op= reseats ctx_ mid-eval.
   //
   // Accessed only atomically (AtomicLoadShared/AtomicStoreShared): no const
   // method mutates ctx_, but op= and the copy ctor write it on a Manifold that

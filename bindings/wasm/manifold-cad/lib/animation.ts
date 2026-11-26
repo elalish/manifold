@@ -192,7 +192,7 @@ export function morphStart(manifoldMesh: Mesh, morph?: Morph):
         for (let i = 0; i < manifoldMesh.numVert; ++i) {
           const vertProp = manifoldMesh.vertProperties;
           const offset = i * manifoldMesh.numProp;
-          const pos = inputPositions.slice(offset, offset + 3) as Vec3;
+          const pos = inputPositions.slice(3 * i, 3 * (i + 1)) as Vec3;
           morph.start(pos);
           for (let j = 0; j < 3; ++j) vertProp[offset + j] = pos[j];
         }
@@ -213,27 +213,34 @@ export function morphEnd(
 
   mesh.setWeights([0]);
 
-  mesh.listPrimitives().forEach((primitive, i) => {
-    if (morph.end) {
-      for (let i = 0; i < manifoldMesh.numVert; ++i) {
-        const pos = inputPositions.slice(3 * i, 3 * (i + 1)) as Vec3;
-        morph.end(pos);
-        inputPositions.splice(3 * i, 3, ...pos);
+  if (morph.end) {
+    for (let i = 0; i < manifoldMesh.numVert; ++i) {
+      const pos = inputPositions.slice(3 * i, 3 * (i + 1)) as Vec3;
+      morph.end(pos);
+      inputPositions.splice(3 * i, 3, ...pos);
+    }
+  }
+
+  // Runs select triangle indices, not ranges of vertices. Primitives sharing
+  // the full position accessor can also share their morph deltas.
+  const position2morph = new Map<Accessor, Accessor>();
+  mesh.listPrimitives().forEach(primitive => {
+    const position = primitive.getAttribute('POSITION')!;
+    let morphAccessor = position2morph.get(position);
+    if (!morphAccessor) {
+      const startPosition = position.getArray()!;
+      const array = new Float32Array(startPosition.length);
+
+      for (let j = 0; j < array.length; ++j) {
+        array[j] = inputPositions[j] - startPosition[j];
       }
+
+      morphAccessor = doc.createAccessor(mesh.getName() + ' morph target')
+                          .setBuffer(doc.getRoot().listBuffers()[0])
+                          .setArray(array)
+                          .setType(Accessor.Type.VEC3);
+      position2morph.set(position, morphAccessor);
     }
-
-    const startPosition = primitive.getAttribute('POSITION')!.getArray()!;
-    const array = new Float32Array(startPosition.length);
-
-    const offset = manifoldMesh.runIndex[i];
-    for (let j = 0; j < array.length; ++j) {
-      array[j] = inputPositions[offset + j] - startPosition[j];
-    }
-
-    const morphAccessor = doc.createAccessor(mesh.getName() + ' morph target')
-                              .setBuffer(doc.getRoot().listBuffers()[0])
-                              .setArray(array)
-                              .setType(Accessor.Type.VEC3);
     const morphTarget =
         doc.createPrimitiveTarget().setAttribute('POSITION', morphAccessor);
     primitive.addTarget(morphTarget);
