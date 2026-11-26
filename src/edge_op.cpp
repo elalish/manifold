@@ -225,12 +225,15 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge) const {
   mat3 A(0.);
   vec3 b(0.);
   double c = 0;
+  // Cost of the midpoint from the face planes alone, without property bounds.
+  double cFaces = 0;
 
   auto addCost = [&](vec3 normal, vec3 pos) {
     A += la::outerprod(normal, normal);
     double d = la::dot(normal, pos - mid);
     b += normal * d;
     c += d * d;
+    return d * d;
   };
 
   int firstEdge = edge;
@@ -245,7 +248,7 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge) const {
     // Equal-weighted per triangle, keeps the cost in terms of distance.
     // Angle-weighting like pseudo-normals may be better, but it is more
     // expensive to compute and may be less stable on degenerates.
-    addCost(normal, pos);
+    cFaces += addCost(normal, pos);
 
     if (!Continuous(current)) {
       // Penalize motion across an edge that contains a property boundary.
@@ -264,7 +267,10 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge) const {
   const mat2 A2 = transpose(P) * A * P;
   const vec2 b2 = transpose(P) * b;
   vec2 u = inverse(A2) * b2;
-  if (!std::isfinite(u[0])) return {0, 0, 0.5, mid};
+  // A2 is singular when the faces on either side of the edge point in opposite
+  // directions, as on a zero-volume fold. Collapsing it to the midpoint costs
+  // nothing only if the midpoint lies on the planes of the faces around it.
+  if (!std::isfinite(u[0])) return {cFaces, cFaces, 0.5, mid};
   // u[0] is the interpolation along the collapsed edge, which is used to
   // interpolate the properties. It is clamped to avoid extrapolation.
   u[0] = la::clamp(u[0], -0.5, 0.5);
