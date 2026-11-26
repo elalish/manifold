@@ -90,7 +90,7 @@ namespace manifold {
  * The halfedgeTangent vector is used to specify the weighted tangent vectors of
  * each halfedge for the purpose of using the Refine methods to create a
  * smoothly-interpolated surface. They can also be output when calculated
- * automatically by the Smooth functions.
+ * automatically by SmoothByNormals().
  *
  * MeshGL is an alias for the standard single-precision version. Use MeshGL64 to
  * output the full double precision that Manifold uses internally.
@@ -141,7 +141,8 @@ struct MeshGLP {
   /// Optional: For each run, a 3x4 transform is stored representing how the
   /// corresponding original mesh was transformed to create this triangle run.
   /// This matrix is stored in column-major order and the length of the overall
-  /// vector is 12 * runOriginalID.size().
+  /// vector is 12 * runOriginalID.size(). It is empty in the output of a
+  /// Manifold that is an original (see OriginalID()).
   std::vector<Precision> runTransform;
   /// Optional: For each run, defines a set of flags giving extra information
   /// about the run. See the corresponding getter functions for details on the
@@ -166,7 +167,9 @@ struct MeshGLP {
    * out-of-range indices), the copy is unchanged. Otherwise, verts along open
    * edges are merged within tolerance (the maximum of the specified tolerance
    * and the baseline bounding-box tolerance), keeping any from the existing
-   * merge vectors.
+   * merge vectors. The baseline is the bounding box scale times the relative
+   * precision a Manifold made from this mesh gets: kDefaultRelativePrecision
+   * for MeshGL and kMinRelativePrecision for MeshGL64.
    *
    * There is no guarantee the result will be manifold - this is a
    * best-effort helper function designed primarily to aid in the case where
@@ -175,7 +178,8 @@ struct MeshGLP {
    * Manifold from the result will report an error status if it is not
    * manifold.
    *
-   * @param tolerance Merge open-edge verts closer than this.
+   * @param tolerance Merge open-edge verts closer than this. NaN is treated
+   * as 0.
    */
   [[nodiscard]] MeshGLP Merge(Precision tolerance = 0) const;
 

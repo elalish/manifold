@@ -113,22 +113,14 @@ function triangleIndices(primitive: GLTFTransform.Primitive):
   const mode = primitive.getMode();
   const {TRIANGLES, TRIANGLE_STRIP, TRIANGLE_FAN} =
       GLTFTransform.Primitive.Mode;
-  const positions = primitive.getAttribute('POSITION');
-  if (!positions ||
-      (mode !== TRIANGLES && mode !== TRIANGLE_STRIP && mode !== TRIANGLE_FAN))
-    return null;
-  const indices = primitive.getIndices()?.getArray() ??
-      Array.from({length: positions.getCount()}, (_, i) => i);
-  if (mode === TRIANGLES) return indices;
-
-  const triangles: number[] = [];
-  for (let i = 0; i + 2 < indices.length; ++i) {
-    const a = mode === TRIANGLE_FAN ? indices[0] : indices[i];
-    const b = indices[i + 1 + (mode === TRIANGLE_STRIP ? i % 2 : 0)];
-    const c = indices[i + 2 - (mode === TRIANGLE_STRIP ? i % 2 : 0)];
-    if (a !== b && b !== c && a !== c) triangles.push(a, b, c);
+  if (mode === TRIANGLE_STRIP || mode === TRIANGLE_FAN) {
+    throw new Error(`Unsupported glTF primitive mode ${
+        mode}: convert strips and fans to TRIANGLES`);
   }
-  return triangles;
+  const positions = primitive.getAttribute('POSITION');
+  if (!positions || mode !== TRIANGLES) return null;
+  return primitive.getIndices()?.getArray() ??
+      Array.from({length: positions.getCount()}, (_, i) => i);
 }
 
 /**

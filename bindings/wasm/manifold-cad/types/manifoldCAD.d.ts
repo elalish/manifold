@@ -13,8 +13,8 @@
 // limitations under the License.
 
 /* This file is used in two ways.
- * Run it through typedoc (`npm run docs:jsuser`), and it generates
- * the ManifoldCAD User Guide.
+ * Run through typedoc (`npm run docs:jsuser`, via
+ * `manifoldCADUserGuide.d.ts`), it generates the ManifoldCAD User Guide.
  * On the other hand API Extractor (`npm run postbuild`) rolls up
  * all of the imported references to generate `dist/manifoldCAD.d.ts`.
  *
@@ -69,7 +69,7 @@ export {importManifold, importModel} from '../lib/import-model';
 /** @group Material */
 export {setMaterial} from '../lib/material';
 /** @group Basics */
-export {CrossSection, Manifold} from 'manifold-3d';
+export {CrossSection, Manifold, MIN_RELATIVE_PRECISION} from 'manifold-3d';
 /** @group Polygons */
 export {triangulate} from 'manifold-3d';
 /** @group Level of Detail */
@@ -94,10 +94,10 @@ export type {
 
 /* See the Developer Guide for more detail on these: */
 /** @internal */
-export type {SealedFloat32Array, SealedUint32Array} from 'manifold-3d';
+export type {SealedFloat32Array, SealedFloat64Array, SealedUint32Array} from 'manifold-3d';
 /** @internal */
 export type {ImportOptions} from '../lib/import-model';
 /** @internal */
-export type {MeshOptions} from 'manifold-3d';
+export type {MeshOptions, Mesh64Options} from 'manifold-3d';
 /** @internal */
-export {Mesh} from 'manifold-3d';
+export {Mesh, Mesh64} from 'manifold-3d';

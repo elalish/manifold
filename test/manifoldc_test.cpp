@@ -1,5 +1,6 @@
 #include "manifold/manifoldc.h"
 
+#include <cfloat>
 #include <cmath>
 #include <cstddef>
 #ifndef MANIFOLD_NO_IOSTREAM
@@ -828,6 +829,70 @@ TEST(CBIND, meshgl64_merge_returns_mem) {
   manifold_delete_manifold(result);
   manifold_delete_meshgl64(merged);
   manifold_delete_meshgl64(original);
+  manifold_delete_manifold(cube);
+}
+
+TEST(CBIND, precision) {
+  ManifoldManifold* cube = manifold_cube(1.0, 1.0, 1.0, 0);
+  ManifoldMeshGL* mesh = manifold_get_meshgl(cube);
+  ManifoldMeshGL64* mesh64 = manifold_get_meshgl64(cube);
+  ManifoldManifold* ingested = manifold_of_meshgl(mesh);
+  ManifoldManifold* ingested64 = manifold_of_meshgl64(mesh64);
+  EXPECT_EQ(manifold_get_precision(cube), FLT_EPSILON);
+  EXPECT_EQ(manifold_get_precision(ingested), FLT_EPSILON);
+  EXPECT_EQ(manifold_get_precision(ingested64),
+            MANIFOLD_MIN_RELATIVE_PRECISION);
+
+  ManifoldManifold* stamped = manifold_with_precision(cube, 1e-2);
+  EXPECT_EQ(manifold_get_precision(stamped), 1e-2);
+  EXPECT_EQ(manifold_num_tri(stamped), manifold_num_tri(cube));
+  ManifoldManifold* fine = manifold_with_precision(ingested, 1e-20);
+  EXPECT_EQ(manifold_get_precision(fine), MANIFOLD_MIN_RELATIVE_PRECISION);
+  // 0, negative values, NaN and infinity give FLT_EPSILON, even for a
+  // manifold made from a MeshGL64.
+  for (double unset :
+       {0.0, -1.0, static_cast<double>(NAN), static_cast<double>(INFINITY)}) {
+    ManifoldManifold* reset = manifold_with_precision(ingested64, unset);
+    EXPECT_EQ(manifold_get_precision(reset), FLT_EPSILON);
+    manifold_delete_manifold(reset);
+  }
+
+  ManifoldManifold* empty = manifold_empty();
+  ManifoldManifold* coarseEmpty = manifold_with_precision(empty, 1e-3);
+  EXPECT_EQ(manifold_epsilon(empty), -1);
+  EXPECT_EQ(manifold_epsilon(coarseEmpty), -1);
+
+  manifold_delete_manifold(coarseEmpty);
+  manifold_delete_manifold(empty);
+  manifold_delete_manifold(fine);
+  manifold_delete_manifold(stamped);
+  manifold_delete_manifold(ingested64);
+  manifold_delete_manifold(ingested);
+  manifold_delete_meshgl64(mesh64);
+  manifold_delete_meshgl(mesh);
+  manifold_delete_manifold(cube);
+}
+
+TEST(CBIND, execution_context_of_meshgl_precision) {
+  ManifoldManifold* cube = manifold_cube(1.0, 1.0, 1.0, 0);
+  ManifoldMeshGL* mesh = manifold_get_meshgl(cube);
+  ManifoldMeshGL64* mesh64 = manifold_get_meshgl64(cube);
+  ManifoldExecutionContext* ec = manifold_execution_context();
+  ManifoldManifold* ingested = manifold_execution_context_of_meshgl(ec, mesh);
+  ManifoldManifold* ingested64 =
+      manifold_execution_context_of_meshgl64(ec, mesh64);
+  EXPECT_EQ(manifold_get_precision(ingested), FLT_EPSILON);
+  EXPECT_EQ(manifold_get_precision(ingested64),
+            MANIFOLD_MIN_RELATIVE_PRECISION);
+  EXPECT_DOUBLE_EQ(manifold_epsilon(ingested), FLT_EPSILON);
+  EXPECT_DOUBLE_EQ(manifold_epsilon(ingested64),
+                   MANIFOLD_MIN_RELATIVE_PRECISION);
+
+  manifold_delete_manifold(ingested);
+  manifold_delete_manifold(ingested64);
+  manifold_delete_execution_context(ec);
+  manifold_delete_meshgl(mesh);
+  manifold_delete_meshgl64(mesh64);
   manifold_delete_manifold(cube);
 }
 

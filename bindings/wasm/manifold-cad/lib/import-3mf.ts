@@ -89,8 +89,6 @@ interface Triangle3MF {
   v1?: number|string;
   v2?: number|string;
   v3?: number|string;
-  pid?: number|string;
-  p1?: number|string;
 }
 
 interface Mesh3MF {
@@ -106,28 +104,13 @@ interface ComponentRef3MF {
 interface ObjectNode3MF {
   id?: number|string;
   name?: string;
-  pid?: number|string;
-  pindex?: number|string;
   mesh?: Mesh3MF;
   components?: {component?: ComponentRef3MF|Array<ComponentRef3MF>;};
 }
 
-interface BaseMaterial3MF {
-  name?: string;
-  displaycolor?: string;
-}
-
-interface BaseMaterialGroup3MF {
-  id?: number|string;
-  base?: BaseMaterial3MF|Array<BaseMaterial3MF>;
-}
-
 interface Model3MF {
   unit?: string;
-  resources?: {
-    object?: ObjectNode3MF|Array<ObjectNode3MF>;
-    basematerials?: BaseMaterialGroup3MF | Array<BaseMaterialGroup3MF>;
-  };
+  resources?: {object?: ObjectNode3MF|Array<ObjectNode3MF>;};
   build?: {item?: ComponentRef3MF|Array<ComponentRef3MF>;};
 }
 
@@ -204,11 +187,9 @@ function parseTransform(value?: string): number[] {
 }
 
 function parseMesh(
-    object: ObjectNode3MF, doc: GLTFTransform.Document,
-    buf: GLTFTransform.Buffer, defaultMaterial: GLTFTransform.Material,
-    baseMaterials: Map<string, GLTFTransform.Material[]>): GLTFTransform.Mesh|
-    null {
-  const mesh = object.mesh;
+    mesh: Mesh3MF|undefined, doc: GLTFTransform.Document,
+    buf: GLTFTransform.Buffer,
+    defaultMaterial: GLTFTransform.Material): GLTFTransform.Mesh|null {
   if (!mesh) return null;
 
   // --- vertices ---
@@ -227,7 +208,7 @@ function parseMesh(
   if (!positions.length) return null;
 
   // --- triangles ---
-  const byMaterial = new Map<GLTFTransform.Material, number[]>();
+  const indices: number[] = [];
   const vertexCount = positions.length / 3;
   for (const [triangleIndex, tri] of asArray(mesh.triangles?.triangle)
            .entries()) {
@@ -239,59 +220,23 @@ function parseMesh(
       throw new Error(`Invalid 3MF mesh: triangle ${
           triangleIndex} has an invalid vertex index`);
     }
-    const group = baseMaterials.get((tri.pid ?? object.pid)?.toString() ?? '');
-    const index = toFiniteNumber(tri.p1 ?? object.pindex);
-    // The core specification permits consumers without gradient support to
-    // apply p1 to the entire triangle.
-    const material = index != null && Number.isInteger(index) ?
-        (group?.[index] ?? defaultMaterial) :
-        defaultMaterial;
-    let indices = byMaterial.get(material);
-    if (!indices) byMaterial.set(material, indices = []);
     indices.push(v1, v2, v3);
   }
-  if (!byMaterial.size) return null;
+  if (!indices.length) return null;
 
   const posAcc = doc.createAccessor()
                      .setBuffer(buf)
                      .setType(GLTFTransform.Accessor.Type.VEC3)
                      .setArray(new Float32Array(positions));
-  const out = doc.createMesh();
-  for (const [material, indices] of byMaterial) {
-    const indAcc = doc.createAccessor()
-                       .setBuffer(buf)
-                       .setType(GLTFTransform.Accessor.Type.SCALAR)
-                       .setArray(new Uint32Array(indices));
-    out.addPrimitive(doc.createPrimitive()
-                         .setAttribute('POSITION', posAcc)
-                         .setIndices(indAcc)
-                         .setMaterial(material));
-  }
-  return out;
-}
-
-function parseBaseMaterials(model: Model3MF, doc: GLTFTransform.Document):
-    Map<string, GLTFTransform.Material[]> {
-  const groups = new Map<string, GLTFTransform.Material[]>();
-  for (const group of asArray(model.resources?.basematerials)) {
-    if (group.id == null) continue;
-    const materials = asArray(group.base).map(base => {
-      const material = doc.createMaterial(base.name);
-      const color = base.displaycolor;
-      if (color && /^#[\da-f]{6}([\da-f]{2})?$/i.test(color)) {
-        const alpha =
-            color.length === 9 ? parseInt(color.slice(7), 16) / 255 : 1;
-        const factor = GLTFTransform.ColorUtils.hexToFactor<GLTFTransform.vec4>(
-            parseInt(color.slice(1, 7), 16), [0, 0, 0, alpha]);
-        material.setBaseColorFactor(factor);
-        if (alpha < 1)
-          material.setAlphaMode(GLTFTransform.Material.AlphaMode.BLEND);
-      }
-      return material;
-    });
-    groups.set(group.id.toString(), materials);
-  }
-  return groups;
+  const indAcc = doc.createAccessor()
+                     .setBuffer(buf)
+                     .setType(GLTFTransform.Accessor.Type.SCALAR)
+                     .setArray(new Uint32Array(indices));
+  const primitive = doc.createPrimitive()
+                        .setAttribute('POSITION', posAcc)
+                        .setIndices(indAcc)
+                        .setMaterial(defaultMaterial);
+  return doc.createMesh().addPrimitive(primitive);
 }
 
 function parseComponentRefs(object: ObjectNode3MF): Array<ObjectRef3MF> {
@@ -318,7 +263,10 @@ function matchesTransform(node: GLTFTransform.Node, matrix: number[]): boolean {
   const restored = node.getMatrix();
   for (let column = 0; column < 4; column++) {
     const start = column * 4;
-    const tolerance = 64 * Number.EPSILON *
+    // Six-decimal 3MF rotations are not exactly orthogonal. Allow their print
+    // and decomposition error relative to each basis column, without an
+    // absolute floor that could hide shear on very small affine scales.
+    const tolerance = 2e-6 *
         Math.max(
             Math.abs(matrix[start]), Math.abs(matrix[start + 1]),
             Math.abs(matrix[start + 2]));
@@ -356,7 +304,8 @@ function instantiateObjectNode(
   const node = doc.createNode(object.name);
   node.setMatrix(ref.transform as GLTFTransform.mat4);
   // glTF nodes store TRS, which cannot represent every 3MF affine matrix.
-  // Allow decomposition roundoff, but bake shear into this instance's mesh.
+  // Allow print/decomposition roundoff, but bake shear into this instance's
+  // mesh.
   const bake = !matchesTransform(node, ref.transform);
   if (bake) node.setMatrix(identityMatrix as GLTFTransform.mat4);
   if (object.mesh) {
@@ -399,7 +348,6 @@ function parse3mfXml(xml: string): GLTFTransform.Document {
   // A default material is required so that gltfDocToManifold can process
   // the primitives (it calls getMaterial() on each primitive).
   const defaultMaterial = doc.createMaterial();
-  const baseMaterials = parseBaseMaterials(model, doc);
   const scene = doc.createScene();
   const unitToMeters = parseUnitMeters(model.unit);
   const objects = new Map<string, Object3MF>();
@@ -419,7 +367,7 @@ function parse3mfXml(xml: string): GLTFTransform.Document {
     objects.set(id, {
       id,
       name: object.name,
-      mesh: parseMesh(object, doc, buf, defaultMaterial, baseMaterials),
+      mesh: parseMesh(object.mesh, doc, buf, defaultMaterial),
       children: parseComponentRefs(object)
     });
   }

@@ -10,10 +10,21 @@ def snake_case(name):
 
 def python_param_modifier(comment):
     # p = f":{snake_case(m[0][1:])}:"
+    params = re.findall(r"@param (\w+)", comment)
     comment = re.sub(r"@(param \w+)", lambda m: f":{snake_case(m[1])}:", comment)
+    # the prose refers to params by name, so give them their Python names too
+    for name in params:
+        comment = re.sub(rf"\b{name}\b", snake_case(name), comment)
+    comment = re.sub("GetMeshGL", "to_mesh", comment)
+    comment = re.sub(r"RemoveDegenerates\(\)", "simplify()", comment)
+    comment = re.sub(
+        "ExecutionContext::FromMeshGL", "ExecutionContext.from_mesh", comment
+    )
     # python API renames `MeshGL` to `Mesh`
-    comment = re.sub("mesh_gl", "mesh", comment)
+    comment = re.sub("mesh_gl(64)?", "mesh", comment)
     comment = re.sub("MeshGL", "Mesh", comment)
+    comment = re.sub("kMinRelativePrecision", "MIN_RELATIVE_PRECISION", comment)
+    comment = re.sub("kDefaultRelativePrecision", "float epsilon", comment)
     return comment
 
 

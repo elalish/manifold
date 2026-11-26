@@ -32,7 +32,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
   // BatchBoolean (via the same ctx threaded into GetCsgLeafNode, which
   // routes into Boolean3's existing cancel checks). The per-hull work
   // itself is currently not interrupted -- granularity inside a batch
-  // is "one Manifold::Hull(simpleHull) call."
+  // is "one hull call."
   auto cancelled = [] {
     auto impl = std::make_shared<Impl>();
     impl->status_ = Error::Cancelled;
@@ -52,8 +52,16 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
   };
   if (IsCancelled(ctx)) return cancelled();
 
+  // The result has the finer precision of the two operands, including an
+  // empty result. A non-empty result ignores an empty operand.
+  const double relPrecision = std::min(relPrecision_, other.relPrecision_);
+
   // Eroding an empty base must not return the other operand.
-  if (inset && IsEmpty()) return Manifold(std::make_shared<Impl>(*this));
+  if (inset && IsEmpty()) {
+    auto result = std::make_shared<Impl>(*this);
+    result->relPrecision_ = relPrecision;
+    return Manifold(result);
+  }
 
   const Impl* aImpl = this;
   const Impl* bImpl = &other;
@@ -72,12 +80,22 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
   // Early-exit if either input is empty
   if (bImpl->IsEmpty()) {
     std::shared_ptr<Impl> result = std::make_shared<Impl>(*aImpl);
+    if (aImpl->IsEmpty()) result->relPrecision_ = relPrecision;
     return Manifold(result);
   }
   if (aImpl->IsEmpty()) {
     std::shared_ptr<Impl> result = std::make_shared<Impl>(*bImpl);
     return Manifold(result);
   }
+
+  // The hulls use the finer precision, so the Booleans that combine them do
+  // too.
+  auto hull = [relPrecision](const std::vector<vec3>& pts) {
+    auto impl = std::make_shared<Impl>();
+    impl->relPrecision_ = relPrecision;
+    impl->Hull(Vec<vec3>(pts));
+    return Manifold(impl);
+  };
 
   std::vector<Manifold> composedHulls;
   // Reserve for face batches; component seeds may require additional space.
@@ -127,7 +145,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
       simpleHull.insert(simpleHull.end(), TransformIterator(verts.begin(), t),
                         TransformIterator(verts.end(), t));
     }
-    composedHulls.push_back(Manifold::Hull(simpleHull));
+    composedHulls.push_back(hull(simpleHull));
     // Hull each A face with all B vertices when B is convex. For erosion,
     // convex A also permits this: A eroded by B equals A eroded by B's hull.
   } else if (bConvex || (inset && aConvex)) {
@@ -140,7 +158,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
       size_t numIter = std::min(numTri - offset, BATCH_SIZE);
       std::vector<Manifold> newHulls(numIter);
       for_each_n(autoPolicy(numIter, 100), countAt(0), numIter,
-                 [&newHulls, &aImpl, &verts, offset](const int iter) {
+                 [&newHulls, &aImpl, &verts, &hull, offset](const int iter) {
                    std::vector<vec3> simpleHull;
                    for (int i : {0, 1, 2}) {
                      const int edge = ((offset + iter) * 3) + i;
@@ -151,7 +169,7 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
                                        TransformIterator(verts.begin(), t),
                                        TransformIterator(verts.end(), t));
                    }
-                   newHulls[iter] = Manifold::Hull(simpleHull);
+                   newHulls[iter] = hull(simpleHull);
                  });
       composedHulls.push_back(evalBatch(std::move(newHulls), OpType::Add));
     }
@@ -196,8 +214,8 @@ Manifold Manifold::Impl::Minkowski(const Impl& other, bool inset,
             vec3 b2 = bImpl->vertPos_[bImpl->halfedge_.Start((bFace * 3) + 1)];
             vec3 b3 = bImpl->vertPos_[bImpl->halfedge_.Start((bFace * 3) + 2)];
             faceHulls[bFace] =
-                Manifold::Hull({a1 + b1, a1 + b2, a1 + b3, a2 + b1, a2 + b2,
-                                a2 + b3, a3 + b1, a3 + b2, a3 + b3});
+                hull({a1 + b1, a1 + b2, a1 + b3, a2 + b1, a2 + b2, a2 + b3,
+                      a3 + b1, a3 + b2, a3 + b3});
           });
 
       // Collect non-empty hulls for this A face

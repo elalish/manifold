@@ -571,6 +571,7 @@ Manifold::Impl Manifold::Impl::Transform(const mat3x4& transform_) const {
   if (transform_ == mat3x4(la::identity)) return *this;
   auto policy = autoPolicy(NumVert());
   Impl result;
+  result.relPrecision_ = relPrecision_;
   if (status_ != Manifold::Error::NoError) {
     result.status_ = status_;
     return result;
@@ -866,7 +867,8 @@ bool WriteOBJ(std::ostream& stream, const MeshGL64& mesh) {
  */
 std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
   MeshGL64 mesh = GetMeshGLImpl<double, uint64_t>(impl);
-  return WriteOBJWithEpsilon(stream, mesh, {impl.epsilon_});
+  return WriteOBJWithEpsilon(stream, mesh,
+                             {impl.IsEmpty() ? -1 : impl.epsilon_});
 }
 
 /**

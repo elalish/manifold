@@ -44,7 +44,6 @@ export {getAnimationDuration, getAnimationFPS, getAnimationMode, setAnimationDur
 export {only, show} from './debug.ts';
 export type {GLTFAttribute, GLTFMaterial} from './gltf-node.ts';
 export {GLTFNode} from './gltf-node.ts';
-export {getRelativePrecision, setRelativePrecision} from './level-of-detail.ts';
 export {setMaterial} from './material.ts';
 
 type Cacheable = Manifold|CrossSection;

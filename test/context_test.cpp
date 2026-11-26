@@ -125,6 +125,16 @@ TEST(Context, ExecutionContextCancelBeforeEval) {
   ExecutionContext ctx;
   ctx.Cancel();
   EXPECT_EQ(u.WithContext(ctx).Status(), Manifold::Error::Cancelled);
+  // WithPrecision evaluates under the attached context.
+  EXPECT_EQ(Manifold::BatchBoolean(items, OpType::Add)
+                .WithContext(ctx)
+                .WithPrecision(1e-3)
+                .Status(),
+            Manifold::Error::Cancelled);
+  // So does GetPrecision.
+  const Manifold lazy = Manifold::BatchBoolean(items, OpType::Add);
+  lazy.WithContext(ctx).GetPrecision();
+  EXPECT_EQ(lazy.Status(), Manifold::Error::Cancelled);
 }
 
 // Cancel from another thread mid-evaluation. Expensive CSG tree so there's
@@ -925,6 +935,8 @@ TEST(Context, ManifoldContextEveryOpDropsAttachment) {
       {"SmoothByNormals",
        [](const Manifold& m) { return std::vector{m.SmoothByNormals()}; }},
       {"Hull", [](const Manifold& m) { return std::vector{m.Hull()}; }},
+      {"WithPrecision",
+       [](const Manifold& m) { return std::vector{m.WithPrecision(1e-3)}; }},
       {"HullVector",
        [](const Manifold& m) {
          return std::vector{Manifold::Hull(std::vector{m})};

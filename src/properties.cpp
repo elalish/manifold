@@ -191,11 +191,13 @@ bool Manifold::Impl::IsSelfIntersecting() const {
 }
 
 /**
- * Returns true if all triangles are CCW relative to their triNormals_.
+ * Returns true if all triangles are CCW relative to their faceNormal_, with
+ * tolerances scaled by epsilon. If checkFlat, also returns false if a triangle
+ * is far from the plane of its faceNormal_.
  */
-bool Manifold::Impl::MatchesTriNormals() const {
+bool Manifold::Impl::MatchesTriNormals(double epsilon, bool checkFlat) const {
   if (halfedge_.size() == 0 || faceNormal_.size() != NumTri()) return true;
-  const double tol = 1000 * epsilon_;
+  const double tol = 1000 * epsilon;
   return all_of(countAt(0_uz), countAt(NumTri()), [&](size_t face) {
     if (halfedge_.Pair(3 * face) < 0) return true;
 
@@ -211,9 +213,10 @@ bool Manifold::Impl::MatchesTriNormals() const {
       max = std::max(max, d);
       min = std::min(min, d);
     }
-    if (max - min > tol) return false;
+    if (checkFlat && max - min > tol) return false;
 
-    const int ccw = CCW(v[0], v[1], v[2], tol);
+    // Rejects triangles reversed by more than 10 epsilon.
+    const int ccw = CCW(v[0], v[1], v[2], 20 * epsilon);
     return ccw >= 0;
   });
 }
@@ -302,7 +305,7 @@ bool Manifold::Impl::IsConvex() const {
 bool Manifold::Impl::IsVug() const {
   const double volume = GetProperty(Property::Volume);
   const double area = GetProperty(Property::SurfaceArea);
-  return volume < -area * bBox_.Scale() * Quality::GetRelativePrecision();
+  return volume < -area * bBox_.Scale() * relPrecision_;
 }
 
 double Manifold::Impl::GetProperty(Property prop) const {
@@ -435,7 +438,7 @@ void Manifold::Impl::CalculateBBox() {
     // Decimated out of existence - early out.
     MakeEmpty(Error::NoError);
   }
-  epsilon_ = Quality::GetRelativePrecision() * bBox_.Scale();
+  epsilon_ = relPrecision_ * bBox_.Scale();
 }
 
 /**

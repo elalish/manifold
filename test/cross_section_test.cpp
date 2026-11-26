@@ -472,11 +472,77 @@ TEST(CrossSection, MiterOffset) {
 
   EXPECT_EQ(result.Genus(), 0);
   EXPECT_NEAR(result.Volume(), 30. * 30., 0.01);
-  // Offset keeps collinear verts on the miter edges; stripping them is
-  // Simplify's job, so the raw offset has more than 4 verts and Simplify
-  // reduces it to the 4 corners (checked backend-agnostically).
-  EXPECT_GT(offset.NumVert(), 4);
+  // Each corner is one miter point.
+  EXPECT_EQ(offset.NumVert(), 4);
   EXPECT_EQ(offset.Simplify().NumVert(), 4);
+}
+
+// A regular hexagon's 120-degree corners are within the default miter limit.
+// An outward offset gives each corner a miter join. An inward offset makes
+// every corner concave on the offset side, where the fill rule trims the
+// crossing offset edges to one vertex.
+TEST(CrossSection, OffsetMiterHexagonVertexCount) {
+  const CrossSection hexagon = CrossSection::Circle(10, {6});
+  const double inradius = 10 * std::cos(kPi / 6);
+  for (double delta : {1.0, -1.0}) {
+    SCOPED_TRACE(delta);
+    const CrossSection out =
+        hexagon.Offset(delta, CrossSection::JoinType::Miter);
+    const double r = inradius + delta;
+    EXPECT_NEAR(out.Area(), 6 * r * r * std::tan(kPi / 6), 1e-9);
+    EXPECT_EQ(out.NumVert(), 6);
+    EXPECT_EQ(out.Simplify().NumVert(), 6);
+  }
+}
+
+// A Square join cuts each corner of a square off with a flat edge
+// perpendicular to the corner's bisector.
+TEST(CrossSection, OffsetSquareJoinSquareVertexCount) {
+  const CrossSection square = CrossSection::Square({20., 20.}, true);
+  const CrossSection out = square.Offset(5., CrossSection::JoinType::Square);
+  // Each flat edge removes a right isosceles triangle with legs
+  // 5 * (2 - sqrt(2)) from the 30 x 30 square that Miter joins would give.
+  const double leg = 5 * (2 - std::sqrt(2.0));
+  EXPECT_NEAR(out.Area(), 30. * 30. - 4 * leg * leg / 2, 1e-9);
+  // Each corner is the flat edge's two ends.
+  EXPECT_EQ(out.NumVert(), 8);
+  EXPECT_EQ(out.Simplify().NumVert(), 8);
+}
+
+// Offset keeps collinear input vertices: a square with a vertex at the middle
+// of each edge keeps an offset copy of each midpoint.
+TEST(CrossSection, OffsetMiterKeepsCollinearInputVerts) {
+  const SimplePolygon square = {{-10, -10}, {0, -10}, {10, -10}, {10, 0},
+                                {10, 10},   {0, 10},  {-10, 10}, {-10, 0}};
+  const CrossSection cs(square);
+  ASSERT_EQ(cs.NumVert(), 8);
+  const CrossSection out = cs.Offset(1., CrossSection::JoinType::Miter);
+  EXPECT_NEAR(out.Area(), 22. * 22., 1e-9);
+  // Four offset midpoints and four miter points.
+  EXPECT_EQ(out.NumVert(), 8);
+  const Polygons polys = out.ToPolygons();
+  ASSERT_EQ(polys.size(), 1);
+  for (const vec2 mid :
+       {vec2(0, -11), vec2(11, 0), vec2(0, 11), vec2(-11, 0)}) {
+    EXPECT_NE(std::find(polys[0].begin(), polys[0].end(), mid), polys[0].end())
+        << "missing offset midpoint (" << mid.x << ", " << mid.y << ")";
+  }
+}
+
+// Found by fuzzing. Regularizing this self-crossing ring leaves two vertices
+// 2e-16 apart where the ring touches itself. Offset gives the edge between
+// them the bisector of its neighbors' normals, so the result matches
+// Clipper2's and the result with the two vertices merged into one.
+TEST(CrossSection, OffsetMiterNextToSubEpsEdge) {
+  const SimplePolygon ring = {{4, 3},  {10, 1}, {8, 3},
+                              {9, -2}, {8, 1},  {9.999999998, 4.999999996}};
+  const CrossSection cs(ring);
+  ASSERT_EQ(cs.NumVert(), 6);
+  const CrossSection out =
+      cs.Offset(1.0083379023984145, CrossSection::JoinType::Miter);
+  EXPECT_EQ(out.NumContour(), 1);
+  EXPECT_NEAR(out.Area(), 30.696439315160, 1e-9);
+  EXPECT_EQ(out.NumVert(), 8);
 }
 
 TEST(CrossSection, OffsetWithHole) {
@@ -2761,6 +2827,13 @@ TEST(CrossSection, SimplifyRemovesCollinearVertices) {
   EXPECT_NEAR(simplified.Area(), 4.0, 1e-9);
 }
 
+TEST(CrossSection, SimplifyNaNTolerance) {
+  // NaN simplifies like 0, at the cross-section's own tolerance.
+  const CrossSection simplified = CrossSection::Square({2, 2}).Simplify(NAN);
+  EXPECT_EQ(simplified.NumVert(), 4);
+  EXPECT_NEAR(simplified.Area(), 4.0, 1e-9);
+}
+
 TEST(CrossSection, SimplifyReducesCurveWithoutCollapsing) {
   // A moderate epsilon reduces a dense curve but must never delete it
   // (regression: feeding epsilon as the boolean merge tolerance collapsed
@@ -3227,6 +3300,57 @@ TEST(CrossSection, BatchBoolean) {
 
   EXPECT_FLOAT_EQ(subtract.Area(), 7234.478452);
   EXPECT_FLOAT_EQ(subtract.NumVert(), 42);
+}
+
+TEST(CrossSection, BatchIntersectionEmptyOperands) {
+  const auto circle = CrossSection::Circle(10, {256});
+  for (int emptyAt : {0, 1, 4, 7}) {
+    std::vector<CrossSection> sections(8, circle);
+    sections[emptyAt] = CrossSection();
+    std::vector<Polygons> originals;
+    for (const auto& section : sections)
+      originals.push_back(section.ToPolygons());
+
+    const auto result = CrossSection::BatchBoolean(sections, OpType::Intersect);
+    EXPECT_TRUE(result.IsEmpty());
+    EXPECT_EQ(result.NumContour(), 0);
+    EXPECT_EQ(result.NumVert(), 0);
+    EXPECT_EQ(result.Area(), 0);
+    for (size_t i = 0; i < sections.size(); ++i)
+      EXPECT_EQ(sections[i].ToPolygons(), originals[i]);
+  }
+}
+
+TEST(CrossSection, BatchIntersectionDisjointPrefix) {
+  std::vector<CrossSection> sections = {
+      CrossSection::Square({1, 1}),
+      CrossSection::Square({1, 1}).Translate({2, 0})};
+  for (int i = 0; i < 30; ++i)
+    sections.push_back(CrossSection::Circle(10, {256}));
+  const auto result = CrossSection::BatchBoolean(sections, OpType::Intersect);
+  EXPECT_TRUE(result.IsEmpty());
+  EXPECT_EQ(result.Area(), 0);
+  EXPECT_EQ(result.NumVert(), 0);
+}
+
+TEST(CrossSection, BatchIntersectionNonemptyAndOtherOperations) {
+  const std::vector<CrossSection> sections = {
+      CrossSection::Square({10, 10}),
+      CrossSection::Square({10, 10}).Translate({2, 0}),
+      CrossSection::Square({10, 10}).Translate({0, 3}),
+      CrossSection::Square({10, 10}).Translate({1, 1})};
+  const auto result = CrossSection::BatchBoolean(sections, OpType::Intersect);
+  EXPECT_EQ(result.Area(), 56);
+  EXPECT_EQ(result.NumVert(), 4);
+  EXPECT_EQ(result.NumContour(), 1);
+  EXPECT_EQ(result.Bounds().min, (vec2{2, 3}));
+  EXPECT_EQ(result.Bounds().max, (vec2{10, 10}));
+  EXPECT_EQ(CrossSection::BatchBoolean(sections, OpType::Add).Area(), 151);
+  EXPECT_EQ(CrossSection::BatchBoolean(sections, OpType::Subtract).Area(), 4);
+  EXPECT_TRUE(CrossSection::BatchBoolean({}, OpType::Intersect).IsEmpty());
+  EXPECT_EQ(
+      CrossSection::BatchBoolean({sections[0]}, OpType::Intersect).ToPolygons(),
+      sections[0].ToPolygons());
 }
 
 // A is a 37-vertex near-degenerate star (many zero-radius vertices); B is a

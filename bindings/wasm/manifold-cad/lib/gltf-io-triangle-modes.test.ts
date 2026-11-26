@@ -5,8 +5,6 @@ import {readMesh} from './gltf-io.ts';
 
 test.each([
   [Primitive.Mode.TRIANGLES, [0, 1, 2, 3, 4, 5], [0, 1, 2, 3, 4, 5]],
-  [Primitive.Mode.TRIANGLE_STRIP, [0, 1, 2, 3, 4], [0, 1, 2, 1, 3, 2, 2, 3, 4]],
-  [Primitive.Mode.TRIANGLE_FAN, [0, 1, 2, 3], [0, 1, 2, 0, 2, 3]],
 ] as const)(
     'expands mode %i with and without indices', (mode, order, expected) => {
       for (const indexed of [false, true]) {
@@ -33,24 +31,27 @@ test.each([
       }
     });
 
-test('drops repeated-index connector triangles in strips', () => {
+test.each([
+  [Primitive.Mode.TRIANGLE_STRIP, false],
+  [Primitive.Mode.TRIANGLE_STRIP, true],
+  [Primitive.Mode.TRIANGLE_FAN, false],
+  [Primitive.Mode.TRIANGLE_FAN, true],
+] as const)('rejects unsupported mode %i (indexed: %s)', (mode, indexed) => {
   const doc = new Document(), buffer = doc.createBuffer();
-  const primitive =
-      doc.createPrimitive()
-          .setMode(Primitive.Mode.TRIANGLE_STRIP)
-          .setAttribute(
-              'POSITION',
-              doc.createAccessor()
-                  .setBuffer(buffer)
-                  .setType(Accessor.Type.VEC3)
-                  .setArray(new Float32Array(18)))
-          .setIndices(doc.createAccessor()
-                          .setBuffer(buffer)
-                          .setType(Accessor.Type.SCALAR)
-                          .setArray(new Uint16Array([0, 1, 2, 2, 3, 3, 4, 5])));
-  expect(Array.from(
-             readMesh(doc.createMesh().addPrimitive(primitive))!.mesh.triVerts))
-      .toEqual([0, 1, 2, 3, 5, 4]);
+  const primitive = doc.createPrimitive().setMode(mode).setAttribute(
+      'POSITION',
+      doc.createAccessor()
+          .setBuffer(buffer)
+          .setType(Accessor.Type.VEC3)
+          .setArray(new Float32Array(18)));
+  if (indexed) {
+    primitive.setIndices(doc.createAccessor()
+                             .setBuffer(buffer)
+                             .setType(Accessor.Type.SCALAR)
+                             .setArray(new Uint16Array([0, 1, 2, 3, 4, 5])));
+  }
+  expect(() => readMesh(doc.createMesh().addPrimitive(primitive)))
+      .toThrow('Unsupported glTF primitive mode');
 });
 
 test.each([

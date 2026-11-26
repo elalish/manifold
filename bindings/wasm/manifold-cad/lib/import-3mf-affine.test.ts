@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import type {Document, Node} from '@gltf-transform/core';
+import {Document, type Node} from '@gltf-transform/core';
 import {strToU8, zipSync} from 'fflate';
 import {beforeAll, expect, test} from 'vitest';
 
 import {fromArrayBuffer} from './import-3mf.ts';
 import {cleanup, importManifold} from './import-model.ts';
+import {euler2quat} from './math.ts';
 import {getManifoldModule} from './wasm.ts';
 
 const vertices = [
@@ -187,6 +188,53 @@ test('preserves shared geometry for ordinary TRS instances', async () => {
       nodes[1], vertices.map(([x, y, z]) => [3 - 3 * y, 4 + 2 * x, 5 + 4 * z]));
   expectGeometry(
       nodes[2], vertices.map(([x, y, z]) => [3 - 2 * x, 4 + 3 * y, 5 + 4 * z]));
+});
+
+test('keeps six-decimal rotation instances on shared geometry', async () => {
+  const rotations: [number, number, number][] =
+      [[17, 29, 43], [13, 57, -31], [-47, 21, 63]];
+  const transforms = rotations.map(angles => {
+    const doc = new Document();
+    return doc.createNode()
+        .setRotation(euler2quat(angles))
+        .getMatrix()
+        .map(value => Number(value.toFixed(6)));
+  });
+  const build = '<item objectid="1"/>' +
+      transforms
+          .map(matrix => {
+            const transform =
+                matrix.filter((_, index) => index % 4 !== 3).join(' ');
+            return `<item objectid="1" transform="${transform}"/>`;
+          })
+          .join('');
+  const doc = await fromArrayBuffer(archive(cube, build));
+  const nodes = meshNodes(doc);
+  expect(nodes).toHaveLength(4);
+  expect(doc.getRoot().listMeshes()).toHaveLength(1);
+  for (const [index, matrix] of transforms.entries()) {
+    const node = nodes[index + 1];
+    expect(node.getMesh()).toBe(nodes[0].getMesh());
+    for (const [vertexIndex, [x, y, z]] of vertices.entries()) {
+      const [a, b, c] = [0, 1, 2].map(
+          row => matrix[row] * x + matrix[row + 4] * y + matrix[row + 8] * z);
+      const expected = [a * 1e-3, c * 1e-3, -b * 1e-3];
+      for (let axis = 0; axis < 3; ++axis) {
+        expect(
+            Math.abs(worldPositions(node)[vertexIndex][axis] - expected[axis]))
+            .toBeLessThan(3e-9);
+      }
+    }
+  }
+});
+
+test('still bakes shear larger than the print tolerance', async () => {
+  const doc = await fromArrayBuffer(archive(
+      cube,
+      '<item objectid="1"/><item objectid="1" transform="1 0 0 0.0001 1 0 0 0 1 0 0 0"/>'));
+  const [plain, sheared] = meshNodes(doc);
+  expect(sheared.getMesh()).not.toBe(plain.getMesh());
+  expectGeometry(sheared, vertices.map(([x, y, z]) => [x + 0.0001 * y, y, z]));
 });
 
 test(

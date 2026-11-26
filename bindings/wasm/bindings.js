@@ -438,11 +438,12 @@ Module.setup = function() {
     return this._Simplify(tolerance);
   };
 
-  class Mesh {
-    constructor({
+  // Shared by Mesh and Mesh64, which differ only in float precision.
+  class MeshBase {
+    constructor(Float, {
       numProp = 3,
       triVerts = new Uint32Array(),
-      vertProperties = new Float32Array(),
+      vertProperties = new Float(),
       mergeFromVert,
       mergeToVert,
       runIndex,
@@ -475,10 +476,6 @@ Module.setup = function() {
 
     get numRun() {
       return this.runOriginalID.length;
-    }
-
-    merge(tolerance = 0) {
-      return new Mesh(Module._Merge(this, tolerance));
     }
 
     verts(tri) {
@@ -521,10 +518,40 @@ Module.setup = function() {
     }
   }
 
+  class Mesh extends MeshBase {
+    constructor(options) {
+      super(Float32Array, options);
+    }
+
+    merge(tolerance = 0) {
+      return new Mesh(Module._Merge(this, tolerance));
+    }
+  }
+
+  class Mesh64 extends MeshBase {
+    constructor(options) {
+      super(Float64Array, options);
+    }
+
+    merge(tolerance = 0) {
+      return new Mesh64(Module._Merge64(this, tolerance));
+    }
+  }
+
+  // A registered symbol, so a Mesh64 from another instance of this module is
+  // also read as double.
+  const isMesh64 = Symbol.for('manifold-3d.Mesh64');
+  Mesh64.prototype[isMesh64] = true;
+
   Module.Mesh = Mesh;
+  Module.Mesh64 = Mesh64;
 
   Module.Manifold.prototype.getMesh = function() {
     return new Mesh(this._GetMeshJS());
+  };
+
+  Module.Manifold.prototype.getMesh64 = function() {
+    return new Mesh64(this._GetMesh64JS());
   };
 
   Module.ManifoldError = function ManifoldError(code, ...args) {
@@ -590,10 +617,6 @@ Module.setup = function() {
     const cs = new CrossSectionCtor(polygonsVec);
     polygonsVec.delete();
     return cs;
-  };
-
-  Module.CrossSection.ofPolygons = function(polygons) {
-    return new Module.CrossSection(polygons);
   };
 
   Module.CrossSection.evenOdd = function(polygons) {
@@ -687,11 +710,8 @@ Module.setup = function() {
 
   const ManifoldCtor = Module.Manifold;
   Module.Manifold = function(mesh) {
-    return checkedManifold(new ManifoldCtor(mesh));
-  };
-
-  Module.Manifold.ofMesh = function(mesh) {
-    return new Module.Manifold(mesh);
+    return checkedManifold(
+        mesh?.[isMesh64] ? Module._FromMesh64(mesh) : Module._FromMesh(mesh));
   };
 
   Module.Manifold.tetrahedron = function() {
@@ -772,10 +792,10 @@ Module.setup = function() {
     return out;
   };
 
-  // ctx-aware static factories: mirror Manifold.ofMesh / levelSet but
+  // ctx-aware static factories: mirror new Manifold / levelSet but
   // run under this ExecutionContext so progress/cancellation are observed.
   Module.ExecutionContext.prototype.fromMesh = function(mesh) {
-    return this._FromMesh(mesh);
+    return mesh?.[isMesh64] ? this._FromMesh64(mesh) : this._FromMesh(mesh);
   };
 
   Module.ExecutionContext.prototype.levelSet = function(
@@ -806,10 +826,11 @@ Module.setup = function() {
 
   Module.Manifold.hull = function(...args) {
     if (args.length == 1) args = args[0];
-    let pts = new Module.Vector_vec3();
+    const manifolds = [];
+    const pts = new Module.Vector_vec3();
     for (const m of args) {
       if (m instanceof ManifoldCtor) {
-        Module._manifoldCollectVertices(pts, m);
+        manifolds.push(m);
       } else if (
           m instanceof Array && m.length == 3 && typeof m[0] == 'number') {
         pts.push_back({x: m[0], y: m[1], z: m[2]});
@@ -819,9 +840,32 @@ Module.setup = function() {
         pushVec3(pts, m);
       }
     }
+    if (pts.size() == 0) {
+      // The hull of Manifolds alone uses their smallest precision.
+      const vec = new Module.Vector_manifold();
+      toVec(vec, manifolds);
+      pts.delete();
+      const result = Module._manifoldHull(vec);
+      vec.delete();
+      return result;
+    }
+    let relPrecision = Infinity;
+    for (const m of manifolds) {
+      Module._manifoldCollectVertices(pts, m);
+      if (!m.isEmpty()) relPrecision = Math.min(relPrecision, m.getPrecision());
+    }
     const result = Module._manifoldHullPoints(pts);
     pts.delete();
-    return result;
+    if (!isFinite(relPrecision) || relPrecision == result.getPrecision())
+      return result;
+    // Like the other operations on several Manifolds, the hull uses the
+    // smallest precision among the non-empty input Manifolds, so it is
+    // recomputed at that precision.
+    const stamped = result.withPrecision(relPrecision);
+    result.delete();
+    const hull = stamped.hull();
+    stamped.delete();
+    return hull;
   };
 
   Module.Manifold.prototype = Object.create(ManifoldCtor.prototype);

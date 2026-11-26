@@ -168,13 +168,15 @@ Manifold Manifold::Cylinder(double height, double radiusLow, double radiusHigh,
       !std::isfinite(radiusHigh) || height <= 0.0 || radiusLow < 0.0) {
     return Invalid();
   }
-  const bool flip = radiusLow == 0.0;
-  if (flip) {
-    if (radiusHigh <= 0.0) {
-      return Invalid();
-    }
-    std::swap(radiusLow, radiusHigh);
+  if (radiusLow == 0.0 && radiusHigh <= 0.0) {
+    return Invalid();
   }
+  // Preserve the usual construction's floating-point coordinates. Reverse only
+  // when scaling from the requested bottom radius would overflow.
+  const bool flip =
+      radiusLow == 0.0 ||
+      (radiusHigh > radiusLow && !std::isfinite(radiusHigh / radiusLow));
+  if (flip) std::swap(radiusLow, radiusHigh);
   const double scale = radiusHigh >= 0.0 ? radiusHigh / radiusLow : 1.0;
   const double radius = fmax(radiusLow, radiusHigh);
   const int n = quality.SegmentsFor(radius);
@@ -236,10 +238,10 @@ Manifold Manifold::Sphere(double radius, CircularQuality quality) {
  *
  * @param crossSection A set of non-overlapping polygons to extrude.
  * @param height Z-extent of extrusion.
- * @param nDivisions Number of extra copies of the crossSection to insert into
+ * @param nDivisions Number of extra copies of the cross-section to insert into
  * the shape vertically; especially useful in combination with twistDegrees to
  * avoid interpolation artifacts. Default is none.
- * @param twistDegrees Amount to twist the top crossSection relative to the
+ * @param twistDegrees Amount to twist the top cross-section relative to the
  * bottom, interpolated linearly for the divisions in between.
  * @param scaleTop Amount to scale the top (independently in X and Y). If the
  * scale is {0, 0}, a pure cone is formed with only a single vertex at the top.
@@ -526,6 +528,7 @@ std::vector<Manifold> Manifold::Decompose() const {
     if (faceNew2Old.empty()) continue;
 
     auto impl = std::make_shared<Impl>();
+    impl->relPrecision_ = pImpl_->relPrecision_;
     const int nVert = vertNew2Old.size();
     impl->vertPos_.resize(nVert);
     impl->vertNormal_.resize(nVert);
@@ -618,6 +621,7 @@ std::vector<Manifold> Manifold::Decompose() const {
     }
 
     auto impl = std::make_shared<Impl>();
+    impl->relPrecision_ = pImpl_->relPrecision_;
 
     Vec<int> vertNew2Old(numVert);
     const int nVert = copy_if(countAt(0), countAt(numVert), vertNew2Old.begin(),

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include <cmath>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -408,7 +409,7 @@ void Manifold::Impl::Decimate(double tolerance) {
   Vec<double> totalCost(vertPos_.size(), 0);
   size_t totalCollapsed = 0;
   Vec<Merger> merger(edges.size(), {});
-  tolerance = std::max(tolerance, epsilon_);
+  tolerance = std::max(epsilon_, tolerance);
   const double maxCost = tolerance * tolerance;
   Vec<int> scratchBuffer;
   scratchBuffer.reserve(10);

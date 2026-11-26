@@ -129,6 +129,53 @@ double ValidMiterLimit(double miterLimit) {
   return std::isfinite(miterLimit) && miterLimit >= 2.0 ? miterLimit : 2.0;
 }
 
+// Appends the points of the join at convex corner V. The caller appends the
+// offset endpoints V + delta * nPrev before them and V + delta * nNext after
+// them, and passes a miterLimit already checked by ValidMiterLimit.
+void AppendJoin(SimplePolygon& out, vec2 V, vec2 nPrev, vec2 nNext,
+                double delta, JoinType jt, double miterLimit, int segments) {
+  switch (jt) {
+    case JoinType::Round:
+      AppendRoundJoin(out, V, nPrev, nNext, delta, segments);
+      break;
+    case JoinType::Miter: {
+      // miterLen / |delta| = 1 / cos(half_angle) =
+      // sqrt(2 / (1 + dot(nPrev, nNext))). The limit
+      // miterLen <= miterLimit * |delta| rearranges to
+      // dot >= 2 / miterLimit^2 - 1. Comparing on the dot product
+      // directly avoids computing the miter point in the
+      // clamped case (and avoids FP-fragility of MiterPoint when
+      // the denominator (1 + dot) approaches zero - exactly the
+      // case where we'd clamp anyway).
+      const double dotN = dot(nPrev, nNext);
+      const double miterCosThresh = 2.0 / (miterLimit * miterLimit) - 1.0;
+      // Equality is allowed by the miter limit. `dotN` comes from rounded
+      // unit normals, so use only the baseline unit-scale predicate epsilon
+      // to avoid squaring a corner that is exactly on the limit.
+      const double miterTieTol = EpsilonFromScale(1.0, /*k_budget=*/0);
+      // Near-opposite normals make MiterPoint unbounded (it scales as
+      // 1/(1 + dotN)), and the miterLimit gate stops bounding it once
+      // 2/miterLimit^2 underflows miterTieTol (i.e. for very large
+      // miterLimit). Independently square such degenerate-sharp corners so
+      // the emitted coordinate stays bounded by sqrt(2 / kMinMiterDenom) *
+      // |delta|; 2e-12 caps it at ~1e6 * |delta|, far beyond any meaningful
+      // miter, so honest finite limits are unaffected.
+      constexpr double kMinMiterDenom = 2e-12;
+      if (dotN + miterTieTol < miterCosThresh || 1.0 + dotN < kMinMiterDenom) {
+        AppendSquareJoin(out, V, nPrev, nNext, delta);
+      } else {
+        out.push_back(MiterPoint(V, nPrev, nNext, delta));
+      }
+      break;
+    }
+    case JoinType::Square:
+      AppendSquareJoin(out, V, nPrev, nNext, delta);
+      break;
+    case JoinType::Bevel:
+      break;
+  }
+}
+
 // Offset a single input contour. Positive `delta` inflates the solid
 // region (outer CCW rings expand outward; inner CW holes shrink as
 // their boundary moves into the hole). Negative `delta` does the
@@ -146,6 +193,33 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
   const double deltaSign = (delta >= 0) ? 1.0 : -1.0;
   miterLimit = ValidMiterLimit(miterLimit);
 
+  // Edge k runs from contour[k] to contour[k + 1]. Rounding error sets the
+  // direction of an edge shorter than eps, so give such an edge the bisector
+  // of the normals of its nearest edges that are not short.
+  Rect box;
+  for (const vec2& v : contour) box.Union(v);
+  const double shortEps = EpsilonFromScale(box.Scale());
+  std::vector<vec2> normals(n);
+  std::vector<bool> isShort(n);
+  int longEdges = 0;
+  for (int k = 0; k < n; ++k) {
+    const vec2 e = contour[(k + 1) % n] - contour[k];
+    isShort[k] = la::length2(e) <= shortEps * shortEps;
+    normals[k] = OutwardNormal(e);
+    if (!isShort[k]) ++longEdges;
+  }
+  if (longEdges > 0 && longEdges < n) {
+    for (int k = 0; k < n; ++k) {
+      if (!isShort[k]) continue;
+      int before = (k + n - 1) % n, after = (k + 1) % n;
+      while (isShort[before]) before = (before + n - 1) % n;
+      while (isShort[after]) after = (after + 1) % n;
+      const ScaledDirection bisector =
+          UnitFromScaled(normals[before] + normals[after]);
+      normals[k] = bisector.scale != 0 ? bisector.unit : normals[before];
+    }
+  }
+
   SimplePolygon out;
   out.reserve(static_cast<size_t>(n) * 2);
   for (int i = 0; i < n; ++i) {
@@ -154,8 +228,9 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
     const vec2 N = contour[(i + 1) % n];
     const vec2 ePrev = V - P;
     const vec2 eNext = N - V;
-    const vec2 nPrev = OutwardNormal(ePrev);
-    const vec2 nNext = OutwardNormal(eNext);
+    const int prevEdge = (i + n - 1) % n;
+    const vec2 nPrev = normals[prevEdge];
+    const vec2 nNext = normals[i];
     if (nPrev == vec2(0, 0) || nNext == vec2(0, 0)) continue;
     const vec2 endPrev = V + delta * nPrev;
     const vec2 startNext = V + delta * nNext;
@@ -165,19 +240,26 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
     // concave indent = solid's convex bulge into the hole). Negative
     // delta flips the offset role (a solid-convex corner becomes a
     // shrinking-corner that needs a miter), hence the `* deltaSign`.
-    const double cross = la::cross(ePrev, eNext);
+    // Next to a short edge, the vertex positions are too close together to
+    // give the direction of the turn, so take it from the normals. Consecutive
+    // normals turn by the same angle as their edges.
+    const bool besideShort = isShort[prevEdge] || isShort[i];
+    const double cross =
+        besideShort ? la::cross(nPrev, nNext) : la::cross(ePrev, eNext);
     // Collinearity reuses the canonical CCW predicate, with a scale-derived
     // tolerance from the larger adjacent edge.
     const double eps = EpsilonFromScale(
         std::sqrt(std::max(la::length2(ePrev), la::length2(eNext))));
-    if (CCW(P, V, N, eps) == 0) {
+    const bool straight = besideShort ? nPrev == nNext || nPrev == -nNext
+                                      : CCW(P, V, N, eps) == 0;
+    if (straight) {
       // Zero cross is either a straight continuation (dot >= 0: nPrev == nNext,
       // so endPrev == startNext - one point suffices) or an antiparallel
       // reversal (dot < 0: nPrev == -nNext, so the offset endpoints are
       // distinct and on opposite sides). Emit both for the reversal to bevel
       // across the spike instead of collapsing it to a single point.
       out.push_back(endPrev);
-      if (dot(ePrev, eNext) < 0) out.push_back(startNext);
+      if (dot(nPrev, nNext) < 0) out.push_back(startNext);
       continue;
     }
     const bool convex = cross * deltaSign > 0;
@@ -193,50 +275,24 @@ SimplePolygon OffsetContour(const SimplePolygon& contour, double delta,
       out.push_back(startNext);
       continue;
     }
-    // Convex corner: apply join.
-    out.push_back(endPrev);
-    switch (jt) {
-      case JoinType::Round:
-        AppendRoundJoin(out, V, nPrev, nNext, delta, segments);
-        break;
-      case JoinType::Miter: {
-        // miterLen / |delta| = 1 / cos(half_angle) =
-        // sqrt(2 / (1 + dot(nPrev, nNext))). The limit
-        // miterLen <= miterLimit * |delta| rearranges to
-        // dot >= 2 / miterLimit^2 - 1. Comparing on the dot product
-        // directly avoids materialising the miter point in the
-        // clamped case (and avoids FP-fragility of MiterPoint when
-        // the denominator (1 + dot) approaches zero - exactly the
-        // case where we'd clamp anyway).
-        const double dotN = dot(nPrev, nNext);
-        const double miterCosThresh = 2.0 / (miterLimit * miterLimit) - 1.0;
-        // Equality is allowed by the miter limit. `dotN` comes from rounded
-        // unit normals, so use only the baseline unit-scale predicate epsilon
-        // to avoid squaring a corner that is exactly on the limit.
-        const double miterTieTol = EpsilonFromScale(1.0, /*k_budget=*/0);
-        // Near-opposite normals make MiterPoint unbounded (it scales as
-        // 1/(1 + dotN)), and the miterLimit gate stops bounding it once
-        // 2/miterLimit^2 underflows miterTieTol (i.e. for very large
-        // miterLimit). Independently square such degenerate-sharp corners so
-        // the emitted coordinate stays bounded by sqrt(2 / kMinMiterDenom) *
-        // |delta|; 2e-12 caps it at ~1e6 * |delta|, far beyond any meaningful
-        // miter, so honest finite limits are unaffected.
-        constexpr double kMinMiterDenom = 2e-12;
-        if (dotN + miterTieTol < miterCosThresh ||
-            1.0 + dotN < kMinMiterDenom) {
-          AppendSquareJoin(out, V, nPrev, nNext, delta);
-        } else {
-          out.push_back(MiterPoint(V, nPrev, nNext, delta));
-        }
-        break;
-      }
-      case JoinType::Square:
-        AppendSquareJoin(out, V, nPrev, nNext, delta);
-        break;
-      case JoinType::Bevel:
-        break;
+    // Convex corner: apply the join. Round and Bevel joins connect endPrev to
+    // startNext, so they need both. A Miter or Square join starts on the
+    // previous offset edge and ends on the next one, and the neighboring
+    // vertices' points lie on those edges too, so endPrev and startNext would
+    // only add collinear points. Keep them only when the join emits no points
+    // (a Square join at an exact reversal).
+    if (jt == JoinType::Round || jt == JoinType::Bevel) {
+      out.push_back(endPrev);
+      AppendJoin(out, V, nPrev, nNext, delta, jt, miterLimit, segments);
+      out.push_back(startNext);
+      continue;
     }
-    out.push_back(startNext);
+    const size_t joinStart = out.size();
+    AppendJoin(out, V, nPrev, nNext, delta, jt, miterLimit, segments);
+    if (out.size() == joinStart) {
+      out.push_back(endPrev);
+      out.push_back(startNext);
+    }
   }
   return out;
 }
@@ -272,9 +328,10 @@ bool CollapsesUnderOffset(const SimplePolygon& contour, double delta) {
 // chord count per 360 degrees of Round join for radius |delta|.
 //
 // Each input contour produces one offset ring, or none if the offset erases
-// it, then all rings are regularized with Positive/Add filling. Collinear
-// vertices are left in place for the caller to `Simplify` if wanted, matching
-// Manifold's tolerance model rather than Clipper2's finishing behaviour.
+// it, then all rings are regularized with Positive/Add filling. Joins add no
+// collinear vertices. Collinear input vertices keep their offset copies,
+// consistent with Manifold's tolerance model, and the caller can remove them
+// with `Simplify`; Clipper2 removes them during the offset.
 Polygons Offset(const Polygons& in, double delta, JoinType jt,
                 double miterLimit, const CircularQuality& quality) {
   // Reject NaN/Inf delta and input coordinates.

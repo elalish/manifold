@@ -593,8 +593,8 @@ TEST(Manifold, NormalsAutoSubstitute) {
 }
 
 TEST(Manifold, NormalsRoundTrip) {
-  // getMesh -> ofMesh -> getMesh preserves the per-run flag, so the second
-  // getMesh still emits world-frame normals.
+  // GetMeshGL -> Manifold(mesh) -> GetMeshGL preserves the per-run flag, so
+  // the second GetMeshGL still emits world-frame normals.
   Manifold round = (Manifold::Sphere(10.0, {32}) - Manifold::Sphere(3.0, {32}))
                        .CalculateNormals();
   MeshGL out1 = round.GetMeshGL();
@@ -1010,6 +1010,7 @@ TEST(Manifold, ObjRoundTrip) {
   Manifold m2 = Manifold::ReadOBJ(ss);
   EXPECT_EQ(m2.Status(), Manifold::Error::NoError);
   EXPECT_EQ(m2.Volume(), 1);
+  EXPECT_EQ(m2.GetPrecision(), kMinRelativePrecision);
 }
 
 // A unit tetrahedron, missing its last face line.
@@ -1986,6 +1987,24 @@ TEST(Manifold, Simplify) {
   if (options.exportModels) WriteTestOBJ("torus.obj", simplified);
 }
 
+TEST(Manifold, SimplifyNaNTolerance) {
+  Polygons polyCircle =
+      CrossSection::Circle(1, {20}).Translate({10, 0}).ToPolygons();
+  const Manifold torus = Manifold::Revolve(polyCircle, {100});
+  // NaN simplifies like 0, at the Manifold's epsilon.
+  const Manifold simplified = torus.Simplify(NAN);
+  EXPECT_EQ(simplified.Status(), Manifold::Error::NoError);
+  EXPECT_EQ(simplified.NumTri(), torus.Simplify().NumTri());
+}
+
+TEST(Manifold, SimplifyToEmpty) {
+  const Manifold cube = Manifold::Cube();
+  const Manifold gone = cube.Translate({100, 0, 0}).Simplify(1e9);
+  EXPECT_TRUE(gone.IsEmpty());
+  EXPECT_FALSE(gone.BoundingBox().IsFinite());
+  EXPECT_EQ((gone + cube).GetEpsilon(), cube.GetEpsilon());
+}
+
 TEST(Manifold, MeshID) {
   const Manifold cube = Manifold::Cube();
   MeshGL cubeGL = cube.GetMeshGL();
@@ -2104,6 +2123,376 @@ TEST(Manifold, MergeTolerance) {
   MeshGL mesh = CubeSTL();
   mesh.vertProperties[0] += 1e-4f;
   EXPECT_EQ(Manifold(mesh.Merge(1e-3f)).Status(), Manifold::Error::NoError);
+}
+
+TEST(Manifold, MergeNaNTolerance) {
+  const MeshGL mesh = CubeSTL();
+  MeshGL64 mesh64;
+  mesh64.numProp = mesh.numProp;
+  mesh64.vertProperties.assign(mesh.vertProperties.begin(),
+                               mesh.vertProperties.end());
+  mesh64.triVerts.assign(mesh.triVerts.begin(), mesh.triVerts.end());
+  // NaN merges like 0, at the floor of each mesh type.
+  EXPECT_FALSE(mesh.Merge().mergeFromVert.empty());
+  EXPECT_EQ(mesh.Merge(NAN).mergeFromVert, mesh.Merge().mergeFromVert);
+  EXPECT_EQ(mesh64.Merge(NAN).mergeFromVert, mesh64.Merge().mergeFromVert);
+}
+
+TEST(Precision, Merge) {
+  // The merge floor is the ingest precision of the mesh type times the
+  // bounding box scale, which is 0.5 for the centered cube.
+  MeshGL mesh = CubeSTL();
+  mesh.vertProperties[0] += 1e-4f;
+  EXPECT_EQ(Manifold(mesh.Merge()).Status(), Manifold::Error::NotManifold);
+  EXPECT_EQ(Manifold(mesh.Merge(1e-3f)).Status(), Manifold::Error::NoError);
+  // Shifted to [0, 1], the scale is 1 and an offset from 0 is exact in float.
+  mesh = CubeSTL();
+  for (size_t v = 0; v < mesh.NumVert(); ++v) {
+    for (const int i : {0, 1, 2})
+      mesh.vertProperties[mesh.numProp * v + i] += 0.5f;
+  }
+  size_t atZero = 0;
+  while (mesh.vertProperties[mesh.numProp * atZero] != 0) ++atZero;
+  mesh.vertProperties[mesh.numProp * atZero] += 0.5 * kDefaultRelativePrecision;
+  EXPECT_EQ(Manifold(mesh.Merge()).Status(), Manifold::Error::NoError);
+
+  const MeshGL stl = CubeSTL();
+  MeshGL64 mesh64;
+  mesh64.numProp = stl.numProp;
+  mesh64.vertProperties.assign(stl.vertProperties.begin(),
+                               stl.vertProperties.end());
+  mesh64.triVerts.assign(stl.triVerts.begin(), stl.triVerts.end());
+  MeshGL64 coarse64 = mesh64;
+  coarse64.vertProperties[0] += 0.1 * kDefaultRelativePrecision;
+  EXPECT_EQ(Manifold(coarse64.Merge()).Status(), Manifold::Error::NotManifold);
+  EXPECT_EQ(Manifold(coarse64.Merge(kDefaultRelativePrecision)).Status(),
+            Manifold::Error::NoError);
+  mesh64.vertProperties[0] += 0.1 * kMinRelativePrecision;
+  EXPECT_EQ(Manifold(mesh64.Merge()).Status(), Manifold::Error::NoError);
+}
+
+TEST(Precision, Ingest) {
+  // WithPrecision is the only way to set the precision.
+  static_assert(!std::is_constructible_v<Manifold, const MeshGL&, double>);
+  static_assert(!std::is_constructible_v<Manifold, const MeshGL64&, double>);
+  const MeshGL64 mesh = Manifold::Sphere(1, {64}).GetMeshGL64();
+  const MeshGL meshF = Manifold::Sphere(1, {64}).GetMeshGL();
+  // The default follows the representation.
+  EXPECT_EQ(kDefaultRelativePrecision, std::numeric_limits<float>::epsilon());
+  EXPECT_EQ(Manifold(mesh).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ(Manifold(meshF).GetPrecision(), kDefaultRelativePrecision);
+  ExecutionContext ctx;
+  EXPECT_EQ(ctx.FromMeshGL(mesh).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ(ctx.FromMeshGL(meshF).GetPrecision(), kDefaultRelativePrecision);
+  const Manifold coarse = Manifold(mesh).WithPrecision(1e-3);
+  EXPECT_EQ(coarse.GetPrecision(), 1e-3);
+  EXPECT_DOUBLE_EQ(coarse.GetEpsilon(), 1e-3 * coarse.BoundingBox().Scale());
+  // 0, negative values, NaN and infinity give kDefaultRelativePrecision, even
+  // for a Manifold made from MeshGL64.
+  for (const double unset :
+       {0.0, -0.0, -1e-3, -1e-15, -kMinRelativePrecision,
+        static_cast<double>(NAN), static_cast<double>(INFINITY),
+        static_cast<double>(-INFINITY)}) {
+    EXPECT_EQ(Manifold(mesh).WithPrecision(unset).GetPrecision(),
+              kDefaultRelativePrecision);
+    EXPECT_EQ(Manifold(meshF).WithPrecision(unset).GetPrecision(),
+              kDefaultRelativePrecision);
+  }
+  // Positive values below the floor use the floor.
+  EXPECT_EQ(Manifold(meshF).WithPrecision(1e-15).GetPrecision(),
+            kMinRelativePrecision);
+  EXPECT_EQ(Manifold(meshF).WithPrecision(kMinRelativePrecision).GetPrecision(),
+            kMinRelativePrecision);
+  EXPECT_EQ(Manifold(meshF).WithPrecision(1e-9).GetPrecision(), 1e-9);
+  // The mesh does not store the precision.
+  EXPECT_EQ(Manifold(coarse.GetMeshGL64()).GetPrecision(),
+            kMinRelativePrecision);
+  EXPECT_EQ(Manifold(coarse.GetMeshGL()).GetPrecision(),
+            kDefaultRelativePrecision);
+  // Transforms and single-input operations keep the precision.
+  EXPECT_EQ(coarse.Translate({10, 0, 0}).GetPrecision(), 1e-3);
+  EXPECT_DOUBLE_EQ(coarse.Translate({10, 0, 0}).GetEpsilon(), 1e-3 * 11);
+  EXPECT_EQ(coarse.Refine(2).GetPrecision(), 1e-3);
+  EXPECT_EQ(coarse.Simplify().GetPrecision(), 1e-3);
+  EXPECT_EQ(coarse.AsOriginal().GetPrecision(), 1e-3);
+  EXPECT_EQ(coarse.CalculateNormals().GetPrecision(), 1e-3);
+  EXPECT_EQ(coarse.Warp([](vec3& v) { v.x *= 2; }).GetPrecision(), 1e-3);
+  EXPECT_EQ(coarse
+                .SetProperties(4, [](double* newProp, vec3 pos,
+                                     const double*) { newProp[3] = pos.x; })
+                .GetPrecision(),
+            1e-3);
+  EXPECT_EQ(coarse.Hull().GetPrecision(), 1e-3);
+  EXPECT_EQ(coarse.TrimByPlane({0, 0, 1}, 0).GetPrecision(), 1e-3);
+  const auto halves = coarse.SplitByPlane({0, 0, 1}, 0);
+  EXPECT_EQ(halves.first.GetPrecision(), 1e-3);
+  EXPECT_EQ(halves.second.GetPrecision(), 1e-3);
+  for (const Manifold& part :
+       (coarse + coarse.Translate({5, 0, 0})).Decompose()) {
+    EXPECT_EQ(part.GetPrecision(), 1e-3);
+  }
+  // A part with an inner void is rebuilt by a separate Decompose path.
+  const Manifold hollow =
+      (Manifold::Cube(vec3(4), true) - Manifold::Cube(vec3(2), true))
+          .WithPrecision(1e-3);
+  for (const Manifold& part :
+       (hollow + coarse.Translate({10, 0, 0})).Decompose()) {
+    EXPECT_EQ(part.GetPrecision(), 1e-3);
+  }
+}
+
+TEST(Precision, IngestIgnoresUnusedVerts) {
+  MeshGL64 mesh = Manifold::Cube(vec3(1)).Refine(2).GetMeshGL64();
+  int raised = 0;
+  for (size_t v = 0; v < mesh.NumVert(); ++v) {
+    double* p = &mesh.vertProperties[mesh.numProp * v];
+    if (p[0] == 0.5 && p[1] == 0.5 && p[2] == 1) {
+      p[2] += 1e-4;
+      ++raised;
+    }
+  }
+  ASSERT_EQ(raised, 1);
+  const size_t numVert =
+      Manifold(mesh).WithPrecision(1e-6).Simplify().NumVert();
+
+  // A far unused vertex must not widen the tolerance.
+  mesh.vertProperties.push_back(1000);
+  for (size_t i = 1; i < mesh.numProp; ++i) mesh.vertProperties.push_back(0);
+  const Manifold m = Manifold(mesh).WithPrecision(1e-6);
+  EXPECT_DOUBLE_EQ(m.GetEpsilon(), 1e-6 * m.BoundingBox().Scale());
+  EXPECT_EQ(m.Simplify().NumVert(), numVert);
+
+  ExecutionContext ctx;
+  const Manifold viaCtx = ctx.FromMeshGL(mesh);
+  EXPECT_DOUBLE_EQ(viaCtx.GetEpsilon(),
+                   kMinRelativePrecision * viaCtx.BoundingBox().Scale());
+}
+
+TEST(Precision, BuiltShapesDefaultToFloat) {
+  const CrossSection square = CrossSection::Square(vec2(1));
+  const std::vector<Manifold> shapes = {
+      Manifold(),
+      Manifold::Tetrahedron(),
+      Manifold::Cube(),
+      Manifold::Cylinder(1, 1),
+      Manifold::Sphere(1),
+      Manifold::Extrude(square.ToPolygons(), 1),
+      Manifold::Revolve(square.Translate({1, 0}).ToPolygons()),
+      Manifold::LevelSet([](vec3 p) { return 1 - la::length(p); },
+                         {vec3(-2), vec3(2)}, 0.5),
+      Manifold::Hull({{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}}),
+  };
+  for (const Manifold& shape : shapes) {
+    EXPECT_EQ(shape.GetPrecision(), kDefaultRelativePrecision);
+  }
+  ExecutionContext ctx;
+  EXPECT_EQ(ctx.LevelSet([](vec3 p) { return 1 - la::length(p); },
+                         {vec3(-2), vec3(2)}, 0.5)
+                .GetPrecision(),
+            kDefaultRelativePrecision);
+  // A MeshGL64 operand keeps a Boolean at double precision.
+  const Manifold fine(Manifold::Sphere(1).GetMeshGL64());
+  EXPECT_EQ((fine - Manifold::Cube()).GetPrecision(), kMinRelativePrecision);
+}
+
+TEST(Precision, WithPrecisionAffectsOnlyLaterOps) {
+  const Manifold fine =
+      Manifold::Sphere(1, {256}) - Manifold::Cube(vec3(1)).Rotate(10, 20, 30);
+  const size_t numTri = fine.NumTri();
+  const Manifold coarse = fine.WithPrecision(1e-2);
+  // The geometry is not recomputed.
+  EXPECT_EQ(coarse.NumTri(), numTri);
+  EXPECT_EQ(coarse.GetPrecision(), 1e-2);
+  EXPECT_DOUBLE_EQ(coarse.GetEpsilon(), 1e-2 * coarse.BoundingBox().Scale());
+  EXPECT_EQ(fine.GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_EQ(fine.WithPrecision(kMinRelativePrecision).GetPrecision(),
+            kMinRelativePrecision);
+  EXPECT_EQ(fine.WithPrecision(1e-15).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ(fine.WithPrecision(1e-12).WithPrecision(0).GetPrecision(),
+            kDefaultRelativePrecision);
+  EXPECT_EQ(fine.WithPrecision(1e-12).WithPrecision(-1).GetPrecision(),
+            kDefaultRelativePrecision);
+  EXPECT_EQ(fine.WithPrecision(INFINITY).GetPrecision(),
+            kDefaultRelativePrecision);
+  // Later operations use it.
+  const Manifold cutter = Manifold::Cube(vec3(3), true).Translate({2, 0, 0});
+  const Manifold coarseCut = coarse - cutter.WithPrecision(1e-2);
+  const Manifold fineCut = fine - cutter;
+  EXPECT_EQ(coarseCut.GetPrecision(), 1e-2);
+  EXPECT_LT(coarseCut.NumTri(), fineCut.NumTri());
+  EXPECT_EQ(fine.NumTri(), numTri);
+  EXPECT_EQ((fine - cutter).NumTri(), fineCut.NumTri());
+}
+
+TEST(Precision, SmallestKeepsFineDetail) {
+  const Manifold sphere = Manifold::Sphere(1, {256});
+  const Manifold cube = Manifold::Cube(vec3(1)).Rotate(10, 20, 30);
+  const Manifold allFine = sphere - cube;
+  const Manifold allCoarse =
+      sphere.WithPrecision(1e-2) - cube.WithPrecision(1e-2);
+  const Manifold mixed = sphere - cube.WithPrecision(1e-2);
+  EXPECT_EQ(allCoarse.GetPrecision(), 1e-2);
+  EXPECT_EQ(mixed.GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_LT(allCoarse.NumTri(), allFine.NumTri());
+  EXPECT_EQ(mixed.NumTri(), allFine.NumTri());
+  // An empty operand is ignored.
+  EXPECT_EQ((sphere.WithPrecision(1e-2) + Manifold()).GetPrecision(), 1e-2);
+  EXPECT_EQ((sphere.WithPrecision(1e-2) - Manifold()).GetPrecision(), 1e-2);
+  // Compose and Hull follow the same rule.
+  const Manifold far = cube.WithPrecision(1e-2).Translate({10, 0, 0});
+  EXPECT_EQ((sphere.WithPrecision(1e-3) + far).GetPrecision(), 1e-3);
+  EXPECT_EQ(Manifold::Hull({sphere.WithPrecision(1e-3), far}).GetPrecision(),
+            1e-3);
+  EXPECT_EQ(Manifold::Hull({Manifold(), far}).GetPrecision(), 1e-2);
+  EXPECT_EQ(sphere.WithPrecision(1e-3).MinkowskiSum(far).GetPrecision(), 1e-3);
+  // An empty Minkowski result has the smaller precision, in either order.
+  const Manifold empty2 = Manifold().WithPrecision(1e-2);
+  const Manifold empty3 = Manifold().WithPrecision(1e-3);
+  EXPECT_EQ(empty2.MinkowskiSum(empty3).GetPrecision(), 1e-3);
+  EXPECT_EQ(empty3.MinkowskiSum(empty2).GetPrecision(), 1e-3);
+  EXPECT_EQ(empty2.MinkowskiDifference(cube.WithPrecision(1e-3)).GetPrecision(),
+            1e-3);
+  EXPECT_EQ(far.MinkowskiDifference(cube.WithPrecision(1e-3).Scale(vec3(0.1)))
+                .GetPrecision(),
+            1e-3);
+  const auto [inside, outside] = cube.WithPrecision(1e-2).Split(
+      cube.WithPrecision(1e-3).Translate({0.5, 0.5, 0.5}));
+  EXPECT_EQ(inside.GetPrecision(), 1e-3);
+  EXPECT_EQ(outside.GetPrecision(), 1e-3);
+}
+
+TEST(Precision, UnionOrder) {
+  const Manifold a = Manifold::Sphere(1, {128}).WithPrecision(1e-2);
+  const Manifold b = Manifold::Cube(vec3(1)).Rotate(10, 20, 30);
+  const Manifold c =
+      Manifold::Cylinder(2, 0.3, 0.3, {64}).Translate({0.5, 0, -1});
+  const Manifold ab = a + b;
+  const Manifold ba = b + a;
+  EXPECT_EQ(ab.NumTri(), ba.NumTri());
+  EXPECT_EQ(ab.GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_EQ(ba.GetPrecision(), kDefaultRelativePrecision);
+  const Manifold abc = Manifold::BatchBoolean({a, b, c}, OpType::Add);
+  const Manifold cba = Manifold::BatchBoolean({c, b, a}, OpType::Add);
+  EXPECT_EQ(abc.NumTri(), cba.NumTri());
+  EXPECT_EQ(abc.GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_EQ(cba.GetPrecision(), kDefaultRelativePrecision);
+}
+
+TEST(Precision, SharedSubtree) {
+  auto build = []() {
+    return Manifold::Sphere(1, {256}).WithPrecision(1e-2) -
+           Manifold::Cube(vec3(1)).Rotate(10, 20, 30).WithPrecision(1e-2);
+  };
+  const size_t alone = build().NumTri();
+  EXPECT_EQ(build().GetPrecision(), 1e-2);
+
+  // Evaluated first as part of a finer tree, the subtree keeps its own
+  // precision.
+  const Manifold shared = build();
+  const Manifold parent = shared + Manifold::Cube(vec3(1)).Translate({5, 0, 0});
+  const Manifold parent2 = shared.Translate({0, 0, 3}) ^ Manifold::Sphere(5);
+  EXPECT_EQ(parent.GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_GT(parent2.NumTri(), 0);
+  EXPECT_EQ(shared.NumTri(), alone);
+  EXPECT_EQ(shared.GetPrecision(), 1e-2);
+  EXPECT_EQ(parent.NumTri(),
+            (build() + Manifold::Cube(vec3(1)).Translate({5, 0, 0})).NumTri());
+}
+
+TEST(Precision, WithPrecisionThenTransform) {
+  const Manifold cube = Manifold::Cube(vec3(1));
+  const Manifold moved = cube.WithPrecision(1e-3).Translate({10, 0, 0});
+  EXPECT_EQ(moved.GetPrecision(), 1e-3);
+  EXPECT_DOUBLE_EQ(moved.GetEpsilon(), 1e-3 * 11);
+  EXPECT_EQ(moved.Scale(vec3(2)).GetPrecision(), 1e-3);
+  EXPECT_EQ(moved.Mirror(vec3(0.0)).GetPrecision(), 1e-3);
+  const auto halves = Manifold().WithPrecision(1e-3).SplitByPlane({0, 0, 1}, 0);
+  EXPECT_EQ(halves.first.GetPrecision(), 1e-3);
+  EXPECT_EQ(halves.second.GetPrecision(), 1e-3);
+  EXPECT_EQ(cube.GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_DOUBLE_EQ(cube.GetEpsilon(), kDefaultRelativePrecision);
+}
+
+TEST(Precision, WithPrecisionOnError) {
+  const Manifold invalid(CubeSTL());
+  EXPECT_EQ(invalid.Status(), Manifold::Error::NotManifold);
+  const Manifold coarse = invalid.WithPrecision(1e-3);
+  EXPECT_EQ(coarse.Status(), Manifold::Error::NotManifold);
+  EXPECT_EQ(coarse.GetPrecision(), 1e-3);
+  EXPECT_EQ(invalid.GetPrecision(), kDefaultRelativePrecision);
+}
+
+TEST(Precision, EmptyEpsilon) {
+  const Manifold empty;
+  const Manifold coarseEmpty = empty.WithPrecision(1e-3);
+  EXPECT_EQ(empty.GetEpsilon(), -1);
+  EXPECT_EQ(coarseEmpty.GetEpsilon(), -1);
+  EXPECT_EQ(coarseEmpty.GetPrecision(), 1e-3);
+  EXPECT_EQ(empty.Translate({1, 0, 0}).GetEpsilon(), -1);
+  EXPECT_EQ(coarseEmpty.Translate({1, 0, 0}).GetEpsilon(), -1);
+  EXPECT_EQ(Manifold::BatchBoolean({empty, coarseEmpty, empty}, OpType::Add)
+                .GetEpsilon(),
+            -1);
+  const Manifold cube = Manifold::Cube();
+  EXPECT_EQ((cube - cube).GetEpsilon(), -1);
+  EXPECT_EQ((cube ^ cube.Translate({5, 0, 0})).GetEpsilon(), -1);
+  EXPECT_EQ(cube.Simplify(1e9).GetEpsilon(), -1);
+#ifndef MANIFOLD_NO_IOSTREAM
+  for (const Manifold& m :
+       {coarseEmpty.Translate({1, 0, 0}), cube.Simplify(1e9)}) {
+    std::stringstream obj;
+    m.WriteOBJ(obj);
+    EXPECT_NE(obj.str().find("# epsilon = -1"), std::string::npos);
+  }
+#endif
+}
+
+TEST(Precision, EmptyBooleanTakesMin) {
+  const Manifold fine(Manifold::Cube().GetMeshGL64());
+  const Manifold cube = Manifold::Cube();
+  const Manifold far = cube.Translate({5, 0, 0});
+  const Manifold empty;
+  const Manifold coarseEmpty = empty.WithPrecision(1e-2);
+  // An empty result has the smaller precision of the two inputs, in either
+  // order, including an empty input.
+  EXPECT_EQ((fine ^ empty).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ((empty ^ fine).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ((empty - fine).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ((fine ^ far).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ((far ^ fine).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ((fine - fine).GetPrecision(), kMinRelativePrecision);
+  EXPECT_EQ((coarseEmpty + empty.WithPrecision(1e-3)).GetPrecision(), 1e-3);
+  EXPECT_EQ((empty.WithPrecision(1e-3) + coarseEmpty).GetPrecision(), 1e-3);
+  EXPECT_EQ(
+      Manifold::BatchBoolean(
+          {coarseEmpty, empty.WithPrecision(1e-3), coarseEmpty}, OpType::Add)
+          .GetPrecision(),
+      1e-3);
+  EXPECT_EQ((coarseEmpty ^ cube).GetPrecision(), kDefaultRelativePrecision);
+  EXPECT_EQ((cube ^ coarseEmpty).GetPrecision(), kDefaultRelativePrecision);
+  // A non-empty result ignores an empty input.
+  EXPECT_EQ((cube.WithPrecision(1e-2) - empty).GetPrecision(), 1e-2);
+  EXPECT_EQ((empty + cube.WithPrecision(1e-2)).GetPrecision(), 1e-2);
+  // BatchBoolean gives the same in any order.
+  for (const auto& parts : std::vector<std::vector<Manifold>>{
+           {fine, cube, far}, {cube, far, fine}, {far, fine, cube}}) {
+    const Manifold result = Manifold::BatchBoolean(parts, OpType::Intersect);
+    EXPECT_TRUE(result.IsEmpty());
+    EXPECT_EQ(result.GetPrecision(), kMinRelativePrecision);
+  }
+}
+
+TEST(Precision, BooleanTakesMin) {
+  const Manifold sphere = Manifold::Sphere(1, {64});
+  const Manifold cube = Manifold::Cube(vec3(1));
+  EXPECT_EQ((sphere.WithPrecision(1e-3) + cube).GetPrecision(),
+            kDefaultRelativePrecision);
+  EXPECT_EQ((cube - sphere.WithPrecision(1e-3)).GetPrecision(),
+            kDefaultRelativePrecision);
+  EXPECT_EQ((sphere.WithPrecision(1e-2).Translate({0.5, 0, 0}) ^
+             cube.WithPrecision(1e-3))
+                .GetPrecision(),
+            1e-3);
 }
 
 TEST(Manifold, MergeCollapsedEdgeParity) {
@@ -2406,6 +2795,49 @@ TEST(Manifold, CylinderFiniteNegativeTopRadiusUsesBottomRadius) {
     EXPECT_DOUBLE_EQ(cylinder.Volume(), expected.Volume());
     EXPECT_EQ(cylinder.NumVert(), expected.NumVert());
     EXPECT_EQ(cylinder.NumTri(), expected.NumTri());
+  }
+}
+
+TEST(Manifold, CylinderExtremeRadiusRatio) {
+  constexpr int segments = 8;
+  constexpr double height = 2;
+  // The first pair includes a subnormal radius; the second overflows the
+  // radius ratio even though both inputs are normal finite doubles. Include
+  // an ordinary frustum as a control.
+  for (const vec2 radii : {vec2(1e-310, 1), vec2(1e-300, 1e10), vec2(0.5, 1)}) {
+    const double expectedVolume =
+        segments * std::sin(2 * kPi / segments) * height / 6 *
+        (radii.x * radii.x + radii.x * radii.y + radii.y * radii.y);
+    for (bool reverse : {false, true}) {
+      for (bool center : {false, true}) {
+        SCOPED_TRACE(testing::Message()
+                     << radii.x << ", " << radii.y << ", reverse=" << reverse
+                     << ", center=" << center);
+        const double radiusLow = reverse ? radii.y : radii.x;
+        const double radiusHigh = reverse ? radii.x : radii.y;
+        const Manifold cylinder = Manifold::Cylinder(
+            height, radiusLow, radiusHigh, {segments}, center);
+        ASSERT_EQ(cylinder.Status(), Manifold::Error::NoError);
+        ASSERT_FALSE(cylinder.IsEmpty());
+        EXPECT_NEAR(cylinder.Volume() / expectedVolume, 1, 1e-12);
+        const Box bounds = cylinder.BoundingBox();
+        EXPECT_NEAR(bounds.min.x / radii.y, -1, 1e-12);
+        EXPECT_NEAR(bounds.max.x / radii.y, 1, 1e-12);
+        EXPECT_NEAR(bounds.min.y / radii.y, -1, 1e-12);
+        EXPECT_NEAR(bounds.max.y / radii.y, 1, 1e-12);
+        EXPECT_DOUBLE_EQ(bounds.min.z, center ? -height / 2 : 0);
+        EXPECT_DOUBLE_EQ(bounds.max.z, center ? height / 2 : height);
+        // A slice away from the midpoint distinguishes the two orientations.
+        const double quarterRadius = 0.75 * radiusLow + 0.25 * radiusHigh;
+        const double expectedArea = segments * std::sin(2 * kPi / segments) /
+                                    2 * quarterRadius * quarterRadius;
+        const CrossSection slice(cylinder.Slice(bounds.min.z + height / 4));
+        EXPECT_NEAR(slice.Area() / expectedArea, 1, 1e-10);
+        for (double coordinate : cylinder.GetMeshGL64().vertProperties) {
+          EXPECT_TRUE(std::isfinite(coordinate));
+        }
+      }
+    }
   }
 }
 
@@ -2826,10 +3258,9 @@ TEST(Manifold, RemoveDegeneratesSplitsAtNewVert) {
       53, 51, 15, 50, 49, 13, 37, 49, 54, 54, 55, 26, 48, 54, 27, 55, 53, 25,
       47, 48, 24, 49, 50, 55, 50, 52, 53, 52, 51, 53, 49, 55, 54, 50, 53, 55,
   };
-  Quality::SetRelativePrecision(0.1);
   Manifold result;
-  EXPECT_NO_THROW(result = Manifold(mesh).RemoveDegenerates());
-  Quality::ResetToDefaults();
+  EXPECT_NO_THROW(result =
+                      Manifold(mesh).WithPrecision(0.1).RemoveDegenerates());
   EXPECT_EQ(result.Status(), Manifold::Error::NoError);
   EXPECT_EQ(result.NumDegenerateTris(), 0);
 }

@@ -76,6 +76,23 @@ constexpr double kTwoPi = 6.28318530717958647692528676655900576;
 constexpr double kHalfPi = 1.57079632679489661923132169163975144;
 
 /**
+ * The default relative precision of a Manifold made from MeshGL or built by a
+ * factory such as Cube() or LevelSet(): float epsilon. A Manifold's epsilon is
+ * its relative precision times its bounding box scale.
+ *
+ * Manifold::WithPrecision() with 0, a negative value, NaN or infinity gives
+ * this default, even for a Manifold made from MeshGL64.
+ */
+constexpr double kDefaultRelativePrecision =
+    std::numeric_limits<float>::epsilon();
+
+/**
+ * The smallest relative precision allowed, and the default for a Manifold made
+ * from MeshGL64. Pass it to request the finest precision.
+ */
+constexpr double kMinRelativePrecision = 1e-12;
+
+/**
  * Convert degrees to radians.
  *
  * @param a Angle in degrees.
@@ -195,10 +212,10 @@ struct RayHit {
  * @brief Observe and control a long-running Manifold evaluation.
  *
  * Attach to a Manifold via Manifold::WithContext(ctx); the next *eager* op
- * invoked on the result (Status, Refine / RefineToLength / RefineToTolerance,
- * Hull, MinkowskiSum / MinkowskiDifference) snapshots the ctx and reports
- * progress and observes cancellation through it. Safe to read/write from any
- * thread.
+ * invoked on the result (Status, WithPrecision, GetPrecision, Refine /
+ * RefineToLength / RefineToTolerance, Hull, MinkowskiSum /
+ * MinkowskiDifference) snapshots the ctx and reports progress and observes
+ * cancellation through it. Safe to read/write from any thread.
  *
  * Copyable and movable: copies share the same underlying state via a
  * shared_ptr, so one thread can evaluate while another holds a copy and
@@ -216,11 +233,11 @@ struct RayHit {
  * short-circuit to Error::Cancelled. Construct a fresh context to make a
  * new evaluation cancellable independently.
  *
- * Cancellation granularity varies by op: Boolean trees check per
- * sub-boolean (so a single very large boolean may run to completion
- * before the next check); Hull checks at the boundaries of its main
- * phases (post-buildMesh and post-SortGeometry); Minkowski checks per
- * face of the first input and per internal BatchBoolean batch.
+ * Cancellation granularity varies by op: Boolean trees check between
+ * sub-booleans and between the phases inside each one; Hull checks at the
+ * boundaries of its main phases (post-buildMesh and post-SortGeometry);
+ * Minkowski checks per face of the first input and per internal BatchBoolean
+ * batch.
  *
  * Example: cancel a long-running BatchBoolean from an observer thread.
  * @code
@@ -265,7 +282,7 @@ class ExecutionContext {
   /// Normalized progress in [0, 1]. Monotonically increases during
   /// evaluation. Returns 1.0 when no work has been scheduled (interpreted
   /// as trivially complete -- e.g. a single-leaf manifold has nothing to
-  /// evaluate, and `Progress()` called before any `Status(ctx)` reflects
+  /// evaluate, and `Progress()` called before any evaluation reflects
   /// the same "no pending work" state).
   double Progress() const;
 
@@ -274,7 +291,9 @@ class ExecutionContext {
   /// Cancel() before this call wins over empty/malformed input;
   /// validation errors win over a Cancel() that races in after that.
   /// Concurrent calls on the same ctx produce undefined progress
-  /// values; the returned Manifolds remain valid.
+  /// values; the returned Manifolds remain valid. The result has the
+  /// default relative precision of `Manifold(MeshGL)` or
+  /// `Manifold(MeshGL64)`. Use `Manifold::WithPrecision` to change it.
   Manifold FromMeshGL(const MeshGL& mesh);
   Manifold FromMeshGL(const MeshGL64& mesh);
 
@@ -686,16 +705,6 @@ struct CircularQuality {
 
   int SegmentsFor(double radius) const;
   static CircularQuality ForDivisions(int divisions, double degrees);
-};
-
-/**
- * @brief Global parameters for geometric computations.
- */
-class Quality {
- public:
-  static void SetRelativePrecision(double p);
-  static double GetRelativePrecision();
-  static void ResetToDefaults();
 };
 /** @} */
 

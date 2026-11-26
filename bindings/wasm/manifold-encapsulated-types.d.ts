@@ -16,12 +16,12 @@
  * @primaryExport
  */
 
-import {Box, CircularQuality, ErrorStatus, ExecutionContext, JoinType, Mat3, Mat4, Polygons, RayHit, Rect, SealedFloat32Array, SealedUint32Array, SimplePolygon, Vec2, Vec3} from './manifold-global-types';
+import {Box, CircularQuality, ErrorStatus, ExecutionContext, JoinType, Mat3, Mat4, Polygons, RayHit, Rect, SealedFloat32Array, SealedFloat64Array, SealedUint32Array, SimplePolygon, Vec2, Vec3} from './manifold-global-types';
 
 export {ExecutionContext} from './manifold-global-types';
 
 /**
- * Triangulates a set of /epsilon-valid polygons.
+ * Triangulates a set of epsilon-valid polygons.
  *
  * @param polygons The set of polygons, wound CCW and representing multiple
  * polygons and/or holes.
@@ -37,8 +37,11 @@ export {ExecutionContext} from './manifold-global-types';
 export function triangulate(
     polygons: Polygons, epsilon?: number, allowConvex?: boolean): Vec3[];
 
-export function setRelativePrecision(precision: number): void;
-export function getRelativePrecision(): number;
+/**
+ * The finest relative precision a Manifold can have, 1e-12. Pass it to
+ * {@link Manifold.withPrecision} to request the finest.
+ */
+export const MIN_RELATIVE_PRECISION: number;
 
 /**
  * Returns the number of segments a circle of this radius gets with this
@@ -65,11 +68,6 @@ export function segmentsFor(radius: number, quality?: CircularQuality): number;
  */
 export function forDivisions(divisions: number, degrees: number):
     {segments: number, minAngle: number, minEdgeLength: number};
-
-/**
- * Resets the relative precision to its default.
- */
-export function resetToCircularDefaults(): void;
 ///@}
 
 /**
@@ -98,7 +96,8 @@ export class CrossSection {
   /**
    * Constructs a square with the given XY dimensions. By default it is
    * positioned in the first quadrant, touching the origin. If any dimensions in
-   * size are negative, or if all are zero, an empty Manifold will be returned.
+   * size are negative or non-finite, or if all are zero, an empty CrossSection
+   * will be returned.
    *
    * @param size The X, and Y dimensions of the square.
    * @param center Set to true to shift the center to the origin.
@@ -256,10 +255,9 @@ export class CrossSection {
    *
    * @param tolerance minimum distance vertices must diverge from the
    *     hypothetical outline without them in order to be included in the
-   *     output. Default 0 uses the cross-section's own tolerance (from
-   *     tolerance()), which is geometry-scale-derived and may be larger than a
-   *     fixed epsilon for large-coordinate geometry. Pass an explicit value to
-   *     override.
+   *     output. Default 0 uses the cross-section's own tolerance, which is
+   *     geometry-scale-derived and may be larger than a fixed epsilon for
+   *     large-coordinate geometry. Pass an explicit value to override.
    * @group Transformations
    */
   simplify(tolerance?: number): CrossSection;
@@ -350,18 +348,6 @@ export class CrossSection {
   // Polygon Conversion
 
   /**
-   * Create a 2d cross-section from a set of contours (complex polygons). A
-   * boolean union operation (with the Positive filling rule) is performed to
-   * combine overlapping polygons and ensure the resulting CrossSection is free
-   * of intersections.
-   *
-   * @param contours A set of closed paths describing zero or more complex
-   * polygons.
-   * @group Input & Output
-   */
-  static ofPolygons(contours: Polygons): CrossSection;
-
-  /**
    * Create a 2d cross-section from a set of contours, reading them by the
    * even-odd rule: a sub-region is filled when its winding number is odd, so
    * overlapping an odd number of contours fills and overlapping an even number
@@ -442,8 +428,7 @@ export class CrossSection {
 /**
  * This library's internal representation of an oriented, 2-manifold, triangle
  * mesh - a simple boundary-representation of a solid object. Use this class to
- * store and operate on solids, and use MeshGL for input and output, or
- * potentially Mesh if only basic geometry is required.
+ * store and operate on solids, and use Mesh for input and output.
  *
  * In addition to storing geometric data, a Manifold can also store an arbitrary
  * number of vertex properties. These could be anything, e.g. normals, UV
@@ -457,7 +442,7 @@ export class CrossSection {
  * sacrificing manifoldness.
  *
  * Manifolds also keep track of their relationships to their inputs, via
- * OriginalIDs and the faceIDs and transforms accessible through MeshGL. This
+ * OriginalIDs and the faceIDs and transforms accessible through Mesh. This
  * allows object-level properties to be re-associated with the output after many
  * operations, particularly useful for materials. Since separate object's
  * properties are not mixed, there is no requirement that channels have
@@ -469,18 +454,29 @@ export class CrossSection {
 export class Manifold {
   /**
    * Convert a Mesh into a Manifold, retaining its properties and merging only
-   * the positions according to the merge vectors. Will throw an error if the
-   * result is not an oriented 2-manifold. Will collapse degenerate triangles
-   * and unnecessary vertices.
+   * the positions according to the merge vectors. Throws a ManifoldError, with
+   * the error status as its code, if the mesh is invalid or the result is not
+   * an oriented 2-manifold. Triangles with a repeated vertex after merging are
+   * dropped. Other degenerate triangles are kept. Use simplify() to collapse
+   * them. For cancellable ingest that reports progress, use
+   * {@link ExecutionContext.fromMesh}.
    *
    * All fields are read, making this structure suitable for a lossless
    * round-trip of data from getMesh(). For multi-material input, use
    * reserveIDs() to set a unique originalID for each material, and sort the
    * materials into triangle runs.
    *
+   * A Mesh64 is read in double precision, so the input positions are not
+   * rounded to float. A plain object is read as a Mesh. To read a plain object
+   * in double precision, wrap it with new Mesh64(obj).
+   *
+   * The result has relative precision float epsilon, about 1.2e-7, for a Mesh
+   * and {@link MIN_RELATIVE_PRECISION} (1e-12) for a Mesh64. Precision is not
+   * stored in the mesh, so use {@link withPrecision} to change it.
+   *
    * @group Basics
    */
-  constructor(mesh: Mesh);
+  constructor(mesh: Mesh|Mesh64);
 
   // Shapes
 
@@ -578,31 +574,16 @@ export class Manifold {
       polygons: CrossSection|Polygons, quality?: CircularQuality,
       revolveDegrees?: number): Manifold;
 
-  // Mesh Conversion
-
-  /**
-   * Convert a Mesh into a Manifold, retaining its properties and merging only
-   * the positions according to the merge vectors. Will throw an error if the
-   * result is not an oriented 2-manifold. Will collapse degenerate triangles
-   * and unnecessary vertices.
-   *
-   * All fields are read, making this structure suitable for a lossless
-   * round-trip of data from getMesh(). For multi-material input, use
-   * reserveIDs() to set a unique originalID for each material, and sort the
-   * materials into triangle runs.
-   * @group Input & Output
-   */
-  static ofMesh(mesh: Mesh): Manifold;
-
   // Signed Distance Functions
 
   /**
-   * Constructs a level-set Mesh from the input Signed-Distance Function (SDF).
-   * This uses a form of Marching Tetrahedra (akin to Marching Cubes, but better
-   * for manifoldness). Instead of using a cubic grid, it uses a body-centered
-   * cubic grid (two shifted cubic grids). This means if your function's
-   * interior exceeds the given bounds, you will see a kind of egg-crate shape
-   * closing off the manifold, which is due to the underlying grid.
+   * Constructs a level-set manifold from the input Signed-Distance Function
+   * (SDF). This uses a form of Marching Tetrahedra (akin to Marching Cubes, but
+   * better for manifoldness). Instead of using a cubic grid, it uses a
+   * body-centered cubic grid (two shifted cubic grids). This means if your
+   * function's interior exceeds the given bounds, you will see a kind of
+   * egg-crate shape closing off the manifold, which is due to the underlying
+   * grid.
    *
    * @param sdf The signed-distance function which returns the signed distance
    *     of
@@ -691,7 +672,9 @@ export class Manifold {
    * moved according to any arbitrary input function. It is easy to create a
    * function that warps a geometrically valid object into one which overlaps,
    * but that is not checked here, so it is up to the user to choose their
-   * function with discretion.
+   * function with discretion. Throws a ManifoldError if the result has an
+   * error status, such as a non-finite vertex, and rethrows any error from
+   * warpFunc.
    *
    * @param warpFunc A function that modifies a given vertex position.
    * @group Transformations
@@ -700,17 +683,17 @@ export class Manifold {
 
   /**
    * Batch version of warp(). The callback receives a flat array of xyzxyz...
-   * (length = count * 3) and may modify it in-place.
+   * (length = count * 3) and may modify it in-place. Throws like warp().
    */
   warpBatch(warpFunc: (verts: Float64Array, count: number) => void): Manifold;
 
   /**
    * Smooths out the Manifold by filling in the halfedgeTangent vectors. The
-   * geometry will remain unchanged until Refine or RefineToLength is called to
-   * interpolate the surface. This version uses standard vertex normal
-   * properties to define the tangent vectors. Fewer than three properties
-   * count as missing normals. Any vertex where multiple normals exist and don't
-   * agree will result in a sharp edge.
+   * geometry will remain unchanged until refine(), refineToLength() or
+   * refineToTolerance() is called to interpolate the surface. This version
+   * uses standard vertex normal properties to define the tangent vectors. Fewer
+   * than three properties count as missing normals. Any vertex where multiple
+   * normals exist and don't agree will result in a sharp edge.
    * @group Smoothing
    */
   smoothByNormals(): Manifold;
@@ -719,8 +702,8 @@ export class Manifold {
    * Increase the density of the mesh by splitting every edge into n pieces. For
    * instance, with n = 2, each triangle will be split into 4 triangles. These
    * will all be coplanar (and will not be immediately collapsed) unless the
-   * Mesh/Manifold has halfedgeTangents specified (e.g. from the Smooth()
-   * constructor), in which case the new vertices will be moved to the
+   * Mesh/Manifold has halfedgeTangents specified (e.g. from
+   * smoothByNormals()), in which case the new vertices will be moved to the
    * interpolated surface according to their barycentric coordinates.
    *
    * @param n The number of pieces to split every edge into. Must be > 1.
@@ -732,7 +715,7 @@ export class Manifold {
    * Increase the density of the mesh by splitting each edge into pieces of
    * roughly the input length. Interior verts are added to keep the rest of the
    * triangulation edges also of roughly the same length. If halfedgeTangents
-   * are present (e.g. from the Smooth() constructor), the new vertices will be
+   * are present (e.g. from smoothByNormals()), the new vertices will be
    * moved to the interpolated surface according to their barycentric
    * coordinates.
    *
@@ -807,10 +790,9 @@ export class Manifold {
    *
    * @param minSharpAngle Any edges with angles greater than this value will
    * remain sharp, getting different normal vector properties on each side of
-   * the edge. By default, no edges are sharp and all normals are shared. With a
-   * value of zero, the model is faceted and all normals match their triangle
-   * normals, but in this case it would be better not to calculate normals at
-   * all.
+   * the edge. Default is 52.5 degrees. With a value of zero, the model is
+   * faceted and all normals match their triangle normals, but in this case it
+   * would be better not to calculate normals at all.
    * @group Properties
    */
   calculateNormals(minSharpAngle?: number): Manifold;
@@ -891,17 +873,17 @@ export class Manifold {
   split(cutter: Manifold): [Manifold, Manifold];
 
   /**
-   * Convenient version of Split() for a half-space.
+   * Convenient version of split() for a half-space.
    *
    * @param normal This vector is normal to the cutting plane and its length
    *     does
    * not matter. The first result is in the direction of this vector, the second
    * result is on the opposite side.
    * @param originOffset The distance of the plane from the origin in the
-   * direction of the normal vector.
+   * direction of the normal vector. Default 0.
    * @group Boolean
    */
-  splitByPlane(normal: Readonly<Vec3>, originOffset: number):
+  splitByPlane(normal: Readonly<Vec3>, originOffset?: number):
       [Manifold, Manifold];
 
   /**
@@ -911,11 +893,11 @@ export class Manifold {
    *     does not matter. The result is in the direction of this vector from the
    *     plane.
    * @param originOffset The distance of the plane from the origin in the
-   *     direction of the normal vector.
+   *     direction of the normal vector. Default 0.
    *
    * @group Boolean
    */
-  trimByPlane(normal: Readonly<Vec3>, originOffset: number): Manifold;
+  trimByPlane(normal: Readonly<Vec3>, originOffset?: number): Manifold;
 
   /**
    * Compute the minkowski sum of this manifold with another.
@@ -941,10 +923,10 @@ export class Manifold {
    * of the bounding box will return the bottom faces, while using a height
    * equal to the top of the bounding box will return empty.
    *
-   * @param height Z-level of slice.
+   * @param height Z-level of slice. Default 0.
    * @group Polygons
    */
-  slice(height: number): CrossSection;
+  slice(height?: number): CrossSection;
 
   /**
    * Returns a cross section representing the projected outline of this object
@@ -965,7 +947,8 @@ export class Manifold {
 
   /**
    * Compute the convex hull of all points contained within a set of Manifolds
-   * and point vectors.
+   * and point vectors. The hull uses the smallest precision among the
+   * non-empty input Manifolds.
    *
    * @group Convex Hull
    */
@@ -1042,7 +1025,7 @@ export class Manifold {
   /**
    * The genus is a topological property of the manifold, representing the
    * number of "handles". A sphere is 0, torus 1, etc. It is only meaningful for
-   * a single mesh, so it is best to call Decompose() first.
+   * a single mesh, so it is best to call decompose() first.
    * @group Information
    */
   genus(): number;
@@ -1096,10 +1079,13 @@ export class Manifold {
 
 
   /**
-   * Returns the reason for an input Mesh producing an empty Manifold. This
-   * Status will carry on through operations like NaN propogation, ensuring an
-   * errored mesh doesn't get mysteriously lost. Empty meshes may still show
-   * NoError, for instance the intersection of non-overlapping meshes.
+   * Returns the reason for an error that made this Manifold empty. The
+   * constructor throws instead, but {@link ExecutionContext.fromMesh} returns
+   * an empty Manifold with this status for an invalid mesh, and a cancelled
+   * evaluation gives 'Cancelled'. This Status will carry on through operations
+   * like NaN propagation, ensuring an errored mesh doesn't get mysteriously
+   * lost. Empty meshes may still show NoError, for instance the intersection
+   * of non-overlapping meshes.
    *
    * @group Information
    */
@@ -1108,8 +1094,9 @@ export class Manifold {
   /**
    * Returns a copy of this Manifold with the given ExecutionContext attached.
    * The attachment is consumed by the next eager op invoked on the result:
-   * status() for a deferred CSG tree, refine() / refineToLength() /
-   * refineToTolerance(), hull(), or minkowskiSum() / minkowskiDifference().
+   * status(), withPrecision() or getPrecision() for a deferred CSG tree,
+   * refine() / refineToLength() / refineToTolerance(), hull(), or
+   * minkowskiSum() / minkowskiDifference().
    * Deferred ops (Boolean operators, transforms, batch ops) ignore any
    * attached ctx and produce a result with no attached ctx. See
    * ExecutionContext for the full model.
@@ -1117,6 +1104,34 @@ export class Manifold {
    * @group Information
    */
   withContext(ctx: ExecutionContext): Manifold;
+
+  /**
+   * Evaluates this Manifold and returns it with the given relative precision,
+   * which defines what counts as coplanar or degenerate. The geometry is not
+   * recomputed: the precision applies only to later operations. Booleans and
+   * other operations on several Manifolds use the smallest precision among
+   * their non-empty inputs.
+   *
+   * @param relPrecision The relative precision. 0, negative values, NaN and
+   * infinity give float epsilon. Positive values below
+   * {@link MIN_RELATIVE_PRECISION} (1e-12) are raised to it, so pass it for the
+   * finest.
+   * @group Information
+   */
+  withPrecision(relPrecision: number): Manifold;
+
+  /**
+   * Returns the relative precision of this Manifold. A Manifold made from a
+   * Mesh or built by a factory such as cube(), extrude(), levelSet() or hull()
+   * of points has float epsilon, about 1.2e-7. One made from a Mesh64 has
+   * {@link MIN_RELATIVE_PRECISION} (1e-12). withPrecision() sets it, other
+   * operations on one Manifold keep it, and operations on several take the
+   * smallest among their non-empty inputs. An empty Boolean or Minkowski result
+   * takes the smallest among all its inputs.
+   *
+   * @group Information
+   */
+  getPrecision(): number;
 
   // Export
 
@@ -1130,11 +1145,19 @@ export class Manifold {
    * property channels contain world-frame normals. Non-original results
    * normalize them for graphics output. Unflagged values in those channels are
    * ordinary properties. To have normals follow transforms, call
-   * calculateNormals() on every operand or import a MeshGL with runFlags bit 1
+   * calculateNormals() on every operand or import a Mesh with runFlags bit 1
    * set.
    * @group Input & Output
    */
   getMesh(): Mesh;
+
+  /**
+   * Like getMesh(), but returns the full double precision used internally
+   * (MeshGL64): vertProperties, runTransform and halfedgeTangent are
+   * Float64Array.
+   * @group Input & Output
+   */
+  getMesh64(): Mesh64;
 
   // ID Management
 
@@ -1143,7 +1166,7 @@ export class Manifold {
    * meshes and this new Manifold is marked an original. It also recreates faces
    * - these don't get joined at boundaries where originalID changes, so the
    * reset may allow triangles of flat faces to be further collapsed with
-   * Simplify().
+   * simplify().
    *
    * If only some of the input recorded normals, the result keeps two runs
    * with this ID, one for the triangles with normals and one for the rest.
@@ -1204,8 +1227,8 @@ export interface MeshOptions {
 }
 
 /**
- * An alternative to Mesh for output suitable for pushing into graphics
- * libraries directly. This may not be manifold since the verts are duplicated
+ * A mesh for input and output, suitable for pushing into graphics libraries
+ * directly. This may not be manifold since the verts are duplicated
  * along property boundaries that do not match. The additional merge vectors
  * store this missing information, allowing the manifold to be reconstructed.
  *
@@ -1262,8 +1285,8 @@ export class Mesh {
    * Optional: The OriginalID of the mesh this triangle run came from. This ID
    * is ideal for reapplying materials to the output mesh. Multiple runs may
    * have the same ID, e.g. representing different copies of the same input
-   * mesh. If you create an input MeshGL that you want to be able to reference
-   * as one or more originals, be sure to set unique values from ReserveIDs().
+   * mesh. If you create an input Mesh that you want to be able to reference
+   * as one or more originals, be sure to set unique values from reserveIDs().
    */
   runOriginalID: Uint32Array;
 
@@ -1271,7 +1294,8 @@ export class Mesh {
    * Optional: For each run, a 3x4 transform is stored representing how the
    * corresponding original mesh was transformed to create this triangle run.
    * This matrix is stored in column-major order and the length of the overall
-   * vector is 12 * runOriginalID.size().
+   * vector is 12 * runOriginalID.size(). It is empty in the output of a
+   * Manifold that is an original (see originalID()).
    */
   runTransform: Float32Array;
 
@@ -1292,7 +1316,7 @@ export class Mesh {
   faceID: Uint32Array;
 
   /**
-   * Optional: The X-Y-Z-W weighted tangent vectors for smooth Refine(). If
+   * Optional: The X-Y-Z-W weighted tangent vectors for smooth refine(). If
    * non-empty, must be exactly four times as long as Mesh.triVerts. Indexed
    * as 4 * (3 * tri + i) + j, i < 3, j < 4, representing the tangent value
    * Mesh.triVerts[tri][i] along the CCW edge. If empty, mesh is faceted.
@@ -1317,14 +1341,16 @@ export class Mesh {
 
   /**
    * Returns a copy with mergeFromVert and mergeToVert vectors updated in order
-   * to create a manifold solid. If the MeshGL is already manifold, the merge
+   * to create a manifold solid. If the Mesh is already manifold, the merge
    * vectors are unchanged. Otherwise, verts along open edges are merged within
    * tolerance (the maximum of the specified tolerance and the baseline
-   * bounding-box tolerance), keeping any from the existing merge vectors.
+   * bounding-box tolerance), keeping any from the existing merge vectors. The
+   * baseline is the bounding box scale times float epsilon, the precision a
+   * Manifold made from this mesh gets.
    *
    * There is no guarantee the result will be manifold - this is a best-effort
    * helper function designed primarily to aid in the case where a manifold
-   * multi-material MeshGL was produced, but its merge vectors were lost due to
+   * multi-material Mesh was produced, but its merge vectors were lost due to
    * a round-trip through a file format. Constructing a Manifold from the result
    * will report a Status if it is not manifold.
    *
@@ -1395,4 +1421,99 @@ export class Mesh {
    * @param run triangle run index.
    */
   hasNormals(run: number): boolean;
+}
+
+/**
+ * @group Input & Output
+ * @internal
+ */
+export interface Mesh64Options {
+  numProp: number;
+  vertProperties: Float64Array;
+  triVerts: Uint32Array;
+  mergeFromVert?: Uint32Array;
+  mergeToVert?: Uint32Array;
+  runIndex?: Uint32Array;
+  runOriginalID?: Uint32Array;
+  runTransform?: Float64Array;
+  runFlags?: Uint8Array;
+  faceID?: Uint32Array;
+  halfedgeTangent?: Float64Array;
+}
+
+/**
+ * The double-precision version of Mesh, matching MeshGL64 in C++: the vertex
+ * properties, run transforms and tangents are Float64Array. Indices are
+ * Uint32Array, as in Mesh. See Mesh for the meaning of each field and method.
+ *
+ * @see {@link https://manifoldcad.org/docs/html/structmanifold_1_1_mesh_g_l_p.html | C++ API: MeshGLP< Precision, I > Struct Template Reference}
+ * @group Input & Output
+ * @internal
+ */
+export class Mesh64 {
+  constructor(options: Mesh64Options);
+
+  numProp: number;
+  vertProperties: Float64Array;
+  triVerts: Uint32Array;
+  mergeFromVert: Uint32Array;
+  mergeToVert: Uint32Array;
+  runIndex: Uint32Array;
+  runOriginalID: Uint32Array;
+  runTransform: Float64Array;
+  runFlags: Uint8Array;
+  faceID: Uint32Array;
+  halfedgeTangent: Float64Array;
+
+  get numTri(): number;
+  get numVert(): number;
+  get numRun(): number;
+
+  /**
+   * Like Mesh.merge(), in double precision. The baseline is the bounding box
+   * scale times 1e-12, the precision a Manifold made from a Mesh64 gets.
+   *
+   * @param tolerance Default 0, with a bounding-box and precision-based floor.
+   */
+  merge(tolerance?: number): Mesh64;
+
+  verts(tri: number): SealedUint32Array<3>;
+
+  /** Gets the x, y, z position of this vertex in double precision. */
+  position(vert: number): SealedFloat64Array<3>;
+
+  /** Gets any other properties of this vertex in double precision. */
+  extras(vert: number): Float64Array;
+
+  /** Like Mesh.tangent(), in double precision. */
+  tangent(halfedge: number): SealedFloat64Array<4>;
+
+  transform(run: number): Mat4;
+  backside(run: number): boolean;
+  hasNormals(run: number): boolean;
+}
+
+/**
+ * The error thrown when a Manifold operation fails with an error status, for
+ * example by the Manifold constructor on an invalid mesh, or by warp() when the
+ * result has a non-finite vertex. Its message is a short description of the
+ * status.
+ *
+ * @group Basics
+ */
+export class ManifoldError extends Error {
+  /**
+   * @param code The error status.
+   */
+  constructor(code: ErrorStatus);
+
+  /**
+   * Always 'ManifoldError'.
+   */
+  name: 'ManifoldError';
+
+  /**
+   * The error status that caused this error.
+   */
+  code: ErrorStatus;
 }

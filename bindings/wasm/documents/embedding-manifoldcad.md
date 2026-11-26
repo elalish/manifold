@@ -30,3 +30,6 @@ When evaluated through the worker, {@link manifoldCAD!isManifoldCAD | isManifold
 
 ## Using the ManifoldCAD runtime directly
 
+A script or app can also import `manifold-cad/manifoldCAD` as an ordinary ES module, in Node or in a bundled web app.  The import instantiates the Manifold WASM module and exports the same API that scripts see in the worker.  Here, {@link manifoldCAD!isManifoldCAD | isManifoldCAD()} returns false.
+
+This module tracks the Manifold and CrossSection objects its functions and methods return, so that it can delete them later.  Nothing deletes them automatically.  When you are done with a model, call {@link lib/worker!cleanup | cleanup()} from `manifold-cad/lib/worker`.  It deletes every tracked object, even ones still referenced elsewhere, and resets scene state such as materials and `show()`.  Without it, WASM memory grows with every model.

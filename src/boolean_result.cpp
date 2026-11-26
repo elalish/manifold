@@ -735,25 +735,28 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   };
   PhaseBalance balance{ctx_};
 
+  // The output Manifold, including an empty one, has the smaller precision of
+  // the two inputs.
+  Manifold::Impl outR;
+  outR.relPrecision_ = std::min(inP_.relPrecision_, inQ_.relPrecision_);
+
   if (inP_.status_ != Manifold::Error::NoError) {
-    auto impl = Manifold::Impl();
-    impl.status_ = inP_.status_;
-    return impl;
+    outR.status_ = inP_.status_;
+    return outR;
   }
   if (inQ_.status_ != Manifold::Error::NoError) {
-    auto impl = Manifold::Impl();
-    impl.status_ = inQ_.status_;
-    return impl;
+    outR.status_ = inQ_.status_;
+    return outR;
   }
 
   if (inP_.IsEmpty()) {
     if (!inQ_.IsEmpty() && op == OpType::Add) {
       return inQ_;
     }
-    return Manifold::Impl();
+    return outR;
   } else if (inQ_.IsEmpty()) {
     if (op == OpType::Intersect) {
-      return Manifold::Impl();
+      return outR;
     }
     return inP_;
   }
@@ -824,9 +827,6 @@ Manifold::Impl Boolean3::Result(OpType op) const {
     numVertR = AbsSum()(v21R.back(), i21.back());
   }
   const int n21 = numVertR - nPv - nQv - n12;
-
-  // Create the output Manifold
-  Manifold::Impl outR;
 
   if (numVertR == 0) {
     return outR;
@@ -958,6 +958,16 @@ Manifold::Impl Boolean3::Result(OpType op) const {
   if (ManifoldParams().intermediateChecks) {
     DEBUG_ASSERT(outR.Is2Manifold(), logicErr,
                  "simplified mesh is not 2-manifold!");
+    // Ties are decided in the operands' tolerance, which can be much larger
+    // than the result's epsilon. They can also leave zero-area triangles far
+    // from their input planes, so this checks orientation only.
+    if (!ManifoldParams().processOverlaps) {
+      DEBUG_ASSERT(
+          outR.MatchesTriNormals(
+              std::max(outR.epsilon_, std::min(inP_.epsilon_, inQ_.epsilon_)),
+              /*checkFlat=*/false),
+          geometryErr, "triangles do not match their input normals!");
+    }
   }
   if (ManifoldParams().verifyNoDegenerates) {
     DEBUG_ASSERT(outR.NumDegenerateTris() == 0, logicErr,

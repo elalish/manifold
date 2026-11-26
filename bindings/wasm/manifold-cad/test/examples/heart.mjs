@@ -1,7 +1,7 @@
 // Smooth, complex manifolds can be created using the warp() function.
 // This example recreates the Exploitable Heart by Emmett Lalish:
 // https://www.thingiverse.com/thing:6190
-// It also demonstrates the use of setMorph to animate a warping function.
+// It also demonstrates the use of setMorphStart to animate a warping function.
 
 import {GLTFNode, Manifold, setMorphStart} from 'manifold-cad/manifoldCAD';
 
