@@ -253,6 +253,8 @@ const CATEGORIES: Record<string, Entry> = {
   'CrossSection.transform':
       {cat: 'C', call: () => square().transform([1, 0, 0, 0, 1, 0, 0, 0, 1])},
   'CrossSection.warp': {cat: 'C', call: () => square().warp(v => {v[0] = NaN})},
+  'CrossSection.warpBatch':
+      {cat: 'C', call: () => square().warpBatch(v => {v[0] = NaN})},
   'CrossSection.simplify': {cat: 'C', call: () => square().simplify()},
   'CrossSection.offset': {cat: 'C', call: () => square().offset(NaN)},
   'CrossSection.add': {cat: 'C', call: () => square().add(square())},
@@ -291,6 +293,7 @@ const CATEGORIES: Record<string, Entry> = {
       {cat: 'C', call: () => wasm.triangulate([[0, 0], [1, 0], [0, 1]])},
   'segmentsFor': {cat: 'C', call: () => wasm.segmentsFor(1)},
   'forDivisions': {cat: 'C', call: () => wasm.forDivisions(4, 90)},
+  'version': {cat: 'C', call: () => wasm.version()},
 };
 
 const own = (o: object) => Object.getOwnPropertyNames(o).filter(
