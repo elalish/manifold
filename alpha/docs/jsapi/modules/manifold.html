@@ -11,7 +11,9 @@ and reports progress / observes cancellation through it. Deferred ops
 (Boolean, transforms, batch ops) ignore any attached ctx. Safe to read/write
 from any thread/worker.</p>
 <p>Cancellation is permanent for a Manifold: once cancelled and detected,
-the Manifold's status becomes 'Cancelled' and stays 'Cancelled'.</p>
+the Manifold's status becomes 'Cancelled' and stays 'Cancelled'. The eager
+ops above, other than status(), and the factories below then throw a
+ManifoldError with code 'Cancelled'. Queries don't observe a cancel.</p>
 </div></dd><dt class="tsd-member-summary" id="manifoldtoplevel"><span class="tsd-member-summary-name"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Interface"><use href="../assets/icons.svg#icon-256"></use></svg><a href="../interfaces/manifold.ManifoldToplevel.html">ManifoldToplevel</a><a href="#manifoldtoplevel" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></span></dt><dd class="tsd-member-summary"></dd></dl></details><details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Basics"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg><h2>Basics</h2></summary><dl class="tsd-member-summaries"><dt class="tsd-member-summary" id="crosssection"><span class="tsd-member-summary-name"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Class"><use href="../assets/icons.svg#icon-128"></use></svg><a href="../classes/manifold.CrossSection.html">CrossSection</a><a href="#crosssection" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></span></dt><dd class="tsd-member-summary"><div class="tsd-comment tsd-typography"><p>Two-dimensional cross sections guaranteed to be without self-intersections,
 or overlaps between polygons (from construction onwards). Polygon clipping
 (boolean) and offsetting use Manifold's own robust floating-point predicates.</p>
@@ -33,10 +35,23 @@ allows object-level properties to be re-associated with the output after many
 operations, particularly useful for materials. Since separate object's
 properties are not mixed, there is no requirement that channels have
 consistent meaning between different inputs.</p>
-</div></dd><dt class="tsd-member-summary" id="manifolderror"><span class="tsd-member-summary-name"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Class"><use href="../assets/icons.svg#icon-128"></use></svg><a href="../classes/manifold.ManifoldError.html">ManifoldError</a><a href="#manifolderror" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></span></dt><dd class="tsd-member-summary"><div class="tsd-comment tsd-typography"><p>The error thrown when a Manifold operation fails with an error status, for
-example by the Manifold constructor on an invalid mesh, or by warp() when the
-result has a non-finite vertex. Its message is a short description of the
-status.</p>
+<p>Booleans and transforms are lazy: they never throw, and an error in their
+input or result shows up when the Manifold is next evaluated. Calls that
+evaluate a Manifold throw a <a href="../classes/manifold.ManifoldError.html" class="tsd-kind-class">ManifoldError</a> when it has an error, but
+never evaluate one just to check. Calls that return Manifolds check their
+results, and other calls, such as queries and getMesh(), check their Manifold
+inputs. Invalid parameters, such as a negative size, give
+'InvalidConstruction'. Empty input, such as an empty CrossSection, gives an
+empty Manifold with no error. Use <a href="../classes/manifold.Manifold.html#status" class="tsd-kind-method">status</a> to check a lazy result
+without an exception.</p>
+</div></dd><dt class="tsd-member-summary" id="manifolderror"><span class="tsd-member-summary-name"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Class"><use href="../assets/icons.svg#icon-128"></use></svg><a href="../classes/manifold.ManifoldError.html">ManifoldError</a><a href="#manifolderror" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></span></dt><dd class="tsd-member-summary"><div class="tsd-comment tsd-typography"><p>The error thrown when a call evaluates a Manifold that has an error status.
+Constructors and calls that return Manifolds throw for an errored result, for
+example the Manifold constructor on an invalid mesh, cube() with a negative
+size, or warp() when the result has a non-finite vertex. Queries throw for an
+errored input. Booleans, transforms, trimByPlane(), withContext(), status()
+and CrossSection operations other than extrude() and revolve() never throw.
+A detected cancel throws with code 'Cancelled'. Its message is a short
+description of the status.</p>
 </div></dd></dl></details><details class="tsd-panel-group tsd-member-group tsd-accordion" open><summary class="tsd-accordion-summary" data-key="section-Input & Output"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="../assets/icons.svg#icon-chevronDown"></use></svg><h2>Input &amp; Output</h2></summary><dl class="tsd-member-summaries"><dt class="tsd-member-summary" id="mesh64options"><span class="tsd-member-summary-name"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Interface"><use href="../assets/icons.svg#icon-256"></use></svg><a href="../interfaces/manifold.Mesh64Options.html">Mesh64Options</a><a href="#mesh64options" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></span></dt><dd class="tsd-member-summary"></dd><dt class="tsd-member-summary" id="meshoptions"><span class="tsd-member-summary-name"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Interface"><use href="../assets/icons.svg#icon-256"></use></svg><a href="../interfaces/manifold.MeshOptions.html">MeshOptions</a><a href="#meshoptions" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></span></dt><dd class="tsd-member-summary"></dd><dt class="tsd-member-summary" id="mesh"><span class="tsd-member-summary-name"><svg class="tsd-kind-icon" viewBox="0 0 24 24" aria-label="Class"><use href="../assets/icons.svg#icon-128"></use></svg><a href="../classes/manifold.Mesh.html">Mesh</a><a href="#mesh" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="../assets/icons.svg#icon-anchor"></use></svg></a></span></dt><dd class="tsd-member-summary"><div class="tsd-comment tsd-typography"><p>A mesh for input and output, suitable for pushing into graphics libraries
 directly. This may not be manifold since the verts are duplicated
 along property boundaries that do not match. The additional merge vectors

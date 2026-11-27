@@ -126,7 +126,10 @@ export declare class CrossSection {
     // Extrusions (2d to 3d manifold)
 
     /**
-     * Constructs a manifold by extruding the cross-section along Z-axis.
+     * Constructs a manifold by extruding the cross-section along Z-axis. Throws a
+     * ManifoldError with code 'InvalidConstruction' for an invalid parameter or a
+     * non-finite vertex. An empty cross-section gives an empty Manifold with no
+     * error.
      *
      * @param height Z-extent of extrusion.
      * @param nDivisions Number of extra copies of the crossSection to insert into
@@ -151,6 +154,9 @@ export declare class CrossSection {
      * then setting this as the Z-axis of the resulting manifold. If the contours
      * cross the Y-axis, only the part on the positive X side is used.
      * Geometrically valid input will result in geometrically valid output.
+     * Throws a ManifoldError with code 'InvalidConstruction' for an invalid angle
+     * or a non-finite vertex. An empty cross-section gives an empty Manifold with
+     * no error.
      *
      * @param quality Number of segments in a full circle, see
      * {@link CircularQuality}. A partial revolve uses the matching fraction of
@@ -495,7 +501,9 @@ export declare type ErrorStatus = 'NoError'|'NonFiniteVertex'|'NotManifold'|
  * from any thread/worker.
  *
  * Cancellation is permanent for a Manifold: once cancelled and detected,
- * the Manifold's status becomes 'Cancelled' and stays 'Cancelled'.
+ * the Manifold's status becomes 'Cancelled' and stays 'Cancelled'. The eager
+ * ops above, other than status(), and the factories below then throw a
+ * ManifoldError with code 'Cancelled'. Queries don't observe a cancel.
  */
 export declare interface ExecutionContext {
     /** Request cancellation. Can be called from any context. Idempotent. */
@@ -513,9 +521,16 @@ export declare interface ExecutionContext {
     // run under this context so progress / cancellation are observed (these ops
     // have no source Manifold to attach via Manifold.withContext).
 
-    /** Like `new Manifold`, observed/cancellable via this context. */
+    /**
+     * Like `new Manifold`, observed/cancellable via this context.
+     * Throws a ManifoldError for an invalid mesh, and with code 'Cancelled' on
+     * cancel.
+     */
     fromMesh(mesh: Mesh|Mesh64): Manifold;
-    /** Like {@link Manifold.levelSet}, observed/cancellable via this context. */
+    /**
+     * Like {@link Manifold.levelSet}, observed/cancellable via this context.
+     * Throws a ManifoldError with code 'Cancelled' on cancel.
+     */
     levelSet(
     sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
     level?: number, tolerance?: number): Manifold;
@@ -763,6 +778,16 @@ export declare type JoinType = 'Square'|'Round'|'Miter'|'Bevel';
  * operations, particularly useful for materials. Since separate object's
  * properties are not mixed, there is no requirement that channels have
  * consistent meaning between different inputs.
+ *
+ * Booleans and transforms are lazy: they never throw, and an error in their
+ * input or result shows up when the Manifold is next evaluated. Calls that
+ * evaluate a Manifold throw a {@link ManifoldError} when it has an error, but
+ * never evaluate one just to check. Calls that return Manifolds check their
+ * results, and other calls, such as queries and getMesh(), check their Manifold
+ * inputs. Invalid parameters, such as a negative size, give
+ * 'InvalidConstruction'. Empty input, such as an empty CrossSection, gives an
+ * empty Manifold with no error. Use {@link status} to check a lazy result
+ * without an exception.
  *
  * @see {@link https://manifoldcad.org/docs/html/classmanifold_1_1_manifold.html | C++ API: Manifold Class Reference}
  * @group Basics
@@ -1284,7 +1309,9 @@ export declare class Manifold {
     // Property Access
 
     /**
-     * Does the Manifold have any triangles?
+     * Does the Manifold have any triangles? An errored Manifold is invalid, not
+     * empty, so this throws a ManifoldError for it, like the other queries. Use
+     * {@link status} to check for an error without throwing.
      * @group Information
      */
     isEmpty(): boolean;
@@ -1395,13 +1422,13 @@ export declare class Manifold {
 
 
     /**
-     * Returns the reason for an error that made this Manifold empty. The
-     * constructor throws instead, but {@link ExecutionContext.fromMesh} returns
-     * an empty Manifold with this status for an invalid mesh, and a cancelled
-     * evaluation gives 'Cancelled'. This Status will carry on through operations
-     * like NaN propagation, ensuring an errored mesh doesn't get mysteriously
-     * lost. Empty meshes may still show NoError, for instance the intersection
-     * of non-overlapping meshes.
+     * Returns the reason for an error that made this Manifold empty, evaluating
+     * it under its attached context. This is the way to check a lazy result,
+     * such as a Boolean or transform, without an exception, and it never throws.
+     * The status carries on through later operations like NaN propagation, so an
+     * error doesn't get mysteriously lost. A cancelled evaluation gives
+     * 'Cancelled'. Empty Manifolds may still show NoError, for instance the
+     * intersection of non-overlapping meshes.
      *
      * @group Information
      */
@@ -1522,6 +1549,35 @@ export declare class Manifold {
      * @group Basics
      */
     delete(): void;
+}
+
+/**
+ * The error thrown when a call evaluates a Manifold that has an error status.
+ * Constructors and calls that return Manifolds throw for an errored result, for
+ * example the Manifold constructor on an invalid mesh, cube() with a negative
+ * size, or warp() when the result has a non-finite vertex. Queries throw for an
+ * errored input. Booleans, transforms, trimByPlane(), withContext(), status()
+ * and CrossSection operations other than extrude() and revolve() never throw.
+ * A detected cancel throws with code 'Cancelled'. Its message is a short
+ * description of the status.
+ *
+ * @group Basics
+ */
+export declare class ManifoldError extends Error {
+    /**
+     * @param code The error status.
+     */
+    constructor(code: ErrorStatus);
+
+    /**
+     * Always 'ManifoldError'.
+     */
+    name: 'ManifoldError';
+
+    /**
+     * The error status that caused this error.
+     */
+    code: ErrorStatus;
 }
 
 /**
@@ -1688,7 +1744,7 @@ export declare class Mesh {
      * helper function designed primarily to aid in the case where a manifold
      * multi-material Mesh was produced, but its merge vectors were lost due to
      * a round-trip through a file format. Constructing a Manifold from the result
-     * will report a Status if it is not manifold.
+     * throws a ManifoldError if it is not manifold.
      *
      * @param tolerance Default 0, with a bounding-box and precision-based floor.
      */
