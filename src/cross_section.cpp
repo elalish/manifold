@@ -541,8 +541,10 @@ CrossSection CrossSection::Scale(const vec2 v) const {
  * @param normal The normal vector of the axis to be mirrored over
  */
 CrossSection CrossSection::Mirror(const vec2 normal) const {
-  if (la::length(normal) == 0.0) return CrossSection();
-  const vec2 n = la::normalize(normal);
+  if (normal == vec2(0.0)) return CrossSection();
+  // Rescale before taking the length so finite nonzero normals neither
+  // overflow nor underflow when their components are squared.
+  const vec2 n = la::normalize(normal / la::maxelem(la::abs(normal)));
   return Transform(
       mat2x3(mat2(la::identity) - 2.0 * la::outerprod(n, n), vec2(0.0)));
 }

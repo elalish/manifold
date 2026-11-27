@@ -27,6 +27,7 @@ set(
   properties_test.cpp
   manifold_test.cpp
   context_test.cpp
+  mirror_test.cpp
   measurement_test.cpp
   boolean_test.cpp
   sdf_test.cpp
@@ -86,3 +87,4 @@ if(MANIFOLD_FUZZ)
   link_fuzztest(manifold_fuzz)
   gtest_discover_tests(manifold_fuzz)
 endif()
+

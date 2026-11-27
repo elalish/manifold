@@ -650,7 +650,7 @@ Manifold Manifold::Transform(const mat3x4& m) const {
  * @param normal The normal vector of the plane to be mirrored over
  */
 Manifold Manifold::Mirror(vec3 normal) const {
-  if (la::length(normal) == 0.) {
+  if (normal == vec3(0.0)) {
     // A degenerate mirror must not hide an existing error behind its empty
     // result. Other mirrors stay deferred; Impl::Transform propagates errors.
     auto leafImpl = GetCsgLeafNode().GetImpl();
@@ -658,7 +658,9 @@ Manifold Manifold::Mirror(vec3 normal) const {
       return PropagateStatus(leafImpl->status_);
     return Manifold().WithPrecision(leafImpl->relPrecision_);
   }
-  auto n = la::normalize(normal);
+  // Rescale before taking the length so finite nonzero normals neither
+  // overflow nor underflow when their components are squared.
+  auto n = la::normalize(normal / la::maxelem(la::abs(normal)));
   auto m = mat3x4(mat3(la::identity) - 2.0 * la::outerprod(n, n), vec3());
   return Manifold(LoadPNode()->Transform(m));
 }
