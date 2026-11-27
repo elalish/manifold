@@ -859,7 +859,7 @@ Manifold Manifold::ReadOBJ(std::istream& stream) {
 bool WriteOBJ(std::ostream& stream, const MeshGL64& mesh) {
   if (!stream.good()) return false;
   WriteOBJWithEpsilon(stream, mesh, {});
-  return true;
+  return stream.good();
 }
 
 /**
@@ -879,7 +879,7 @@ std::ostream& operator<<(std::ostream& stream, const Manifold::Impl& impl) {
 bool Manifold::WriteOBJ(std::ostream& stream) const {
   if (!stream.good()) return false;
   stream << *this->GetCsgLeafNode().GetImpl();
-  return true;
+  return stream.good();
 }
 #endif
 }  // namespace manifold
