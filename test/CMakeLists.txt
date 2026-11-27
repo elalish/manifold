@@ -23,6 +23,7 @@ set(
   SOURCE_FILES
   test_main.cpp
   utils_test.cpp
+  math_test.cpp
   polygon_test.cpp
   properties_test.cpp
   manifold_test.cpp

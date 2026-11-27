@@ -144,9 +144,7 @@ inline double TanKernel(double x, double y, int odd) {
   return a0 + aa * (1.0 + a0 * w0 + a0 * vv);
 }
 
-inline double acos(double x) {
-  constexpr double pio2_hi = 1.57079632679489655800e+00;
-  constexpr double pio2_lo = 6.12323399573676603587e-17;
+inline double AsinCorrection(double z) {
   constexpr double pS0 = 1.66666666666666657415e-01;
   constexpr double pS1 = -3.25565818622400915405e-01;
   constexpr double pS2 = 2.01212532134862925881e-01;
@@ -157,12 +155,15 @@ inline double acos(double x) {
   constexpr double qS2 = 2.02094576023350569471e+00;
   constexpr double qS3 = -6.88283971605453293030e-01;
   constexpr double qS4 = 7.70381505559019352791e-02;
-  auto R = [=](double z) {
-    const double p =
-        z * (pS0 + z * (pS1 + z * (pS2 + z * (pS3 + z * (pS4 + z * pS5)))));
-    const double q = 1.0 + z * (qS1 + z * (qS2 + z * (qS3 + z * qS4)));
-    return p / q;
-  };
+  const double p =
+      z * (pS0 + z * (pS1 + z * (pS2 + z * (pS3 + z * (pS4 + z * pS5)))));
+  const double q = 1.0 + z * (qS1 + z * (qS2 + z * (qS3 + z * qS4)));
+  return p / q;
+}
+
+inline double acos(double x) {
+  constexpr double pio2_hi = 1.57079632679489655800e+00;
+  constexpr double pio2_lo = 6.12323399573676603587e-17;
   double z, w, s, c, df;
   uint64_t xx;
   uint32_t hx, lx, ix;
@@ -179,12 +180,12 @@ inline double acos(double x) {
   }
   if (ix < 0x3fe00000) {
     if (ix <= 0x3c600000) return pio2_hi + 0x1p-120f;
-    return pio2_hi - (x - (pio2_lo - x * R(x * x)));
+    return pio2_hi - (x - (pio2_lo - x * AsinCorrection(x * x)));
   }
   if (hx >> 31) {
     z = (1.0 + x) * 0.5;
     s = std::sqrt(z);
-    w = R(z) * s - pio2_lo;
+    w = AsinCorrection(z) * s - pio2_lo;
     return 2 * (pio2_hi - (s + w));
   }
   z = (1.0 - x) * 0.5;
@@ -193,7 +194,7 @@ inline double acos(double x) {
   xx &= 0xffffffff00000000;
   std::memcpy(&df, &xx, sizeof(xx));
   c = (z - df * df) / (s + df);
-  w = R(z) * s + c;
+  w = AsinCorrection(z) * s + c;
   return 2 * (df + w);
 }
 
@@ -382,6 +383,9 @@ inline double asin(double x) {
   if (!std::isfinite(x) || x < -1.0 || x > 1.0) return NAN;
   if (x == 1.0) return half_pi;
   if (x == -1.0) return -half_pi;
+  // Avoid subtracting nearly equal angles for shallow dihedrals and plane
+  // normals.
+  if (std::fabs(x) < 0.5) return x + x * AsinCorrection(x * x);
   return half_pi - acos(x);
 }
 
