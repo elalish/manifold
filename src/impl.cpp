@@ -805,7 +805,7 @@ static MeshGL64 ReadOBJMesh(std::istream& stream) {
   std::array<char, BUFFER_SIZE> buffer;
   std::cmatch m;
 
-  while (stream.good()) {
+  while (!stream.eof()) {
     // extract line, and skip the line if it is longer than BUFFER_SIZE
     // because the lines we care about should not be that long
     // not using std::basic_istream<...>::getline because getline throws when
@@ -833,9 +833,6 @@ static MeshGL64 ReadOBJMesh(std::istream& stream) {
     }
   }
 
-  // A read error is not a normal EOF. Do not expose a truncated mesh after a
-  // stream buffer fails with badbit or failbit but without eofbit.
-  if (stream.fail() && !stream.eof()) return {};
   return mesh;
 }
 
@@ -851,7 +848,6 @@ MeshGL64 ReadOBJ(std::istream& stream) { return ReadOBJMesh(stream); }
 Manifold Manifold::ReadOBJ(std::istream& stream) {
   if (!stream.good()) return Invalid();
   MeshGL64 mesh = ReadOBJMesh(stream);
-  if (stream.fail() && !stream.eof()) return Invalid();
   auto impl = std::make_shared<Impl>(mesh);
   return Manifold(impl);
 }

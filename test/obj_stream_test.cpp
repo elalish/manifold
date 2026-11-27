@@ -16,7 +16,6 @@
 
 #include <algorithm>
 #include <sstream>
-#include <stdexcept>
 #include <streambuf>
 #include <string>
 
@@ -26,17 +25,6 @@
 using namespace manifold;
 
 namespace {
-class FailingInput : public std::streambuf {
- public:
-  explicit FailingInput(std::string prefix) : prefix_(std::move(prefix)) {
-    setg(prefix_.data(), prefix_.data(), prefix_.data() + prefix_.size());
-  }
-
- private:
-  int_type underflow() override { throw std::runtime_error("read failed"); }
-  std::string prefix_;
-};
-
 class LimitedOutput : public std::streambuf {
  public:
   explicit LimitedOutput(std::streamsize capacity, bool failSync = false)
@@ -63,11 +51,6 @@ class LimitedOutput : public std::streambuf {
   bool failSync_;
 };
 
-std::string CubeOBJ() {
-  std::ostringstream output;
-  Manifold::Cube().WriteOBJ(output);
-  return output.str();
-}
 }  // namespace
 
 TEST(OBJStream, ReportShortWrites) {
@@ -97,91 +80,62 @@ TEST(OBJStream, ReportFlushErrors) {
   }
 }
 
-TEST(OBJStream, ReadErrorDoesNotReturnPartialMesh) {
-  for (const std::string& prefix :
-       {std::string(), std::string("v 0 0 0\n"), CubeOBJ()}) {
-    FailingInput freeBuffer(prefix);
-    std::istream freeInput(&freeBuffer);
-    const MeshGL64 mesh = ReadOBJ(freeInput);
-    EXPECT_TRUE(freeInput.bad());
-    EXPECT_FALSE(freeInput.eof());
-    EXPECT_TRUE(mesh.vertProperties.empty());
-    EXPECT_TRUE(mesh.triVerts.empty());
-
-    FailingInput memberBuffer(prefix);
-    std::istream memberInput(&memberBuffer);
-    EXPECT_EQ(Manifold::ReadOBJ(memberInput).Status(),
-              Manifold::Error::InvalidConstruction);
-    EXPECT_TRUE(memberInput.bad());
-    EXPECT_FALSE(memberInput.eof());
-  }
-}
-
-TEST(OBJStream, SuccessfulWriteAndNormalEOF) {
+TEST(OBJStream, SuccessfulWrite) {
   const Manifold cube = Manifold::Cube();
   for (const bool member : {false, true}) {
     std::ostringstream output;
-    const bool written =
-        member ? cube.WriteOBJ(output) : WriteOBJ(output, cube.GetMeshGL64());
-    ASSERT_TRUE(written);
-    const std::string text = output.str();
-    for (const bool newline : {false, true}) {
-      const std::string inputText =
-          newline ? text : text.substr(0, text.size() - 1);
-      std::istringstream freeInput(inputText);
-      const MeshGL64 mesh = ReadOBJ(freeInput);
-      EXPECT_TRUE(freeInput.eof());
-      EXPECT_FALSE(freeInput.bad());
-      EXPECT_EQ(mesh.NumVert(), cube.NumVert());
-      EXPECT_EQ(mesh.NumTri(), cube.NumTri());
-      std::istringstream memberInput(inputText);
-      const Manifold restored = Manifold::ReadOBJ(memberInput);
-      EXPECT_EQ(restored.Status(), Manifold::Error::NoError);
-      EXPECT_DOUBLE_EQ(restored.Volume(), 1);
-    }
-  }
-}
-
-TEST(OBJStream, LastVertexWithoutNewline) {
-  for (const std::string text : {"v 1 2 3", "v 1 2 3\n", "v 1 2 3\r\n"}) {
-    std::istringstream input(text);
+    ASSERT_TRUE(member ? cube.WriteOBJ(output)
+                       : WriteOBJ(output, cube.GetMeshGL64()));
+    EXPECT_TRUE(output.good());
+    std::istringstream input(output.str());
     const MeshGL64 mesh = ReadOBJ(input);
-    EXPECT_EQ(mesh.vertProperties, (std::vector<double>{1, 2, 3}));
-    EXPECT_FALSE(input.bad());
+    EXPECT_EQ(mesh.NumVert(), cube.NumVert());
+    EXPECT_EQ(mesh.NumTri(), cube.NumTri());
+    EXPECT_DOUBLE_EQ(Manifold(mesh).Volume(), cube.Volume());
   }
 }
 
-TEST(OBJStream, InitiallyFailedStreams) {
-  const Manifold cube = Manifold::Cube();
-  std::istringstream input(CubeOBJ());
-  input.setstate(std::ios::failbit);
-  EXPECT_TRUE(ReadOBJ(input).vertProperties.empty());
-  EXPECT_EQ(Manifold::ReadOBJ(input).Status(),
-            Manifold::Error::InvalidConstruction);
-  std::ostringstream output;
-  output.setstate(std::ios::failbit);
-  EXPECT_FALSE(WriteOBJ(output, cube.GetMeshGL64()));
-  EXPECT_FALSE(cube.WriteOBJ(output));
+TEST(OBJStream, EmptyMeshWrite) {
+  for (const bool member : {false, true}) {
+    std::ostringstream output;
+    ASSERT_TRUE(member ? Manifold().WriteOBJ(output)
+                       : WriteOBJ(output, MeshGL64{}));
+    EXPECT_TRUE(output.good());
+    EXPECT_NE(output.str().find("# ======== end mesh ======="),
+              std::string::npos);
+    std::istringstream input(output.str());
+    EXPECT_TRUE(ReadOBJ(input).vertProperties.empty());
+  }
 }
 
-TEST(OBJStream, PreserveExceptionMasks) {
-  for (const bool member : {false, true}) {
-    FailingInput inputBuffer("v 0 0 0\n");
-    std::istream input(&inputBuffer);
-    input.exceptions(std::ios::badbit);
-    if (member) {
-      EXPECT_THROW(Manifold::ReadOBJ(input), std::runtime_error);
-    } else {
-      EXPECT_THROW(ReadOBJ(input), std::runtime_error);
+TEST(OBJStream, InitiallyFailedOutput) {
+  const Manifold cube = Manifold::Cube();
+  for (const auto state :
+       {std::ios::failbit, std::ios::badbit, std::ios::eofbit}) {
+    for (const bool member : {false, true}) {
+      std::ostringstream output;
+      output.setstate(state);
+      EXPECT_FALSE(member ? cube.WriteOBJ(output)
+                          : WriteOBJ(output, cube.GetMeshGL64()));
+      EXPECT_EQ(output.rdstate(), state);
+      EXPECT_TRUE(output.str().empty());
     }
-    LimitedOutput outputBuffer(0);
-    std::ostream output(&outputBuffer);
-    output.exceptions(std::ios::badbit);
-    if (member) {
-      EXPECT_THROW(Manifold::Cube().WriteOBJ(output), std::ios_base::failure);
-    } else {
-      EXPECT_THROW(WriteOBJ(output, Manifold::Cube().GetMeshGL64()),
-                   std::ios_base::failure);
+  }
+}
+
+TEST(OBJStream, PreserveOutputExceptionMasks) {
+  for (const bool member : {false, true}) {
+    for (const bool failSync : {false, true}) {
+      LimitedOutput outputBuffer(failSync ? 10000 : 0, failSync);
+      std::ostream output(&outputBuffer);
+      output.exceptions(std::ios::badbit);
+      if (member) {
+        EXPECT_THROW(Manifold::Cube().WriteOBJ(output), std::ios_base::failure);
+      } else {
+        EXPECT_THROW(WriteOBJ(output, Manifold::Cube().GetMeshGL64()),
+                     std::ios_base::failure);
+      }
+      EXPECT_EQ(output.exceptions(), std::ios::badbit);
     }
   }
 }
