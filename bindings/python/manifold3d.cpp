@@ -124,7 +124,7 @@ struct nb::detail::type_caster<la::mat<T, R, C>> {
         buffer[i * C + j] = mat[j][i];
       }
     }
-    numpy_type arr{buffer, {R, C}, nb::handle()};
+    numpy_type arr{buffer.data(), {R, C}, nb::handle()};
     // we must copy the underlying data
     return make_caster<numpy_type>::from_cpp(arr, rv_policy::copy, cleanup);
   }
@@ -300,6 +300,15 @@ NB_MODULE(manifold3d, m) {
   m.def("triangulate", &Triangulate, nb::arg("polygons"),
         nb::arg("epsilon") = -1, nb::arg("allow_convex") = true,
         triangulate__polygons__epsilon__allow_convex);
+
+  m.def(
+      "version",
+      []() {
+        const auto v = Version();
+        return std::make_tuple(v[0], v[1], v[2]);
+      },
+      "Returns the version of the Manifold library.\n\n"
+      ":return: Version as (major, minor, patch).");
 
   nb::class_<Manifold>(
       m, "Manifold",
@@ -585,13 +594,11 @@ NB_MODULE(manifold3d, m) {
       .def(
           "project",
           [](const Manifold& self) {
-            const Manifold checked = Check(self);
-            return CrossSection(checked.Project())
-                .Simplify(checked.GetEpsilon());
+            return CrossSection(Check(self).Project());
           },
           "Returns a CrossSection of the projected outline of this object onto "
           "the X-Y plane. The outline polygons are combined with the positive "
-          "fill rule and simplified at this Manifold's epsilon.")
+          "fill rule.")
       .def("status", &Manifold::Status, manifold__status, release_gil())
       .def("with_context", &Manifold::WithContext, nb::arg("ctx"),
            manifold__with_context__ctx)
@@ -714,8 +721,8 @@ NB_MODULE(manifold3d, m) {
                                              nb::c_contig>>& runIndex,
              const std::optional<nb::ndarray<const uint32_t, nb::shape<-1>,
                                              nb::c_contig>>& runOriginalID,
-             std::optional<nb::ndarray<const float, nb::shape<-1, 4, 3>,
-                                       nb::c_contig>>& runTransform,
+             const std::optional<nb::ndarray<const float, nb::shape<-1, 3, 4>,
+                                             nb::c_contig>>& runTransform,
              const std::optional<nb::ndarray<const uint8_t, nb::shape<-1>,
                                              nb::c_contig>>& runFlags,
              const std::optional<nb::ndarray<const uint32_t, nb::shape<-1>,
@@ -747,8 +754,13 @@ NB_MODULE(manifold3d, m) {
                   toVector(runOriginalID->data(), runOriginalID->size());
 
             if (runTransform.has_value()) {
-              self->runTransform =
-                  toVector(runTransform->data(), runTransform->size());
+              // Each run is a 3x4 matrix, stored column-major in C++.
+              auto rt = runTransform->view();
+              self->runTransform.reserve(runTransform->size());
+              for (size_t run = 0; run < rt.shape(0); ++run)
+                for (size_t col = 0; col < 4; ++col)
+                  for (size_t row = 0; row < 3; ++row)
+                    self->runTransform.push_back(rt(run, row, col));
             }
 
             if (runFlags.has_value()) {
@@ -791,11 +803,15 @@ NB_MODULE(manifold3d, m) {
       .def_prop_ro(
           "run_transform",
           [](const MeshGL& self) {
-            return nb::ndarray<nb::numpy, const float, nb::c_contig>(
-                self.runTransform.data(), {self.runTransform.size() / 12, 4, 3},
-                nb::handle());
+            // Transposed view of the column-major C++ storage.
+            return nb::ndarray<nb::numpy, const float>(
+                self.runTransform.data(), {self.runTransform.size() / 12, 3, 4},
+                nb::handle(), {12, 1, 3});
           },
-          nb::rv_policy::reference_internal)
+          nb::rv_policy::reference_internal,
+          "Per-run transforms as an (n, 3, 4) array, in the layout "
+          "Manifold.transform takes. Empty when the Manifold is itself an "
+          "original, so use get_run_transform to read any run.")
       .def_prop_ro(
           "halfedge_tangent",
           [](const MeshGL& self) {
@@ -812,6 +828,9 @@ NB_MODULE(manifold3d, m) {
       .def_ro("face_id", &MeshGL::faceID)
       .def("backside", &MeshGL::Backside, nb::arg("run"))
       .def("has_normals", &MeshGL::HasNormals, nb::arg("run"))
+      .def("get_run_transform", &MeshGL::GetRunTransform, nb::arg("run"),
+           "Returns the 3x4 transform of the given run, or the identity if "
+           "run_transform has no entry for it.")
       .def("merge", &MeshGL::Merge, nb::arg("tolerance") = 0.0f,
            mesh_gl__merge__tolerance);
 
@@ -831,8 +850,8 @@ NB_MODULE(manifold3d, m) {
                                              nb::c_contig>>& runIndex,
              const std::optional<nb::ndarray<const uint32_t, nb::shape<-1>,
                                              nb::c_contig>>& runOriginalID,
-             std::optional<nb::ndarray<const double, nb::shape<-1, 4, 3>,
-                                       nb::c_contig>>& runTransform,
+             const std::optional<nb::ndarray<const double, nb::shape<-1, 3, 4>,
+                                             nb::c_contig>>& runTransform,
              const std::optional<nb::ndarray<const uint8_t, nb::shape<-1>,
                                              nb::c_contig>>& runFlags,
              const std::optional<nb::ndarray<const uint64_t, nb::shape<-1>,
@@ -864,8 +883,13 @@ NB_MODULE(manifold3d, m) {
                   toVector(runOriginalID->data(), runOriginalID->size());
 
             if (runTransform.has_value()) {
-              self->runTransform =
-                  toVector(runTransform->data(), runTransform->size());
+              // Each run is a 3x4 matrix, stored column-major in C++.
+              auto rt = runTransform->view();
+              self->runTransform.reserve(runTransform->size());
+              for (size_t run = 0; run < rt.shape(0); ++run)
+                for (size_t col = 0; col < 4; ++col)
+                  for (size_t row = 0; row < 3; ++row)
+                    self->runTransform.push_back(rt(run, row, col));
             }
 
             if (runFlags.has_value()) {
@@ -908,11 +932,15 @@ NB_MODULE(manifold3d, m) {
       .def_prop_ro(
           "run_transform",
           [](const MeshGL64& self) {
-            return nb::ndarray<nb::numpy, const double, nb::c_contig>(
-                self.runTransform.data(), {self.runTransform.size() / 12, 4, 3},
-                nb::handle());
+            // Transposed view of the column-major C++ storage.
+            return nb::ndarray<nb::numpy, const double>(
+                self.runTransform.data(), {self.runTransform.size() / 12, 3, 4},
+                nb::handle(), {12, 1, 3});
           },
-          nb::rv_policy::reference_internal)
+          nb::rv_policy::reference_internal,
+          "Per-run transforms as an (n, 3, 4) array, in the layout "
+          "Manifold.transform takes. Empty when the Manifold is itself an "
+          "original, so use get_run_transform to read any run.")
       .def_prop_ro(
           "halfedge_tangent",
           [](const MeshGL64& self) {
@@ -929,6 +957,9 @@ NB_MODULE(manifold3d, m) {
       .def_ro("face_id", &MeshGL64::faceID)
       .def("backside", &MeshGL64::Backside, nb::arg("run"))
       .def("has_normals", &MeshGL64::HasNormals, nb::arg("run"))
+      .def("get_run_transform", &MeshGL64::GetRunTransform, nb::arg("run"),
+           "Returns the 3x4 transform of the given run, or the identity if "
+           "run_transform has no entry for it.")
       .def("merge", &MeshGL64::Merge, nb::arg("tolerance") = 0.0,
            mesh_gl__merge__tolerance);
 

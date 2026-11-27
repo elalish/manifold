@@ -30,7 +30,7 @@ def test_mesh_copies_all_input_buffers(mesh_type, export, readonly):
         "merge_to_vert": np.array([0], dtype=index_type),
         "run_index": np.array([0, source.tri_verts.size], dtype=index_type),
         "run_original_id": np.array([7], dtype=np.uint32),
-        "run_transform": np.arange(12, dtype=float_type).reshape(1, 4, 3),
+        "run_transform": np.arange(12, dtype=float_type).reshape(1, 3, 4),
         "run_flags": np.array([1], dtype=np.uint8),
         "face_id": np.arange(len(source.tri_verts), dtype=index_type),
         "halfedge_tangent": np.arange(

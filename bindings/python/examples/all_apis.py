@@ -9,6 +9,7 @@ def all_root_level():
     poly = [[0, 0], [1, 0], [1, 1]]
     tris = triangulate([poly])
     tris = triangulate([np.array(poly)])
+    major, minor, patch = version()
 
 
 def all_cross_section():

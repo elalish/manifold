@@ -226,11 +226,10 @@ struct MeshGLP {
    * @param run The index of the triangle run (0 <= run < runOriginalID.size()).
    */
   mat3x4 GetRunTransform(size_t run) const {
-    size_t offset = 12 * run;
-    if (offset + 12 > runTransform.size()) {
+    if (run >= runTransform.size() / 12) {
       return la::identity;
     }
-    return mat3x4(la::mat<Precision, 3, 4>(&runTransform[offset]));
+    return mat3x4(la::mat<Precision, 3, 4>(&runTransform[12 * run]));
   }
 
   /**
