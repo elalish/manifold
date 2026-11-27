@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-shopt -s extglob
+shopt -s extglob globstar
 if [ -z "$CLANG_FORMAT" ]; then
 CLANG_FORMAT=clang-format
 fi
@@ -21,6 +21,10 @@ $CLANG_FORMAT -i bindings/wasm/manifold-cad/test/fixtures/*.{ts,mjs} &
 $CLANG_FORMAT -i bindings/wasm/manifold-cad/types/*.ts &
 $CLANG_FORMAT -i src/*.{h,cpp} &
 $CLANG_FORMAT -i include/manifold/*.h &
+find bindings/wasm/openscad-compiler \
+  -type f \( -name '*.js' -o -name '*.ts' -o -name '*.html' \) \
+  -not -path '*/node_modules/*' -not -path '*/dist/*' \
+  -print0 | xargs -0 $CLANG_FORMAT -i &
 
 black --quiet bindings/python/examples/*.py &
 
