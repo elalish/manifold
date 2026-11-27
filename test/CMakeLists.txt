@@ -28,6 +28,7 @@ set(
   manifold_test.cpp
   context_test.cpp
   measurement_test.cpp
+  obj_stream_test.cpp
   boolean_test.cpp
   sdf_test.cpp
   smooth_test.cpp
