@@ -383,7 +383,8 @@ inline double asin(double x) {
   if (!std::isfinite(x) || x < -1.0 || x > 1.0) return NAN;
   if (x == 1.0) return half_pi;
   if (x == -1.0) return -half_pi;
-  // Avoid subtracting nearly equal angles for shallow dihedrals and plane normals.
+  // Avoid subtracting nearly equal angles for shallow dihedrals and plane
+  // normals.
   if (std::fabs(x) < 0.5) return x + x * AsinCorrection(x * x);
   return half_pi - acos(x);
 }

@@ -12,22 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#include "manifold/math.h"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
 
 #include "gtest/gtest.h"
-#include "manifold/math.h"
 
 namespace {
-constexpr double kRelativeTolerance = 4 * std::numeric_limits<double>::epsilon();
+constexpr double kRelativeTolerance =
+    4 * std::numeric_limits<double>::epsilon();
 }  // namespace
 
 TEST(Math, AsinSmallAngles) {
-  for (double magnitude : {std::numeric_limits<double>::denorm_min(),
-                           std::numeric_limits<double>::min(), 1e-300, 1e-20,
-                           1e-12, 1e-8, 1e-4, 0.1, 0.25,
-                           std::nextafter(0.5, 0.0)}) {
+  for (double magnitude :
+       {std::numeric_limits<double>::denorm_min(),
+        std::numeric_limits<double>::min(), 1e-300, 1e-20, 1e-12, 1e-8, 1e-4,
+        0.1, 0.25, std::nextafter(0.5, 0.0)}) {
     for (double sign : {-1.0, 1.0}) {
       const double x = sign * magnitude;
       SCOPED_TRACE(x);
@@ -62,13 +64,13 @@ TEST(Math, AsinAcrossDomain) {
     if (i == 0) continue;
     const double x = i / 8192.0;
     const double expected = std::asin(x);
-    largestRelativeError = std::max(
-        largestRelativeError,
-        std::abs((manifold::math::asin(x) - expected) / expected));
+    largestRelativeError =
+        std::max(largestRelativeError,
+                 std::abs((manifold::math::asin(x) - expected) / expected));
   }
   EXPECT_LE(largestRelativeError, kRelativeTolerance);
-  for (double x : {std::nextafter(0.5, 0.0), 0.5,
-                   std::nextafter(0.5, 1.0), std::nextafter(1.0, 0.0)}) {
+  for (double x : {std::nextafter(0.5, 0.0), 0.5, std::nextafter(0.5, 1.0),
+                   std::nextafter(1.0, 0.0)}) {
     for (double sign : {-1.0, 1.0}) {
       const double expected = std::asin(sign * x);
       EXPECT_NEAR(manifold::math::asin(sign * x), expected,
@@ -82,9 +84,9 @@ TEST(Math, AcosAcrossDomain) {
   for (int i = -8192; i < 8192; ++i) {
     const double x = i / 8192.0;
     const double expected = std::acos(x);
-    largestRelativeError = std::max(
-        largestRelativeError,
-        std::abs((manifold::math::acos(x) - expected) / expected));
+    largestRelativeError =
+        std::max(largestRelativeError,
+                 std::abs((manifold::math::acos(x) - expected) / expected));
   }
   EXPECT_LE(largestRelativeError, kRelativeTolerance);
   EXPECT_EQ(manifold::math::acos(1.0), 0.0);
