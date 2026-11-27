@@ -280,6 +280,7 @@ CATEGORIES = {
     "CircularQuality.segments_for": (C, []),
     "CircularQuality.for_divisions": (C, []),
     "triangulate": (C, []),
+    "version": (C, []),
 }
 
 # Calls that cannot give an error today. They are checked anyway.
