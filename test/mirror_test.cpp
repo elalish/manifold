@@ -26,8 +26,8 @@ TEST(Mirror, ManifoldNormalMagnitude) {
     const Box expected = input.Mirror(normal).BoundingBox();
     for (const double scale :
          {std::numeric_limits<double>::denorm_min(),
-          std::numeric_limits<double>::min(), 1e-200, 1e-160, 1.0, 1e160,
-          1e200, std::numeric_limits<double>::max() / 4}) {
+          std::numeric_limits<double>::min(), 1e-200, 1e-160, 1.0, 1e160, 1e200,
+          std::numeric_limits<double>::max() / 4}) {
       SCOPED_TRACE(scale);
       const Manifold mirrored = input.Mirror(normal * scale);
       ASSERT_EQ(mirrored.Status(), Manifold::Error::NoError);
@@ -49,8 +49,8 @@ TEST(Mirror, CrossSectionNormalMagnitude) {
     const Rect expected = input.Mirror(normal).Bounds();
     for (const double scale :
          {std::numeric_limits<double>::denorm_min(),
-          std::numeric_limits<double>::min(), 1e-200, 1e-160, 1.0, 1e160,
-          1e200, std::numeric_limits<double>::max() / 4}) {
+          std::numeric_limits<double>::min(), 1e-200, 1e-160, 1.0, 1e160, 1e200,
+          std::numeric_limits<double>::max() / 4}) {
       SCOPED_TRACE(scale);
       const CrossSection mirrored = input.Mirror(normal * scale);
       EXPECT_FALSE(mirrored.IsEmpty());
