@@ -153,6 +153,10 @@ test('collects CrossSection warp, extrusion and revolution results', () => {
   const warped = remember(square.warp(vertex => {
     vertex[0] += 2;
   }));
+  const batch = remember(square.warpBatch(vertices => {
+    for (let i = 0; i < vertices.length; i += 2) vertices[i] += 2;
+  }));
+  expect(batch.bounds().min[0]).toBe(2);
   const extruded = remember(warped.extrude(3));
   const revolved = remember(warped.revolve(8));
   expect(warped.bounds().min[0]).toBe(2);

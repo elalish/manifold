@@ -221,17 +221,19 @@ struct RayHit {
  * shared_ptr, so one thread can evaluate while another holds a copy and
  * observes Progress() or calls Cancel(). Use a separate context per
  * evaluation; passing the same context (or a copy of it) to two concurrent
- * eager ops produces meaningless progress values because both calls reset
- * and mutate the same counters.
+ * eager ops produces meaningless progress values because both calls can
+ * reset and mutate the same counters.
  *
  * Cancellation is permanent for a Manifold: once requested and detected,
  * the Manifold's status becomes Error::Cancelled and stays Cancelled. To
  * retry, construct a new Manifold. A context, however, is reusable: each
- * evaluation through it resets the progress counters, but it does NOT
- * clear the cancel flag -- once Cancel() has been called on a context,
- * every subsequent evaluation with that context (or any copy of it) will
- * short-circuit to Error::Cancelled. Construct a fresh context to make a
- * new evaluation cancellable independently.
+ * evaluation of Booleans through it, and each FromMeshGL or LevelSet call on
+ * it, resets the progress counters. Any other call that evaluates no
+ * Booleans, such as a query on an evaluated Manifold, leaves them as they
+ * are. Reuse does NOT clear the cancel flag -- once Cancel() has been called
+ * on a context, every subsequent evaluation with that context (or any copy of
+ * it) will short-circuit to Error::Cancelled. Construct a fresh context to
+ * make a new evaluation cancellable independently.
  *
  * Cancellation granularity varies by op: Boolean trees check between
  * sub-booleans and between the phases inside each one; Hull checks at the
@@ -279,11 +281,11 @@ class ExecutionContext {
   void Cancel();
   /// Has cancellation been requested?
   bool Cancelled() const;
-  /// Normalized progress in [0, 1]. Monotonically increases during
-  /// evaluation. Returns 1.0 when no work has been scheduled (interpreted
-  /// as trivially complete -- e.g. a single-leaf manifold has nothing to
-  /// evaluate, and `Progress()` called before any evaluation reflects
-  /// the same "no pending work" state).
+  /// Normalized progress in [0, 1] of the last evaluation through this
+  /// context. Monotonically increases during evaluation. Returns 1.0 before
+  /// any evaluation (no work scheduled reads as trivially complete). A call
+  /// that evaluates no Booleans, such as a query on an evaluated Manifold,
+  /// leaves it as it was, except FromMeshGL and LevelSet below.
   double Progress() const;
 
   /// Eager ctx-aware `Manifold(MeshGL)`. The heavy ingest steps check
@@ -318,7 +320,7 @@ struct Box {
   vec3 max = vec3(-std::numeric_limits<double>::infinity());
 
   /**
-   * Default constructor is an infinite box that contains all space.
+   * Default constructor is an empty box, the bounding box of no points.
    */
   constexpr Box() {}
 

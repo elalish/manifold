@@ -20,9 +20,12 @@
 #include <cmath>
 #include <limits>
 #include <random>
+#include <set>
 #include <stdexcept>
+#include <string>
 #include <thread>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "../src/execution_impl.h"
@@ -265,6 +268,30 @@ TEST(Manifold, Empty) {
 
   EXPECT_TRUE(empty.IsEmpty());
   EXPECT_EQ(empty.Status(), Manifold::Error::NoError);
+}
+
+TEST(Manifold, ErrorStrings) {
+  using Error = Manifold::Error;
+  const std::string unknownName = ErrorName(static_cast<Error>(-1));
+  const std::string unknown = ToString(static_cast<Error>(-1));
+  std::set<std::string> names;
+  std::set<std::string> messages;
+  for (int i = 0; i <= static_cast<int>(Error::Cancelled); ++i) {
+    const std::string name = ErrorName(static_cast<Error>(i));
+    const std::string message = ToString(static_cast<Error>(i));
+    EXPECT_FALSE(name.empty());
+    EXPECT_FALSE(message.empty());
+    EXPECT_NE(name, unknownName);
+    EXPECT_NE(message, unknown);
+    names.insert(name);
+    messages.insert(message);
+  }
+  EXPECT_EQ(names.size(), static_cast<size_t>(Error::Cancelled) + 1);
+  EXPECT_EQ(messages.size(), static_cast<size_t>(Error::Cancelled) + 1);
+  EXPECT_STREQ(ErrorName(Error::Cancelled), "Cancelled");
+  const auto past = static_cast<Error>(static_cast<int>(Error::Cancelled) + 1);
+  EXPECT_EQ(ErrorName(past), unknownName);
+  EXPECT_EQ(ToString(past), unknown);
 }
 
 TEST(Manifold, ValidInput) {
@@ -981,6 +1008,17 @@ TEST(Manifold, ErrorPropagationSplitByPlane) {
   EXPECT_EQ(parts.second.Status(), Manifold::Error::NonFiniteVertex);
 }
 
+TEST(Manifold, ErrorPropagationTrimByPlane) {
+  MeshGL in = TetGL();
+  std::swap(in.triVerts[1], in.triVerts[2]);
+  Manifold errored(in);
+  ASSERT_EQ(errored.Status(), Manifold::Error::NotManifold);
+  for (vec3 normal : {vec3(0, 0, 1), vec3(0.0)}) {
+    EXPECT_EQ(errored.TrimByPlane(normal, 0).Status(),
+              Manifold::Error::NotManifold);
+  }
+}
+
 TEST(Manifold, ErrorPropagationMirror) {
   MeshGL in = TetGL();
   in.vertProperties[2 * 3 + 1] = NAN;
@@ -1529,8 +1567,6 @@ TEST(Manifold, ExtrudeInvalid) {
   EXPECT_EQ(Manifold::Extrude(square, 1, 4, 0, vec2(INFINITY)).Status(),
             Manifold::Error::InvalidConstruction);
   EXPECT_EQ(Manifold::Extrude({{{0, 0}, {1, 0}, {NAN, 1}}}, 1).Status(),
-            Manifold::Error::InvalidConstruction);
-  EXPECT_EQ(Manifold::Extrude({{{0, 0}}}, 1).Status(),
             Manifold::Error::InvalidConstruction);
 }
 
@@ -2674,8 +2710,6 @@ TEST(Manifold, MirroredNormals) {
 TEST(Manifold, Invalid) {
   auto invalid = Manifold::Error::InvalidConstruction;
   auto circ = CrossSection::Circle(10.);
-  auto empty_circ = CrossSection::Circle(-2.);
-  auto empty_sq = CrossSection::Square(vec2(0.0));
 
   EXPECT_EQ(Manifold::Sphere(0).Status(), invalid);
   EXPECT_EQ(Manifold::Cylinder(0, 5).Status(), invalid);
@@ -2685,8 +2719,71 @@ TEST(Manifold, Invalid) {
   EXPECT_EQ(Manifold::Cube(vec3(0.0)).Status(), invalid);
   EXPECT_EQ(Manifold::Cube({-1, 1, 1}).Status(), invalid);
   EXPECT_EQ(Manifold::Extrude(circ.ToPolygons(), 0.).Status(), invalid);
-  EXPECT_EQ(Manifold::Extrude(empty_circ.ToPolygons(), 10.).Status(), invalid);
-  EXPECT_EQ(Manifold::Revolve(empty_sq.ToPolygons()).Status(), invalid);
+}
+
+// Empty input gives an empty result with no error, however it is extruded or
+// revolved, as long as the parameters are valid.
+TEST(Manifold, EmptyCrossSectionGivesEmpty) {
+  const std::vector<Polygons> empties = {
+      {},
+      {{}},
+      CrossSection::Circle(-2.).ToPolygons(),
+      CrossSection::Square(vec2(0.0)).ToPolygons(),
+      {{{0, 0}}, {{1, 0}, {2, 0}}},
+  };
+  // Revolve also drops contours entirely on the negative X side.
+  std::vector<Polygons> revolveEmpties = empties;
+  revolveEmpties.push_back(
+      CrossSection::Square({1, 1}).Translate({-2, 0}).ToPolygons());
+  const auto expectEmpty = [](const Manifold& m) {
+    EXPECT_EQ(m.Status(), Manifold::Error::NoError);
+    EXPECT_TRUE(m.IsEmpty());
+  };
+  for (size_t i = 0; i < empties.size(); ++i) {
+    SCOPED_TRACE(testing::Message() << "empty cross-section " << i);
+    expectEmpty(Manifold::Extrude(empties[i], 1));
+    expectEmpty(Manifold::Extrude(empties[i], 2, 3, 45, {0, 0}));
+    expectEmpty(Manifold::Extrude(empties[i], 2, 0, 0, {2, 0.5}));
+  }
+  for (size_t i = 0; i < revolveEmpties.size(); ++i) {
+    SCOPED_TRACE(testing::Message() << "empty cross-section " << i);
+    for (double degrees : {360.0, 90.0, -90.0, 720.0}) {
+      for (int segments : {0, 12}) {
+        expectEmpty(Manifold::Revolve(revolveEmpties[i], {segments}, degrees));
+      }
+    }
+  }
+}
+
+// Invalid parameters are an error whether or not the cross-section is empty.
+TEST(Manifold, InvalidParameterWithEmptyCrossSection) {
+  const double inf = std::numeric_limits<double>::infinity();
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  const Polygons square = CrossSection::Square({1, 1}).ToPolygons();
+  const Polygons offset =
+      CrossSection::Square({1, 1}).Translate({1, 0}).ToPolygons();
+  const auto expectInvalid = [](const Manifold& m) {
+    EXPECT_EQ(m.Status(), Manifold::Error::InvalidConstruction);
+    EXPECT_TRUE(m.IsEmpty());
+  };
+  for (const Polygons& polys : {Polygons(), square}) {
+    SCOPED_TRACE(testing::Message() << "contours " << polys.size());
+    for (double height : {0.0, -1.0, nan, inf}) {
+      expectInvalid(Manifold::Extrude(polys, height));
+    }
+    expectInvalid(Manifold::Extrude(polys, 1, -1));
+    expectInvalid(Manifold::Extrude(polys, 1, 0, nan));
+    for (vec2 scaleTop :
+         {vec2(-1, 1), vec2(1, -0.5), vec2(nan, 1), vec2(1, inf)}) {
+      expectInvalid(Manifold::Extrude(polys, 1, 0, 0, scaleTop));
+    }
+  }
+  for (const Polygons& polys : {Polygons(), offset}) {
+    SCOPED_TRACE(testing::Message() << "contours " << polys.size());
+    for (double degrees : {0.0, nan, inf, -inf}) {
+      expectInvalid(Manifold::Revolve(polys, {}, degrees));
+    }
+  }
 }
 
 TEST(Manifold, NonFiniteCubeIsInvalid) {

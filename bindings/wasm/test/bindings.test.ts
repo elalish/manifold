@@ -282,6 +282,41 @@ suite('Manifold Bindings', () => {
     cancelCtx.delete();
   });
 
+  test('ManifoldError messages', () => {
+    const ManifoldError = (manifoldModule as any).ManifoldError;
+    const status = (manifoldModule as any).status;
+    const codes =
+        Object.keys(status).filter(k => typeof status[k]?.value === 'number');
+    expect(codes).toContain('Cancelled');
+    expect(codes.map(code => status[code].value)).toEqual([...codes.keys()]);
+    const messages = codes.map(code => {
+      const error = new ManifoldError(code);
+      expect(error).toBeInstanceOf(Error);
+      expect(error.name).toEqual('ManifoldError');
+      expect(error.code).toEqual(code);
+      return error.message;
+    });
+    const unknown = new ManifoldError('Bogus').message;
+    expect(messages.every(m => m.length > 0 && m !== unknown)).toBe(true);
+    expect(new Set(messages).size).toEqual(codes.length);
+    expect(new ManifoldError('Cancelled').message).not.toEqual('Unknown error');
+
+    const mesh = new manifoldModule.Mesh({
+      numProp: 3,
+      vertProperties: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+      triVerts: new Uint32Array([0, 1, 2])
+    });
+    let thrown: any;
+    try {
+      new manifoldModule.Manifold(mesh);
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(ManifoldError);
+    expect(thrown.code).toEqual('NotManifold');
+    expect(thrown.message).toEqual(new ManifoldError('NotManifold').message);
+  });
+
   test('refineToTolerance does not throw (issue #1545)', () => {
     // Reproduces the original failing geometry from issue #1545: a flat-faced
     // mesh with normals set via calculateNormals + smoothByNormals. On flat
@@ -590,5 +625,189 @@ suite('Mesh64', () => {
       Math.fround(offset), offset, Math.fround(offset + 1), offset + 1
     ].sort((a, b) => a - b));
     for (const m of [double, floatManifold, moved, union]) m.delete();
+  });
+});
+
+suite('Bindings match C++', () => {
+  const identity = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+
+  test('the transform of a run with no runTransform is the identity', () => {
+    const {Manifold, Mesh, Mesh64} = manifoldModule;
+    const cube = Manifold.cube();
+    const sphere = Manifold.sphere(1, 8);
+    for (const m of [cube, sphere]) {
+      for (const mesh of [m.getMesh(), m.getMesh64()]) {
+        expect(mesh.numRun).toBeGreaterThan(0);
+        for (let run = 0; run < mesh.numRun; ++run) {
+          expect(mesh.transform(run)).toEqual(identity);
+        }
+      }
+    }
+    // As in C++, a run past the end of runTransform gets the identity, and so
+    // does an invalid run.
+    const row = Array.from({length: 12}, (_, i) => i + 2);
+    for (const [MeshType, Float] of [
+             [Mesh, Float32Array], [Mesh64, Float64Array]] as const) {
+      for (const runTransform of [undefined, new Float(), Float.from(row)]) {
+        const mesh = new MeshType({
+          numProp: 3,
+          triVerts: new Uint32Array(),
+          vertProperties: new Float(),
+          runOriginalID: new Uint32Array([1, 2]),
+          runTransform
+        } as any);
+        const first = mesh.transform(0);
+        if (runTransform?.length) {
+          expect([0, 1, 2, 4, 5, 6, 8, 9, 10, 12, 13, 14].map(i => first[i]))
+              .toEqual(row);
+        } else {
+          expect(first).toEqual(identity);
+        }
+        for (const run of [1, -1, NaN]) {
+          expect(mesh.transform(run)).toEqual(identity);
+        }
+      }
+    }
+    cube.delete();
+    sphere.delete();
+  });
+
+  test('each run transform maps its original onto that run', () => {
+    const {Manifold} = manifoldModule;
+    const cube = Manifold.cube();
+    const moved = cube.rotate(0, 0, 90).translate(5, 2, 3);
+    const union = cube.add(moved);
+    const original = cube.getMesh64();
+    for (const mesh of [union.getMesh(), union.getMesh64()]) {
+      expect(mesh.numRun).toBe(2);
+      for (let run = 0; run < mesh.numRun; ++run) {
+        const m = mesh.transform(run);
+        expect([m[3], m[7], m[11], m[15]]).toEqual([0, 0, 0, 1]);
+        const mapped = [];
+        for (let v = 0; v < original.numVert; ++v) {
+          const p = [...original.position(v), 1];
+          mapped.push([0, 1, 2].map(
+              row => [0, 1, 2, 3].reduce(
+                  (sum, col) => sum + m[4 * col + row] * p[col], 0)));
+        }
+        const begin = mesh.runIndex[run] / 3;
+        const end = mesh.runIndex[run + 1] / 3;
+        for (let tri = begin; tri < end; ++tri) {
+          for (const v of mesh.verts(tri)) {
+            const p = mesh.position(v);
+            expect(
+                mapped.some(q => q.every((x, i) => Math.abs(x - p[i]) < 1e-6)))
+                .toBe(true);
+          }
+        }
+      }
+    }
+    for (const m of [cube, moved, union]) m.delete();
+  });
+
+  test('a NaN transform argument gives NonFiniteVertex, as in C++', () => {
+    const {Manifold} = manifoldModule;
+    const cube = Manifold.cube();
+    const args = [[NaN], [0, NaN], [0, 0, NaN], [1, 2, 3], [1], [1, 2]];
+    for (const op of ['translate', 'rotate'] as const) {
+      for (const a of args) {
+        const spread = (cube[op] as any)(...a);
+        const array = cube[op]([a[0], a[1] ?? 0, a[2] ?? 0]);
+        const expected = a.some(isNaN) ? 'NonFiniteVertex' : 'NoError';
+        expect(spread.status()).toBe(expected);
+        expect(array.status()).toBe(expected);
+        if (expected == 'NoError') {
+          expect(spread.boundingBox()).toEqual(array.boundingBox());
+        }
+        spread.delete();
+        array.delete();
+      }
+    }
+    cube.delete();
+  });
+
+  test('CrossSection.translate passes NaN on to C++', () => {
+    const {CrossSection} = manifoldModule;
+    const square = CrossSection.square();
+    for (const a of [[NaN, 5], [5, NaN], [1, 2], [1]]) {
+      const spread = (square.translate as any)(...a);
+      const array = square.translate([a[0], a[1] ?? 0]);
+      expect(spread.bounds()).toEqual(array.bounds());
+      spread.delete();
+      array.delete();
+    }
+    square.delete();
+  });
+
+  test('empty polygons give empty results', () => {
+    const {CrossSection, Manifold, triangulate} = manifoldModule;
+    const sections = [
+      new CrossSection([]), CrossSection.evenOdd([]), CrossSection.nonZero([]),
+      CrossSection.hull([]), CrossSection.union([]),
+      CrossSection.square().intersect([])
+    ];
+    for (const cs of sections) {
+      expect(cs.isEmpty()).toBe(true);
+      expect(cs.numContour()).toBe(0);
+      cs.delete();
+    }
+    // Empty polygons extrude and revolve like any empty CrossSection, so the
+    // status is whatever C++ gives for empty input.
+    const square = CrossSection.square();
+    const empty = square.subtract(square);
+    const pairs = [
+      [Manifold.extrude([], 1), empty.extrude(1)],
+      [Manifold.revolve([]), empty.revolve()]
+    ];
+    for (const [fromPolygons, fromEmpty] of pairs) {
+      expect(fromPolygons.status()).toBe(fromEmpty.status());
+      expect(fromPolygons.isEmpty()).toBe(true);
+      fromPolygons.delete();
+      fromEmpty.delete();
+    }
+    square.delete();
+    empty.delete();
+    expect(triangulate([])).toEqual([]);
+  });
+
+  test('Polygons are read by shape, not by contour length', () => {
+    const {CrossSection} = manifoldModule;
+    const square: [number, number][] = [[0, 0], [1, 0], [1, 1], [0, 1]];
+    const small: [number, number][][] =
+        [[], [[5, 5]], [[5, 5], [6, 5]], [[5, 5], [6, 5], [5, 6]]];
+    for (const first of small) {
+      const both = new CrossSection([first, square]);
+      const alone = new CrossSection([first]);
+      const ref = new CrossSection(square);
+      expect(both.area()).toBeCloseTo(ref.area() + alone.area(), 12);
+      expect(new CrossSection(first).area()).toBe(alone.area());
+      for (const cs of [both, alone, ref]) cs.delete();
+    }
+  });
+
+  test('points may be {x, y} objects, including at the origin', () => {
+    const {CrossSection, Manifold} = manifoldModule;
+    const tri = [[0, 0], [1, 0], [0, 1]];
+    const objects = tri.map(([x, y]) => ({x, y})) as any;
+    for (const cs
+             of [new CrossSection(objects), new CrossSection([objects]),
+                 CrossSection.hull(objects), CrossSection.hull([objects])]) {
+      expect(cs.area()).toBeCloseTo(0.5, 12);
+      cs.delete();
+    }
+    const corners = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]];
+    const hull = Manifold.hull(corners.map(([x, y, z]) => ({x, y, z})) as any);
+    expect(hull.volume()).toBeCloseTo(1 / 6, 12);
+    hull.delete();
+  });
+
+  test('version is three non-negative integers', () => {
+    const v = manifoldModule.version();
+    expect(Array.isArray(v)).toBe(true);
+    expect(v).toHaveLength(3);
+    for (const x of v) {
+      expect(Number.isInteger(x)).toBe(true);
+      expect(x).toBeGreaterThanOrEqual(0);
+    }
   });
 });

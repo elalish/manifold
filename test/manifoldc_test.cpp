@@ -24,6 +24,16 @@ TEST(CBIND, version) {
 const ManifoldCircularQuality kQuality32 = {32, 10.0, 1.0};
 const ManifoldCircularQuality kQuality100 = {100, 10.0, 1.0};
 
+TEST(CBIND, error_string) {
+  for (int i = 0; i <= MANIFOLD_CANCELLED; ++i) {
+    EXPECT_STREQ(manifold_error_string(static_cast<ManifoldError>(i)),
+                 manifold::ToString(static_cast<manifold::Manifold::Error>(i)));
+  }
+  EXPECT_STREQ(
+      manifold_error_string(static_cast<ManifoldError>(MANIFOLD_CANCELLED + 1)),
+      "Unknown error");
+}
+
 TEST(CBIND, circular_quality) {
   const ManifoldCircularQuality q = {0, 22.5, 0.125};
   EXPECT_EQ(manifold_circular_quality_segments_for(2.0, &q), 16);
@@ -373,6 +383,94 @@ TEST(CBIND, warp_translation) {
   manifold_delete_manifold(warpedcontext);
   manifold_delete_manifold(diffcontext);
   free(context);
+}
+
+struct BatchCalls {
+  int calls = 0;
+  size_t count = 0;
+};
+
+ManifoldVec3 WarpPoint3(double x, double y, double z, void*) {
+  return {x + 0.3 * std::sin(2 * y), y * (1 + 0.2 * z), z + 0.1 * x * y};
+}
+
+void WarpBatch3(double* xyz, size_t count, void* ctx) {
+  BatchCalls* calls = static_cast<BatchCalls*>(ctx);
+  ++calls->calls;
+  calls->count += count;
+  for (size_t i = 0; i < count; ++i) {
+    ManifoldVec3 v =
+        WarpPoint3(xyz[3 * i], xyz[3 * i + 1], xyz[3 * i + 2], nullptr);
+    xyz[3 * i] = v.x;
+    xyz[3 * i + 1] = v.y;
+    xyz[3 * i + 2] = v.z;
+  }
+}
+
+TEST(CBIND, warp_batch_matches_warp) {
+  ManifoldManifold* cube = manifold_cube(1, 2, 3, 1);
+  ManifoldManifold* sphere = manifold_sphere(1.0, &kQuality32);
+  ManifoldManifold* shapes[] = {
+      manifold_copy(cube),
+      manifold_copy(sphere),
+      manifold_cylinder(2.0, 1.0, 0.5, &kQuality32, 0),
+      manifold_union(cube, sphere),
+      manifold_empty(),
+  };
+  manifold_delete_manifold(cube);
+  manifold_delete_manifold(sphere);
+  for (ManifoldManifold* shape : shapes) {
+    const double volume = manifold_volume(shape);
+    BatchCalls calls;
+    ManifoldManifold* batch = manifold_warp_batch(shape, WarpBatch3, &calls);
+    ManifoldManifold* single = manifold_warp(shape, WarpPoint3, nullptr);
+    EXPECT_EQ(calls.calls, 1);
+    EXPECT_EQ(calls.count, manifold_num_vert(shape));
+    EXPECT_EQ(manifold_status(batch), MANIFOLD_NO_ERROR);
+
+    ManifoldMeshGL64* a = manifold_get_meshgl64(batch);
+    ManifoldMeshGL64* b = manifold_get_meshgl64(single);
+    ASSERT_EQ(manifold_meshgl64_vert_properties_length(a),
+              manifold_meshgl64_vert_properties_length(b));
+    ASSERT_EQ(manifold_meshgl64_tri_length(a), manifold_meshgl64_tri_length(b));
+    const double* propA = manifold_meshgl64_vert_properties(a);
+    const double* propB = manifold_meshgl64_vert_properties(b);
+    for (size_t i = 0; i < manifold_meshgl64_vert_properties_length(a); ++i) {
+      EXPECT_EQ(propA[i], propB[i]);
+    }
+    const uint64_t* triA = manifold_meshgl64_tri_verts(a);
+    const uint64_t* triB = manifold_meshgl64_tri_verts(b);
+    for (size_t i = 0; i < manifold_meshgl64_tri_length(a); ++i) {
+      EXPECT_EQ(triA[i], triB[i]);
+    }
+    if (volume > 0) {
+      EXPECT_NE(manifold_volume(batch), volume);
+    }
+    EXPECT_EQ(manifold_volume(shape), volume);
+
+    manifold_delete_meshgl64(a);
+    manifold_delete_meshgl64(b);
+    manifold_delete_manifold(batch);
+    manifold_delete_manifold(single);
+    manifold_delete_manifold(shape);
+  }
+}
+
+TEST(CBIND, warp_batch_skips_errored_input) {
+  const double verts[] = {0, 0, 0, 1, 0, 0, 0, 1, 0};
+  const uint64_t tris[] = {0, 1, 2};
+  ManifoldMeshGL64* mesh = manifold_meshgl64(verts, 3, 3, tris, 1);
+  ManifoldManifold* bad = manifold_of_meshgl64(mesh);
+  ASSERT_EQ(manifold_status(bad), MANIFOLD_NOT_MANIFOLD);
+
+  BatchCalls calls;
+  ManifoldManifold* warped = manifold_warp_batch(bad, WarpBatch3, &calls);
+  EXPECT_EQ(calls.calls, 0);
+  EXPECT_EQ(manifold_status(warped), MANIFOLD_NOT_MANIFOLD);
+
+  manifold_delete_manifold(warped);
+  manifold_delete_manifold(bad);
+  manifold_delete_meshgl64(mesh);
 }
 
 TEST(CBIND, include_pt_mutates_bounds) {
@@ -1071,6 +1169,69 @@ TEST(CBIND, cross_section_warp) {
   manifold_delete_cross_section(warped);
   manifold_delete_cross_section(cross_section);
   manifold_delete_simple_polygon(polygon);
+}
+
+ManifoldVec2 WarpPoint2(double x, double y, void*) {
+  return {x + 0.2 * std::sin(y), 1.1 * y + 0.05 * x};
+}
+
+void WarpBatch2(double* xy, size_t count, void* ctx) {
+  BatchCalls* calls = static_cast<BatchCalls*>(ctx);
+  ++calls->calls;
+  calls->count += count;
+  for (size_t i = 0; i < count; ++i) {
+    ManifoldVec2 v = WarpPoint2(xy[2 * i], xy[2 * i + 1], nullptr);
+    xy[2 * i] = v.x;
+    xy[2 * i + 1] = v.y;
+  }
+}
+
+TEST(CBIND, cross_section_warp_batch_matches_warp) {
+  ManifoldCrossSection* square = manifold_cross_section_square(3, 2, 1);
+  ManifoldCrossSection* circle =
+      manifold_cross_section_circle(0.5, &kQuality32);
+  ManifoldCrossSection* shapes[] = {
+      manifold_cross_section_copy(square),
+      manifold_cross_section_copy(circle),
+      manifold_cross_section_difference(square, circle),
+      manifold_cross_section_empty(),
+  };
+  manifold_delete_cross_section(square);
+  manifold_delete_cross_section(circle);
+  for (ManifoldCrossSection* shape : shapes) {
+    const double area = manifold_cross_section_area(shape);
+    BatchCalls calls;
+    ManifoldCrossSection* batch =
+        manifold_cross_section_warp_batch(shape, WarpBatch2, &calls);
+    ManifoldCrossSection* single =
+        manifold_cross_section_warp(shape, WarpPoint2, nullptr);
+    EXPECT_EQ(calls.calls, 1);
+    EXPECT_EQ(calls.count, manifold_cross_section_num_vert(shape));
+    if (area > 0) {
+      EXPECT_NE(manifold_cross_section_area(batch), area);
+    }
+    EXPECT_EQ(manifold_cross_section_area(shape), area);
+
+    ManifoldPolygons* a = manifold_cross_section_to_polygons(batch);
+    ManifoldPolygons* b = manifold_cross_section_to_polygons(single);
+    ASSERT_EQ(manifold_polygons_length(a), manifold_polygons_length(b));
+    for (size_t i = 0; i < manifold_polygons_length(a); ++i) {
+      ASSERT_EQ(manifold_polygons_simple_length(a, i),
+                manifold_polygons_simple_length(b, i));
+      for (size_t j = 0; j < manifold_polygons_simple_length(a, i); ++j) {
+        ManifoldVec2 pa = manifold_polygons_get_point(a, i, j);
+        ManifoldVec2 pb = manifold_polygons_get_point(b, i, j);
+        EXPECT_EQ(pa.x, pb.x);
+        EXPECT_EQ(pa.y, pb.y);
+      }
+    }
+
+    manifold_delete_polygons(a);
+    manifold_delete_polygons(b);
+    manifold_delete_cross_section(batch);
+    manifold_delete_cross_section(single);
+    manifold_delete_cross_section(shape);
+  }
 }
 
 TEST(CBIND, cross_section_even_odd) {

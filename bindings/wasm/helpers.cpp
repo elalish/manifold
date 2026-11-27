@@ -86,6 +86,11 @@ CircularQuality DefaultCircularQuality() { return {}; }
 int SegmentsFor(CircularQuality quality, double radius) {
   return quality.SegmentsFor(radius);
 }
+
+ivec3 Version() {
+  const auto v = manifold::Version();
+  return {v[0], v[1], v[2]};
+}
 }  // namespace js
 
 namespace cross_js {
@@ -136,6 +141,33 @@ CrossSection Transform(CrossSection& cross_section, const val& mat) {
 CrossSection Warp(CrossSection& cross_section, uintptr_t funcPtr) {
   void (*f)(vec2&) = reinterpret_cast<void (*)(vec2&)>(funcPtr);
   return cross_section.Warp(f);
+}
+
+CrossSection WarpBatch(CrossSection& cross_section, uintptr_t funcPtr) {
+  void (*f)(uintptr_t, size_t) =
+      reinterpret_cast<void (*)(uintptr_t, size_t)>(funcPtr);
+
+  return cross_section.WarpBatch([&](manifold::VecView<manifold::vec2> vecs) {
+    const size_t n = vecs.size();
+
+    // Flatten
+    std::vector<double> flat;
+    flat.resize(n * 2);
+    for (size_t i = 0; i < n; ++i) {
+      const manifold::vec2& v = vecs[i];
+      flat[i * 2 + 0] = v[0];
+      flat[i * 2 + 1] = v[1];
+    }
+
+    f(reinterpret_cast<uintptr_t>(flat.data()), n);
+
+    // Copy back to vecs
+    for (size_t i = 0; i < n; ++i) {
+      manifold::vec2& v = vecs[i];
+      v[0] = flat[i * 2 + 0];
+      v[1] = flat[i * 2 + 1];
+    }
+  });
 }
 
 CrossSection Offset(CrossSection& cross_section, double delta, int join_type,
@@ -247,46 +279,7 @@ Manifold ExecutionContextLevelSet(ExecutionContext& ctx, uintptr_t funcPtr,
   return ctx.LevelSet(f, bounds, edgeLength, level, tolerance, false);
 }
 
-std::string ErrorToString(Manifold::Error error) {
-  switch (error) {
-    case Manifold::Error::NoError:
-      return "NoError";
-    case Manifold::Error::NonFiniteVertex:
-      return "NonFiniteVertex";
-    case Manifold::Error::NotManifold:
-      return "NotManifold";
-    case Manifold::Error::VertexOutOfBounds:
-      return "VertexOutOfBounds";
-    case Manifold::Error::PropertiesWrongLength:
-      return "PropertiesWrongLength";
-    case Manifold::Error::MissingPositionProperties:
-      return "MissingPositionProperties";
-    case Manifold::Error::MergeVectorsDifferentLengths:
-      return "MergeVectorsDifferentLengths";
-    case Manifold::Error::MergeIndexOutOfBounds:
-      return "MergeIndexOutOfBounds";
-    case Manifold::Error::TransformWrongLength:
-      return "TransformWrongLength";
-    case Manifold::Error::RunIndexWrongLength:
-      return "RunIndexWrongLength";
-    case Manifold::Error::FaceIDWrongLength:
-      return "FaceIDWrongLength";
-    case Manifold::Error::InvalidConstruction:
-      return "InvalidConstruction";
-    case Manifold::Error::ResultTooLarge:
-      return "ResultTooLarge";
-    case Manifold::Error::InvalidTangents:
-      return "InvalidTangents";
-    case Manifold::Error::Cancelled:
-      return "Cancelled";
-    default:
-      return "UnknownError";
-  }
-}
-
-std::string Status(Manifold& manifold) {
-  return ErrorToString(manifold.Status());
-}
+std::string Status(Manifold& manifold) { return ErrorName(manifold.Status()); }
 
 std::vector<Manifold> Split(Manifold& a, Manifold& b) {
   auto [r1, r2] = a.Split(b);

@@ -58,6 +58,7 @@ const {
   triangulate,
   segmentsFor,
   forDivisions,
+  version,
   MIN_RELATIVE_PRECISION
 } = manifoldWasm;
 
@@ -81,6 +82,7 @@ export {
   triangulate,
   segmentsFor,
   forDivisions,
+  version,
   MIN_RELATIVE_PRECISION,
   show,
   only,

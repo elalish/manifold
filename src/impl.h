@@ -324,6 +324,7 @@ Manifold::Impl::Impl(const MeshGLP<Precision, I>& meshGL,
 
   if (numVert == 0 && numTri == 0) {
     MakeEmpty(Error::NoError);
+    if (ctx) ctx->donePhases.store(ctx->totalPhases.load());
     return;
   }
 

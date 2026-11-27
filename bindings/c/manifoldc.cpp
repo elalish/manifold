@@ -341,6 +341,17 @@ ManifoldManifold* manifold_warp(const ManifoldManifold* m,
   return to_c(new Manifold(warped));
 }
 
+ManifoldManifold* manifold_warp_batch(const ManifoldManifold* m,
+                                      void (*fun)(double* xyz, size_t count,
+                                                  void* ctx),
+                                      void* ctx) {
+  static_assert(sizeof(vec3) == 3 * sizeof(double));
+  auto warped = from_c(m)->WarpBatch([fun, ctx](VecView<vec3> verts) {
+    fun(reinterpret_cast<double*>(verts.data()), verts.size(), ctx);
+  });
+  return to_c(new Manifold(warped));
+}
+
 ManifoldManifold* manifold_level_set(
     double (*sdf)(double, double, double, void*), const ManifoldBox* bounds,
     double edge_length, double level, double tolerance, void* ctx) {
@@ -725,6 +736,10 @@ int manifold_is_empty(const ManifoldManifold* m) {
 ManifoldError manifold_status(const ManifoldManifold* m) {
   auto error = from_c(m)->Status();
   return to_c(error);
+}
+
+const char* manifold_error_string(ManifoldError error) {
+  return ToString(static_cast<Manifold::Error>(error));
 }
 
 ManifoldManifold* manifold_with_context(const ManifoldManifold* m,

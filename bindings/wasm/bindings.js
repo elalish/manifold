@@ -93,10 +93,15 @@ Module.setup = function() {
     return result;
   }
 
+  // A point is [x, y] or {x, y}.
+  function isPoint(p) {
+    return typeof p?.[0] == 'number' || typeof p?.x == 'number';
+  }
+
+  // Polygons is either one contour, whose first element is a point, or a list
+  // of contours.
   function polygons2vec(polygons) {
-    if (polygons[0].length < 3) {
-      polygons = [polygons];
-    }
+    if (isPoint(polygons[0])) polygons = [polygons];
     const polygonsVec = new Module.Vector2_vec2();
     for (const poly of polygons) {
       const polyVec = toVec(new Module.Vector_vec2(), poly, p => {
@@ -112,8 +117,8 @@ Module.setup = function() {
   function vararg2vec2(vec) {
     if (vec[0] instanceof Array) return {x: vec[0][0], y: vec[0][1]};
     if (typeof (vec[0]) == 'number')
-      // default to 0
-      return {x: vec[0] || 0, y: vec[1] || 0};
+      // missing components default to 0
+      return {x: vec[0], y: vec[1] ?? 0};
     return vec[0];
   }
 
@@ -121,8 +126,8 @@ Module.setup = function() {
     if (vec[0] instanceof Array)
       return {x: vec[0][0], y: vec[0][1], z: vec[0][2]};
     if (typeof (vec[0]) == 'number')
-      // default to 0
-      return {x: vec[0] || 0, y: vec[1] || 0, z: vec[2] || 0};
+      // missing components default to 0
+      return {x: vec[0], y: vec[1] ?? 0, z: vec[2] ?? 0};
     return vec[0];
   }
 
@@ -179,6 +184,28 @@ Module.setup = function() {
         state.failure = error;
       }
     }, 'vi', pointer => this._Warp(pointer));
+  };
+
+  Module.CrossSection.prototype.warpBatch = function(func) {
+    return withCallback(state => function(ptr, count) {
+      if (state.failed) return;
+      try {
+        const heapF64 = Module.HEAPF64 ?? HEAPF64;
+        if (!heapF64) {
+          throw new Error('WASM heap is not initialized (HEAPF64 unavailable)');
+        }
+        // Commit only after success, as in scalar warp. The temporary also
+        // stays valid if the callback allocates enough to grow WASM memory.
+        const verts = new Float64Array(heapF64.buffer, ptr, count * 2).slice();
+        func(verts, count);
+        const currentHeap = Module.HEAPF64 ?? HEAPF64;
+        new Float64Array(currentHeap.buffer, ptr, count * 2).set(verts);
+      } catch (error) {
+        // Return normally so C++ can destroy its local allocations.
+        state.failed = true;
+        state.failure = error;
+      }
+    }, 'vii', pointer => this._WarpBatch(pointer));
   };
 
   Module.CrossSection.prototype.decompose = function() {
@@ -345,7 +372,7 @@ Module.setup = function() {
     if (Array.isArray(xOrVec)) {
       return this._Rotate(...xOrVec);
     } else {
-      return this._Rotate(xOrVec, y || 0, z || 0);
+      return this._Rotate(xOrVec, y ?? 0, z ?? 0);
     }
   };
 
@@ -496,14 +523,17 @@ Module.setup = function() {
       return this.halfedgeTangent.subarray(4 * halfedge, 4 * (halfedge + 1));
     }
 
+    // Identity when the run has no transform, as for an original.
     transform(run) {
-      const mat4 = new Array(16);
+      const mat4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+      if (!(run >= 0 && 12 * (run + 1) <= (this.runTransform?.length ?? 0))) {
+        return mat4;
+      }
       for (const col of [0, 1, 2, 3]) {
         for (const row of [0, 1, 2]) {
           mat4[4 * col + row] = this.runTransform[12 * run + 3 * col + row];
         }
       }
-      mat4[15] = 1;
       return mat4;
     }
 
@@ -555,48 +585,7 @@ Module.setup = function() {
   };
 
   Module.ManifoldError = function ManifoldError(code, ...args) {
-    let message = 'Unknown error';
-    switch (code) {
-      case 'NonFiniteVertex':
-        message = 'Non-finite vertex';
-        break;
-      case 'NotManifold':
-        message = 'Not manifold';
-        break;
-      case 'VertexOutOfBounds':
-        message = 'Vertex index out of bounds';
-        break;
-      case 'PropertiesWrongLength':
-        message = 'Properties have wrong length';
-        break;
-      case 'MissingPositionProperties':
-        message = 'Less than three properties';
-        break;
-      case 'MergeVectorsDifferentLengths':
-        message = 'Merge vectors have different lengths';
-        break;
-      case 'MergeIndexOutOfBounds':
-        message = 'Merge index out of bounds';
-        break;
-      case 'TransformWrongLength':
-        message = 'Transform vector has wrong length';
-        break;
-      case 'RunIndexWrongLength':
-        message = 'Run index vector has wrong length';
-        break;
-      case 'FaceIDWrongLength':
-        message = 'Face ID vector has wrong length';
-        break;
-      case 'InvalidConstruction':
-        message = 'Manifold constructed with invalid parameters';
-        break;
-      case 'ResultTooLarge':
-        message = 'Result exceeds maximum size';
-        break;
-      case 'InvalidTangents':
-        message = 'Invalid halfedge tangents';
-        break;
-    }
+    const message = Module._ErrorMessage(Module.status[code]?.value ?? -1);
 
     const base = Error.apply(this, [message, ...args]);
     base.name = this.name = 'ManifoldError';
@@ -679,15 +668,10 @@ Module.setup = function() {
     for (const cs of args) {
       if (cs instanceof CrossSectionCtor) {
         Module._crossSectionCollectVertices(pts, cs);
-      } else if (
-          cs instanceof Array && cs.length == 2 && typeof cs[0] == 'number') {
-        pts.push_back({x: cs[0], y: cs[1]});
-      } else if (cs.x) {
-        pts.push_back(cs);
+      } else if (isPoint(cs)) {
+        pushVec2(pts, [cs]);
       } else {
-        const wrap =
-            ((cs[0].length == 2 && typeof cs[0][0] == 'number') || cs[0].x);
-        const polys = wrap ? [cs] : cs;
+        const polys = isPoint(cs[0]) ? [cs] : cs;
         for (const poly of polys) pushVec2(pts, poly);
       }
     }
@@ -773,23 +757,34 @@ Module.setup = function() {
   Module.Manifold.difference = manifoldBatchbool('Difference');
   Module.Manifold.intersection = manifoldBatchbool('Intersection');
 
+  function withLevelSetCallback(sdf, level, operation) {
+    return withCallback(state => function(vec3Ptr) {
+      // Outside the surface, so later evaluations add no geometry.
+      if (state.failed) return level - 1;
+      try {
+        const x = getValue(vec3Ptr, 'double');
+        const y = getValue(vec3Ptr + 8, 'double');
+        const z = getValue(vec3Ptr + 16, 'double');
+        return sdf([x, y, z]);
+      } catch (error) {
+        // Return normally so C++ can destroy its local allocations.
+        state.failed = true;
+        state.failure = error;
+        return level - 1;
+      }
+    }, 'di', operation);
+  }
+
   Module.Manifold.levelSet = function(
       sdf, bounds, edgeLength, level = 0, tolerance = -1) {
     const bounds2 = {
       min: {x: bounds.min[0], y: bounds.min[1], z: bounds.min[2]},
       max: {x: bounds.max[0], y: bounds.max[1], z: bounds.max[2]},
     };
-    const wasmFuncPtr = addFunction(function(vec3Ptr) {
-      const x = getValue(vec3Ptr, 'double');
-      const y = getValue(vec3Ptr + 8, 'double');
-      const z = getValue(vec3Ptr + 16, 'double');
-      const vert = [x, y, z];
-      return sdf(vert);
-    }, 'di');
-    const out =
-        Module._LevelSet(wasmFuncPtr, bounds2, edgeLength, level, tolerance);
-    removeFunction(wasmFuncPtr);
-    return out;
+    return withLevelSetCallback(
+        sdf, level,
+        pointer =>
+            Module._LevelSet(pointer, bounds2, edgeLength, level, tolerance));
   };
 
   // ctx-aware static factories: mirror new Manifold / levelSet but
@@ -804,17 +799,10 @@ Module.setup = function() {
       min: {x: bounds.min[0], y: bounds.min[1], z: bounds.min[2]},
       max: {x: bounds.max[0], y: bounds.max[1], z: bounds.max[2]},
     };
-    const wasmFuncPtr = addFunction(function(vec3Ptr) {
-      const x = getValue(vec3Ptr, 'double');
-      const y = getValue(vec3Ptr + 8, 'double');
-      const z = getValue(vec3Ptr + 16, 'double');
-      const vert = [x, y, z];
-      return sdf(vert);
-    }, 'di');
-    const out =
-        this._LevelSet(wasmFuncPtr, bounds2, edgeLength, level, tolerance);
-    removeFunction(wasmFuncPtr);
-    return out;
+    return withLevelSetCallback(
+        sdf, level,
+        pointer =>
+            this._LevelSet(pointer, bounds2, edgeLength, level, tolerance));
   };
 
   function pushVec3(vec, ps) {
@@ -831,11 +819,8 @@ Module.setup = function() {
     for (const m of args) {
       if (m instanceof ManifoldCtor) {
         manifolds.push(m);
-      } else if (
-          m instanceof Array && m.length == 3 && typeof m[0] == 'number') {
-        pts.push_back({x: m[0], y: m[1], z: m[2]});
-      } else if (m.x) {
-        pts.push_back(m);
+      } else if (isPoint(m)) {
+        pushVec3(pts, [m]);
       } else {
         pushVec3(pts, m);
       }
@@ -887,5 +872,10 @@ Module.setup = function() {
     const result = fromVec(trianglesVec, (x) => [x[0], x[1], x[2]]);
     trianglesVec.delete();
     return result;
+  };
+
+  Module.version = function() {
+    const v = Module._Version();
+    return [v[0], v[1], v[2]];
   };
 };

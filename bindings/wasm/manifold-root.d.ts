@@ -24,10 +24,10 @@
  */
 
 export type * from './manifold-global-types';
-export type {MeshOptions, Mesh64Options, MIN_RELATIVE_PRECISION, triangulate, segmentsFor, forDivisions} from './manifold-encapsulated-types';
+export type {MeshOptions, Mesh64Options, MIN_RELATIVE_PRECISION, triangulate, segmentsFor, forDivisions, version} from './manifold-encapsulated-types';
 export {CrossSection, Manifold, ManifoldError, Mesh, Mesh64} from './manifold-encapsulated-types';
 
-import type {MIN_RELATIVE_PRECISION, triangulate, segmentsFor, forDivisions} from './manifold-encapsulated-types';
+import type {MIN_RELATIVE_PRECISION, triangulate, segmentsFor, forDivisions, version} from './manifold-encapsulated-types';
 import {CrossSection, Manifold, ManifoldError, Mesh, Mesh64} from './manifold-encapsulated-types';
 
 import type {ExecutionContext} from './manifold-global-types';
@@ -43,6 +43,7 @@ export interface ManifoldToplevel {
   triangulate: typeof triangulate;
   segmentsFor: typeof segmentsFor;
   forDivisions: typeof forDivisions;
+  version: typeof version;
   setup: () => void;
 }
 

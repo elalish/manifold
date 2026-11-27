@@ -809,24 +809,15 @@ NB_MODULE(manifold3d, m) {
           "Like Manifold.level_set, run under this context so the level-set "
           "evaluation reports progress and observes cancellation.");
 
-  nb::enum_<Manifold::Error>(m, "Error")
-      .value("NoError", Manifold::Error::NoError)
-      .value("NonFiniteVertex", Manifold::Error::NonFiniteVertex)
-      .value("NotManifold", Manifold::Error::NotManifold)
-      .value("VertexOutOfBounds", Manifold::Error::VertexOutOfBounds)
-      .value("PropertiesWrongLength", Manifold::Error::PropertiesWrongLength)
-      .value("MissingPositionProperties",
-             Manifold::Error::MissingPositionProperties)
-      .value("MergeVectorsDifferentLengths",
-             Manifold::Error::MergeVectorsDifferentLengths)
-      .value("MergeIndexOutOfBounds", Manifold::Error::MergeIndexOutOfBounds)
-      .value("TransformWrongLength", Manifold::Error::TransformWrongLength)
-      .value("RunIndexWrongLength", Manifold::Error::RunIndexWrongLength)
-      .value("FaceIDWrongLength", Manifold::Error::FaceIDWrongLength)
-      .value("InvalidConstruction", Manifold::Error::InvalidConstruction)
-      .value("ResultTooLarge", Manifold::Error::ResultTooLarge)
-      .value("InvalidTangents", Manifold::Error::InvalidTangents)
-      .value("Cancelled", Manifold::Error::Cancelled);
+  nb::enum_<Manifold::Error> error(m, "Error");
+  for (int i = 0; i <= static_cast<int>(Manifold::Error::Cancelled); ++i) {
+    const auto e = static_cast<Manifold::Error>(i);
+    error.value(ErrorName(e), e);
+  }
+  error.def(
+      "__str__", [](Manifold::Error e) { return ToString(e); },
+      "A short English description of the error, the same text every "
+      "binding uses.");
 
   nb::enum_<CrossSection::JoinType>(m, "JoinType")
       .value("Square", CrossSection::JoinType::Square,

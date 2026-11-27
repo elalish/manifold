@@ -35,6 +35,27 @@ struct Layers {
   }
 };
 
+// The bounding box of empty geometry gives an empty result with no error, so
+// a level set bounded by an empty Manifold is empty.
+TEST(SDF, EmptyBounds) {
+  auto sphere = [](vec3 p) { return 1 - la::length(p); };
+  ASSERT_EQ(Manifold().BoundingBox(), Box());
+  ExecutionContext ctx;
+  for (double edgeLength : {0.5, 2.0}) {
+    for (const Manifold& m :
+         {Manifold::LevelSet(sphere, Manifold().BoundingBox(), edgeLength),
+          ctx.LevelSet(sphere, Box(), edgeLength, 0.5)}) {
+      EXPECT_EQ(m.Status(), Manifold::Error::NoError);
+      EXPECT_TRUE(m.IsEmpty());
+    }
+  }
+  // An invalid edge length is an error even with empty bounds.
+  for (double edgeLength : {0.0, -1.0, double(NAN)}) {
+    EXPECT_EQ(Manifold::LevelSet(sphere, Box(), edgeLength).Status(),
+              Manifold::Error::InvalidConstruction);
+  }
+}
+
 TEST(SDF, InvalidGrid) {
   auto sphere = [](vec3 p) { return 1 - la::length(p); };
   const Box box(vec3(-1), vec3(1));

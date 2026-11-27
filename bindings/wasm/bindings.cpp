@@ -67,24 +67,15 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .field("z", &vec4::z)
       .field("w", &vec4::w);
 
-  enum_<Manifold::Error>("status")
-      .value("NoError", Manifold::Error::NoError)
-      .value("NonFiniteVertex", Manifold::Error::NonFiniteVertex)
-      .value("NotManifold", Manifold::Error::NotManifold)
-      .value("VertexOutOfBounds", Manifold::Error::VertexOutOfBounds)
-      .value("PropertiesWrongLength", Manifold::Error::PropertiesWrongLength)
-      .value("MissingPositionProperties",
-             Manifold::Error::MissingPositionProperties)
-      .value("MergeVectorsDifferentLengths",
-             Manifold::Error::MergeVectorsDifferentLengths)
-      .value("MergeIndexOutOfBounds", Manifold::Error::MergeIndexOutOfBounds)
-      .value("TransformWrongLength", Manifold::Error::TransformWrongLength)
-      .value("RunIndexWrongLength", Manifold::Error::RunIndexWrongLength)
-      .value("FaceIDWrongLength", Manifold::Error::FaceIDWrongLength)
-      .value("InvalidConstruction", Manifold::Error::InvalidConstruction)
-      .value("ResultTooLarge", Manifold::Error::ResultTooLarge)
-      .value("InvalidTangents", Manifold::Error::InvalidTangents)
-      .value("Cancelled", Manifold::Error::Cancelled);
+  enum_<Manifold::Error> status("status");
+  for (int i = 0; i <= static_cast<int>(Manifold::Error::Cancelled); ++i) {
+    const auto error = static_cast<Manifold::Error>(i);
+    status.value(ErrorName(error), error);
+  }
+  function(
+      "_ErrorMessage", +[](int error) {
+        return std::string(ToString(static_cast<Manifold::Error>(error)));
+      });
 
   enum_<CrossSection::JoinType>("jointype")
       .value("Square", CrossSection::JoinType::Square)
@@ -135,6 +126,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
       .function("_subtract", &cross_js::Difference)
       .function("_intersect", &cross_js::Intersection)
       .function("_Warp", &cross_js::Warp)
+      .function("_WarpBatch", &cross_js::WarpBatch)
       .function("transform", &cross_js::Transform)
       .function("_Translate", &CrossSection::Translate)
       .function("rotate", &CrossSection::Rotate)
@@ -244,6 +236,7 @@ EMSCRIPTEN_BINDINGS(whatever) {
   function("_DefaultCircularQuality", &js::DefaultCircularQuality);
   function("_SegmentsFor", &js::SegmentsFor);
   function("_ForDivisions", &CircularQuality::ForDivisions);
+  function("_Version", &js::Version);
 
   constant("MIN_RELATIVE_PRECISION", kMinRelativePrecision);
 

@@ -294,8 +294,8 @@ class Manifold {
    *   Manifold obj_m = Manifold::ReadOBJ(ifile);
    *   ifile.close();
    *   if (obj_m.Status() != Manifold::Error::NoError) {
-   *      std::cerr << "Failed reading " << filename << ": error "
-   *                << static_cast<int>(obj_m.Status()) << "\n";
+   *      std::cerr << "Failed reading " << filename << ": "
+   *                << ToString(obj_m.Status()) << "\n";
    *   }
    * }
    * @endcode
@@ -369,6 +369,20 @@ class Manifold {
 };
 /** @} */
 
+/**
+ * Returns the enumerator name of an error status, such as "NotManifold". The
+ * bindings use it to name their enum values and as the JS error code. Values
+ * outside the enum give "UnknownError".
+ */
+const char* ErrorName(Manifold::Error error);
+
+/**
+ * Returns a short English description of an error status, such as "Not
+ * manifold". Every binding uses these messages. Values outside the enum give
+ * "Unknown error".
+ */
+const char* ToString(Manifold::Error error);
+
 /** @addtogroup Debug
  *  @ingroup Optional
  *  @brief Debugging features
@@ -378,43 +392,6 @@ class Manifold {
  *  @{
  */
 #ifdef MANIFOLD_DEBUG
-inline std::string ToString(const Manifold::Error& error) {
-  switch (error) {
-    case Manifold::Error::NoError:
-      return "No Error";
-    case Manifold::Error::NonFiniteVertex:
-      return "Non Finite Vertex";
-    case Manifold::Error::NotManifold:
-      return "Not Manifold";
-    case Manifold::Error::VertexOutOfBounds:
-      return "Vertex Out Of Bounds";
-    case Manifold::Error::PropertiesWrongLength:
-      return "Properties Wrong Length";
-    case Manifold::Error::MissingPositionProperties:
-      return "Missing Position Properties";
-    case Manifold::Error::MergeVectorsDifferentLengths:
-      return "Merge Vectors Different Lengths";
-    case Manifold::Error::MergeIndexOutOfBounds:
-      return "Merge Index Out Of Bounds";
-    case Manifold::Error::TransformWrongLength:
-      return "Transform Wrong Length";
-    case Manifold::Error::RunIndexWrongLength:
-      return "Run Index Wrong Length";
-    case Manifold::Error::FaceIDWrongLength:
-      return "Face ID Wrong Length";
-    case Manifold::Error::InvalidConstruction:
-      return "Invalid Construction";
-    case Manifold::Error::ResultTooLarge:
-      return "Result Too Large";
-    case Manifold::Error::InvalidTangents:
-      return "Invalid Tangents";
-    case Manifold::Error::Cancelled:
-      return "Cancelled";
-    default:
-      return "Unknown Error";
-  };
-}
-
 inline std::ostream& operator<<(std::ostream& stream,
                                 const Manifold::Error& error) {
   return stream << ToString(error);

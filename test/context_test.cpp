@@ -453,25 +453,54 @@ TEST(Context, ExecutionContextSubBooleanProgress) {
 }
 #endif  // MANIFOLD_PAR == 1
 
-// Calling Status(ctx) on an already-evaluated Manifold should reset counters,
-// not leave stale values from a previous evaluation on a different Manifold.
-TEST(Context, ExecutionContextNoStaleState) {
-  Manifold complex = Manifold::BatchBoolean(
-      {Manifold::Cube(vec3(1), true),
-       Manifold::Cube(vec3(1), true).Translate(vec3(2, 0, 0)),
-       Manifold::Cube(vec3(1), true).Translate(vec3(4, 0, 0))},
-      OpType::Add);
-  Manifold leaf = Manifold::Cube(vec3(1), true);
+// A call with no Booleans left to evaluate leaves the ctx as its last
+// evaluation left it, whether that evaluation finished or was cancelled.
+TEST(Context, ExecutionContextQueryLeavesProgress) {
+  using Query = std::function<void(const Manifold&)>;
+  const std::vector<std::pair<const char*, Query>> queries = {
+      {"Status", [](const Manifold& m) { m.Status(); }},
+      {"GetPrecision", [](const Manifold& m) { m.GetPrecision(); }},
+      {"WithPrecision", [](const Manifold& m) { m.WithPrecision(1e-3); }},
+  };
+  const auto counters = [](const ExecutionContext& ctx) {
+    return std::vector{
+        ctx.impl_->totalBooleans.load(), ctx.impl_->doneBooleans.load(),
+        ctx.impl_->totalPhases.load(), ctx.impl_->donePhases.load()};
+  };
+  for (bool cancel : {false, true}) {
+    for (const auto& [name, query] : queries) {
+      SCOPED_TRACE(std::string(name) + (cancel ? " cancelled" : ""));
+      std::vector<Manifold> items;
+      for (int i = 0; i < 3; i++) {
+        items.push_back(Manifold::Cube(vec3(1)).Translate(vec3(i * 0.5)));
+      }
+      const Manifold tree = Manifold::BatchBoolean(items, OpType::Add);
+      const Manifold evaluated =
+          Manifold::Cube() + Manifold::Cube().Translate(vec3(0.5));
+      evaluated.Status();
 
-  ExecutionContext ctx;
-  EXPECT_EQ(complex.WithContext(ctx).Status(), Manifold::Error::NoError);
-  EXPECT_EQ(ctx.impl_->doneBooleans.load(), 2);
+      ExecutionContext ctx;
+      if (cancel) ctx.Cancel();
+      // Evaluating this copy leaves tree holding the op node with its result
+      // cached.
+      const Manifold attached = tree.WithContext(ctx);
+      attached.Status();
+      const std::vector<int> before = counters(ctx);
+      ASSERT_EQ(before[0], 2);
+      EXPECT_EQ(ctx.Progress() < 1.0, cancel);
 
-  // Now evaluate a leaf Manifold with the same ctx. Counters should
-  // reflect that there's no work to do (0/0), not the stale 2/2.
-  EXPECT_EQ(leaf.WithContext(ctx).Status(), Manifold::Error::NoError);
-  EXPECT_EQ(ctx.impl_->totalBooleans.load(), 0);
-  EXPECT_EQ(ctx.impl_->doneBooleans.load(), 0);
+      std::vector<Manifold> noWork = {attached, tree, evaluated, Manifold(),
+                                      Manifold::Cube()};
+      // After a finished evaluation, a Translate of tree is an unevaluated op
+      // node over the single result. A cancelled one leaves the Booleans.
+      if (!cancel) noWork.push_back(tree.Translate(vec3(1)));
+      for (const Manifold& m : noWork) {
+        query(m.WithContext(ctx));
+        EXPECT_EQ(counters(ctx), before);
+        EXPECT_EQ(ctx.Cancelled(), cancel);
+      }
+    }
+  }
 }
 
 // ExecutionContext copies share state (pimpl semantics): one thread
@@ -643,10 +672,9 @@ TEST(Context, ParallelStableSortStability) {
 // produce a result with no attached ctx. Raw copy / assignment preserves the
 // attachment (it's the same logical Manifold).
 //
-// "No attached ctx" is asserted behaviorally: pre-set a sentinel value on
-// the ctx counters, then trigger Status() on the result. If the result has
-// no attached ctx, GetCsgLeafNode(nullptr) skips the counter-reset path,
-// leaving the sentinel intact. If a ctx is attached, the reset overwrites it.
+// "No attached ctx" is asserted behaviorally: cancel the ctx, then run an
+// eager op on the result. A result with no error status reports Cancelled
+// only if it carries the ctx.
 
 // Raw copy preserves the attachment: ctx-attached on the source means
 // Status on the copy observes the same ctx.
@@ -811,13 +839,12 @@ TEST(Context, ManifoldContextRefineDropsAttachmentFromResult) {
   EXPECT_EQ(other.impl_->totalBooleans.load(), kSentinel);
 }
 
-// True if `m` still carries `ctx`: Status() through an attached ctx resets
-// its counters, so a sentinel left in them is overwritten.
+// True if `m` still carries `ctx`: Minkowski on it observes the ctx's cancel,
+// even when `m` is empty. Cancels `ctx`. A Manifold with an error status
+// never uses its ctx, so for one the probe reads its own status instead.
 static bool CarriesContext(const Manifold& m, ExecutionContext& ctx) {
-  constexpr int kSentinel = 97;
-  ctx.impl_->totalBooleans.store(kSentinel);
-  (void)m.Status();
-  return ctx.impl_->totalBooleans.load() != kSentinel;
+  ctx.Cancel();
+  return m.MinkowskiSum(Manifold()).Status() == Manifold::Error::Cancelled;
 }
 
 // Every op that returns a new Manifold drops the attachment, whatever its
@@ -1098,6 +1125,20 @@ TEST(Context, MeshGLCancelBeforeIngest) {
   ctx.Cancel();
   Manifold m = ctx.FromMeshGL(TetGL());
   EXPECT_EQ(m.Status(), Manifold::Error::Cancelled);
+}
+
+// Empty input is finished work: no error and full progress.
+TEST(Context, EmptyInputFactoriesComplete) {
+  ExecutionContext ctx;
+  const auto expectComplete = [&ctx](const Manifold& m) {
+    EXPECT_EQ(m.Status(), Manifold::Error::NoError);
+    EXPECT_TRUE(m.IsEmpty());
+    EXPECT_EQ(ctx.Progress(), 1.0);
+  };
+  expectComplete(ctx.FromMeshGL(MeshGL{}));
+  expectComplete(ctx.FromMeshGL(MeshGL64{}));
+  expectComplete(
+      ctx.LevelSet([](vec3 p) { return 1 - la::length(p); }, Box(), 0.5));
 }
 
 // Pre-cancel beats the empty-input fast path (would otherwise be NoError).

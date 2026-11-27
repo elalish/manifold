@@ -141,8 +141,9 @@ struct MeshGLP {
   /// Optional: For each run, a 3x4 transform is stored representing how the
   /// corresponding original mesh was transformed to create this triangle run.
   /// This matrix is stored in column-major order and the length of the overall
-  /// vector is 12 * runOriginalID.size(). It is empty in the output of a
-  /// Manifold that is an original (see OriginalID()).
+  /// vector is either 12 * runOriginalID.size() or 0. It is empty in the output
+  /// of a Manifold that is an original (see OriginalID()), and every run then
+  /// has the identity transform.
   std::vector<Precision> runTransform;
   /// Optional: For each run, defines a set of flags giving extra information
   /// about the run. See the corresponding getter functions for details on the
@@ -219,7 +220,8 @@ struct MeshGLP {
   }
 
   /**
-   * Returns the transformation matrix for the specified run.
+   * Returns the transformation matrix for the specified run, or the identity
+   * if runTransform does not hold one.
    *
    * @param run The index of the triangle run (0 <= run < runOriginalID.size()).
    */

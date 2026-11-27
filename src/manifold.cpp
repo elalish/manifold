@@ -15,6 +15,8 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <string_view>
+#include <utility>
 
 #include "atomic_compat.h"
 #include "boolean3.h"
@@ -90,6 +92,66 @@ namespace manifold {
 std::array<int, 3> Version() {
   return {MANIFOLD_VERSION_MAJOR, MANIFOLD_VERSION_MINOR,
           MANIFOLD_VERSION_PATCH};
+}
+
+// Returns the {name, message} pair of an error status.
+static constexpr std::pair<const char*, const char*> ErrorStrings(
+    Manifold::Error error) {
+  using Error = Manifold::Error;
+  switch (error) {
+    case Error::NoError:
+      return {"NoError", "No error"};
+    case Error::NonFiniteVertex:
+      return {"NonFiniteVertex", "Non-finite vertex"};
+    case Error::NotManifold:
+      return {"NotManifold", "Not manifold"};
+    case Error::VertexOutOfBounds:
+      return {"VertexOutOfBounds", "Vertex index out of bounds"};
+    case Error::PropertiesWrongLength:
+      return {"PropertiesWrongLength", "Properties have wrong length"};
+    case Error::MissingPositionProperties:
+      return {"MissingPositionProperties",
+              "Fewer than three properties per vertex"};
+    case Error::MergeVectorsDifferentLengths:
+      return {"MergeVectorsDifferentLengths",
+              "Merge vectors have different lengths"};
+    case Error::MergeIndexOutOfBounds:
+      return {"MergeIndexOutOfBounds", "Merge index out of bounds"};
+    case Error::TransformWrongLength:
+      return {"TransformWrongLength", "Transform vector has wrong length"};
+    case Error::RunIndexWrongLength:
+      return {"RunIndexWrongLength", "Invalid run index vector"};
+    case Error::FaceIDWrongLength:
+      return {"FaceIDWrongLength", "Face ID vector has wrong length"};
+    case Error::InvalidConstruction:
+      return {"InvalidConstruction",
+              "Manifold constructed with invalid parameters"};
+    case Error::ResultTooLarge:
+      return {"ResultTooLarge", "Result exceeds maximum size"};
+    case Error::InvalidTangents:
+      return {"InvalidTangents", "Invalid halfedge tangents"};
+    case Error::Cancelled:
+      return {"Cancelled", "Operation cancelled"};
+  }
+  return {"UnknownError", "Unknown error"};
+}
+
+// The bindings and tests loop over 0..Cancelled, so Cancelled must be last.
+static_assert(
+    std::string_view(
+        ErrorStrings(static_cast<Manifold::Error>(
+                         static_cast<int>(Manifold::Error::Cancelled) + 1))
+            .first) == "UnknownError",
+    "Cancelled is no longer the last Manifold::Error: add the new value to "
+    "ManifoldError in the C bindings and move the Cancelled bound in the "
+    "binding and test loops and in this assert");
+
+const char* ErrorName(Manifold::Error error) {
+  return ErrorStrings(error).first;
+}
+
+const char* ToString(Manifold::Error error) {
+  return ErrorStrings(error).second;
 }
 
 /**
@@ -188,25 +250,24 @@ std::shared_ptr<CsgNode> Manifold::LoadPNode() const {
 
 CsgLeafNode& Manifold::GetCsgLeafNode(ExecutionContext::Impl* ctx) const {
   std::lock_guard<std::mutex> lock(*pNodeMutex_);
-  if (ctx != nullptr) {
-    // Reset counters to reflect this evaluation. For pre-evaluated leaf
-    // Manifolds, NumLeaves() returns 1 so totalBooleans is 0 — no work.
-    // This also prevents stale counters from a previous use of the same
-    // ctx. The cancel flag is intentionally NOT reset — sticky cancel is
-    // part of the documented API contract (see ExecutionContext in
-    // common.h).
-    const size_t leaves = pNode_->NumLeaves();
-    const int booleans = leaves > 0 ? static_cast<int>(leaves - 1) : 0;
-    // Reset numerators before denominators so a concurrent `Progress()`
-    // observer cannot see (old donePhases / new totalPhases), which could
-    // yield Progress > 1.0 transiently when a ctx is reused across evals.
-    ctx->doneBooleans.store(0, std::memory_order_relaxed);
-    ctx->donePhases.store(0, std::memory_order_relaxed);
-    ctx->totalBooleans.store(booleans, std::memory_order_relaxed);
-    ctx->totalPhases.store(booleans * kPhasesPerBoolean,
-                           std::memory_order_relaxed);
-  }
   if (pNode_->GetNodeType() != CsgNodeType::Leaf) {
+    // Reset the counters only when Booleans remain to evaluate. An evaluated
+    // op node counts as one leaf, so a call with no Boolean work leaves the
+    // ctx's progress from its last evaluation untouched. The cancel flag is
+    // never reset: sticky cancel is part of the documented API contract (see
+    // ExecutionContext in common.h).
+    const size_t leaves = ctx != nullptr ? pNode_->NumLeaves() : 0;
+    if (leaves > 1) {
+      const int booleans = static_cast<int>(leaves - 1);
+      // Reset numerators before denominators so a concurrent `Progress()`
+      // observer cannot see (old donePhases / new totalPhases), which could
+      // yield Progress > 1.0 transiently when a ctx is reused across evals.
+      ctx->doneBooleans.store(0, std::memory_order_relaxed);
+      ctx->donePhases.store(0, std::memory_order_relaxed);
+      ctx->totalBooleans.store(booleans, std::memory_order_relaxed);
+      ctx->totalPhases.store(booleans * kPhasesPerBoolean,
+                             std::memory_order_relaxed);
+    }
     pNode_ = pNode_->ToLeafNode(ctx);
   }
   return *std::static_pointer_cast<CsgLeafNode>(pNode_);
@@ -303,10 +364,14 @@ MeshGL64 Manifold::GetMeshGL64() const {
  */
 bool Manifold::IsEmpty() const { return GetCsgLeafNode().GetImpl()->IsEmpty(); }
 /**
- * Returns the reason for an input Mesh producing an empty Manifold. This Status
- * will carry on through operations like NaN propagation, ensuring an errored
- * mesh doesn't get mysteriously lost. Empty meshes may still show
- * NoError, for instance the intersection of non-overlapping meshes.
+ * Returns the error status of this Manifold. This is the way to check for
+ * errors, since the library reports them only through this status. A failed
+ * constructor or operation always gives an empty Manifold, and its status
+ * carries on through later operations like NaN propagation, so an error
+ * doesn't get mysteriously lost. Invalid parameters, such as a non-finite or
+ * negative size, give InvalidConstruction. Empty Manifolds may still show
+ * NoError: empty input gives empty output with no error, as does the
+ * intersection of non-overlapping meshes.
  */
 Manifold::Error Manifold::Status() const {
   // Routes through any attached ExecutionContext (see WithContext). The
@@ -1044,7 +1109,7 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(
 
 /**
  * Identical to SplitByPlane(), but calculating and returning only the first
- * result.
+ * result. An empty input gives an empty result with the same status.
  *
  * @param normal This vector is normal to the cutting plane and its length does
  * not matter. The result is in the direction of this vector from the plane.
@@ -1052,6 +1117,8 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(
  * direction of the normal vector.
  */
 Manifold Manifold::TrimByPlane(vec3 normal, double originOffset) const {
+  // An empty input, errored or not, has no bounding box to size the cutter.
+  if (IsEmpty()) return Manifold(LoadPNode());
   auto leafImpl = GetCsgLeafNode().GetImpl();
   if (leafImpl->status_ == Error::NoError && !leafImpl->IsEmpty()) {
     const int side =
