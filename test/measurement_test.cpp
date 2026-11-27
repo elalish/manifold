@@ -697,4 +697,3 @@ TEST(Measurement, WindingMatchesRayCastParity) {
         << "mismatch at (" << p.x << "," << p.y << "," << p.z << ")";
   }
 }
-
