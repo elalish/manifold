@@ -811,6 +811,108 @@ TEST(Boolean, SplitByPlane60) {
   EXPECT_NEAR(splits.first.Volume(), splits.second.Volume(), 1e-5);
 }
 
+TEST(Boolean, PlaneOutsideBoundsPreservesGeometry) {
+  const Manifold original = Manifold::Cube(vec3(2.0), true)
+                                .WithPrecision(1e-9)
+                                .AsOriginal()
+                                .CalculateNormals(180)
+                                .SmoothByNormals();
+  ASSERT_GT(original.OriginalID(), 0);
+  for (const Manifold& source :
+       {original, original.Rotate(20, 30, 40).Translate({3, -2, 1})}) {
+    const MeshGL64 input = source.GetMeshGL64();
+    ASSERT_FALSE(input.halfedgeTangent.empty());
+    ASSERT_FALSE(input.runFlags.empty());
+    // Originals omit the identity run transform; products spell it out.
+    std::vector<double> runTransform = input.runTransform;
+    if (runTransform.empty()) {
+      for (size_t run = 0; run < input.NumRun(); ++run) {
+        runTransform.insert(runTransform.end(),
+                            {1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0});
+      }
+    }
+    for (const vec3 normal :
+         {vec3(1, 0, 0), vec3(-3, 0, 0), vec3(0, 0, -2), vec3(1, 2, -3)}) {
+      for (const double offset : {-1e200, -100.0, 100.0, 1e200}) {
+        SCOPED_TRACE(offset);
+        const auto split = source.SplitByPlane(normal, offset);
+        const Manifold trim = source.TrimByPlane(normal, offset);
+        const bool keep = offset < 0;
+        for (const auto& [result, full] : {std::make_pair(split.first, keep),
+                                           std::make_pair(split.second, !keep),
+                                           std::make_pair(trim, keep)}) {
+          ASSERT_EQ(result.Status(), Manifold::Error::NoError);
+          EXPECT_EQ(result.OriginalID(), -1);
+          EXPECT_EQ(result.IsEmpty(), !full);
+          EXPECT_DOUBLE_EQ(result.GetPrecision(), source.GetPrecision());
+          EXPECT_NEAR(result.Volume(), full ? 8.0 : 0.0, 1e-12);
+          if (!full) continue;
+          EXPECT_EQ(result.BoundingBox().min, source.BoundingBox().min);
+          EXPECT_EQ(result.BoundingBox().max, source.BoundingBox().max);
+          EXPECT_DOUBLE_EQ(result.GetEpsilon(), source.GetEpsilon());
+          const MeshGL64 output = result.GetMeshGL64();
+          EXPECT_EQ(output.vertProperties, input.vertProperties);
+          EXPECT_EQ(output.triVerts, input.triVerts);
+          EXPECT_EQ(output.mergeFromVert, input.mergeFromVert);
+          EXPECT_EQ(output.mergeToVert, input.mergeToVert);
+          EXPECT_EQ(output.runOriginalID, input.runOriginalID);
+          EXPECT_EQ(output.runIndex, input.runIndex);
+          EXPECT_EQ(output.runTransform, runTransform);
+          EXPECT_EQ(output.runFlags, input.runFlags);
+          EXPECT_EQ(output.faceID, input.faceID);
+          EXPECT_EQ(output.halfedgeTangent, input.halfedgeTangent);
+          for (const double property : output.vertProperties) {
+            EXPECT_TRUE(std::isfinite(property));
+          }
+        }
+      }
+    }
+    EXPECT_EQ(source.GetMeshGL64().vertProperties, input.vertProperties);
+  }
+  EXPECT_GT(original.OriginalID(), 0);
+}
+
+TEST(Boolean, PlaneAtOrInsideBounds) {
+  const Manifold cube = Manifold::Cube(vec3(2.0), true);
+  for (const vec3 normal :
+       {vec3(1, 0, 0), vec3(-3, 0, 0), vec3(0, 0, 2), vec3(0, 0, -1)}) {
+    for (const double offset : {-1.0, -0.25, 0.0, 0.25, 1.0}) {
+      SCOPED_TRACE(offset);
+      const auto split = cube.SplitByPlane(normal, offset);
+      const Manifold trim = cube.TrimByPlane(normal, offset);
+      for (const Manifold& result : {split.first, split.second, trim}) {
+        EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+        EXPECT_TRUE(result.MatchesTriNormals());
+        for (const double coordinate : result.GetMeshGL64().vertProperties) {
+          EXPECT_TRUE(std::isfinite(coordinate));
+        }
+      }
+      EXPECT_NEAR(split.first.Volume(), 4 * (1 - offset), 1e-12);
+      EXPECT_NEAR(split.second.Volume(), 4 * (1 + offset), 1e-12);
+      EXPECT_NEAR(trim.Volume(), split.first.Volume(), 1e-12);
+    }
+  }
+}
+
+TEST(Boolean, PlaneInvalidArguments) {
+  const Manifold cube = Manifold::Cube();
+  const double inf = std::numeric_limits<double>::infinity();
+  const double nan = std::numeric_limits<double>::quiet_NaN();
+  for (const auto& [normal, offset] :
+       {std::make_pair(vec3(0.0), -100.0),
+        std::make_pair(vec3(nan, 0, 0), -100.0),
+        std::make_pair(vec3(inf, 0, 0), -100.0),
+        std::make_pair(vec3(1, 0, 0), nan), std::make_pair(vec3(1, 0, 0), inf),
+        std::make_pair(vec3(1, 0, 0), -inf)}) {
+    const auto split = cube.SplitByPlane(normal, offset);
+    const Manifold trim = cube.TrimByPlane(normal, offset);
+    for (const Manifold& result : {split.first, split.second, trim}) {
+      EXPECT_EQ(result.Status(), Manifold::Error::NonFiniteVertex);
+      EXPECT_TRUE(result.IsEmpty());
+    }
+  }
+}
+
 TEST(Boolean, ConvexConvexMinkowski) {
   double r = 0.1;
   double w = 2.0;

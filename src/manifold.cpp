@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <string_view>
 #include <utility>
@@ -30,6 +31,31 @@ namespace {
 using namespace manifold;
 
 ExecutionParams manifoldParams;
+
+// Return the side containing the entire box, or zero when the plane is close
+// enough to require the normal Boolean path. Invalid inputs use that path too.
+int BoxPlaneSide(Box box, vec3 normal, double originOffset, double epsilon) {
+  const double length = la::length(normal);
+  if (!(length > 0) || !std::isfinite(length) || !std::isfinite(originOffset) ||
+      !(epsilon >= 0) || !std::isfinite(epsilon)) {
+    return 0;
+  }
+  normal /= length;
+  double minProjection = 0;
+  double maxProjection = 0;
+  for (int axis = 0; axis < 3; ++axis) {
+    const double a = normal[axis] * box.min[axis];
+    const double b = normal[axis] * box.max[axis];
+    minProjection += std::min(a, b);
+    maxProjection += std::max(a, b);
+  }
+  if (!std::isfinite(minProjection) || !std::isfinite(maxProjection)) return 0;
+  // Leave two epsilon of headroom for projection roundoff; near-boundary
+  // planes continue through the Boolean path.
+  if (minProjection - originOffset > 2 * epsilon) return 1;
+  if (maxProjection - originOffset < -2 * epsilon) return -1;
+  return 0;
+}
 
 // The cutter carries relPrecision, so cutting keeps the source's precision.
 Manifold Halfspace(Box bBox, vec3 normal, double originOffset,
@@ -1066,9 +1092,17 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(
     Manifold err = PropagateStatus(leafImpl->status_);
     return {err, err};
   }
-  if (IsEmpty()) {
-    const Manifold empty = Manifold().WithPrecision(GetPrecision());
-    return {empty, empty};
+  const Manifold empty = Manifold().WithPrecision(leafImpl->relPrecision_);
+  if (IsEmpty()) return {empty, empty};
+  const int side =
+      BoxPlaneSide(leafImpl->bBox_, normal, originOffset, leafImpl->epsilon_);
+  if (side != 0) {
+    // No Boolean work is needed, so retain the source's tangent data too.
+    auto resultImpl = std::make_shared<Impl>(*leafImpl);
+    resultImpl->meshRelation_.originalID = -1;
+    Manifold result(std::make_shared<CsgLeafNode>(resultImpl));
+    return side > 0 ? std::make_pair(result, empty)
+                    : std::make_pair(empty, result);
   }
   return Split(Halfspace(BoundingBox(), normal, originOffset, GetPrecision()));
 }
@@ -1085,6 +1119,18 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(
 Manifold Manifold::TrimByPlane(vec3 normal, double originOffset) const {
   // An empty input, errored or not, has no bounding box to size the cutter.
   if (IsEmpty()) return Manifold(LoadPNode());
+  auto leafImpl = GetCsgLeafNode().GetImpl();
+  if (leafImpl->status_ == Error::NoError && !leafImpl->IsEmpty()) {
+    const int side =
+        BoxPlaneSide(leafImpl->bBox_, normal, originOffset, leafImpl->epsilon_);
+    if (side < 0) return Manifold().WithPrecision(leafImpl->relPrecision_);
+    if (side > 0) {
+      // Preserve unchanged geometry and tangents, as with an empty cutter.
+      auto resultImpl = std::make_shared<Impl>(*leafImpl);
+      resultImpl->meshRelation_.originalID = -1;
+      return Manifold(std::make_shared<CsgLeafNode>(resultImpl));
+    }
+  }
   return *this ^ Halfspace(BoundingBox(), normal, originOffset, GetPrecision());
 }
 
