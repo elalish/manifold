@@ -312,11 +312,15 @@ double Manifold::Impl::GetProperty(Property prop) const {
   ZoneScoped;
   if (IsEmpty()) return 0;
 
-  auto Volume = [this](size_t tri) {
+  // A nearby reference keeps the signed tetrahedra small when the entire mesh
+  // is far from the origin. Their sum is reference-independent for a closed
+  // surface, including inward-oriented cavity shells.
+  const vec3 reference = vertPos_[0];
+  auto Volume = [this, reference](size_t tri) {
     const vec3 v = vertPos_[halfedge_.Start(3 * tri)];
     vec3 crossP = la::cross(vertPos_[halfedge_.Start(3 * tri + 1)] - v,
                             vertPos_[halfedge_.Start(3 * tri + 2)] - v);
-    return la::dot(crossP, v) / 6.0;
+    return la::dot(crossP, v - reference) / 6.0;
   };
 
   auto Area = [this](size_t tri) {

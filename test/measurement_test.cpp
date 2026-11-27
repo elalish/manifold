@@ -13,6 +13,7 @@
 // limitations under the License.
 
 // Tests for measurement-style queries on Manifolds:
+//   - `Manifold::Volume` and `Manifold::SurfaceArea`
 //   - `Manifold::RayCast` (ray-mesh intersection)
 //   - `Manifold::MinGap` (inter-manifold distance)
 //   - `DistanceTriangleTriangleSquared` (the per-triangle primitive
@@ -27,6 +28,89 @@
 #include "samples.h"
 
 using namespace manifold;
+
+TEST(Measurement, VolumeTranslatedBoxes) {
+  for (const vec3 size : {vec3(1), vec3(1, 2, 3), vec3(3, 5, 7)}) {
+    const double volume = size.x * size.y * size.z;
+    const double area = 2 * (size.x * size.y + size.y * size.z + size.z * size.x);
+    for (const double offset : {0.0, 1e6, -1e8, 1e10, -1e10}) {
+      SCOPED_TRACE(offset);
+      // Integer coordinates remain exactly representable at these offsets.
+      // Keep the mesh epsilon smaller than its shortest edge.
+      const Manifold box = Manifold::Cube(size)
+                               .WithPrecision(1e-12)
+                               .Translate({offset, -offset, offset});
+      ASSERT_EQ(box.Status(), Manifold::Error::NoError);
+      EXPECT_NEAR(box.Volume(), volume, volume * 1e-14);
+      EXPECT_DOUBLE_EQ(box.SurfaceArea(), area);
+    }
+  }
+}
+
+TEST(Measurement, VolumeTranslatedCavityAndComponents) {
+  const Manifold cavity = Manifold::Cube({5, 4, 3}) -
+                          Manifold::Cube({1, 2, 1}).Translate({1, 1, 1});
+  const Manifold separate =
+      cavity + Manifold::Cube({2, 3, 4}).Translate({10, 12, 14});
+  for (const auto& [shape, volume] :
+       {std::pair<Manifold, double>{cavity, 58}, {separate, 82}}) {
+    const double area = shape.SurfaceArea();
+    for (const double offset : {0.0, -1e8, 1e10}) {
+      SCOPED_TRACE(offset);
+      const Manifold translated = shape.WithPrecision(1e-12).Translate(
+          {offset, -offset, offset});
+      ASSERT_EQ(translated.Status(), Manifold::Error::NoError);
+      EXPECT_NEAR(translated.Volume(), volume, volume * 1e-14);
+      EXPECT_DOUBLE_EQ(translated.SurfaceArea(), area);
+    }
+  }
+}
+
+TEST(Measurement, VolumeTranslatedThroughHole) {
+  const Manifold hole = Manifold::Cube(vec3(3), true) -
+                        Manifold::Cube({1, 1, 5}, true);
+  ASSERT_EQ(hole.Genus(), 1);
+  const Manifold translated =
+      hole.WithPrecision(1e-12).Translate({1e10, -1e10, 1e10});
+  ASSERT_EQ(translated.Status(), Manifold::Error::NoError);
+  EXPECT_NEAR(translated.Volume(), 24, 1e-12);
+  EXPECT_DOUBLE_EQ(translated.SurfaceArea(), hole.SurfaceArea());
+}
+
+TEST(Measurement, VolumeTranslatedWindingAndReflection) {
+  const Manifold box = Manifold::Cube({1, 2, 3});
+  MeshGL64 mesh = box.GetMeshGL64();
+  for (size_t i = 0; i < mesh.triVerts.size(); i += 3) {
+    std::swap(mesh.triVerts[i + 1], mesh.triVerts[i + 2]);
+  }
+  const Manifold inward(mesh);
+  for (const auto& [shape, volume] :
+       {std::pair<Manifold, double>{inward, -6},
+        {box.Mirror({1, 0, 0}), 6}}) {
+    for (const double offset : {0.0, 1e10, -1e10}) {
+      SCOPED_TRACE(offset);
+      const Manifold translated = shape.WithPrecision(1e-12).Translate(
+          {offset, -offset, offset});
+      ASSERT_EQ(translated.Status(), Manifold::Error::NoError);
+      EXPECT_NEAR(translated.Volume(), volume, 1e-13);
+      EXPECT_DOUBLE_EQ(translated.SurfaceArea(), 22);
+    }
+  }
+}
+
+TEST(Measurement, VolumeTranslatedTetrahedronAndEmpty) {
+  const Manifold tetrahedron = Manifold::Tetrahedron();
+  for (const double offset : {0.0, 1e8, -1e10}) {
+    const vec3 translation(offset, -offset, offset);
+    const Manifold translated =
+        tetrahedron.WithPrecision(1e-12).Translate(translation);
+    ASSERT_EQ(translated.Status(), Manifold::Error::NoError);
+    EXPECT_NEAR(translated.Volume(), 8.0 / 3.0, 1e-13);
+    EXPECT_DOUBLE_EQ(translated.SurfaceArea(), tetrahedron.SurfaceArea());
+    EXPECT_DOUBLE_EQ(Manifold().Translate(translation).Volume(), 0);
+    EXPECT_DOUBLE_EQ(Manifold().Translate(translation).SurfaceArea(), 0);
+  }
+}
 
 TEST(Measurement, RayCastHitCube) {
   // Ray through center along Z — also tests watertight shared edge at (0,0)
@@ -614,3 +698,4 @@ TEST(Measurement, WindingMatchesRayCastParity) {
         << "mismatch at (" << p.x << "," << p.y << "," << p.z << ")";
   }
 }
+
