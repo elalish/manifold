@@ -175,7 +175,9 @@ export type ErrorStatus = 'NoError'|'NonFiniteVertex'|'NotManifold'|
  * from any thread/worker.
  *
  * Cancellation is permanent for a Manifold: once cancelled and detected,
- * the Manifold's status becomes 'Cancelled' and stays 'Cancelled'.
+ * the Manifold's status becomes 'Cancelled' and stays 'Cancelled'. The eager
+ * ops above, other than status(), and the factories below then throw a
+ * ManifoldError with code 'Cancelled'. Queries don't observe a cancel.
  */
 export interface ExecutionContext {
   /** Request cancellation. Can be called from any context. Idempotent. */
@@ -193,9 +195,16 @@ export interface ExecutionContext {
   // run under this context so progress / cancellation are observed (these ops
   // have no source Manifold to attach via Manifold.withContext).
 
-  /** Like `new Manifold`, observed/cancellable via this context. */
+  /**
+   * Like `new Manifold`, observed/cancellable via this context.
+   * Throws a ManifoldError for an invalid mesh, and with code 'Cancelled' on
+   * cancel.
+   */
   fromMesh(mesh: Mesh|Mesh64): Manifold;
-  /** Like {@link Manifold.levelSet}, observed/cancellable via this context. */
+  /**
+   * Like {@link Manifold.levelSet}, observed/cancellable via this context.
+   * Throws a ManifoldError with code 'Cancelled' on cancel.
+   */
   levelSet(
       sdf: (point: Vec3) => number, bounds: Box, edgeLength: number,
       level?: number, tolerance?: number): Manifold;

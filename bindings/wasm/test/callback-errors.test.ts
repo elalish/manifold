@@ -81,9 +81,10 @@ function observeNativeResults(input: any, method: string) {
   const native = input[method];
   input[method] = (...args: any[]) => {
     const handle = keep(native.apply(input, args));
+    // The unchecked volume, since an errored result would throw.
     results.push({
       handle,
-      measure: handle.volume ? handle.volume() : handle.area(),
+      measure: handle.status ? handle._Volume() : handle.area(),
       status: handle.status ? handle.status() : 'NoError'
     });
     return handle;

@@ -43,4 +43,12 @@ suite('When executed, the CLI will', () => {
     await expect(execCLI('unitSphereNoManifoldImport.mjs'))
         .rejects.toThrow('Manifold is not defined');
   });
+
+  test.each(['manifoldErrorEager.mjs', 'manifoldErrorLazy.mjs'])(
+      'Exit with an error when %s has a ManifoldError', async infile => {
+        await expect(execCLI(infile)).rejects.toMatchObject({
+          code: 1,
+          stderr: expect.stringMatching(/ManifoldError/)
+        });
+      });
 });

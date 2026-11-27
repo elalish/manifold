@@ -116,6 +116,43 @@ suite('Build a model with the worker', () => {
     expect(rest.length).toEqual(2);
   });
 
+  test(
+      'A ManifoldError from an eager call stops at the model line',
+      async () => {
+        const filepath =
+            resolve(import.meta.dirname, './fixtures/manifoldErrorEager.mjs');
+        let code = await bundleFile(filepath);
+        let error: RuntimeError|null = null;
+        try {
+          await worker.evaluate(code, {doNotBundle: true});
+        } catch (e) {
+          error = e as RuntimeError;
+        }
+        expect(error).toBeInstanceOf(RuntimeError);
+        expect(error!.name).toBe('ManifoldError');
+        expect((error!.cause as any).code).toBe('InvalidConstruction');
+        const [frame] = stackTraceParser.parse(error!.manifoldStack!);
+        expect(frame.lineNumber).toBe(3);
+        expect(frame.file).toMatch(/manifoldErrorEager\.mjs$/);
+      });
+
+  test('A ManifoldError from a lazy call surfaces at export', async () => {
+    const filepath =
+        resolve(import.meta.dirname, './fixtures/manifoldErrorLazy.mjs');
+    let code = await bundleFile(filepath);
+    const ev = async () => await worker.evaluate(code, {doNotBundle: true});
+    await expect(ev()).rejects.toMatchObject(
+        {name: 'ManifoldError', code: 'NonFiniteVertex'});
+  });
+
+  test('Models can catch a ManifoldError', async () => {
+    const filepath =
+        resolve(import.meta.dirname, './fixtures/catchManifoldError.mjs');
+    let code = await bundleFile(filepath);
+    const ev = async () => await worker.evaluate(code, {doNotBundle: true});
+    await expect(ev()).resolves.toBeDefined();
+  });
+
   test('Bundler exceptions should be wrapped', async () => {
     const filepath =
         resolve(import.meta.dirname, './fixtures/bundlerError.mjs');
@@ -145,6 +182,11 @@ suite('Build a model without the worker', () => {
     const imp = async () =>
         await import('./fixtures/generateReferenceError.mjs');
     await expect(imp()).rejects.toThrowError()
+  });
+
+  test('Models can catch a ManifoldError', async () => {
+    const imp = async () => await import('./fixtures/catchManifoldError.mjs');
+    await expect(imp()).resolves.toBeDefined();
   });
 
   test('Exceptions should be native', async () => {

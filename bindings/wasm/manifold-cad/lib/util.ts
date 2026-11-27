@@ -38,18 +38,22 @@ export const isWebWorker = (): boolean =>
 export const isNode = (): boolean =>
     typeof process !== 'undefined' && !!process?.versions?.node;
 
+// Keep only frames located in the function constructor's code. A frame like
+// `at Proxy.<anonymous> (file.ts:1:2)` is an unnamed library function.
 const parseV8StackTrace = (stack: string) =>
-    stack.split('\n').filter(frame => frame.match(/<anonymous>/)).map(frame => {
-      const matches = frame.matchAll(/:([0-9]+):([0-9]+)\)$/g).next().value;
-      const [line, column] = [parseInt(matches![1]), parseInt(matches![2])];
-      const methodName = frame.match(/^\s+at\s([^\s]+)/)![1];
-      return {
-        line,
-        column,
-        // In Node or Chrome, a function constructor shows as 'eval'.
-        methodName: methodName === 'eval' ? null : methodName
-      };
-    });
+    stack.split('\n')
+        .filter(frame => frame.match(/<anonymous>:[0-9]+:[0-9]+\)$/))
+        .map(frame => {
+          const matches = frame.matchAll(/:([0-9]+):([0-9]+)\)$/g).next().value;
+          const [line, column] = [parseInt(matches![1]), parseInt(matches![2])];
+          const methodName = frame.match(/^\s+at\s([^\s]+)/)![1];
+          return {
+            line,
+            column,
+            // In Node or Chrome, a function constructor shows as 'eval'.
+            methodName: methodName === 'eval' ? null : methodName
+          };
+        });
 
 const parseSpiderMonkeyStackTrace = (stack: string) =>
     stack.split('\n')
