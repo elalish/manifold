@@ -58,8 +58,11 @@ struct CurvatureAngles {
     }
 
     if (!angle.empty()) {
-      const double phi0 = math::acos(-la::dot(edge[2], edge[0]));
-      const double phi1 = math::acos(-la::dot(edge[0], edge[1]));
+      // Normalized edge dot products can round just outside [-1, 1].
+      const double phi0 =
+          math::acos(la::clamp(-la::dot(edge[2], edge[0]), -1.0, 1.0));
+      const double phi1 =
+          math::acos(la::clamp(-la::dot(edge[0], edge[1]), -1.0, 1.0));
       angle[3 * tri] = phi0;
       angle[3 * tri + 1] = phi1;
       angle[3 * tri + 2] = kPi - phi0 - phi1;
