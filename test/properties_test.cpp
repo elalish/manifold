@@ -175,6 +175,95 @@ TEST(Properties, CalculateCurvature) {
   }
 }
 
+TEST(Properties, GaussianCurvatureNearlyCollinearEdges) {
+  for (const double delta : {1e-5, 1e-8, 1e-10}) {
+    for (const double scale : {1e-3, 1.0, 1e3}) {
+      SCOPED_TRACE(testing::Message() << delta << ", " << scale);
+      MeshGL64 mesh;
+      mesh.vertProperties = {0, 0, 0, 1, 1, 1, 2, 2 + delta, 2, 0, 0, -1};
+      mesh.triVerts = {0, 1, 2, 0, 3, 1, 0, 2, 3, 1, 3, 2};
+      for (double& value : mesh.vertProperties) value *= scale;
+      const Manifold solid(mesh);
+      ASSERT_EQ(solid.Status(), Manifold::Error::NoError);
+      ASSERT_EQ(solid.NumTri(), 4);
+      ASSERT_EQ(solid.NumDegenerateTris(), 0);
+      ASSERT_GT(solid.Volume(), 0.0);
+
+      // Use atan2 on the unnormalized edges as an independent angle reference.
+      const MeshGL64 reference = solid.GetMeshGL64();
+      std::vector<double> defect(reference.NumVert(), kTwoPi);
+      std::vector<double> area(reference.NumVert(), 0.0);
+      std::vector<int> degree(reference.NumVert(), 0);
+      for (size_t tri = 0; tri < reference.NumTri(); ++tri) {
+        for (int corner = 0; corner < 3; ++corner) {
+          const auto v = reference.triVerts[3 * tri + corner];
+          const vec3 origin = reference.GetVertPos(v);
+          const vec3 a = reference.GetVertPos(
+                             reference.triVerts[3 * tri + (corner + 1) % 3]) -
+                         origin;
+          const vec3 b = reference.GetVertPos(
+                             reference.triVerts[3 * tri + (corner + 2) % 3]) -
+                         origin;
+          const double twiceArea = la::length(la::cross(a, b));
+          ASSERT_GT(twiceArea / std::max(la::length(a), la::length(b)),
+                    10 * solid.GetEpsilon());
+          defect[v] -= std::atan2(twiceArea, la::dot(a, b));
+          area[v] += twiceArea / 6.0;
+          ++degree[v];
+        }
+      }
+
+      const MeshGL64 result = solid.CalculateCurvature(0, -1).GetMeshGL64();
+      ASSERT_EQ(result.NumVert(), reference.NumVert());
+      for (size_t v = 0; v < result.NumVert(); ++v) {
+        const double gaussian = result.vertProperties[result.numProp * v + 3];
+        ASSERT_TRUE(std::isfinite(gaussian));
+        // Adding properties can change the exported property-vertex order.
+        size_t original = 0;
+        while (original < reference.NumVert() &&
+               reference.GetVertPos(original) != result.GetVertPos(v)) {
+          ++original;
+        }
+        ASSERT_LT(original, reference.NumVert());
+        const double expected =
+            defect[original] * degree[original] / (6 * area[original]);
+        EXPECT_NEAR(gaussian, expected, 1e-7 / (scale * scale));
+      }
+    }
+  }
+}
+
+TEST(Properties, ThinFaceCurvaturePreservesOtherChannels) {
+  MeshGL64 mesh;
+  mesh.vertProperties = {0, 0, 0, 1, 1, 1, 2, 2 + 1e-8, 2, 0, 0, -1};
+  mesh.triVerts = {0, 1, 2, 0, 3, 1, 0, 2, 3, 1, 3, 2};
+  const Manifold solid =
+      Manifold(mesh).SetProperties(3, [](double* props, vec3 p, const double*) {
+        props[0] = 10 + p.x;
+        props[1] = 20 + p.y;
+        props[2] = 30 + p.z;
+      });
+  const MeshGL64 before = solid.GetMeshGL64();
+  const MeshGL64 gaussian = solid.CalculateCurvature(1, -1).GetMeshGL64();
+  const MeshGL64 both = solid.CalculateCurvature(1, 4).GetMeshGL64();
+  const MeshGL64 mean = solid.CalculateCurvature(-1, 4).GetMeshGL64();
+  ASSERT_EQ(gaussian.NumVert(), before.NumVert());
+  ASSERT_EQ(both.NumVert(), before.NumVert());
+  ASSERT_EQ(mean.NumVert(), before.NumVert());
+  for (size_t v = 0; v < before.NumVert(); ++v) {
+    const double value = gaussian.vertProperties[gaussian.numProp * v + 4];
+    ASSERT_TRUE(std::isfinite(value));
+    EXPECT_DOUBLE_EQ(value, both.vertProperties[both.numProp * v + 4]);
+    EXPECT_DOUBLE_EQ(both.vertProperties[both.numProp * v + 7],
+                     mean.vertProperties[mean.numProp * v + 7]);
+    for (int p : {0, 1, 2, 3, 5}) {
+      EXPECT_DOUBLE_EQ(gaussian.vertProperties[gaussian.numProp * v + p],
+                       before.vertProperties[before.numProp * v + p]);
+    }
+  }
+  EXPECT_EQ(solid.GetMeshGL64().vertProperties, before.vertProperties);
+}
+
 TEST(Properties, CurvatureChannels) {
   for (const Manifold& shape :
        {Manifold::Sphere(1, {24}), Manifold::Cube(vec3(1), true),
