@@ -32,14 +32,14 @@ using namespace manifold;
 TEST(Measurement, VolumeTranslatedBoxes) {
   for (const vec3 size : {vec3(1), vec3(1, 2, 3), vec3(3, 5, 7)}) {
     const double volume = size.x * size.y * size.z;
-    const double area = 2 * (size.x * size.y + size.y * size.z + size.z * size.x);
+    const double area =
+        2 * (size.x * size.y + size.y * size.z + size.z * size.x);
     for (const double offset : {0.0, 1e6, -1e8, 1e10, -1e10}) {
       SCOPED_TRACE(offset);
       // Integer coordinates remain exactly representable at these offsets.
       // Keep the mesh epsilon smaller than its shortest edge.
-      const Manifold box = Manifold::Cube(size)
-                               .WithPrecision(1e-12)
-                               .Translate({offset, -offset, offset});
+      const Manifold box = Manifold::Cube(size).WithPrecision(1e-12).Translate(
+          {offset, -offset, offset});
       ASSERT_EQ(box.Status(), Manifold::Error::NoError);
       EXPECT_NEAR(box.Volume(), volume, volume * 1e-14);
       EXPECT_DOUBLE_EQ(box.SurfaceArea(), area);
@@ -57,8 +57,8 @@ TEST(Measurement, VolumeTranslatedCavityAndComponents) {
     const double area = shape.SurfaceArea();
     for (const double offset : {0.0, -1e8, 1e10}) {
       SCOPED_TRACE(offset);
-      const Manifold translated = shape.WithPrecision(1e-12).Translate(
-          {offset, -offset, offset});
+      const Manifold translated =
+          shape.WithPrecision(1e-12).Translate({offset, -offset, offset});
       ASSERT_EQ(translated.Status(), Manifold::Error::NoError);
       EXPECT_NEAR(translated.Volume(), volume, volume * 1e-14);
       EXPECT_DOUBLE_EQ(translated.SurfaceArea(), area);
@@ -67,8 +67,8 @@ TEST(Measurement, VolumeTranslatedCavityAndComponents) {
 }
 
 TEST(Measurement, VolumeTranslatedThroughHole) {
-  const Manifold hole = Manifold::Cube(vec3(3), true) -
-                        Manifold::Cube({1, 1, 5}, true);
+  const Manifold hole =
+      Manifold::Cube(vec3(3), true) - Manifold::Cube({1, 1, 5}, true);
   ASSERT_EQ(hole.Genus(), 1);
   const Manifold translated =
       hole.WithPrecision(1e-12).Translate({1e10, -1e10, 1e10});
@@ -85,12 +85,11 @@ TEST(Measurement, VolumeTranslatedWindingAndReflection) {
   }
   const Manifold inward(mesh);
   for (const auto& [shape, volume] :
-       {std::pair<Manifold, double>{inward, -6},
-        {box.Mirror({1, 0, 0}), 6}}) {
+       {std::pair<Manifold, double>{inward, -6}, {box.Mirror({1, 0, 0}), 6}}) {
     for (const double offset : {0.0, 1e10, -1e10}) {
       SCOPED_TRACE(offset);
-      const Manifold translated = shape.WithPrecision(1e-12).Translate(
-          {offset, -offset, offset});
+      const Manifold translated =
+          shape.WithPrecision(1e-12).Translate({offset, -offset, offset});
       ASSERT_EQ(translated.Status(), Manifold::Error::NoError);
       EXPECT_NEAR(translated.Volume(), volume, 1e-13);
       EXPECT_DOUBLE_EQ(translated.SurfaceArea(), 22);
