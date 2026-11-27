@@ -267,9 +267,10 @@ Manifold::Impl::Merger Manifold::Impl::CheckEdge(int edge) const {
   const mat2 A2 = transpose(P) * A * P;
   const vec2 b2 = transpose(P) * b;
   vec2 u = inverse(A2) * b2;
-  // A2 is singular when the faces on either side of the edge point in opposite
-  // directions, as on a zero-volume fold. Collapsing it to the midpoint costs
-  // nothing only if the midpoint lies on the planes of the faces around it.
+  // A2 is singular, for example, when the faces on either side of the edge
+  // point in opposite directions, as on a zero-volume fold. Collapsing it to
+  // the midpoint costs nothing only if the midpoint lies on the planes of the
+  // faces around it.
   if (!std::isfinite(u[0])) return {cFaces, cFaces, 0.5, mid};
   // u[0] is the interpolation along the collapsed edge, which is used to
   // interpolate the properties. It is clamped to avoid extrapolation.

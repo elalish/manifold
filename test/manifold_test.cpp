@@ -2041,6 +2041,18 @@ TEST(Manifold, SimplifyToEmpty) {
   EXPECT_EQ((gone + cube).GetEpsilon(), cube.GetEpsilon());
 }
 
+// A jamb thinner than epsilon leaves a knife edge between exactly opposite
+// faces. Simplify must not collapse it into the opening (#2096).
+TEST(Manifold, SimplifyThinJamb) {
+  const Manifold wall = Manifold::Cube({10, 1, 3}) -
+                        Manifold::Cube({1, 3, 2}).Translate({1e-6, -1, 0.5});
+  ASSERT_EQ(wall.Genus(), 1);
+  const Manifold simplified = wall.Simplify();
+  EXPECT_EQ(simplified.Genus(), 1);
+  EXPECT_NEAR(simplified.Volume(), wall.Volume(), 1e-6);
+  EXPECT_NEAR(simplified.SurfaceArea(), wall.SurfaceArea(), 1e-6);
+}
+
 TEST(Manifold, MeshID) {
   const Manifold cube = Manifold::Cube();
   MeshGL cubeGL = cube.GetMeshGL();
