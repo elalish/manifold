@@ -123,6 +123,8 @@ TEST(OBJStream, InitiallyFailedOutput) {
   }
 }
 
+// Emscripten's libc++ aborts when an enabled stream exception mask fires.
+#if GTEST_HAS_EXCEPTIONS && !defined(__EMSCRIPTEN__)
 TEST(OBJStream, PreserveOutputExceptionMasks) {
   for (const bool member : {false, true}) {
     for (const bool failSync : {false, true}) {
@@ -139,5 +141,6 @@ TEST(OBJStream, PreserveOutputExceptionMasks) {
     }
   }
 }
+#endif
 
 #endif  // MANIFOLD_NO_IOSTREAM
