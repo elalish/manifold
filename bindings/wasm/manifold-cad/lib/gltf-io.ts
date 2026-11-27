@@ -108,6 +108,21 @@ export function setupIO(io: GLTFTransform.WebIO) {
   return io.registerExtensions([EXTManifold]);
 }
 
+function triangleIndices(primitive: GLTFTransform.Primitive):
+    GLTFTransform.TypedArray|number[]|null {
+  const mode = primitive.getMode();
+  const {TRIANGLES, TRIANGLE_STRIP, TRIANGLE_FAN} =
+      GLTFTransform.Primitive.Mode;
+  if (mode === TRIANGLE_STRIP || mode === TRIANGLE_FAN) {
+    throw new Error(`Unsupported glTF primitive mode ${
+        mode}: convert strips and fans to TRIANGLES`);
+  }
+  const positions = primitive.getAttribute('POSITION');
+  if (!positions || mode !== TRIANGLES) return null;
+  return primitive.getIndices()?.getArray() ??
+      Array.from({length: positions.getCount()}, (_, i) => i);
+}
+
 /**
  * Read an input mesh into Manifold-compatible data structures, whether it
  * contains the EXT_mesh_manifold extension or not.
@@ -232,9 +247,9 @@ export function readMesh(
     }
   } else {
     for (const primitive of primitives) {
-      const indices = primitive.getIndices();
+      const indices = triangleIndices(primitive);
       if (!indices) {
-        console.log('Skipping non-indexed primitive ', primitive.getName());
+        console.log('Skipping non-triangular primitive ', primitive.getName());
         continue;
       }
       const numVert = vertPropArray.length / numProp;
@@ -242,7 +257,7 @@ export function readMesh(
           [...vertPropArray, ...readPrimitive(primitive, numProp, attributes)];
       // Offset in number space, not in the source Uint8/Uint16Array: the
       // combined mesh may need wider indices than any individual primitive.
-      for (const i of indices.getArray()!) triVertArray.push(i + numVert);
+      for (const i of indices) triVertArray.push(i + numVert);
       runIndexArray.push(triVertArray.length);
 
       const attributesIn = primitive.listSemantics() as Attribute[];
@@ -362,6 +377,7 @@ function writePrimitiveAttributes(
       });
     } else {
       primitive2attributes.set(primitive, ['POSITION']);
+      if (attributeUnion.length === 0) attributeUnion.push('POSITION');
     }
 
     mesh.addPrimitive(primitive);
@@ -499,22 +515,37 @@ function writePlainIndices(
 export function disposeMesh(mesh: GLTFTransform.Mesh) {
   if (!mesh) return;
   const primitives = mesh.listPrimitives();
+  const accessors = new Set<GLTFTransform.Accessor>();
   for (const primitive of primitives) {
-    primitive.getIndices()?.dispose();
-    for (const accessor of primitive.listAttributes()) {
-      accessor.dispose();
-    }
+    const indices = primitive.getIndices();
+    if (indices) accessors.add(indices);
+    for (const accessor of primitive.listAttributes()) accessors.add(accessor);
   }
 
   const manifoldPrimitive =
       mesh.getExtension('EXT_mesh_manifold') as ManifoldPrimitive;
   if (manifoldPrimitive) {
-    manifoldPrimitive.getIndices()?.dispose();
-    manifoldPrimitive.getMergeIndices()?.dispose();
-    manifoldPrimitive.getMergeValues()?.dispose();
+    for (const accessor
+             of [manifoldPrimitive.getIndices(),
+                 manifoldPrimitive.getMergeIndices(),
+                 manifoldPrimitive.getMergeValues()]) {
+      if (accessor) accessors.add(accessor);
+    }
   }
 
   mesh.dispose();
+  // Detach only objects owned by this mesh. Shared primitives and accessors
+  // may still carry geometry for another mesh in the same document.
+  for (const primitive of primitives) {
+    if (primitive.listParents().length === 0) primitive.dispose();
+  }
+  if (manifoldPrimitive && manifoldPrimitive.listParents().length === 0)
+    manifoldPrimitive.dispose();
+  for (const accessor of accessors) {
+    if (accessor.listParents().every(
+            parent => parent.propertyType === GLTFTransform.PropertyType.ROOT))
+      accessor.dispose();
+  }
 }
 
 /**
@@ -536,9 +567,14 @@ function writeProperties(
   const array = accessor.getArray()!;
   const size = accessor.getElementSize();
   const numVert = accessor.getCount();
+  const normalized = accessor.getNormalized();
+  const componentType = accessor.getComponentType();
   for (let i = 0; i < numVert; ++i) {
     for (let j = 0; j < size; ++j) {
-      vertProperties[numProp * i + offset + j] = array[i * size + j];
+      const value = array[i * size + j];
+      vertProperties[numProp * i + offset + j] = normalized ?
+          GLTFTransform.MathUtils.decodeNormalizedInt(value, componentType) :
+          value;
     }
   }
 }

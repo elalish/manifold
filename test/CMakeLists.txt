@@ -38,6 +38,7 @@ set(
   cross_section_complex_test.cpp
   cross_section_offset_corpus_test.cpp
   $<$<BOOL:${MANIFOLD_CBIND}>:manifoldc_test.cpp>
+  $<$<BOOL:${ASSIMP_ENABLE}>:mesh_io_test.cpp>
 )
 
 add_executable(manifold_test ${SOURCE_FILES})
@@ -49,6 +50,7 @@ target_link_libraries(
     samples
     $<$<BOOL:${MANIFOLD_CBIND}>:manifoldc>
     $<$<BOOL:${MANIFOLD_PAR}>:TBB::tbb>
+    $<$<BOOL:${ASSIMP_ENABLE}>:meshIO>
 )
 
 if(EMSCRIPTEN)
