@@ -373,35 +373,37 @@ void QuickHull::createConvexHalfedgeMesh() {
       auto& pvf = mesh.faces[faceData.faceIndex];
       DEBUG_ASSERT(!pvf.isDisabled(), logicErr, "pvf should not be disabled");
 
-      if (pvf.visibilityCheckedOnIteration == iter) {
-        if (pvf.isVisibleFaceOnCurrentIteration) {
-          continue;
-        }
-      } else {
-        const Plane& P = pvf.P;
-        pvf.visibilityCheckedOnIteration = iter;
-        const double d = la::dot(P.N, activePoint) + P.D;
-        // Visible only if the point is more than epsilon above the face, the
-        // same test addPointToFace() uses. A face the point lies on (within
-        // rounding) must stay: replacing it builds the new face from three
-        // nearly collinear points, whose normal can point anywhere.
-        if (d > 0 && d * d > epsilonSquared * P.sqrNLength) {
-          pvf.isVisibleFaceOnCurrentIteration = 1;
-          pvf.horizonEdgesOnCurrentIteration = 0;
-          visibleFaces.push_back(faceData.faceIndex);
-          for (auto heIndex : mesh.getHalfEdgeIndicesOfFace(pvf)) {
-            if (mesh.halfedges[heIndex].pairedHalfedge !=
-                faceData.enteredFromHalfedge) {
-              possiblyVisibleFaces.push_back(
-                  {mesh.halfedgeToFace[mesh.halfedges[heIndex].pairedHalfedge],
-                   heIndex});
-            }
+      const Plane& P = pvf.P;
+      const double d = la::dot(P.N, activePoint) + P.D;
+      const int entry = faceData.enteredFromHalfedge;
+      // Beyond epsilon, or just above the plane where keeping the face would
+      // fold the new triangle back over it. Other faces the point lies on must
+      // stay: replacing one can build a face from nearly collinear points.
+      const auto isVisible = [&]() {
+        return d > 0 && (d * d > epsilonSquared * P.sqrNLength ||
+                         foldsOver(entry, P.N, activePoint));
+      };
+
+      const bool checked = pvf.visibilityCheckedOnIteration == iter;
+      if (checked && pvf.isVisibleFaceOnCurrentIteration) continue;
+      pvf.visibilityCheckedOnIteration = iter;
+      if (isVisible()) {
+        // Another edge may already have put this face on the horizon.
+        if (checked) removeFromHorizon(faceData.faceIndex);
+        pvf.isVisibleFaceOnCurrentIteration = 1;
+        pvf.horizonEdgesOnCurrentIteration = 0;
+        visibleFaces.push_back(faceData.faceIndex);
+        for (auto heIndex : mesh.getHalfEdgeIndicesOfFace(pvf)) {
+          if (mesh.halfedges[heIndex].pairedHalfedge != entry) {
+            possiblyVisibleFaces.push_back(
+                {mesh.halfedgeToFace[mesh.halfedges[heIndex].pairedHalfedge],
+                 heIndex});
           }
-          continue;
         }
-        DEBUG_ASSERT(faceData.faceIndex != topFaceIndex, logicErr,
-                     "face index invalid");
+        continue;
       }
+      DEBUG_ASSERT(faceData.faceIndex != topFaceIndex, logicErr,
+                   "face index invalid");
 
       // The face is not visible. Therefore, the halfedge we came from is part
       // of the horizon edge.
@@ -626,6 +628,33 @@ bool QuickHull::reorderHorizonEdges(VecView<size_t>& horizonEdges) {
               .endVert,
       logicErr, "invalid halfedge");
   return true;
+}
+
+bool QuickHull::foldsOver(int halfedge, const vec3& normal,
+                          const vec3& point) const {
+  if (halfedge < 0) return false;
+  const auto v = mesh.getVertexIndicesOfHalfEdge(mesh.halfedges[halfedge]);
+  const vec3 a = originalVertexData[v[0]];
+  const vec3 b = originalVertexData[v[1]];
+  return la::dot(la::cross(b - a, point - a), normal) < 0;
+}
+
+void QuickHull::removeFromHorizon(int faceIndex) {
+  size_t kept = 0;
+  for (const size_t he : horizonEdgesData) {
+    if (mesh.halfedgeToFace[mesh.halfedges[he].pairedHalfedge] != faceIndex) {
+      horizonEdgesData[kept++] = he;
+      continue;
+    }
+    auto& owner = mesh.faces[mesh.halfedgeToFace[he]];
+    const auto edges = mesh.getHalfEdgeIndicesOfFace(owner);
+    for (int j = 0; j < 3; ++j) {
+      if (static_cast<size_t>(edges[j]) == he) {
+        owner.horizonEdgesOnCurrentIteration &= ~(1 << j);
+      }
+    }
+  }
+  horizonEdgesData.resize(kept);
 }
 
 double QuickHull::getScale(const std::array<size_t, 6>& extremeValuesInput) {
