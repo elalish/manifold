@@ -325,18 +325,29 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
     // next. Pairs are sorted at the end so the unite step stays deterministic.
     std::vector<int> order(n);
     std::iota(order.begin(), order.end(), 0);
-    manifold::stable_sort(order.begin(), order.end(),
-                          [&](int a, int b) { return in[a].x < in[b].x; });
+    manifold::stable_sort(order.begin(), order.end(), [&](int a, int b) {
+      return in[a].x < in[b].x || (in[a].x == in[b].x && in[a].y < in[b].y);
+    });
+    // Exact copies are now adjacent, first occurrence first. Pair each copy
+    // with it and scan only the first, so k copies cost k pairs, not k^2/2.
+    int m = 0;
+    for (int i = 0; i < n; ++i) {
+      if (m > 0 && in[order[i]] == in[order[m - 1]])
+        pairs.emplace_back(order[m - 1], order[i]);
+      else
+        order[m++] = order[i];
+    }
+    order.resize(m);
     // in[order[i]], gathered so the scans read linearly.
-    std::vector<vec2> pos(n);
-    for (int i = 0; i < n; ++i) pos[i] = in[order[i]];
+    std::vector<vec2> pos(m);
+    for (int i = 0; i < m; ++i) pos[i] = in[order[i]];
     const double thresh = 2 * eps;
     std::vector<int> start;
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < m; ++i) {
       if (start.empty() || !(pos[i].x - pos[start.back()].x <= thresh))
         start.push_back(i);
     }
-    start.push_back(n);
+    start.push_back(m);
     const int numSlabs = static_cast<int>(start.size()) - 1;
     for (int s = 0; s < numSlabs; ++s) {
       const int lo = start[s], hi = start[s + 1];
@@ -377,7 +388,7 @@ VertexMerge MergeVerts(const std::vector<vec2>& in, double eps) {
     };
     constexpr int kParallelMergeMin = 1024;
 #if (MANIFOLD_PAR == 1)
-    if (n >= kParallelMergeMin) {
+    if (m >= kParallelMergeMin) {
       tbb::combinable<std::vector<std::pair<int, int>>> tls;
       manifold::for_each_n(autoPolicy(numSlabs, kFineParallelGrainSize),
                            countAt(0), numSlabs,
