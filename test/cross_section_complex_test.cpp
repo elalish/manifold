@@ -472,6 +472,68 @@ TEST(CrossSectionComplex, MergeVertsTransitiveChainCanDriftPastEps) {
   EXPECT_GT(std::hypot(endpointDrift.x, endpointDrift.y), eps);
 }
 
+TEST(CrossSectionComplex, MergeVertsExactDuplicatesMatchSingleCopy) {
+  // A chain a - b - c and a lone point d, the chain points copied once each,
+  // plus far points so the copies take the sorted sweep (32 or more points).
+  const vec2 a(0, 0), b(0.75, 0), c(1.5, 0), d(5, 0);
+  std::vector<vec2> single = {a, d, b, c};
+  std::vector<vec2> duplicates = {a, d, b, c, b, c, a};
+  const std::vector<int> copyOf = {0, 1, 2, 3, 2, 3, 0};
+  for (int i = 0; i < 26; ++i) {
+    single.push_back({10.0 + 3 * i, 0});
+    duplicates.push_back(single.back());
+  }
+  const VertexMerge once = MergeVerts(single, /*eps=*/1.0);
+  const VertexMerge repeated = MergeVerts(duplicates, /*eps=*/1.0);
+
+  EXPECT_EQ(repeated.verts, once.verts);
+  for (size_t i = 0; i < duplicates.size(); ++i) {
+    const int s = i < copyOf.size() ? copyOf[i] : static_cast<int>(i) - 3;
+    EXPECT_EQ(repeated.inputVert2Merged[i], once.inputVert2Merged[s]);
+  }
+}
+
+TEST(CrossSectionComplex, MergeVertsCopiesWeightTheCentroid) {
+  // Chain 0 - 1 - 2 at eps 1.5: one component, represented by the input
+  // vertex nearest its centroid. One copy each puts the centroid at x = 1.
+  // 30 copies of the origin pull it to x = 3/32, nearest the origin.
+  const std::vector<vec2> once = {{0, 0}, {1, 0}, {2, 0}};
+  EXPECT_EQ(MergeVerts(once, 1.5).verts, std::vector<vec2>({{1, 0}}));
+  std::vector<vec2> weighted(30, vec2(0, 0));
+  weighted.push_back({1, 0});
+  weighted.push_back({2, 0});
+  const VertexMerge merge = MergeVerts(weighted, 1.5);
+  EXPECT_EQ(merge.verts, std::vector<vec2>({{0, 0}}));
+  EXPECT_EQ(merge.inputVert2Merged, std::vector<int>(weighted.size(), 0));
+}
+
+TEST(CrossSectionComplex, MergeVertsJoinsCopiesWithoutNearPairs) {
+  const std::vector<vec2> square = {{0, 0}, {1, 0}, {1, 1}, {0, 1}};
+  std::vector<vec2> copies;
+  for (int k = 0; k < 8; ++k)
+    copies.insert(copies.end(), square.begin(), square.end());
+  const VertexMerge merge = MergeVerts(copies, 1e-6);
+  EXPECT_EQ(merge.verts, square);
+  for (size_t i = 0; i < copies.size(); ++i)
+    EXPECT_EQ(merge.inputVert2Merged[i], merge.inputVert2Merged[i % 4]);
+}
+
+TEST(CrossSectionComplex, DuplicateContoursMatchSingleContour) {
+  const std::vector<SimplePolygon> contours = {
+      {{0, 0}, {2, 0}, {1, 1}},
+      {{0, 0}, {3, 0}, {3, 1}, {1, 1}, {1, 3}, {0, 3}},
+      {{-2, -1}, {2, -1}, {2, 1}, {-2, 1}},
+  };
+  for (const SimplePolygon& contour : contours) {
+    const Polygons expected = CrossSection(contour).ToPolygons();
+    for (const int copies : {2, 17, 2000}) {
+      Polygons input(copies, contour);
+      EXPECT_EQ(CrossSection(input).ToPolygons(), expected)
+          << "copies=" << copies;
+    }
+  }
+}
+
 TEST(CrossSectionComplex, VertexMergeIdempotenceTightCluster) {
   const std::vector<vec2> verts = {{-564.24299726366871, -1.},
                                    {-564.25684749526681, -1.},
