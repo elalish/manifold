@@ -60,8 +60,14 @@ int GetLabels(std::vector<int>& components,
 #ifndef MANIFOLD_NO_IOSTREAM
 template <typename T>
 double FromChars(T buffer) {
+  const std::string text = buffer;
+  const size_t start = text[0] == '-' ? 1 : 0;
+  if (text.compare(start, 2, "0x") == 0 || text.compare(start, 2, "0X") == 0) {
+    // Stream extraction stops at 'x' instead of reading a C-format hex float.
+    return std::strtod(text.c_str(), nullptr);
+  }
   double tmp;
-  std::istringstream iss(buffer);
+  std::istringstream iss(text);
   iss >> std::setprecision(19);
   iss >> tmp;
   return tmp;
@@ -747,7 +753,9 @@ static std::ostream& WriteOBJWithEpsilon(std::ostream& stream,
       std::snprintf(buf, sizeof(buf), "%.13a", value);
       stream << buf;
     } else {
-      stream << value;
+      // Fixed decimal places round small coordinates to zero. Keep enough
+      // significant digits at every scale, then retain the fixed stream state.
+      stream << std::scientific << value << std::fixed;
     }
   };
 
@@ -756,7 +764,7 @@ static std::ostream& WriteOBJWithEpsilon(std::ostream& stream,
     stream << std::fixed;  // for uniformity in output numbers
   }
   stream << "# ======= begin mesh ======" << std::endl;
-  stream << "# float_format = " << (hexFloat ? "hexfloat" : "fixed")
+  stream << "# float_format = " << (hexFloat ? "hexfloat" : "scientific")
          << std::endl;
   if (epsilon.has_value()) {
     stream << "# epsilon = ";
