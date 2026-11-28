@@ -246,6 +246,12 @@ class QuickHull {
   // Return true on success.
   bool reorderHorizonEdges(VecView<size_t>& horizonEdges);
 
+  // True if the triangle joining this halfedge to point faces against normal.
+  bool foldsOver(int halfedge, const vec3& normal, const vec3& point) const;
+
+  // Drop the horizon edges that border a face now found to be visible.
+  void removeFromHorizon(int faceIndex);
+
   // Find indices of extreme values (max x, min x, max y, min y, max z, min z)
   // for the given point cloud
   std::array<size_t, 6> getExtremeValues();

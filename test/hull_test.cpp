@@ -225,6 +225,61 @@ TEST(Hull, CoplanarClusters) {
   EXPECT_NEAR(hull.Volume(), 0.002259329608, 1e-12);
 }
 
+TEST(Hull, NearCoplanarFold) {
+  // A point within epsilon above a face, on the inner side of one of its edges.
+  // Keeping that face folded the new triangle back over it.
+  const std::vector<vec3> hullPts = {
+      {-0x1.4ee12a11cf174p-4, -0x1.54f3a76ac6401p-2, -0x1.f000bf2f2f9c5p-2},
+      {-0x1.4ecbc87cb1179p-4, 0x1.8a96e99eda124p-4, -0x1.f923c4e27e38ep-2},
+      {-0x1.4eaef28b4d685p-4, -0x1.5bed770629debp-2, -0x1.f0150e32d645bp-2},
+      {-0x1.4e64d1230c345p-4, -0x1.817ceb61c0841p-2, -0x1.e1122d52d828fp-2},
+      {-0x1.4dcc517664b17p-4, 0x1.e10bfaa7998c1p-2, -0x1.965107a45f08ap-2},
+      {-0x1.4ca0401984232p-4, 0x1.e3c2aab017514p-2, -0x1.986dae5e5ec5dp-2},
+      {-0x1.49d8282619b71p-4, -0x1.e3c2a684ddd9p-2, -0x1.b6010f66d62d4p-2},
+      {-0x1.2e84095d867bdp-4, -0x1.51613a8b9f827p-2, -0x1.f27bc3c913456p-2},
+      {-0x1.293ffb61e9c6p-4, -0x1.5b782bd003b8ap-2, -0x1.f033cf476fe1fp-2},
+      {-0x1.0037fd87c2667p-4, 0x1.502742c3321cbp-4, -0x1.fcdcdb7c2f6d1p-2},
+      {-0x1.001ede75832b6p-4, -0x1.5557e99548e9ap-2, -0x1.f28d7cb16ed5bp-2},
+      {-0x1.fcccc7cf1850bp-5, 0x1.57e4fe6dd25ebp-4, -0x1.fce925a53b944p-2},
+      {-0x1.f5c599f6874e3p-5, -0x1.54bb60a44277ep-2, -0x1.f2c912dd66f3ep-2},
+      {-0x1.a78efeecd05dfp-5, 0x1.db88f2caacf16p-2, 0x1.fffffbd4c8dbp-2},
+      {-0x1.a0d005257579cp-5, 0x1.58264c6396bd7p-4, -0x1.fb9b79efef2bep-2},
+      {-0x1.976edc1180893p-5, -0x1.e1a6dce8e74f1p-2, -0x1.b9a4efc10f291p-2},
+      {-0x1.93f158cb2a18fp-5, -0x1.8241e0257232ep-2, -0x1.e0beff162d33dp-2},
+      {0x1.3e3ace9f2b869p-8, 0x1.8125132b8e86fp-2, -0x1.b2d261ffff0e5p-2},
+      {0x1.507a39ae251c8p-8, -0x1.4298ab00e9de6p-2, -0x1.f980149e8ee6cp-2},
+      {0x1.5ff810094da5p-8, 0x1.1b740b120c501p-4, -0x1.0000024e80a4bp-1},
+      {0x1.0e5a7ed137cadp-4, -0x1.b9ba3be96352fp-2, 0x1.dbcc72343909cp-2},
+      {0x1.0f38c9fb6f6dep-4, -0x1.b5bebab8a8276p-2, -0x1.c1f8dd4d0920bp-2},
+      {0x1.4d56820f1e318p-4, 0x1.58b2b09fd8e31p-2, 0x1.f0251f71aa1acp-2},
+      {0x1.4d65df1096f0cp-4, 0x1.537ea666762f1p-2, -0x1.ad33618cf4ca3p-2},
+      {0x1.4ecc7d6a254d2p-4, -0x1.98fb1d84ef894p-2, -0x1.ccba4c60d3242p-2},
+  };
+  auto hull = Manifold::Hull(hullPts);
+  if (options.exportModels) WriteTestOBJ("near_coplanar_fold.obj", hull);
+  EXPECT_TRUE(isMeshConvex(hull));
+}
+
+TEST(Hull, NearCoplanarFoldSecondEdge) {
+  // As above, but the face is first reached across an edge that does not fold.
+  const std::vector<vec3> hullPts = {
+      {-0x1.6102379d5c083p-6, -0x1.17bc079edcf4dp-2, 0x1.3a88a7214d888p-6},
+      {-0x1p-4, -0x1.db5c49ccbb67p-5, 0x1.a86c03926efa8p-2},
+      {-0x1p-4, 0x1.cd60574187958p-2, -0x1.18cdf12a9c652p-2},
+      {-0x1.fdc66576cdf94p-5, 0x1.ce0a03a128b8p-2, -0x1.18934d8ff79aap-2},
+      {0x1.00000bd4c86ecp-4, 0x1.c3b46259b547cp-4, -0x1.3607eebf9fffp-2},
+      {0x1.5555270cfcdabp-5, -0x1.95d22eea3f368p-2, -0x1.6d5f91501d8e7p-3},
+      {-0x1p-4, -0x1.e8ff2e59ce758p-4, -0x1.5f4a547baa548p-5},
+      {-0x1.59ae538e35d69p-5, -0x1.1161b1036d90fp-3, -0x1.ca11ae796f81cp-2},
+      {-0x1.00000682d34bap-4, -0x1.f74ca59a66c38p-3, -0x1.51df270a377c9p-6},
+      {-0x1.00000b3e6363cp-4, -0x1.fc0a8d7c000fdp-3, 0x1.ef7b3552e6021p-3},
+      {0x1.589d96a27ca94p-6, 0x1.5173c6cea866p-2, 0x1.b59bc7598479cp-2},
+  };
+  auto hull = Manifold::Hull(hullPts);
+  if (options.exportModels) WriteTestOBJ("near_coplanar_fold_edge.obj", hull);
+  EXPECT_TRUE(isMeshConvex(hull));
+}
+
 TEST(Hull, DisabledFaceTest) {
   // 101213.stl
   const std::vector<vec3> hullPts = {
