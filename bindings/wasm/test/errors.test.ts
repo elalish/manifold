@@ -375,10 +375,13 @@ suite('Error checks', () => {
     const {CrossSection, Manifold} = wasm;
     const empty = keep(square().subtract(square()));
     expect(empty.isEmpty()).toBe(true);
-    for (const result
-             of [empty.extrude(1), empty.revolve(),
-                 Manifold.hull([[0, 0, 0], [1, 0, 0], [0, 1, 0]]),
-                 Manifold.hull([keep(empty.extrude(1))])]) {
+    const emptyBox = keep(empty.extrude(1)).boundingBox();
+    for (const result of
+             [empty.extrude(1), empty.revolve(),
+              Manifold.hull([[0, 0, 0], [1, 0, 0], [0, 1, 0]]),
+              Manifold.hull([keep(empty.extrude(1))]),
+              Manifold.levelSet(sdf, emptyBox, 0.5),
+              keep(new wasm.ExecutionContext()).levelSet(sdf, emptyBox, 0.5)]) {
       keep(result);
       expect(result.status()).toEqual('NoError');
       expect(result.isEmpty()).toBe(true);
