@@ -456,18 +456,14 @@ function gltfNodeToMeshes(
  * or is empty.  All other exceptions will be re-thrown.
  */
 const tryToMakeManifold = (mesh: Mesh): Manifold|null => {
-  const {Manifold} = getManifoldModuleSync()!;
+  const {Manifold, ManifoldError} = getManifoldModuleSync()!;
   try {
     const manifold = new Manifold(mesh);
     if (manifold && !manifold.isEmpty()) {
       return manifold;
     }
   } catch (e) {
-    if ((e as any)?.name === 'ManifoldError' ||
-        (e as any)?.code === 'NotManifold') {
-    } else {
-      throw e;
-    }
+    if (!(e instanceof ManifoldError && e.code === 'NotManifold')) throw e;
   }
   return null;
 };

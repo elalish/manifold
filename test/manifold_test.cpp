@@ -1003,9 +1003,11 @@ TEST(Manifold, ErrorPropagationSplitByPlane) {
   in.vertProperties[2 * 3 + 1] = NAN;
   Manifold errored(in);
   ASSERT_EQ(errored.Status(), Manifold::Error::NonFiniteVertex);
-  auto parts = errored.SplitByPlane(vec3(0, 0, 1), 0);
-  EXPECT_EQ(parts.first.Status(), Manifold::Error::NonFiniteVertex);
-  EXPECT_EQ(parts.second.Status(), Manifold::Error::NonFiniteVertex);
+  for (vec3 normal : {vec3(0, 0, 1), vec3(0.0)}) {
+    auto parts = errored.SplitByPlane(normal, 0);
+    EXPECT_EQ(parts.first.Status(), Manifold::Error::NonFiniteVertex);
+    EXPECT_EQ(parts.second.Status(), Manifold::Error::NonFiniteVertex);
+  }
 }
 
 TEST(Manifold, ErrorPropagationTrimByPlane) {
@@ -2453,7 +2455,6 @@ TEST(Precision, WithPrecisionThenTransform) {
   EXPECT_EQ(moved.GetPrecision(), 1e-3);
   EXPECT_DOUBLE_EQ(moved.GetEpsilon(), 1e-3 * 11);
   EXPECT_EQ(moved.Scale(vec3(2)).GetPrecision(), 1e-3);
-  EXPECT_EQ(moved.Mirror(vec3(0.0)).GetPrecision(), 1e-3);
   const auto halves = Manifold().WithPrecision(1e-3).SplitByPlane({0, 0, 1}, 0);
   EXPECT_EQ(halves.first.GetPrecision(), 1e-3);
   EXPECT_EQ(halves.second.GetPrecision(), 1e-3);
@@ -2694,7 +2695,6 @@ TEST(Manifold, MirrorUnion) {
 
   auto vol_a = a.Volume();
   EXPECT_FLOAT_EQ(vol_a * 2.75, result.Volume());
-  EXPECT_TRUE(a.Mirror(vec3(0.0)).IsEmpty());
 }
 
 TEST(Manifold, MirrorUnion2) {

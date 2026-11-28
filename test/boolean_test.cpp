@@ -894,21 +894,58 @@ TEST(Boolean, PlaneAtOrInsideBounds) {
   }
 }
 
+// A normal's length does not matter, even when its square would overflow or
+// underflow.
+TEST(Boolean, PlaneExtremeNormals) {
+  const Manifold cube = Manifold::Cube(vec3(2.0), true);
+  for (const double scale :
+       {std::numeric_limits<double>::denorm_min(), 1e-300, 3e-162, 1e-161,
+        1e200, std::numeric_limits<double>::max()}) {
+    SCOPED_TRACE(scale);
+    const vec3 normal(0, scale, -scale);
+    const auto split = cube.SplitByPlane(normal, 0.25);
+    const Manifold trim = cube.TrimByPlane(normal, 0.25);
+    const Manifold mirrored = cube.Translate({0, 1, 0}).Mirror(normal);
+    for (const Manifold& result : {split.first, split.second, trim, mirrored}) {
+      EXPECT_EQ(result.Status(), Manifold::Error::NoError);
+    }
+    const auto unitSplit = cube.SplitByPlane({0, 1, -1}, 0.25);
+    EXPECT_NEAR(split.first.Volume(), unitSplit.first.Volume(), 1e-9);
+    EXPECT_NEAR(split.second.Volume(), unitSplit.second.Volume(), 1e-9);
+    EXPECT_NEAR(trim.Volume(), unitSplit.first.Volume(), 1e-9);
+    const Box box = mirrored.BoundingBox();
+    const Box unitBox =
+        cube.Translate({0, 1, 0}).Mirror({0, 1, -1}).BoundingBox();
+    for (int i : {0, 1, 2}) {
+      EXPECT_NEAR(box.min[i], unitBox.min[i], 1e-9);
+      EXPECT_NEAR(box.max[i], unitBox.max[i], 1e-9);
+    }
+  }
+}
+
 TEST(Boolean, PlaneInvalidArguments) {
-  const Manifold cube = Manifold::Cube();
   const double inf = std::numeric_limits<double>::infinity();
   const double nan = std::numeric_limits<double>::quiet_NaN();
-  for (const auto& [normal, offset] :
-       {std::make_pair(vec3(0.0), -100.0),
-        std::make_pair(vec3(nan, 0, 0), -100.0),
-        std::make_pair(vec3(inf, 0, 0), -100.0),
-        std::make_pair(vec3(1, 0, 0), nan), std::make_pair(vec3(1, 0, 0), inf),
-        std::make_pair(vec3(1, 0, 0), -inf)}) {
-    const auto split = cube.SplitByPlane(normal, offset);
-    const Manifold trim = cube.TrimByPlane(normal, offset);
-    for (const Manifold& result : {split.first, split.second, trim}) {
-      EXPECT_EQ(result.Status(), Manifold::Error::NonFiniteVertex);
-      EXPECT_TRUE(result.IsEmpty());
+  // Empty and lazy inputs check the plane too.
+  for (const Manifold& source :
+       {Manifold::Cube(),
+        Manifold::Cube() + Manifold::Cube().Translate({2, 0, 0}), Manifold(),
+        Manifold::Cube().Translate({5, 0, 0}) ^ Manifold::Cube()}) {
+    for (const auto& [normal, offset] :
+         {std::make_pair(vec3(0.0), -100.0), std::make_pair(vec3(0.0), 0.0),
+          std::make_pair(vec3(nan, 0, 0), -100.0),
+          std::make_pair(vec3(0, inf, 0), -100.0),
+          std::make_pair(vec3(1, 0, 0), nan),
+          std::make_pair(vec3(1, 0, 0), inf),
+          std::make_pair(vec3(1, 0, 0), -inf)}) {
+      const auto split = source.SplitByPlane(normal, offset);
+      const Manifold trim = source.TrimByPlane(normal, offset);
+      std::vector<Manifold> results = {split.first, split.second, trim};
+      if (std::isfinite(offset)) results.push_back(source.Mirror(normal));
+      for (const Manifold& result : results) {
+        EXPECT_EQ(result.Status(), Manifold::Error::InvalidConstruction);
+        EXPECT_TRUE(result.IsEmpty());
+      }
     }
   }
 }
