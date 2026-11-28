@@ -692,9 +692,9 @@ export class Manifold {
 
   /**
    * Mirror this Manifold over the plane described by the unit form of the given
-   * normal vector. If the length of the normal is zero, an empty Manifold is
-   * returned. This operation can be chained. Transforms are combined and
-   * applied lazily.
+   * normal vector. A zero or non-finite normal gives status
+   * 'InvalidConstruction'. This operation can be chained. Transforms are
+   * combined and applied lazily.
    *
    * @param normal The normal vector of the plane to be mirrored over
    * @group Transformations

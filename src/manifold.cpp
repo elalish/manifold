@@ -32,15 +32,19 @@ using namespace manifold;
 
 ExecutionParams manifoldParams;
 
+// A plane needs a finite, nonzero normal. Scales the normal so its largest
+// component has magnitude one, which keeps its length from overflowing or
+// underflowing.
+bool ValidNormal(vec3& normal) {
+  normal /= la::maxelem(la::abs(normal));
+  return la::all(la::isfinite(normal));
+}
+
 // Return the side containing the entire box, or zero when the plane is close
-// enough to require the normal Boolean path. Invalid inputs use that path too.
+// enough to require the normal Boolean path. The plane must be valid.
 int BoxPlaneSide(Box box, vec3 normal, double originOffset, double epsilon) {
-  const double length = la::length(normal);
-  if (!(length > 0) || !std::isfinite(length) || !std::isfinite(originOffset) ||
-      !(epsilon >= 0) || !std::isfinite(epsilon)) {
-    return 0;
-  }
-  normal /= length;
+  if (!(epsilon >= 0) || !std::isfinite(epsilon)) return 0;
+  normal = la::normalize(normal);
   double minProjection = 0;
   double maxProjection = 0;
   for (int axis = 0; axis < 3; ++axis) {
@@ -669,20 +673,19 @@ Manifold Manifold::Transform(const mat3x4& m) const {
 
 /**
  * Mirror this Manifold over the plane described by the unit form of the given
- * normal vector. If the length of the normal is zero, an empty Manifold is
- * returned. This operation can be chained. Transforms are combined and applied
- * lazily.
+ * normal vector. A zero normal, or one with a non-finite component, gives
+ * InvalidConstruction unless this Manifold already has an error. This operation
+ * can be chained. Transforms are combined and applied lazily.
  *
  * @param normal The normal vector of the plane to be mirrored over
  */
 Manifold Manifold::Mirror(vec3 normal) const {
-  if (la::length(normal) == 0.) {
-    // A degenerate mirror must not hide an existing error behind its empty
-    // result. Other mirrors stay deferred; Impl::Transform propagates errors.
-    auto leafImpl = GetCsgLeafNode().GetImpl();
-    if (leafImpl->status_ != Error::NoError)
-      return PropagateStatus(leafImpl->status_);
-    return Manifold().WithPrecision(leafImpl->relPrecision_);
+  if (!ValidNormal(normal)) {
+    // An invalid normal must not hide an existing error. Valid mirrors stay
+    // deferred, and Impl::Transform propagates errors.
+    const Error status = GetCsgLeafNode().GetImpl()->status_;
+    return PropagateStatus(
+        status != Error::NoError ? status : Error::InvalidConstruction);
   }
   auto n = la::normalize(normal);
   auto m = mat3x4(mat3(la::identity) - 2.0 * la::outerprod(n, n), vec3());
@@ -1077,7 +1080,10 @@ std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
 }
 
 /**
- * Convenient version of Split() for a half-space.
+ * Convenient version of Split() for a half-space. An error on this Manifold
+ * goes to both results. Otherwise a zero normal, a normal with a non-finite
+ * component, or a non-finite offset gives InvalidConstruction, even for an
+ * empty input.
  *
  * @param normal This vector is normal to the cutting plane and its length does
  * not matter. The first result is in the direction of this vector, the second
@@ -1088,8 +1094,11 @@ std::pair<Manifold, Manifold> Manifold::Split(const Manifold& cutter) const {
 std::pair<Manifold, Manifold> Manifold::SplitByPlane(
     vec3 normal, double originOffset) const {
   auto leafImpl = GetCsgLeafNode().GetImpl();
-  if (leafImpl->status_ != Error::NoError) {
-    Manifold err = PropagateStatus(leafImpl->status_);
+  if (leafImpl->status_ != Error::NoError || !ValidNormal(normal) ||
+      !std::isfinite(originOffset)) {
+    Manifold err = PropagateStatus(leafImpl->status_ != Error::NoError
+                                       ? leafImpl->status_
+                                       : Error::InvalidConstruction);
     return {err, err};
   }
   const Manifold empty = Manifold().WithPrecision(leafImpl->relPrecision_);
@@ -1109,7 +1118,7 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(
 
 /**
  * Identical to SplitByPlane(), but calculating and returning only the first
- * result. An empty input gives an empty result with the same status.
+ * result.
  *
  * @param normal This vector is normal to the cutting plane and its length does
  * not matter. The result is in the direction of this vector from the plane.
@@ -1117,19 +1126,22 @@ std::pair<Manifold, Manifold> Manifold::SplitByPlane(
  * direction of the normal vector.
  */
 Manifold Manifold::TrimByPlane(vec3 normal, double originOffset) const {
-  // An empty input, errored or not, has no bounding box to size the cutter.
-  if (IsEmpty()) return Manifold(LoadPNode());
   auto leafImpl = GetCsgLeafNode().GetImpl();
-  if (leafImpl->status_ == Error::NoError && !leafImpl->IsEmpty()) {
-    const int side =
-        BoxPlaneSide(leafImpl->bBox_, normal, originOffset, leafImpl->epsilon_);
-    if (side < 0) return Manifold().WithPrecision(leafImpl->relPrecision_);
-    if (side > 0) {
-      // Preserve unchanged geometry and tangents, as with an empty cutter.
-      auto resultImpl = std::make_shared<Impl>(*leafImpl);
-      resultImpl->meshRelation_.originalID = -1;
-      return Manifold(std::make_shared<CsgLeafNode>(resultImpl));
-    }
+  if (leafImpl->status_ != Error::NoError)
+    return PropagateStatus(leafImpl->status_);
+  if (!ValidNormal(normal) || !std::isfinite(originOffset))
+    return PropagateStatus(Error::InvalidConstruction);
+  // An empty input has no bounding box to size the cutter.
+  if (leafImpl->IsEmpty())
+    return Manifold().WithPrecision(leafImpl->relPrecision_);
+  const int side =
+      BoxPlaneSide(leafImpl->bBox_, normal, originOffset, leafImpl->epsilon_);
+  if (side < 0) return Manifold().WithPrecision(leafImpl->relPrecision_);
+  if (side > 0) {
+    // Preserve unchanged geometry and tangents, as with an empty cutter.
+    auto resultImpl = std::make_shared<Impl>(*leafImpl);
+    resultImpl->meshRelation_.originalID = -1;
+    return Manifold(std::make_shared<CsgLeafNode>(resultImpl));
   }
   return *this ^ Halfspace(BoundingBox(), normal, originOffset, GetPrecision());
 }
