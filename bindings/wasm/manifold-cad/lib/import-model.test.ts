@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {Accessor, Document} from '@gltf-transform/core';
 import * as validator from 'gltf-validator';
 import type {Vec3} from 'manifold-3d';
 import * as fs from 'node:fs/promises';
@@ -92,6 +93,32 @@ suite('importManifold()', () => {
         new URL('../test/fixtures/models/boxNotManifold.glb', import.meta.url),
         {tolerance: 4});
     await expect(fn).rejects.toThrowError();
+  });
+
+  test('rethrows Manifold errors other than NotManifold', () => {
+    const {Manifold} = wasm.getManifoldModuleSync()!;
+    const cube = Manifold.cube();
+    const source = cube.getMesh();
+    cube.delete();
+    const vertProperties = Float32Array.from(source.vertProperties);
+    vertProperties[0] = NaN;
+    const doc = new Document();
+    const buffer = doc.createBuffer();
+    const positions = doc.createAccessor()
+                          .setBuffer(buffer)
+                          .setType(Accessor.Type.VEC3)
+                          .setArray(vertProperties);
+    const indices = doc.createAccessor()
+                        .setBuffer(buffer)
+                        .setType(Accessor.Type.SCALAR)
+                        .setArray(source.triVerts);
+    const mesh =
+        doc.createMesh().addPrimitive(doc.createPrimitive()
+                                          .setAttribute('POSITION', positions)
+                                          .setIndices(indices));
+    doc.createScene().addChild(doc.createNode().setMesh(mesh));
+    expect(() => importer.gltfDocToManifold(doc))
+        .toThrow(expect.objectContaining({code: 'NonFiniteVertex'}));
   });
 
   test('import a model by file URL', async () => {
